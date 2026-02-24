@@ -5,7 +5,8 @@ import { JournalEntriesService } from '../../accounting/services/journal-entries
 import { FiscalPeriodsService } from '../../accounting/services/fiscal-periods.service';
 import { ReportsService } from '../../accounting/services/reports.service';
 import { FilesService } from '../../files/files.service';
-import { DocumentCategory } from '@prisma/client';
+import { MemoryService } from '../services/memory.service';
+import { DocumentCategory, MemoryCategory } from '@prisma/client';
 
 export interface ToolExecutionResult {
   success: boolean;
@@ -22,12 +23,14 @@ export class ToolExecutor {
     private readonly fiscalPeriods: FiscalPeriodsService,
     private readonly reports: ReportsService,
     private readonly files: FilesService,
+    private readonly memory: MemoryService,
   ) {}
 
   async execute(
     name: string,
     args: Record<string, unknown>,
     tenantId: string,
+    userId?: string,
   ): Promise<ToolExecutionResult> {
     try {
       switch (name) {
@@ -67,6 +70,15 @@ export class ToolExecutor {
         case 'ask_user_question':
           // This tool is handled by the chat service directly (sends question event to client)
           return { success: true, data: null, summary: 'Pregunta enviada al usuario' };
+
+        case 'memory_store':
+          return await this.memoryStore(args, tenantId, userId ?? null);
+
+        case 'memory_search':
+          return await this.memorySearch(args, tenantId, userId ?? null);
+
+        case 'memory_delete':
+          return await this.memoryDelete(args, tenantId);
 
         default:
           return {
@@ -412,6 +424,72 @@ export class ToolExecutor {
       success: true,
       data: balance,
       summary: `Balance de comprobación: ${(balance as unknown[]).length} cuentas`,
+    };
+  }
+
+  private async memoryStore(
+    args: Record<string, unknown>,
+    tenantId: string,
+    userId: string | null,
+  ): Promise<ToolExecutionResult> {
+    const scope = String(args.scope ?? 'tenant');
+    const effectiveUserId = scope === 'user' ? userId : null;
+
+    const memory = await this.memory.store({
+      tenantId,
+      userId: effectiveUserId,
+      content: String(args.content),
+      category: String(args.category) as MemoryCategory,
+      importance: Number(args.importance ?? 5),
+    });
+
+    return {
+      success: true,
+      data: { id: memory.id, content: memory.content, category: memory.category, scope },
+      summary: `Memoria guardada (${memory.category}, importancia ${memory.importance})`,
+    };
+  }
+
+  private async memorySearch(
+    args: Record<string, unknown>,
+    tenantId: string,
+    userId: string | null,
+  ): Promise<ToolExecutionResult> {
+    const scope = (String(args.scope ?? 'all')) as 'tenant' | 'user' | 'all';
+
+    const results = await this.memory.search({
+      tenantId,
+      userId,
+      query: String(args.query),
+      scope,
+      limit: 6,
+    });
+
+    return {
+      success: true,
+      data: results.map((m) => ({
+        id: m.id,
+        content: m.content,
+        category: m.category,
+        importance: m.importance,
+        scope: m.userId ? 'user' : 'tenant',
+        similarity: m.similarity,
+        createdAt: m.createdAt,
+      })),
+      summary: `${results.length} memoria(s) encontrada(s)`,
+    };
+  }
+
+  private async memoryDelete(
+    args: Record<string, unknown>,
+    tenantId: string,
+  ): Promise<ToolExecutionResult> {
+    const deleted = await this.memory.delete(String(args.memoryId), tenantId);
+
+    return {
+      success: deleted,
+      data: { memoryId: args.memoryId, deleted },
+      summary: deleted ? 'Memoria eliminada' : 'Memoria no encontrada',
     };
   }
 }
