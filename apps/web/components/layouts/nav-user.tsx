@@ -116,7 +116,7 @@ export function NavUser() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => { logout(); router.push("/login"); }}
-              className="text-destructive focus:text-destructive"
+              className="text-destructive focus:text-destructive focus:bg-destructive/10"
             >
               <HugeiconsIcon icon={Logout01Icon} />
               Cerrar sesión

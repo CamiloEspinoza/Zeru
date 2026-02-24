@@ -442,7 +442,7 @@ export default function AssistantChatPage() {
 
   return (
     <div
-      className="flex flex-col h-[calc(100vh-8rem)]"
+      className="flex flex-col h-full min-h-0 overflow-hidden"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -471,59 +471,15 @@ export default function AssistantChatPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 pb-4 border-b">
-        <button
-          type="button"
-          onClick={() => router.push("/assistant")}
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <svg
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
+      <div className="flex items-center gap-3 px-6 py-3 border-b shrink-0">
         <ConversationTitle
           title={conversationTitle ?? (isNew ? "Nueva conversación" : "Cargando...")}
           animate={!!conversationTitle}
         />
-        {!isNew && (
-          <button
-            type="button"
-            onClick={() => {
-              reset();
-              router.push("/assistant/new");
-            }}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            Nueva
-          </button>
-        )}
       </div>
 
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -747,7 +703,7 @@ export default function AssistantChatPage() {
       </div>
 
       {/* Input area */}
-      <div className="border-t pt-4">
+      <div className="border-t px-6 pt-4 pb-5 shrink-0">
         <div
           className={cn(
             "rounded-xl border bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring",

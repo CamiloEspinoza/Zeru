@@ -10,8 +10,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Zeru ERP",
-  description: "Sistema ERP multitenant",
+  title: "Zeru",
+  description: "Gestión empresarial con agentes de inteligencia artificial",
 };
 
 export default function RootLayout({

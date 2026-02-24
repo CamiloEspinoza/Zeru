@@ -6,6 +6,7 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  HttpCode,
 } from '@nestjs/common';
 import type { UserRole } from '@prisma/client';
 import { AuthService } from './auth.service';
@@ -58,6 +59,13 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async me(@Request() req: { user: { userId: string } }) {
     return this.authService.getProfile(req.user.userId);
+  }
+
+  @Post('waitlist')
+  @HttpCode(200)
+  async joinWaitlist(@Body() body: { email?: string }) {
+    if (!body.email) throw new BadRequestException('email es requerido');
+    return this.authService.joinWaitlist(body.email);
   }
 
   @Post('switch-tenant')

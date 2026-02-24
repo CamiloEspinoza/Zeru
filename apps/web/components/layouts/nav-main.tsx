@@ -44,8 +44,8 @@ interface NavItem {
 }
 
 const appNav: NavItem[] = [
-  { title: "Dashboard", href: "/", icon: DashboardSquare01Icon },
-  { title: "Asistente", href: "/assistant", icon: AiChat02Icon },
+  { title: "Dashboard", href: "/dashboard", icon: DashboardSquare01Icon },
+  { title: "Asistente", href: "/assistant/new", icon: AiChat02Icon },
   { title: "Documentos", href: "/documents", icon: File02Icon },
   {
     title: "Contabilidad",
@@ -135,8 +135,10 @@ export function NavMain() {
               <SidebarMenuButton
                 asChild
                 isActive={
-                  item.href === "/"
-                    ? pathname === "/"
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : item.href === "/assistant/new"
+                    ? pathname.startsWith("/assistant")
                     : pathname === item.href || pathname.startsWith(item.href + "/")
                 }
                 tooltip={item.title}

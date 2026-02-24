@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -214,5 +214,14 @@ export class AuthService {
     };
 
     return this.login(authUser);
+  }
+
+  async joinWaitlist(email: string) {
+    try {
+      await this.prisma.waitlistEntry.create({ data: { email } });
+      return { success: true };
+    } catch {
+      throw new ConflictException('Este email ya está en la lista de espera');
+    }
   }
 }

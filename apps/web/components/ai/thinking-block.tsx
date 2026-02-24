@@ -9,7 +9,7 @@ interface ThinkingBlockProps {
 }
 
 export function ThinkingBlock({ text, isStreaming = false }: ThinkingBlockProps) {
-  const [expanded, setExpanded] = useState(isStreaming);
+  const [expanded, setExpanded] = useState(true);
 
   return (
     <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">

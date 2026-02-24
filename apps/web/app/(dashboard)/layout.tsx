@@ -30,7 +30,7 @@ export default function DashboardLayout({
                 <Breadcrumbs />
               </div>
             </header>
-            <div className="flex flex-1 flex-col gap-4 p-6">
+            <div className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-hidden">
               {children}
             </div>
           </SidebarInset>

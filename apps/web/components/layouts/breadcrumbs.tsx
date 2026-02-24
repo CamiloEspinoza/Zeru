@@ -49,7 +49,7 @@ export function Breadcrumbs() {
       <BreadcrumbList>
         <BreadcrumbItem className="hidden md:block">
           <BreadcrumbLink asChild>
-            <Link href="/">Inicio</Link>
+            <Link href="/dashboard">Inicio</Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
         {segments.map((segment, index) => {

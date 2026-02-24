@@ -16,6 +16,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { AuthCover } from "@/components/auth/auth-cover";
 
 type Tenant = TenantSelectionRequired["tenants"][number];
 
@@ -31,11 +32,26 @@ function OrgBadge({ role }: { role: UserRole }) {
     VIEWER: "Lectura",
   };
   return (
-    <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">
+    <span className="text-xs text-white/40 border border-white/10 rounded px-1.5 py-0.5">
       {labels[role] ?? role}
     </span>
   );
 }
+
+// ─── Shared page shell ────────────────────────────────────────────────────────
+
+function AuthShell({ children }: { children: React.ReactNode }) {
+  return (
+    <section className="min-h-screen flex items-center pt-16">
+      <div className="relative max-w-6xl mx-auto w-full px-6 py-20 grid lg:grid-cols-2 gap-16 items-center">
+        {children}
+        <AuthCover />
+      </div>
+    </section>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,9 +82,10 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const response = await api.post<
-        AuthTokens | TenantSelectionRequired
-      >("/auth/login", { email, password });
+      const response = await api.post<AuthTokens | TenantSelectionRequired>(
+        "/auth/login",
+        { email, password }
+      );
 
       if ("requiresTenantSelection" in response) {
         setStep({ kind: "pick-tenant", tenants: response.tenants, email, password });
@@ -76,7 +93,7 @@ export default function LoginPage() {
       }
 
       storeTokens(response as AuthTokens);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
@@ -95,158 +112,130 @@ export default function LoginPage() {
         tenantId,
       });
       storeTokens(tokens);
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al seleccionar organización");
+      setError(
+        err instanceof Error ? err.message : "Error al seleccionar organización"
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  const cover = (
-    <div className="bg-muted relative hidden lg:block">
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <div className="bg-primary text-primary-foreground flex size-16 items-center justify-center rounded-2xl text-3xl font-bold shadow-lg">
-          Z
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight">
-            Contabilidad inteligente
-          </h2>
-          <p className="text-muted-foreground max-w-sm text-sm text-balance">
-            Zeru combina IA con contabilidad chilena para automatizar tus
-            asientos, DTE y reportes tributarios.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-
   if (step.kind === "pick-tenant") {
     return (
-      <div className="grid min-h-svh lg:grid-cols-2">
-        <div className="flex flex-col gap-4 p-6 md:p-10">
-          <div className="flex justify-center gap-2 md:justify-start">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold">
-                Z
-              </div>
-              Zeru
-            </Link>
+      <AuthShell>
+        <div className="flex flex-col gap-8">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold text-white">Selecciona tu organización</h1>
+            <p className="text-white/50 text-sm">
+              Tu cuenta pertenece a varias organizaciones
+            </p>
           </div>
 
-          <div className="flex flex-1 items-center justify-center">
-            <div className="w-full max-w-sm space-y-6">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold">Selecciona tu organización</h1>
-                <p className="text-muted-foreground mt-1 text-sm text-balance">
-                  Tu cuenta pertenece a varias organizaciones
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                {step.tenants.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handlePickTenant(t.id)}
-                    className="flex items-center justify-between rounded-lg border bg-background px-4 py-3 text-left transition-colors hover:bg-muted disabled:opacity-50"
-                  >
-                    <div>
-                      <p className="text-sm font-medium">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.slug}</p>
-                    </div>
-                    <OrgBadge role={t.role} />
-                  </button>
-                ))}
-              </div>
-
-              {error && <p className="text-center text-sm text-destructive">{error}</p>}
-
+          <div className="flex flex-col gap-2">
+            {step.tenants.map((t) => (
               <button
+                key={t.id}
                 type="button"
-                onClick={() => { setStep({ kind: "credentials" }); setError(null); }}
-                className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+                disabled={loading}
+                onClick={() => handlePickTenant(t.id)}
+                className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/15 px-4 py-3 text-left transition-all disabled:opacity-50"
               >
-                ← Volver
+                <div>
+                  <p className="text-sm font-medium text-white">{t.name}</p>
+                  <p className="text-xs text-white/40">{t.slug}</p>
+                </div>
+                <OrgBadge role={t.role} />
               </button>
-            </div>
+            ))}
           </div>
+
+          {error && (
+            <p className="text-center text-sm text-red-400">{error}</p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => { setStep({ kind: "credentials" }); setError(null); }}
+            className="text-sm text-white/40 hover:text-white/70 underline-offset-4 hover:underline transition-colors"
+          >
+            ← Volver
+          </button>
         </div>
-        {cover}
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="grid min-h-svh lg:grid-cols-2">
-      <div className="flex flex-col gap-4 p-6 md:p-10">
-        <div className="flex justify-center gap-2 md:justify-start">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <div className="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-md text-sm font-bold">
-              Z
-            </div>
-            Zeru
-          </Link>
+    <AuthShell>
+      <div className="flex flex-col gap-8">
+        {/* Heading */}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-white">Iniciar sesión</h1>
+          <p className="text-white/50 text-sm">
+            Ingresa tus credenciales para continuar
+          </p>
         </div>
 
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-sm">
-            <form onSubmit={handleCredentials} className="flex flex-col gap-6">
-              <FieldGroup>
-                <div className="flex flex-col items-center gap-1 text-center">
-                  <h1 className="text-2xl font-bold">Iniciar sesión</h1>
-                  <p className="text-muted-foreground text-sm text-balance">
-                    Ingresa tus credenciales para continuar
-                  </p>
-                </div>
+        {/* Form */}
+        <form onSubmit={handleCredentials} className="flex flex-col gap-5">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="email" className="text-white/70">
+                Email
+              </FieldLabel>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@email.com"
+                autoComplete="email"
+                disabled={loading}
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+              />
+            </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="email">Email</FieldLabel>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    autoComplete="email"
-                    disabled={loading}
-                  />
-                </Field>
+            <Field>
+              <FieldLabel htmlFor="password" className="text-white/70">
+                Contraseña
+              </FieldLabel>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                disabled={loading}
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+              />
+            </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="password">Contraseña</FieldLabel>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    disabled={loading}
-                  />
-                </Field>
+            {error && <FieldError>{error}</FieldError>}
 
-                {error && <FieldError>{error}</FieldError>}
-
-                <Field>
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Verificando..." : "Continuar"}
-                  </Button>
-                  <FieldDescription className="text-center">
-                    ¿No tienes cuenta?{" "}
-                    <Link href="/register" className="underline underline-offset-4">
-                      Regístrate
-                    </Link>
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-            </form>
-          </div>
-        </div>
+            <Field>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-teal-500 hover:bg-teal-400 text-white shadow-lg shadow-teal-500/20"
+              >
+                {loading ? "Verificando..." : "Continuar"}
+              </Button>
+              <FieldDescription className="text-center text-white/40">
+                ¿No tienes cuenta?{" "}
+                <Link
+                  href="/register"
+                  className="text-teal-400 hover:text-teal-300 underline-offset-4 hover:underline"
+                >
+                  Regístrate
+                </Link>
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+        </form>
       </div>
-      {cover}
-    </div>
+    </AuthShell>
   );
 }

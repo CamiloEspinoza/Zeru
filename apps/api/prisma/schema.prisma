@@ -312,3 +312,12 @@ model DocumentJournalEntry {
   @@unique([documentId, journalEntryId])
   @@map("document_journal_entries")
 }
+
+/// Registro de emails en lista de espera
+model WaitlistEntry {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("waitlist_entries")
+}

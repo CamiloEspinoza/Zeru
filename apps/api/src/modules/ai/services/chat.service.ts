@@ -206,6 +206,7 @@ export class ChatService {
       let completedResponseOutput: Array<Record<string, unknown>> = [];
       let completedUsage = { inputTokens: 0, outputTokens: 0 };
       let hasQuestion = false;
+      let thinkingText = '';
       // The parentResponseId for the response we're about to create
       const parentResponseIdForThisCall = currentPrevResponseId;
 
@@ -234,7 +235,9 @@ export class ChatService {
 
         // ── Thinking / Reasoning ─────────────────────────────
         if (evType === 'response.reasoning_summary_text.delta') {
-          subject.next({ type: 'thinking', delta: String(ev['delta'] ?? '') });
+          const delta = String(ev['delta'] ?? '');
+          thinkingText += delta;
+          subject.next({ type: 'thinking', delta });
           continue;
         }
 
@@ -361,7 +364,13 @@ export class ChatService {
         }
       }
 
-      // ── Post-stream: save text, decide what to do next ───
+      // ── Post-stream: save thinking + text, decide what to do next ───
+      if (thinkingText) {
+        await this.saveMessage(conversation.id, 'assistant', {
+          type: 'thinking',
+          text: thinkingText,
+        });
+      }
       if (assistantText) {
         await this.saveMessage(conversation.id, 'assistant', {
           type: 'text',

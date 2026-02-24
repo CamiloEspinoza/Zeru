@@ -459,13 +459,45 @@ export function useChatStream() {
           });
         } else if (msg.role === "assistant") {
           const text = msg.content?.text ?? "";
-          if (text) {
-            blocks.push({
-              id: msg.id,
-              type: "assistant",
-              blocks: [{ kind: "text", text }],
-              done: true,
-            });
+          const type = msg.content?.type ?? "text";
+
+          if (type === "thinking" && text) {
+            // Attach thinking block to the last assistant message, or create one
+            const last = blocks[blocks.length - 1];
+            const thinkingBlock: ContentBlock = {
+              kind: "thinking",
+              text,
+              streaming: false,
+            };
+            if (last?.type === "assistant") {
+              blocks[blocks.length - 1] = {
+                ...last,
+                blocks: [...last.blocks, thinkingBlock],
+              };
+            } else {
+              blocks.push({
+                id: msg.id,
+                type: "assistant",
+                blocks: [thinkingBlock],
+                done: true,
+              });
+            }
+          } else if (type === "text" && text) {
+            // Attach text to last assistant block (same turn as thinking), or create new
+            const last = blocks[blocks.length - 1];
+            if (last?.type === "assistant" && last.blocks.some((b) => b.kind === "thinking")) {
+              blocks[blocks.length - 1] = {
+                ...last,
+                blocks: [...last.blocks, { kind: "text", text }],
+              };
+            } else {
+              blocks.push({
+                id: msg.id,
+                type: "assistant",
+                blocks: [{ kind: "text", text }],
+                done: true,
+              });
+            }
           }
         } else if (msg.role === "question") {
           const payload = msg.content?.payload;

@@ -51,7 +51,7 @@ export function TeamSwitcher() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-md text-sm font-bold shrink-0">
+              <div className="bg-teal-500 text-white flex size-8 items-center justify-center rounded-md text-sm font-bold shrink-0">
                 Z
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -59,7 +59,7 @@ export function TeamSwitcher() {
                   {switching ? "Cambiando..." : (tenant?.name ?? "Cargando...")}
                 </span>
                 <span className="truncate text-xs text-sidebar-foreground/60">
-                  Zeru ERP
+                  Zeru
                 </span>
               </div>
               <HugeiconsIcon
