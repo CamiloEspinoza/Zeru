@@ -1,0 +1,64 @@
+code,name,type,isTaxAccount,isControlAccount,currency,notes
+1.1.01.001,Caja,ASSET,false,false,CLP,Caja chica / efectivo
+1.1.01.002,Fondo Fijo,ASSET,false,false,CLP,Fondo fijo para gastos menores
+1.1.02.001,Banco Cuenta Corriente,ASSET,false,false,CLP,Banco principal
+1.1.02.002,Banco Cuenta Vista,ASSET,false,false,CLP,Cuenta vista secundaria
+1.1.03.001,Clientes,ASSET,false,true,CLP,Cuenta control CxC
+1.1.03.002,Documentos por Cobrar,ASSET,false,false,CLP,Letras/pagarés por cobrar
+1.1.03.003,Deudores Varios,ASSET,false,false,CLP,Otros deudores no comerciales
+1.1.04.001,IVA Crédito Fiscal,ASSET,true,false,CLP,IVA compras recuperable
+1.1.04.002,PPM por Recuperar,ASSET,true,false,CLP,Pagos provisionales mensuales
+1.1.04.003,Impuestos por Recuperar,ASSET,true,false,CLP,Otros créditos fiscales
+1.1.05.001,Inventario Mercaderías,ASSET,false,false,CLP,Stock mercaderías para venta
+1.1.05.002,Inventario Materias Primas,ASSET,false,false,CLP,Stock materias primas
+1.1.06.001,Anticipos a Proveedores,ASSET,false,false,CLP,Pagos anticipados a proveedores
+1.1.06.002,Gastos Pagados por Anticipado,ASSET,false,false,CLP,Seguros/arriendos prepagados
+1.2.01.001,Maquinaria y Equipos,ASSET,false,false,CLP,Activo fijo - maquinaria
+1.2.01.002,Muebles y Útiles,ASSET,false,false,CLP,Activo fijo - mobiliario
+1.2.01.003,Equipos Computacionales,ASSET,false,false,CLP,Activo fijo - hardware
+1.2.01.004,Vehículos,ASSET,false,false,CLP,Activo fijo - vehículos
+1.2.02.001,Depreciación Acumulada Maquinaria,ASSET,false,false,CLP,Contra cuenta depreciación
+1.2.02.002,Depreciación Acumulada Muebles,ASSET,false,false,CLP,Contra cuenta depreciación
+1.2.02.003,Depreciación Acumulada Equipos Comp.,ASSET,false,false,CLP,Contra cuenta depreciación
+1.2.02.004,Depreciación Acumulada Vehículos,ASSET,false,false,CLP,Contra cuenta depreciación
+1.2.03.001,Intangibles,ASSET,false,false,CLP,Software / licencias / patentes
+1.2.03.002,Amortización Acumulada Intangibles,ASSET,false,false,CLP,Contra cuenta amortización
+2.1.01.001,Proveedores,LIABILITY,false,true,CLP,Cuenta control CxP
+2.1.01.002,Documentos por Pagar,LIABILITY,false,false,CLP,Letras/pagarés por pagar
+2.1.01.003,Acreedores Varios,LIABILITY,false,false,CLP,Otros acreedores no comerciales
+2.1.02.001,IVA Débito Fiscal,LIABILITY,true,false,CLP,IVA ventas
+2.1.02.002,Retenciones por Pagar,LIABILITY,true,false,CLP,Retenciones de impuestos (honorarios/otros)
+2.1.02.003,PPM por Pagar,LIABILITY,true,false,CLP,Pagos provisionales mensuales
+2.1.02.004,Impuesto Renta por Pagar,LIABILITY,true,false,CLP,Provisión impuesto renta
+2.1.03.001,Remuneraciones por Pagar,LIABILITY,false,false,CLP,Sueldos devengados pendientes de pago
+2.1.03.002,Cotizaciones Previsionales por Pagar,LIABILITY,false,false,CLP,AFP / Salud / Seguro cesantía
+2.1.03.003,Anticipos de Clientes,LIABILITY,false,false,CLP,Pagos anticipados recibidos
+2.1.04.001,Provisiones Varias,LIABILITY,false,false,CLP,Provisiones de corto plazo
+2.2.01.001,Préstamos Bancarios Largo Plazo,LIABILITY,false,false,CLP,Obligaciones financieras LP
+2.2.01.002,Leasing Financiero,LIABILITY,false,false,CLP,Obligaciones por leasing
+3.1.01.001,Capital Pagado,EQUITY,false,false,CLP,Capital aportado por socios
+3.1.02.001,Reservas,EQUITY,false,false,CLP,Reservas legales/estatutarias
+3.1.03.001,Resultados Acumulados,EQUITY,false,false,CLP,Utilidades/pérdidas de ejercicios anteriores
+3.1.04.001,Resultado del Ejercicio,EQUITY,false,false,CLP,Utilidad/pérdida del periodo actual
+4.1.01.001,Ingresos por Ventas Afectas,REVENUE,false,false,CLP,Ventas gravadas con IVA
+4.1.01.002,Ingresos por Ventas Exentas,REVENUE,false,false,CLP,Ventas exentas de IVA
+4.1.02.001,Otros Ingresos Operacionales,REVENUE,false,false,CLP,Ingresos accesorios a la operación
+4.2.01.001,Ingresos Financieros,REVENUE,false,false,CLP,Intereses ganados / diferencia cambio favorable
+4.2.01.002,Otros Ingresos No Operacionales,REVENUE,false,false,CLP,Ingresos extraordinarios
+5.1.01.001,Costo de Ventas,EXPENSE,false,false,CLP,Costo mercaderías vendidas
+5.1.01.002,Costo de Servicios,EXPENSE,false,false,CLP,Costo directo servicios prestados
+5.2.01.001,Remuneraciones,EXPENSE,false,false,CLP,Sueldos y salarios brutos
+5.2.01.002,Cotizaciones Previsionales Empleador,EXPENSE,false,false,CLP,Aporte empleador AFP/Salud/Seguro
+5.2.02.001,Arriendos,EXPENSE,false,false,CLP,Arriendos de oficinas/locales
+5.2.02.002,Servicios Básicos,EXPENSE,false,false,CLP,Electricidad / agua / gas
+5.2.02.003,Telecomunicaciones,EXPENSE,false,false,CLP,Internet / telefonía
+5.2.03.001,Honorarios Profesionales,EXPENSE,false,false,CLP,Servicios de terceros (boleta honorarios)
+5.2.03.002,Asesorías y Consultorías,EXPENSE,false,false,CLP,Servicios externos especializados
+5.2.04.001,Depreciación del Ejercicio,EXPENSE,false,false,CLP,Gasto depreciación activo fijo
+5.2.04.002,Amortización del Ejercicio,EXPENSE,false,false,CLP,Gasto amortización intangibles
+5.2.05.001,Gastos de Viaje,EXPENSE,false,false,CLP,Viáticos y traslados
+5.2.05.002,Gastos de Representación,EXPENSE,false,false,CLP,Atenciones a clientes
+5.2.05.003,Gastos Generales de Administración,EXPENSE,false,false,CLP,Otros gastos administrativos
+5.2.06.001,Gastos Financieros,EXPENSE,false,false,CLP,Intereses / comisiones bancarias
+5.2.06.002,Diferencia de Cambio Desfavorable,EXPENSE,false,false,CLP,Pérdidas por tipo de cambio
+5.2.07.001,Gastos No Deducibles,EXPENSE,false,false,CLP,Gastos rechazados tributariamente (Art. 21 LIR)

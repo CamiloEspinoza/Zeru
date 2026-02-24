@@ -1,0 +1,523 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import type { ChatEvent, QuestionPayload, ToolStartEvent, ToolDoneEvent, TitleUpdateEvent } from "@zeru/shared";
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("access_token");
+  const tenantId = localStorage.getItem("tenantId");
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(tenantId ? { "x-tenant-id": tenantId } : {}),
+  };
+}
+
+// ─── File upload ─────────────────────────────────────────────────────────────
+
+export interface PendingFile {
+  localId: string;
+  file: File;
+  previewUrl?: string;
+  status: "uploading" | "done" | "error";
+  documentId?: string;
+  errorMessage?: string;
+}
+
+export interface AttachedDoc {
+  id: string;
+  name: string;
+  mimeType: string;
+}
+
+export async function uploadFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/files/upload`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { message?: string };
+    throw new Error(body.message ?? `HTTP ${res.status}`);
+  }
+
+  const data = (await res.json()) as { id: string };
+  return data.id;
+}
+
+// ─── Content blocks (ordered, chronological) ─────────────────────────────────
+
+export type ToolState = {
+  toolCallId: string;
+  name: string;
+  label: string;
+  args: Record<string, unknown>;
+  status: "running" | "done" | "error";
+  result?: unknown;
+  summary?: string;
+};
+
+export type ContentBlock =
+  | { kind: "thinking"; text: string; streaming: boolean }
+  | { kind: "tool"; state: ToolState }
+  | {
+      kind: "question";
+      toolCallId: string;
+      payload: QuestionPayload;
+      answered: boolean;
+      answeredValue?: string;
+    }
+  | { kind: "text"; text: string };
+
+// ─── Message blocks ───────────────────────────────────────────────────────────
+
+export type MessageBlock =
+  | { id: string; type: "user"; text: string; docs?: AttachedDoc[] }
+  | {
+      id: string;
+      type: "assistant";
+      blocks: ContentBlock[];
+      done: boolean;
+    };
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useChatStream() {
+  const [messages, setMessages] = useState<MessageBlock[]>([]);
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [conversationTitle, setConversationTitle] = useState<string | undefined>();
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Updater for the last assistant message's blocks array
+  const updateLastAssistantBlocks = useCallback(
+    (updater: (blocks: ContentBlock[]) => ContentBlock[]) => {
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (!last || last.type !== "assistant") return prev;
+        return [
+          ...prev.slice(0, -1),
+          { ...last, blocks: updater(last.blocks) },
+        ];
+      });
+    },
+    []
+  );
+
+  const updateLastAssistant = useCallback(
+    (
+      updater: (
+        msg: Extract<MessageBlock, { type: "assistant" }>
+      ) => Partial<Extract<MessageBlock, { type: "assistant" }>>
+    ) => {
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (!last || last.type !== "assistant") return prev;
+        return [...prev.slice(0, -1), { ...last, ...updater(last) }];
+      });
+    },
+    []
+  );
+
+  const sendMessage = useCallback(
+    async (
+      text: string,
+      opts?: { questionToolCallId?: string; docs?: AttachedDoc[] }
+    ) => {
+      if (streaming) return;
+
+      const userMsgId = crypto.randomUUID();
+      const assistantMsgId = crypto.randomUUID();
+
+      setMessages((prev) => [
+        ...prev,
+        { id: userMsgId, type: "user", text, docs: opts?.docs },
+        {
+          id: assistantMsgId,
+          type: "assistant",
+          blocks: [],
+          done: false,
+        },
+      ]);
+
+      setStreaming(true);
+      abortRef.current = new AbortController();
+
+      try {
+        const res = await fetch(`${API_BASE}/ai/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            message: text,
+            conversationId,
+            questionToolCallId: opts?.questionToolCallId,
+            documentIds: opts?.docs?.map((d) => d.id),
+          }),
+          signal: abortRef.current.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No stream");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (raw === "[DONE]") break;
+
+            let event: ChatEvent;
+            try {
+              event = JSON.parse(raw);
+            } catch {
+              continue;
+            }
+
+            handleEvent(event);
+          }
+        }
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") {
+          updateLastAssistantBlocks((blocks) => {
+            const hasText = blocks.some((b) => b.kind === "text");
+            if (hasText) {
+              return blocks.map((b) =>
+                b.kind === "text"
+                  ? { ...b, text: b.text || "Error al conectar con el asistente." }
+                  : b
+              );
+            }
+            return [
+              ...blocks,
+              { kind: "text", text: "Error al conectar con el asistente." },
+            ];
+          });
+          updateLastAssistant(() => ({ done: true }));
+        }
+      } finally {
+        setStreaming(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [streaming, conversationId, updateLastAssistantBlocks, updateLastAssistant]
+  );
+
+  const handleEvent = useCallback(
+    (event: ChatEvent) => {
+      switch (event.type) {
+        case "thinking":
+          updateLastAssistantBlocks((blocks) => {
+            const last = blocks[blocks.length - 1];
+            if (last?.kind === "thinking") {
+              // Append to the existing thinking block
+              return [
+                ...blocks.slice(0, -1),
+                { ...last, text: last.text + event.delta },
+              ];
+            }
+            // Mark any previous thinking block as done streaming
+            const finalized = blocks.map((b) =>
+              b.kind === "thinking" ? { ...b, streaming: false } : b
+            );
+            return [
+              ...finalized,
+              { kind: "thinking", text: event.delta, streaming: true },
+            ];
+          });
+          break;
+
+        case "text_delta":
+          updateLastAssistantBlocks((blocks) => {
+            const last = blocks[blocks.length - 1];
+            if (last?.kind === "text") {
+              return [
+                ...blocks.slice(0, -1),
+                { ...last, text: last.text + event.delta },
+              ];
+            }
+            // Finalize any open thinking block when text starts
+            const finalized = blocks.map((b) =>
+              b.kind === "thinking" ? { ...b, streaming: false } : b
+            );
+            return [...finalized, { kind: "text", text: event.delta }];
+          });
+          break;
+
+        case "tool_start": {
+          const toolStartEvent = event as ToolStartEvent;
+          updateLastAssistantBlocks((blocks) => {
+            // If the tool block already exists (re-emitted with full args), update it
+            const existing = blocks.findIndex(
+              (b) => b.kind === "tool" && b.state.toolCallId === toolStartEvent.toolCallId
+            );
+            if (existing !== -1) {
+              return blocks.map((b, i) =>
+                i === existing && b.kind === "tool"
+                  ? { ...b, state: { ...b.state, args: toolStartEvent.args } }
+                  : b
+              );
+            }
+            // Finalize open thinking block
+            const finalized = blocks.map((b) =>
+              b.kind === "thinking" ? { ...b, streaming: false } : b
+            );
+            return [
+              ...finalized,
+              {
+                kind: "tool",
+                state: {
+                  toolCallId: toolStartEvent.toolCallId,
+                  name: toolStartEvent.name,
+                  label: toolStartEvent.label,
+                  args: toolStartEvent.args,
+                  status: "running" as const,
+                },
+              },
+            ];
+          });
+          break;
+        }
+
+        case "tool_done": {
+          const toolDoneEvent = event as ToolDoneEvent;
+          updateLastAssistantBlocks((blocks) =>
+            blocks.map((b) =>
+              b.kind === "tool" && b.state.toolCallId === toolDoneEvent.toolCallId
+                ? {
+                    ...b,
+                    state: {
+                      ...b.state,
+                      status: toolDoneEvent.success ? ("done" as const) : ("error" as const),
+                      result: toolDoneEvent.result,
+                      summary: toolDoneEvent.summary,
+                    },
+                  }
+                : b
+            )
+          );
+          break;
+        }
+
+        case "question":
+          // Store conversationId so the answer goes to the same conversation
+          setConversationId(event.conversationId);
+          updateLastAssistantBlocks((blocks) => [
+            ...blocks,
+            {
+              kind: "question",
+              toolCallId: event.toolCallId,
+              payload: event.payload,
+              answered: false,
+            },
+          ]);
+          break;
+
+        case "title_update": {
+          const titleEvent = event as TitleUpdateEvent;
+          setConversationTitle(titleEvent.title);
+          break;
+        }
+
+        case "done":
+          setConversationId(event.conversationId);
+          // Mark all open thinking blocks as done
+          updateLastAssistantBlocks((blocks) =>
+            blocks.map((b) =>
+              b.kind === "thinking" ? { ...b, streaming: false } : b
+            )
+          );
+          updateLastAssistant(() => ({ done: true }));
+          break;
+
+        case "error":
+          updateLastAssistantBlocks((blocks) => {
+            const hasText = blocks.some((b) => b.kind === "text");
+            if (hasText) {
+              return blocks.map((b) =>
+                b.kind === "text"
+                  ? { ...b, text: b.text || `Error: ${event.message}` }
+                  : b
+              );
+            }
+            return [
+              ...blocks,
+              { kind: "text", text: `Error: ${event.message}` },
+            ];
+          });
+          updateLastAssistant(() => ({ done: true }));
+          break;
+      }
+    },
+    [updateLastAssistantBlocks, updateLastAssistant]
+  );
+
+  const answerQuestion = useCallback(
+    (toolCallId: string, answer: string) => {
+      // Mark the question as answered in the UI
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.type !== "assistant") return msg;
+          return {
+            ...msg,
+            blocks: msg.blocks.map((b) =>
+              b.kind === "question" && b.toolCallId === toolCallId
+                ? { ...b, answered: true, answeredValue: answer }
+                : b
+            ),
+          };
+        })
+      );
+      sendMessage(answer, { questionToolCallId: toolCallId });
+    },
+    [sendMessage]
+  );
+
+  const abort = useCallback(() => {
+    abortRef.current?.abort();
+    setStreaming(false);
+  }, []);
+
+  const reset = useCallback(() => {
+    abort();
+    setMessages([]);
+    setConversationId(undefined);
+    setConversationTitle(undefined);
+  }, [abort]);
+
+  /**
+   * Load persisted conversation history from the backend and convert to
+   * MessageBlock[] format for rendering. Call this when entering an existing
+   * conversation (i.e. params.id !== "new").
+   */
+  const loadHistory = useCallback(async (convId: string) => {
+    try {
+      // Fetch conversation metadata (title) and messages in parallel
+      const [convRes, msgRes] = await Promise.all([
+        fetch(`${API_BASE}/ai/conversations/${convId}`, { headers: getAuthHeaders() }),
+        fetch(`${API_BASE}/ai/conversations/${convId}/messages`, { headers: getAuthHeaders() }),
+      ]);
+
+      if (convRes.ok) {
+        const conv = (await convRes.json()) as { title?: string };
+        if (conv.title) setConversationTitle(conv.title);
+      }
+
+      const res = msgRes;
+      if (!res.ok) return;
+
+      type RawMessage = {
+        id: string;
+        role: "user" | "assistant" | "tool" | "question";
+        content: {
+          type?: string;
+          text?: string;
+          payload?: QuestionPayload;
+        };
+      };
+
+      const raw: RawMessage[] = await res.json();
+
+      // Build MessageBlock[] by grouping DB rows into UI message blocks.
+      // Rules:
+      //   user     → new user MessageBlock
+      //   assistant → new assistant MessageBlock with a text ContentBlock
+      //   question  → append question ContentBlock to last assistant block
+      //   tool      → skip (granular tool steps are not persisted)
+      const blocks: MessageBlock[] = [];
+
+      for (let i = 0; i < raw.length; i++) {
+        const msg = raw[i];
+
+        if (msg.role === "user") {
+          blocks.push({
+            id: msg.id,
+            type: "user",
+            text: msg.content?.text ?? "",
+          });
+        } else if (msg.role === "assistant") {
+          const text = msg.content?.text ?? "";
+          if (text) {
+            blocks.push({
+              id: msg.id,
+              type: "assistant",
+              blocks: [{ kind: "text", text }],
+              done: true,
+            });
+          }
+        } else if (msg.role === "question") {
+          const payload = msg.content?.payload;
+          if (!payload) continue;
+
+          // Find the next user message to recover the answered value
+          const nextUser = raw.slice(i + 1).find((m) => m.role === "user");
+          const answeredValue = nextUser?.content?.text;
+
+          const questionBlock: ContentBlock = {
+            kind: "question",
+            toolCallId: msg.id,
+            payload,
+            answered: true,
+            answeredValue,
+          };
+
+          // Attach to the last assistant block, or create a new one
+          const last = blocks[blocks.length - 1];
+          if (last?.type === "assistant") {
+            blocks[blocks.length - 1] = {
+              ...last,
+              blocks: [...last.blocks, questionBlock],
+            };
+          } else {
+            blocks.push({
+              id: msg.id,
+              type: "assistant",
+              blocks: [questionBlock],
+              done: true,
+            });
+          }
+        }
+        // tool role: skip — granular tool steps are not worth re-rendering
+      }
+
+      setMessages(blocks);
+      setConversationId(convId);
+    } catch {
+      // Fail silently — user can still start a new message
+    }
+  }, []);
+
+  return {
+    messages,
+    conversationId,
+    conversationTitle,
+    streaming,
+    sendMessage,
+    answerQuestion,
+    abort,
+    reset,
+    loadHistory,
+  };
+}

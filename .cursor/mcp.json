@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "openaiDeveloperDocs": {
+      "url": "https://developers.openai.com/mcp"
+    },
+    "next-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "next-devtools-mcp@latest"
+      ]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "shadcn@latest",
+        "mcp"
+      ]
+    }
+  }
+}

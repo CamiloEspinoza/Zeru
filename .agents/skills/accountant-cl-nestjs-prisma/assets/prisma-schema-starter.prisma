@@ -1,0 +1,310 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  VALIDATED
+  POSTED
+  REVERSED
+  VOID
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  SOFT_CLOSED
+  CLOSED
+  LOCKED
+}
+
+enum DteStatus {
+  DRAFT
+  ISSUED
+  RECEIVED
+  ACCEPTED
+  REJECTED
+  VOIDED
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  taxId     String?  @map("tax_id")
+  currency  String   @default("CLP")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  fiscalYears       FiscalYear[]
+  accounts          Account[]
+  periods           AccountingPeriod[]
+  journalEntries    JournalEntry[]
+  partners          Partner[]
+  taxCodes          TaxCode[]
+  dteDocuments      DteDocument[]
+  postingTemplates  PostingTemplate[]
+  auditLogs         AuditLog[]
+
+  @@map("companies")
+}
+
+model FiscalYear {
+  id        String   @id @default(cuid())
+  companyId String   @map("company_id")
+  year      Int
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  periods AccountingPeriod[]
+
+  @@unique([companyId, year])
+  @@index([companyId, startDate, endDate])
+  @@map("fiscal_years")
+}
+
+model AccountingPeriod {
+  id           String                 @id @default(cuid())
+  companyId     String                @map("company_id")
+  fiscalYearId  String                @map("fiscal_year_id")
+  periodYear    Int                   @map("period_year")
+  periodMonth   Int                   @map("period_month")
+  startDate     DateTime              @map("start_date")
+  endDate       DateTime              @map("end_date")
+  status        AccountingPeriodStatus @default(OPEN)
+  closedAt      DateTime?             @map("closed_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fiscalYear    FiscalYear            @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+  journalEntries JournalEntry[]
+  taxTransactions TaxTransaction[]
+
+  @@unique([companyId, periodYear, periodMonth])
+  @@index([companyId, status])
+  @@map("accounting_periods")
+}
+
+model Account {
+  id              String      @id @default(cuid())
+  companyId        String      @map("company_id")
+  code             String
+  name             String
+  type             AccountType
+  isActive         Boolean     @default(true) @map("is_active")
+  isTaxAccount     Boolean     @default(false) @map("is_tax_account")
+  isControlAccount Boolean     @default(false) @map("is_control_account")
+  parentAccountId  String?     @map("parent_account_id")
+  currency         String      @default("CLP")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parentAccount    Account?    @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  children         Account[]   @relation("AccountHierarchy")
+  lines            JournalEntryLine[]
+
+  @@unique([companyId, code])
+  @@index([companyId, type, isActive])
+  @@map("accounts")
+}
+
+model Partner {
+  id         String   @id @default(cuid())
+  companyId   String  @map("company_id")
+  name        String
+  taxId       String? @map("tax_id")
+  kind        String? // customer, supplier, both
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  dteDocuments DteDocument[]
+  lines       JournalEntryLine[]
+
+  @@index([companyId, taxId])
+  @@map("partners")
+}
+
+model JournalEntry {
+  id                String           @id @default(cuid())
+  companyId          String           @map("company_id")
+  periodId           String           @map("period_id")
+  entryDate          DateTime         @map("entry_date")
+  entryNumber        String           @map("entry_number")
+  description        String
+  status             JournalEntryStatus @default(DRAFT)
+  sourceType         String           @default("manual") @map("source_type")
+  sourceId           String?          @map("source_id")
+  postedAt           DateTime?        @map("posted_at")
+  reversalOfEntryId  String?          @map("reversal_of_entry_id")
+  reversedByEntryId  String?          @map("reversed_by_entry_id")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  company            Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period             AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  lines              JournalEntryLine[]
+  reversalOfEntry    JournalEntry?    @relation("JournalReversal", fields: [reversalOfEntryId], references: [id])
+  reversedByEntry    JournalEntry?    @relation("JournalReversal", fields: [reversedByEntryId], references: [id])
+  dteDocuments       DteDocument[]
+
+  @@unique([companyId, entryNumber])
+  @@index([companyId, entryDate, status])
+  @@index([sourceType, sourceId])
+  @@map("journal_entries")
+}
+
+model JournalEntryLine {
+  id            String   @id @default(cuid())
+  entryId        String   @map("entry_id")
+  lineNumber     Int      @map("line_number")
+  accountId      String   @map("account_id")
+  debit          Decimal  @db.Decimal(18, 2)
+  credit         Decimal  @db.Decimal(18, 2)
+  currency       String   @default("CLP")
+  fxRate         Decimal? @db.Decimal(18, 6) @map("fx_rate")
+  partnerId      String?  @map("partner_id")
+  costCenterId   String?  @map("cost_center_id")
+  taxCodeId      String?  @map("tax_code_id")
+  taxBaseAmount  Decimal? @db.Decimal(18, 2) @map("tax_base_amount")
+  taxAmount      Decimal? @db.Decimal(18, 2) @map("tax_amount")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  entry          JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  partner        Partner?     @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  taxCode        TaxCode?     @relation(fields: [taxCodeId], references: [id], onDelete: SetNull)
+
+  @@unique([entryId, lineNumber])
+  @@index([accountId])
+  @@index([partnerId])
+  @@index([taxCodeId])
+  @@map("journal_entry_lines")
+}
+
+model TaxCode {
+  id          String   @id @default(cuid())
+  companyId    String  @map("company_id")
+  code         String
+  kind         String  // iva, retention, ppm, etc.
+  rate         Decimal @db.Decimal(9, 6)
+  recoverable  Boolean @default(false)
+  validFrom    DateTime @map("valid_from")
+  validTo      DateTime? @map("valid_to")
+  isActive     Boolean @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lines        JournalEntryLine[]
+  taxTransactions TaxTransaction[]
+
+  @@unique([companyId, code, validFrom])
+  @@index([companyId, kind, isActive])
+  @@map("tax_codes")
+}
+
+model TaxTransaction {
+  id            String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  periodId       String   @map("period_id")
+  taxCodeId      String   @map("tax_code_id")
+  sourceType     String   @map("source_type")
+  sourceId       String   @map("source_id")
+  baseAmount     Decimal? @db.Decimal(18, 2) @map("base_amount")
+  taxAmount      Decimal  @db.Decimal(18, 2) @map("tax_amount")
+  direction      String   // debit/credit/input/output
+  occurredAt     DateTime @map("occurred_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  company        Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  period         AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  taxCode        TaxCode          @relation(fields: [taxCodeId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, periodId, taxCodeId])
+  @@index([sourceType, sourceId])
+  @@map("tax_transactions")
+}
+
+model DteDocument {
+  id              String    @id @default(cuid())
+  companyId        String    @map("company_id")
+  partnerId        String?   @map("partner_id")
+  journalEntryId   String?   @map("journal_entry_id")
+  dteType          Int       @map("dte_type")
+  folio            String?
+  issueDate        DateTime  @map("issue_date")
+  status           DteStatus @default(DRAFT)
+  netAmount        Decimal?  @db.Decimal(18, 2) @map("net_amount")
+  exemptAmount     Decimal?  @db.Decimal(18, 2) @map("exempt_amount")
+  taxAmount        Decimal?  @db.Decimal(18, 2) @map("tax_amount")
+  totalAmount      Decimal   @db.Decimal(18, 2) @map("total_amount")
+  referenceDteId   String?   @map("reference_dte_id")
+  sourceSystem     String?   @map("source_system")
+  payloadHash      String?   @map("payload_hash")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  company          Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  partner          Partner?   @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  journalEntry     JournalEntry? @relation(fields: [journalEntryId], references: [id], onDelete: SetNull)
+  referenceDte     DteDocument? @relation("DteReference", fields: [referenceDteId], references: [id])
+  referencedBy     DteDocument[] @relation("DteReference")
+
+  @@index([companyId, dteType, issueDate])
+  @@index([companyId, folio])
+  @@map("dte_documents")
+}
+
+model PostingTemplate {
+  id          String   @id @default(cuid())
+  companyId    String  @map("company_id")
+  code         String
+  version      Int     @default(1)
+  description  String
+  activeFrom   DateTime @map("active_from")
+  activeTo     DateTime? @map("active_to")
+  isActive     Boolean @default(true) @map("is_active")
+  definitionJson Json   @map("definition_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code, version])
+  @@index([companyId, code, isActive])
+  @@map("posting_templates")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId    String  @map("company_id")
+  actorId      String? @map("actor_id")
+  action       String
+  entityType   String  @map("entity_type")
+  entityId     String  @map("entity_id")
+  metadataJson Json?   @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company      Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, action, createdAt])
+  @@map("audit_logs")
+}
