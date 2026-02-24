@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useChatStream, uploadFile, type AttachedDoc } from "@/hooks/use-chat-stream";
 import { ThinkingBlock } from "@/components/ai/thinking-block";
@@ -8,6 +8,12 @@ import { ToolExecution } from "@/components/ai/tool-execution";
 import { QuestionCard } from "@/components/ai/question-card";
 import { JournalEntryReviewCard } from "@/components/ai/journal-entry-review-card";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -264,9 +270,41 @@ export default function AssistantChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
+  const pendingEntryRefs = useRef<Record<string, HTMLDivElement | null>>({});
   // Ref so loadHistory can check current messages without needing them in deps
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+
+  // Asientos en borrador creados en esta conversación que aún no se han contabilizado
+  const { postedEntryIds, pendingDraftEntries } = useMemo(() => {
+    const posted = new Set<string>();
+    for (const m of messages) {
+      if (m.type !== "assistant") continue;
+      for (const b of m.blocks) {
+        if (b.kind === "tool" && b.state.name === "post_journal_entry" && b.state.status === "done") {
+          const r = b.state.result as { id?: string } | null;
+          if (r?.id) posted.add(r.id);
+        }
+      }
+    }
+    const pending: Array<{ id: string; number: number }> = [];
+    for (const m of messages) {
+      if (m.type !== "assistant") continue;
+      for (const b of m.blocks) {
+        if (b.kind !== "tool" || b.state.name !== "create_journal_entry" || b.state.status !== "done" || !b.state.result) continue;
+        const entry = b.state.result as { id: string; number: number; status?: string };
+        if (entry.status === "DRAFT" && !posted.has(entry.id)) {
+          pending.push({ id: entry.id, number: entry.number });
+        }
+      }
+    }
+    return { postedEntryIds: posted, pendingDraftEntries: pending };
+  }, [messages]);
+
+  const scrollToPendingEntry = useCallback((entryId: string) => {
+    const el = pendingEntryRefs.current[entryId];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, []);
 
   // Auto-scroll
   useEffect(() => {
@@ -573,25 +611,6 @@ export default function AssistantChatPage() {
                 <div className="flex-1 min-w-0 space-y-1">
                   {/* Render blocks in chronological order */}
                   {msg.blocks.map((block, blockIdx) => {
-                    // Pre-compute which journal entry IDs have been posted across ALL messages
-                    const postedEntryIds = new Set(
-                      messages.flatMap((m) =>
-                        m.type === "assistant"
-                          ? m.blocks
-                              .filter(
-                                (b) =>
-                                  b.kind === "tool" &&
-                                  b.state.name === "post_journal_entry" &&
-                                  b.state.status === "done"
-                              )
-                              .map((b) => {
-                                const r = (b as Extract<typeof b, { kind: "tool" }>).state.result as { id?: string } | null;
-                                return r?.id ?? "";
-                              })
-                          : []
-                      )
-                    );
-
                     if (block.kind === "thinking") {
                       return (
                         <ThinkingBlock
@@ -623,16 +642,22 @@ export default function AssistantChatPage() {
                           }>;
                         };
                         return (
-                          <JournalEntryReviewCard
+                          <div
                             key={block.state.toolCallId}
-                            entry={entry}
-                            approved={postedEntryIds.has(entry.id)}
-                            onApprove={(entryId, entryNumber) => {
-                              sendMessage(
-                                `Contabiliza el asiento #${entryNumber} (id: ${entryId})`
-                              );
+                            ref={(el) => {
+                              if (entry.id) pendingEntryRefs.current[entry.id] = el;
                             }}
-                          />
+                          >
+                            <JournalEntryReviewCard
+                              entry={entry}
+                              approved={postedEntryIds.has(entry.id)}
+                              onApprove={(entryId, entryNumber) => {
+                                sendMessage(
+                                  `Contabiliza el asiento #${entryNumber} (id: ${entryId})`
+                                );
+                              }}
+                            />
+                          </div>
                         );
                       }
 
@@ -686,12 +711,38 @@ export default function AssistantChatPage() {
                     }
                     return null;
                   })}
-                  {/* Loading dots when no blocks yet */}
+                  {/* Placeholder bloque de razonamiento mientras esperamos el primer evento del stream */}
                   {msg.blocks.length === 0 && streaming && !msg.done && (
-                    <div className="flex gap-0.5 mt-1">
-                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:0ms]" />
-                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:150ms]" />
-                      <span className="h-2 w-2 rounded-full bg-muted-foreground/40 animate-bounce [animation-delay:300ms]" />
+                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
+                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                          <svg
+                            className="h-3.5 w-3.5 animate-spin text-muted-foreground"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                            />
+                          </svg>
+                        </span>
+                        <span>Conectando con el asistente…</span>
+                      </div>
+                      <div className="px-3 pb-3 pt-0">
+                        <p className="text-xs text-muted-foreground/70 italic">
+                          Esperando respuesta del modelo…
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -834,6 +885,50 @@ export default function AssistantChatPage() {
           antes de contabilizarlos.
         </p>
       </div>
+
+      {/* Botón flotante: asientos en borrador pendientes de contabilizar */}
+      {!isNew && pendingDraftEntries.length > 0 && (
+        <div className="fixed bottom-24 right-6 z-40">
+          {pendingDraftEntries.length === 1 ? (
+            <Button
+              size="sm"
+              variant="default"
+              className="shadow-lg rounded-full gap-2"
+              onClick={() => scrollToPendingEntry(pendingDraftEntries[0].id)}
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              1 asiento en borrador
+            </Button>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="shadow-lg rounded-full gap-2"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {pendingDraftEntries.length} asientos en borrador
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="top" className="min-w-[200px]">
+                {pendingDraftEntries.map(({ id, number }) => (
+                  <DropdownMenuItem
+                    key={id}
+                    onClick={() => scrollToPendingEntry(id)}
+                  >
+                    Ir al asiento #{number}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      )}
     </div>
   );
 }

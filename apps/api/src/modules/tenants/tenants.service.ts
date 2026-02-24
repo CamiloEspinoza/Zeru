@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { UpdateTenantSchema } from '@zeru/shared';
 
@@ -6,8 +6,12 @@ import type { UpdateTenantSchema } from '@zeru/shared';
 export class TenantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findById(id: string) {
-    return this.prisma.tenant.findUniqueOrThrow({ where: { id } });
+  async findById(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id } });
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+    return tenant;
   }
 
   findBySlug(slug: string) {

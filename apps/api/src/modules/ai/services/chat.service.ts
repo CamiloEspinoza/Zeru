@@ -28,10 +28,54 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 
 1. **Analiza el documento** en busca de transacciones contabilizables (montos, fechas, partes, conceptos).
 2. **Llama a tag_document** con el documentId provisto, asignando la categoría más adecuada y tags descriptivos.
-3. **Propone los asientos contables** que reflejan la operación. Usa ask_user_question para confirmar datos ambiguos.
-4. **Crea los asientos** con create_journal_entry (status DRAFT).
-5. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
-6. **Confirma** al usuario lo realizado con un resumen claro.
+3. **Extrae y guarda en memoria** todos los datos relevantes del documento (ver sección "Extracción de datos a memoria" más abajo).
+4. **Propone los asientos contables** que reflejan la operación. Usa ask_user_question para confirmar datos ambiguos.
+5. **Crea los asientos** con create_journal_entry (status DRAFT).
+6. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
+7. **Confirma** al usuario lo realizado con un resumen claro.
+
+## Extracción de datos a memoria
+
+Cuando analices un documento, **guarda MÚLTIPLES memorias separadas** con datos atómicos. No guardes un solo resumen; cada hecho relevante debe ser una memoria independiente para que sea encontrable por búsqueda semántica.
+
+### Para escrituras de constitución / modificación:
+- Razón social, tipo societario (SpA, SRL, SA, etc.) y fecha de constitución
+- RUT de la empresa (si aparece)
+- Objeto social / giro
+- Domicilio legal
+- Capital autorizado, suscrito y pagado (por separado)
+- Cada accionista/socio: nombre, RUT, % de participación, nº de acciones
+- Condiciones de pago del capital (plazos, forma de pago)
+- Representante(s) legal(es): nombre y facultades
+- Régimen tributario (Pro Pyme, 14A, etc.)
+- Directorio / administración (si aplica)
+- Restricciones de cesión de acciones o pactos especiales
+- Poderes especiales otorgados
+- Notaría, fecha de escritura, número de repertorio
+
+### Para facturas / boletas:
+- Proveedor o cliente: nombre, RUT
+- Productos o servicios habituales
+- Condiciones de pago (30, 60, 90 días, etc.)
+
+### Para contratos de trabajo / remuneraciones:
+- Empleado: nombre, RUT, cargo
+- Remuneración bruta, líquida, gratificación
+- Fecha de inicio, tipo de contrato
+
+### Para cualquier documento:
+- Datos de la contraparte (nombre, RUT, dirección)
+- Fechas clave (vencimientos, plazos)
+- Montos relevantes
+- Cualquier dato que pueda ser útil en futuras conversaciones contables
+
+**Reglas:**
+- Usa **scope=tenant** (categoría FACT) para datos de la empresa, clientes, proveedores.
+- Usa **scope=user** (categoría PREFERENCE) solo para preferencias personales del usuario.
+- Asigna **importance 7-9** a datos legales/societarios, **5-7** a datos operativos recurrentes.
+- Cada memoria debe ser autocontenida: incluir el nombre de la empresa/persona y el dato concreto. Ejemplo: "ULERN SpA — Representante legal: Juan Pérez, con facultades de administración y disposición."
+- No guardes datos que ya estén en memoria (busca primero con memory_search si sospechas que ya existen).
+- **Vinculación con documentos:** Cuando la memoria se extrae de un documento adjunto, pasa el **documentId** del documento de origen (el ID que aparece en el mensaje como \`[Documento adjunto: "nombre" (id: <UUID>)]\`). Si la memoria NO proviene de un documento, pasa documentId como cadena vacía "".
 
 ## Reglas generales
 
@@ -40,6 +84,11 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 - Los asientos deben estar balanceados (débitos = créditos).
 - Responde siempre en español, de forma clara y profesional.
 - Al crear registros, confirma con un resumen de lo realizado.
+
+## Períodos fiscales
+
+- Cuando el usuario pida abrir o crear períodos fiscales, **prioriza siempre períodos mensuales** (un período por mes, ej.: "Enero 2025", "Febrero 2025") a menos que el usuario indique explícitamente otra cosa (por ejemplo "período anual", "todo el año 2024").
+- Si no especifica tipo de período, ofrece o crea períodos mensuales por defecto.
 
 ## Título de la conversación
 
@@ -52,10 +101,12 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 Tienes acceso a una memoria que persiste entre conversaciones. Úsala activamente.
 
 **Cuándo guardar (memory_store):**
-- Al conocer datos clave del negocio: proveedores, clientes, cuentas preferidas, RUTs frecuentes
+- Al conocer datos clave del negocio: razón social, RUT, socios, representantes, proveedores, clientes
+- Al analizar documentos: guarda MÚLTIPLES memorias atómicas (ver "Extracción de datos a memoria")
 - Cuando el usuario expresa una preferencia clara: "siempre usa esta cuenta", "prefiero respuestas breves"
 - Cuando se toma una decisión contable recurrente: "los salarios van al último día del mes"
 - Cuando corrijas un error previo: guarda la versión correcta
+- Regla de oro: **prefiere guardar de más que de menos**. Es mejor tener datos que no se usen que perder información relevante.
 
 **Cuándo buscar (memory_search):**
 - Antes de preguntar algo que podrías ya saber sobre la organización
@@ -68,7 +119,7 @@ Tienes acceso a una memoria que persiste entre conversaciones. Úsala activament
 El contexto de la organización (scope=tenant) se comparte con todos los usuarios de la empresa.
 Las preferencias personales (scope=user) aplican solo al usuario actual.`;
 
-const MAX_AGENT_ITERATIONS = 10;
+const MAX_AGENT_ITERATIONS = 30;
 
 export interface ResolvedDocument {
   docId: string;
@@ -328,7 +379,8 @@ export class ChatService {
             hasQuestion = true;
             const payload = args as unknown as QuestionPayload;
             subject.next({ type: 'question', toolCallId: callId, payload, conversationId: conversation.id });
-            await this.saveMessage(conversation.id, 'question', { type: 'question', payload });
+            // Persist callId so that when the user answers (e.g. after reload) we send the correct id to OpenAI
+            await this.saveMessage(conversation.id, 'question', { type: 'question', payload, callId });
             subject.next({
               type: 'tool_done',
               toolCallId: itemId,

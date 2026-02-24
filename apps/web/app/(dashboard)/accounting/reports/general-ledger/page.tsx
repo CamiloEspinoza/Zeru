@@ -16,6 +16,7 @@ import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
 import type { Account, FiscalPeriod } from "@zeru/shared";
+import { downloadExcel } from "@/lib/export-excel";
 
 interface AccountWithChildren extends Account {
   children?: AccountWithChildren[];
@@ -100,6 +101,23 @@ export default function GeneralLedgerPage() {
       .finally(() => setLoading(false));
   };
 
+  const handleExportExcel = () => {
+    const accountLabel =
+      accounts.find((a) => a.id === selectedAccountId)?.name ?? "Cuenta";
+    const rows = data.map((row) => ({
+      Fecha: row.entry_date,
+      Asiento: row.entry_number,
+      Descripción: row.description,
+      Debe: parseFloat(row.debit) || 0,
+      Haber: parseFloat(row.credit) || 0,
+      Saldo: parseFloat(row.running_balance) || 0,
+    }));
+    downloadExcel(
+      [{ name: "Libro Mayor", rows }],
+      `libro-mayor-${accountLabel.replace(/\s+/g, "-")}-${startDate}-${endDate}.xlsx`
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -161,7 +179,14 @@ export default function GeneralLedgerPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Movimientos</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>Movimientos</CardTitle>
+            {hasSearched && data.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                Exportar a Excel
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {error && (

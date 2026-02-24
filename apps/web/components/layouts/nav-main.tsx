@@ -85,7 +85,7 @@ export function NavMain() {
         {isSettings && (
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/dashboard")}
               tooltip="Volver a la app"
               className="text-muted-foreground"
             >

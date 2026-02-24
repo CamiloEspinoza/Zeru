@@ -1,6 +1,3 @@
--- AlterEnum: Add OWNER to UserRole
-ALTER TYPE "UserRole" ADD VALUE 'OWNER';
-
 -- AlterTable users: drop role and tenantId FK columns
 ALTER TABLE "users" DROP CONSTRAINT "users_tenantId_fkey";
 ALTER TABLE "users" DROP COLUMN "role";

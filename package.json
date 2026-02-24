@@ -9,6 +9,7 @@
     "test": "turbo test",
     "db:generate": "turbo db:generate",
     "db:migrate": "turbo db:migrate",
+    "db:reset": "turbo db:reset",
     "db:seed": "turbo db:seed",
     "clean": "turbo clean"
   },

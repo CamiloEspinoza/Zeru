@@ -64,9 +64,15 @@ export function JournalEntryReviewCard({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold">Asiento #{entry.number}</span>
-              <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
-                Borrador
-              </span>
+              {approved ? (
+                <span className="inline-flex items-center rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs text-green-600 dark:text-green-400">
+                  Contabilizado
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
+                  Borrador
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {dateLabel} · {entry.description}

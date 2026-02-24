@@ -20,6 +20,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 interface AiConfig {
@@ -65,6 +77,7 @@ export default function AiSettingsPage() {
   const [modelSave, setModelSave] = useState<SaveStatus>("idle");
   const [keySave, setKeySave] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -191,6 +204,13 @@ export default function AiSettingsPage() {
         if (res.valid) {
           setKeyStatus("valid");
           setKeyError("");
+          autoSave({
+            provider,
+            model,
+            apiKey: value.trim(),
+            setStatus: setKeySave,
+            statusKey: "key",
+          });
         } else {
           setKeyStatus("invalid");
           setKeyError(res.error ?? "API key inválida");
@@ -203,14 +223,23 @@ export default function AiSettingsPage() {
   };
 
   const handleApiKeyBlur = () => {
-    if (keyStatus !== "valid") return;
-    autoSave({
-      provider,
-      model,
-      apiKey: apiKey.trim(),
-      setStatus: setKeySave,
-      statusKey: "key",
-    });
+    // Auto-save happens automatically after successful validation
+  };
+
+  const handleDeleteKey = async () => {
+    setDeleting(true);
+    try {
+      await api.delete("/ai/config/key");
+      setConfig({});
+      setApiKey("");
+      setKeyStatus("idle");
+      setKeyError("");
+      setKeySave("idle");
+    } catch {
+      setSaveError("No se pudo eliminar la API key");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -297,12 +326,54 @@ export default function AiSettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Autenticación</CardTitle>
-            <CardDescription>
-              {config.hasApiKey
-                ? "Ingresa una nueva API key para reemplazar la actual."
-                : "Ingresa tu API key de OpenAI. Se almacena cifrada."}
-            </CardDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base">Autenticación</CardTitle>
+                <CardDescription className="mt-1">
+                  {config.hasApiKey
+                    ? "Ingresa una nueva API key para reemplazar la actual."
+                    : "Ingresa tu API key de OpenAI. Se almacena cifrada."}
+                </CardDescription>
+              </div>
+              {config.hasApiKey && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={deleting}
+                      className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      {deleting ? (
+                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-destructive border-t-transparent" />
+                      ) : (
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                      Eliminar key
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Eliminar API key?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se eliminará la API key almacenada. El asistente IA dejará de funcionar hasta que configures una nueva key.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteKey}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Eliminar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -392,8 +463,8 @@ export default function AiSettingsPage() {
                 </p>
               )}
               {keyStatus === "valid" && !isKeyBusy && keySave === "idle" && (
-                <p className="text-xs text-muted-foreground">
-                  API key válida — se guardará al salir del campo.
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  API key válida
                 </p>
               )}
               {keyStatus === "invalid" && keyError && !isKeyBusy && (

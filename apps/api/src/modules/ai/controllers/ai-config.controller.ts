@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Post, Delete, Body, HttpCode, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
@@ -35,5 +35,11 @@ export class AiConfigController {
       apiKey: body.apiKey,
       model: body.model,
     });
+  }
+
+  @Delete('key')
+  @HttpCode(204)
+  async deleteKey(@CurrentTenant() tenantId: string) {
+    await this.aiConfigService.deleteKey(tenantId);
   }
 }

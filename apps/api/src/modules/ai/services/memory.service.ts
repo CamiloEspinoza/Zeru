@@ -17,6 +17,7 @@ export interface MemoryRecord {
   updatedAt: Date;
   tenantId: string;
   userId: string | null;
+  documentId: string | null;
   similarity?: number;
 }
 
@@ -66,8 +67,9 @@ export class MemoryService {
     content: string;
     category: MemoryCategory;
     importance: number;
+    documentId?: string | null;
   }): Promise<MemoryRecord> {
-    const { tenantId, userId, content, category, importance } = params;
+    const { tenantId, userId, content, category, importance, documentId } = params;
 
     const embedding = await this.generateEmbedding(tenantId, content).catch((err) => {
       this.logger.error(`Failed to generate embedding: ${err.message}`);
@@ -80,8 +82,8 @@ export class MemoryService {
     if (embedding) {
       const vector = this.formatVector(embedding);
       await this.prisma.$executeRawUnsafe(
-        `INSERT INTO memories (id, content, category, importance, embedding, "isActive", "createdAt", "updatedAt", "tenantId", "userId")
-         VALUES ($1, $2, $3::\"memory_category\", $4, $5::vector, true, $6, $7, $8, $9)`,
+        `INSERT INTO memories (id, content, category, importance, embedding, "isActive", "createdAt", "updatedAt", "tenantId", "userId", "documentId")
+         VALUES ($1, $2, $3::\"memory_category\", $4, $5::vector, true, $6, $7, $8, $9, $10)`,
         id,
         content,
         category,
@@ -91,14 +93,15 @@ export class MemoryService {
         now,
         tenantId,
         userId,
+        documentId ?? null,
       );
     } else {
       await this.prisma.memory.create({
-        data: { id, content, category, importance, tenantId, userId, createdAt: now, updatedAt: now },
+        data: { id, content, category, importance, tenantId, userId, documentId: documentId ?? null, createdAt: now, updatedAt: now },
       });
     }
 
-    return { id, content, category, importance, isActive: true, createdAt: now, updatedAt: now, tenantId, userId };
+    return { id, content, category, importance, isActive: true, createdAt: now, updatedAt: now, tenantId, userId, documentId: documentId ?? null };
   }
 
   /**
@@ -137,7 +140,7 @@ export class MemoryService {
     }
 
     const rows = await this.prisma.$queryRawUnsafe<Array<MemoryRecord & { similarity: number }>>(
-      `SELECT id, content, category, importance, "isActive", "createdAt", "updatedAt", "tenantId", "userId",
+      `SELECT id, content, category, importance, "isActive", "createdAt", "updatedAt", "tenantId", "userId", "documentId",
               1 - (embedding <=> $1::vector) AS similarity
        FROM memories
        WHERE "isActive" = true
@@ -183,6 +186,7 @@ export class MemoryService {
         updatedAt: true,
         tenantId: true,
         userId: true,
+        documentId: true,
       },
     });
 

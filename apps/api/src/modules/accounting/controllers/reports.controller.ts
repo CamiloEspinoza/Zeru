@@ -35,19 +35,34 @@ export class ReportsController {
   @Get('income-statement')
   incomeStatement(
     @CurrentTenant() tenantId: string,
+    @Query('fiscalPeriodId') fiscalPeriodId: string | undefined,
+    @Query('year') year: string,
+  ) {
+    const opts = fiscalPeriodId
+      ? { fiscalPeriodId }
+      : { year: year ? parseInt(year, 10) : new Date().getFullYear() };
+    return this.reportsService.incomeStatement(tenantId, opts);
+  }
+
+  @Get('income-statement/by-month')
+  incomeStatementByMonth(
+    @CurrentTenant() tenantId: string,
     @Query('year') year: string,
   ) {
     const yearNum = year ? parseInt(year, 10) : new Date().getFullYear();
-    return this.reportsService.incomeStatement(tenantId, yearNum);
+    return this.reportsService.incomeStatementByMonth(tenantId, yearNum);
   }
 
   @Get('income-statement/account-entries')
   incomeStatementAccountEntries(
     @CurrentTenant() tenantId: string,
     @Query('accountId') accountId: string,
+    @Query('fiscalPeriodId') fiscalPeriodId: string | undefined,
     @Query('year') year: string,
   ) {
-    const yearNum = year ? parseInt(year, 10) : new Date().getFullYear();
-    return this.reportsService.incomeStatementAccountEntries(tenantId, accountId, yearNum);
+    const opts = fiscalPeriodId
+      ? { fiscalPeriodId }
+      : { year: year ? parseInt(year, 10) : new Date().getFullYear() };
+    return this.reportsService.incomeStatementAccountEntries(tenantId, accountId, opts);
   }
 }

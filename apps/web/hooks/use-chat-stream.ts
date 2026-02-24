@@ -6,6 +6,25 @@ import type { ChatEvent, QuestionPayload, ToolStartEvent, ToolDoneEvent, TitleUp
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
+const TOOL_LABELS: Record<string, string> = {
+  update_conversation_title: "Actualizando título de conversación",
+  list_accounts: "Consultando plan de cuentas",
+  create_account: "Creando cuenta contable",
+  create_journal_entry: "Creando asiento contable",
+  create_fiscal_period: "Creando período fiscal",
+  create_chart_of_accounts_template: "Creando plan de cuentas estándar",
+  list_journal_entries: "Consultando asientos contables",
+  list_fiscal_periods: "Consultando períodos fiscales",
+  post_journal_entry: "Contabilizando asiento",
+  get_trial_balance: "Obteniendo balance de comprobación",
+  tag_document: "Clasificando documento",
+  link_document_to_entry: "Vinculando documento a asiento",
+  ask_user_question: "Preguntando al usuario",
+  memory_store: "Guardando en memoria",
+  memory_search: "Buscando en memoria",
+  memory_delete: "Eliminando de memoria",
+};
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = localStorage.getItem("access_token");
@@ -435,104 +454,139 @@ export function useChatStream() {
           type?: string;
           text?: string;
           payload?: QuestionPayload;
-        };
+          /** OpenAI call_id for question messages; required when sending the answer back */
+          callId?: string;
+        } | null;
+        toolName?: string | null;
+        toolArgs?: Record<string, unknown> | null;
+        toolResult?: unknown | null;
       };
 
       const raw: RawMessage[] = await res.json();
 
+      // Tools that are internal/noisy and shouldn't be shown in history
+      const HIDDEN_TOOLS = new Set([
+        "update_conversation_title",
+        "memory_store",
+        "memory_search",
+        "memory_delete",
+      ]);
+
       // Build MessageBlock[] by grouping DB rows into UI message blocks.
-      // Rules:
-      //   user     → new user MessageBlock
-      //   assistant → new assistant MessageBlock with a text ContentBlock
-      //   question  → append question ContentBlock to last assistant block
-      //   tool      → skip (granular tool steps are not persisted)
+      //
+      // DB save order ≠ display order. Within each agent iteration:
+      //   • tools and questions are saved DURING the stream (earlier timestamps)
+      //   • thinking is saved POST-stream (later timestamp, always last in its iteration)
+      //
+      // Correct display order per iteration: thinking → tools → question
+      //
+      // Strategy: buffer every tool/question block encountered in `pending`. When
+      // the `thinking` row for that iteration finally arrives, attach thinking first
+      // then drain the buffer. This naturally reconstructs chronological display order.
       const blocks: MessageBlock[] = [];
+      // Holds tool/question blocks waiting for the iteration's thinking block
+      const pending: ContentBlock[] = [];
+
+      const drainPending = () => {
+        if (pending.length === 0) return;
+        const last = blocks[blocks.length - 1];
+        if (last?.type === "assistant") {
+          blocks[blocks.length - 1] = {
+            ...last,
+            blocks: [...last.blocks, ...pending],
+          };
+        }
+        pending.length = 0;
+      };
+
+      // Ensure a last assistant block exists; return its index.
+      const getOrCreateAssistant = (fallbackId: string): number => {
+        const last = blocks[blocks.length - 1];
+        if (last?.type === "assistant") return blocks.length - 1;
+        blocks.push({ id: fallbackId, type: "assistant", blocks: [], done: true });
+        return blocks.length - 1;
+      };
 
       for (let i = 0; i < raw.length; i++) {
         const msg = raw[i];
 
         if (msg.role === "user") {
+          // Orphaned pending blocks (no thinking arrived) — attach to last assistant
+          drainPending();
           blocks.push({
             id: msg.id,
             type: "user",
             text: msg.content?.text ?? "",
           });
+
         } else if (msg.role === "assistant") {
           const text = msg.content?.text ?? "";
           const type = msg.content?.type ?? "text";
 
           if (type === "thinking" && text) {
-            // Attach thinking block to the last assistant message, or create one
+            // Attach thinking first, then drain buffered tools/question after it
+            const thinkingBlock: ContentBlock = { kind: "thinking", text, streaming: false };
             const last = blocks[blocks.length - 1];
-            const thinkingBlock: ContentBlock = {
-              kind: "thinking",
-              text,
-              streaming: false,
-            };
             if (last?.type === "assistant") {
               blocks[blocks.length - 1] = {
                 ...last,
                 blocks: [...last.blocks, thinkingBlock],
               };
             } else {
-              blocks.push({
-                id: msg.id,
-                type: "assistant",
-                blocks: [thinkingBlock],
-                done: true,
-              });
+              blocks.push({ id: msg.id, type: "assistant", blocks: [thinkingBlock], done: true });
             }
+            drainPending();
+
           } else if (type === "text" && text) {
-            // Attach text to last assistant block (same turn as thinking), or create new
-            const last = blocks[blocks.length - 1];
-            if (last?.type === "assistant" && last.blocks.some((b) => b.kind === "thinking")) {
-              blocks[blocks.length - 1] = {
-                ...last,
-                blocks: [...last.blocks, { kind: "text", text }],
-              };
+            // Drain any pending blocks first (tools from a no-thinking iteration)
+            drainPending();
+            const idx = getOrCreateAssistant(msg.id);
+            const prev = blocks[idx] as Extract<MessageBlock, { type: "assistant" }>;
+            const lastContent = prev.blocks[prev.blocks.length - 1];
+            if (lastContent?.kind !== "text") {
+              blocks[idx] = { ...prev, blocks: [...prev.blocks, { kind: "text", text }] };
             } else {
-              blocks.push({
-                id: msg.id,
-                type: "assistant",
-                blocks: [{ kind: "text", text }],
-                done: true,
-              });
+              blocks.push({ id: msg.id, type: "assistant", blocks: [{ kind: "text", text }], done: true });
             }
           }
+
+        } else if (msg.role === "tool") {
+          const toolName = msg.toolName;
+          if (!toolName || HIDDEN_TOOLS.has(toolName)) continue;
+
+          pending.push({
+            kind: "tool",
+            state: {
+              toolCallId: msg.id,
+              name: toolName,
+              label: TOOL_LABELS[toolName] ?? toolName,
+              args: (msg.toolArgs as Record<string, unknown>) ?? {},
+              status: "done",
+              result: msg.toolResult,
+            },
+          });
+
         } else if (msg.role === "question") {
           const payload = msg.content?.payload;
           if (!payload) continue;
 
-          // Find the next user message to recover the answered value
           const nextUser = raw.slice(i + 1).find((m) => m.role === "user");
-          const answeredValue = nextUser?.content?.text;
+          // Use OpenAI call_id when present so answering sends the correct id (fixes "No tool output found for function call")
+          const toolCallId = msg.content?.callId ?? msg.id;
 
-          const questionBlock: ContentBlock = {
+          // Buffer the question together with tools; all will be drained after thinking
+          pending.push({
             kind: "question",
-            toolCallId: msg.id,
+            toolCallId,
             payload,
-            answered: true,
-            answeredValue,
-          };
-
-          // Attach to the last assistant block, or create a new one
-          const last = blocks[blocks.length - 1];
-          if (last?.type === "assistant") {
-            blocks[blocks.length - 1] = {
-              ...last,
-              blocks: [...last.blocks, questionBlock],
-            };
-          } else {
-            blocks.push({
-              id: msg.id,
-              type: "assistant",
-              blocks: [questionBlock],
-              done: true,
-            });
-          }
+            answered: !!nextUser,
+            answeredValue: nextUser?.content?.text,
+          });
         }
-        // tool role: skip — granular tool steps are not worth re-rendering
       }
+
+      // Drain anything left at the end (e.g. conversation ends with a question)
+      drainPending();
 
       setMessages(blocks);
       setConversationId(convId);

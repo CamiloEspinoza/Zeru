@@ -157,7 +157,7 @@ export const ACCOUNTING_TOOLS: FunctionTool[] = [
     type: 'function',
     name: 'list_journal_entries',
     description:
-      'Lista los asientos contables del tenant. Permite filtrar por estado (DRAFT, POSTED, VOIDED). Usa para revisar asientos existentes.',
+      'Lista los asientos contables del tenant con detalle completo: cada asiento incluye sus líneas (cuenta, código, débito, crédito, descripción). Permite filtrar por estado (DRAFT, POSTED, VOIDED). Úsala para revisar asientos existentes y ver el detalle necesario para recrear o reversar asientos.',
     parameters: {
       type: 'object',
       properties: {
@@ -354,8 +354,13 @@ NO guardes: información transitoria, datos ya en el sistema contable, resultado
           description:
             'tenant = se aplica a toda la organización (compartido con todos sus usuarios). user = preferencia personal del usuario actual.',
         },
+        documentId: {
+          type: 'string',
+          description:
+            'ID del documento de origen (UUID) si la memoria fue extraída de un documento adjunto. Cadena vacía "" si no proviene de un documento.',
+        },
       },
-      required: ['content', 'category', 'importance', 'scope'],
+      required: ['content', 'category', 'importance', 'scope', 'documentId'],
       additionalProperties: false,
     },
     strict: true,

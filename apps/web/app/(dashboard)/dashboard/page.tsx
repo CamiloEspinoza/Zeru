@@ -1,5 +1,4 @@
 import { IncomeStatement } from "./components/income-statement";
-import { AccountingProcessProgress } from "./components/accounting-process-progress";
 
 export default function DashboardPage() {
   return (
@@ -9,9 +8,8 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Bienvenido a Zeru</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="w-full">
         <IncomeStatement />
-        <AccountingProcessProgress />
       </div>
     </div>
   );

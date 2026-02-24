@@ -67,9 +67,29 @@ export class ReportsService {
     return result;
   }
 
-  async incomeStatement(tenantId: string, year: number) {
-    const startDate = new Date(`${year}-01-01`);
-    const endDate = new Date(`${year + 1}-01-01`);
+  async incomeStatement(
+    tenantId: string,
+    opts: { fiscalPeriodId?: string; year?: number },
+  ) {
+    let startDate: Date;
+    let endDate: Date;
+
+    if (opts.fiscalPeriodId) {
+      const period = await this.prisma.fiscalPeriod.findFirst({
+        where: { id: opts.fiscalPeriodId, tenantId },
+      });
+      if (!period)
+        throw new NotFoundException(
+          `Fiscal period ${opts.fiscalPeriodId} not found`,
+        );
+      startDate = period.startDate;
+      endDate = new Date(period.endDate);
+      endDate.setDate(endDate.getDate() + 1);
+    } else {
+      const year = opts.year ?? new Date().getFullYear();
+      startDate = new Date(`${year}-01-01`);
+      endDate = new Date(`${year + 1}-01-01`);
+    }
 
     const result = await this.prisma.$queryRaw<IncomeStatementRow[]>(
       Prisma.sql`
@@ -101,10 +121,69 @@ export class ReportsService {
     return result;
   }
 
+  /** Estado de resultados con un mes/período por columna para el año dado */
+  async incomeStatementByMonth(tenantId: string, year: number) {
+    const startOfYear = new Date(`${year}-01-01`);
+    const endOfYear = new Date(`${year}-12-31`);
+
+    const periods = await this.prisma.fiscalPeriod.findMany({
+      where: {
+        tenantId,
+        startDate: { gte: startOfYear, lte: endOfYear },
+      },
+      orderBy: { startDate: 'asc' },
+      select: { id: true, name: true },
+    });
+
+    if (periods.length === 0) {
+      return { periods: [], rows: [] };
+    }
+
+    const periodIds = periods.map((p) => p.id);
+    const rowsByPeriod: IncomeStatementRow[][] = [];
+
+    for (const period of periods) {
+      const rows = await this.incomeStatement(tenantId, {
+        fiscalPeriodId: period.id,
+      });
+      rowsByPeriod.push(rows);
+    }
+
+    const accountMap = new Map<
+      string,
+      { account_id: string; code: string; name: string; type: string; parent_id: string | null; balances: string[] }
+    >();
+
+    for (let p = 0; p < periods.length; p++) {
+      for (const row of rowsByPeriod[p]) {
+        if (!accountMap.has(row.account_id)) {
+          accountMap.set(row.account_id, {
+            account_id: row.account_id,
+            code: row.code,
+            name: row.name,
+            type: row.type,
+            parent_id: row.parent_id,
+            balances: new Array(periods.length).fill('0'),
+          });
+        }
+        accountMap.get(row.account_id)!.balances[p] = row.balance;
+      }
+    }
+
+    const rows = Array.from(accountMap.values()).sort(
+      (a, b) => (a.code < b.code ? -1 : 1),
+    );
+
+    return {
+      periods: periods.map((p) => ({ id: p.id, name: p.name })),
+      rows,
+    };
+  }
+
   async incomeStatementAccountEntries(
     tenantId: string,
     accountId: string,
-    year: number,
+    opts: { fiscalPeriodId?: string; year?: number },
   ) {
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, tenantId },
@@ -114,8 +193,25 @@ export class ReportsService {
       throw new NotFoundException(`Account with id ${accountId} not found`);
     }
 
-    const startDate = new Date(`${year}-01-01`);
-    const endDate = new Date(`${year + 1}-01-01`);
+    let startDate: Date;
+    let endDate: Date;
+
+    if (opts.fiscalPeriodId) {
+      const period = await this.prisma.fiscalPeriod.findFirst({
+        where: { id: opts.fiscalPeriodId, tenantId },
+      });
+      if (!period)
+        throw new NotFoundException(
+          `Fiscal period ${opts.fiscalPeriodId} not found`,
+        );
+      startDate = period.startDate;
+      endDate = new Date(period.endDate);
+      endDate.setDate(endDate.getDate() + 1);
+    } else {
+      const year = opts.year ?? new Date().getFullYear();
+      startDate = new Date(`${year}-01-01`);
+      endDate = new Date(`${year + 1}-01-01`);
+    }
 
     const result = await this.prisma.$queryRaw<IncomeStatementEntryRow[]>(
       Prisma.sql`

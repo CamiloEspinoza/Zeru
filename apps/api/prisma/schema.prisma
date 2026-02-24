@@ -189,8 +189,13 @@ model Memory {
   userId String?
   user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// Documento de origen (si la memoria fue extraída de un documento)
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
   @@index([tenantId])
   @@index([userId, tenantId])
+  @@index([documentId])
   @@map("memories")
 }
 
@@ -382,6 +387,7 @@ model Document {
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   journalEntries DocumentJournalEntry[]
+  memories       Memory[]
 
   @@index([tenantId])
   @@index([conversationId])

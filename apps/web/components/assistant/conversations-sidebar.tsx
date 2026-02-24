@@ -107,8 +107,8 @@ export function ConversationsSidebar() {
                 className={cn(
                   "group relative flex items-start gap-2 px-3 py-2.5 mx-1 rounded-lg transition-colors",
                   isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    ? "bg-primary/10 text-foreground border-l-2 border-l-primary/40"
+                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                 )}
               >
                 <div className="flex-1 min-w-0">

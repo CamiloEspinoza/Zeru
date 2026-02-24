@@ -148,4 +148,11 @@ export class AiConfigService {
       data: { isActive: false },
     });
   }
+
+  async deleteKey(tenantId: string) {
+    const config = await this.prisma.aiProviderConfig.findUnique({ where: { tenantId } });
+    if (!config) throw new NotFoundException('No hay configuración de IA para este tenant');
+
+    await this.prisma.aiProviderConfig.delete({ where: { tenantId } });
+  }
 }

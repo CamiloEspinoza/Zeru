@@ -387,19 +387,37 @@ export class ToolExecutor {
     const page = args.page ? Number(args.page) : 1;
 
     const result = await this.journalEntries.findAll(tenantId, { page, perPage: 10, status });
-    const entries = (result.data as Array<{ number: number; date: Date; description: string; status: string }>)
-      .map((e) => ({
-        id: (e as any).id,
-        number: e.number,
-        date: e.date,
-        description: e.description,
-        status: e.status,
-      }));
+    const entries = (result.data as Array<{
+      id: string;
+      number: number;
+      date: Date;
+      description: string;
+      status: string;
+      lines?: Array<{
+        debit: number;
+        credit: number;
+        description?: string | null;
+        account?: { code: string; name: string };
+      }>;
+    }>).map((e) => ({
+      id: e.id,
+      number: e.number,
+      date: e.date,
+      description: e.description,
+      status: e.status,
+      lines: (e.lines ?? []).map((l) => ({
+        accountCode: l.account?.code ?? '',
+        accountName: l.account?.name ?? '',
+        debit: Number(l.debit),
+        credit: Number(l.credit),
+        description: l.description ?? null,
+      })),
+    }));
 
     return {
       success: true,
       data: { entries, meta: result.meta },
-      summary: `${entries.length} asiento(s) encontrado(s) (página ${result.meta.page}/${result.meta.totalPages})`,
+      summary: `${entries.length} asiento(s) encontrado(s) (página ${result.meta.page}/${result.meta.totalPages}). Cada asiento incluye el detalle de líneas (cuenta, débito, crédito).`,
     };
   }
 
@@ -435,12 +453,16 @@ export class ToolExecutor {
     const scope = String(args.scope ?? 'tenant');
     const effectiveUserId = scope === 'user' ? userId : null;
 
+    const rawDocId = args.documentId ? String(args.documentId).trim() : '';
+    const documentId = rawDocId.length > 0 ? rawDocId : null;
+
     const memory = await this.memory.store({
       tenantId,
       userId: effectiveUserId,
       content: String(args.content),
       category: String(args.category) as MemoryCategory,
       importance: Number(args.importance ?? 5),
+      documentId,
     });
 
     return {
