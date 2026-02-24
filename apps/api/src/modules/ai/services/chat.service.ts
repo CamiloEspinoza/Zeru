@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { Subject } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { AiConfigService } from './ai-config.service';
+import { MemoryService } from './memory.service';
 import { ToolExecutor } from '../tools/tool-executor';
 import { ACCOUNTING_TOOLS, TOOL_LABELS } from '../tools/accounting-tools';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -15,7 +16,7 @@ const EXCEL_MIME_TYPES = new Set([
   'application/vnd.oasis.opendocument.spreadsheet',
 ]);
 
-const SYSTEM_PROMPT = `Eres Zeru, un asistente contable especializado en Chile que ayuda a llevar la contabilidad de empresas.
+const BASE_SYSTEM_PROMPT = `Eres Zeru, un asistente contable especializado en Chile que ayuda a llevar la contabilidad de empresas.
 
 Tienes acceso a herramientas para consultar y modificar la contabilidad del tenant actual:
 - Consultar plan de cuentas y períodos fiscales
@@ -44,7 +45,28 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 
 - Cuando entiendas con claridad de qué trata la conversación, llama a **update_conversation_title** con un título descriptivo (máximo 6 palabras, sin comillas, en el mismo idioma del usuario).
 - Puedes actualizarlo en cualquier momento si el tema de la conversación evoluciona o se vuelve más específico.
-- No es necesario esperar al final — llámalo en cuanto tengas contexto suficiente.`;
+- No es necesario esperar al final — llámalo en cuanto tengas contexto suficiente.
+
+## Memoria persistente
+
+Tienes acceso a una memoria que persiste entre conversaciones. Úsala activamente.
+
+**Cuándo guardar (memory_store):**
+- Al conocer datos clave del negocio: proveedores, clientes, cuentas preferidas, RUTs frecuentes
+- Cuando el usuario expresa una preferencia clara: "siempre usa esta cuenta", "prefiero respuestas breves"
+- Cuando se toma una decisión contable recurrente: "los salarios van al último día del mes"
+- Cuando corrijas un error previo: guarda la versión correcta
+
+**Cuándo buscar (memory_search):**
+- Antes de preguntar algo que podrías ya saber sobre la organización
+- Al inicio de una conversación cuando el contexto inyectado no es suficiente
+
+**Cuándo eliminar (memory_delete):**
+- Cuando el usuario te corrija algo que tenías en memoria
+- Cuando un dato guardado ya no aplica
+
+El contexto de la organización (scope=tenant) se comparte con todos los usuarios de la empresa.
+Las preferencias personales (scope=user) aplican solo al usuario actual.`;
 
 const MAX_AGENT_ITERATIONS = 10;
 
@@ -77,6 +99,7 @@ export class ChatService {
     private readonly toolExecutor: ToolExecutor,
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
+    private readonly memoryService: MemoryService,
   ) {}
 
   async streamChat(ctx: ChatStreamContext, subject: Subject<ChatEvent>): Promise<void> {
@@ -100,6 +123,17 @@ export class ChatService {
     const openai = new OpenAI({ apiKey });
     const isNewConversation = !ctx.conversationId;
 
+    // Build system prompt with injected memory context
+    const memoryContext = await this.memoryService.getContextForConversation({
+      tenantId: ctx.tenantId,
+      userId: ctx.userId,
+      userMessage: ctx.message,
+    });
+
+    const systemPrompt = memoryContext
+      ? `${BASE_SYSTEM_PROMPT}\n\n## Memoria cargada para esta conversación\n\n${memoryContext}`
+      : BASE_SYSTEM_PROMPT;
+
     // Associate uploaded documents with this conversation and resolve for OpenAI
     let resolvedDocs: ResolvedDocument[] = [];
     if (ctx.documentIds?.length) {
@@ -108,7 +142,7 @@ export class ChatService {
     }
 
     try {
-      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx, resolvedDocs, subject, isNewConversation });
+      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error inesperado';
       subject.next({ type: 'error', message });
@@ -131,8 +165,9 @@ export class ChatService {
     resolvedDocs: ResolvedDocument[];
     subject: Subject<ChatEvent>;
     isNewConversation: boolean;
+    systemPrompt: string;
   }) {
-    const { openai, model, conversation, ctx, resolvedDocs, subject, isNewConversation } = params;
+    const { openai, model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
 
     // Build the initial input for this turn
     let input: OpenAI.Responses.ResponseInput;
@@ -192,9 +227,9 @@ export class ChatService {
         // Continuing an existing conversation
         input = [{ role: 'user', content: userContent }];
       } else {
-        // Fresh conversation
+        // Fresh conversation — inject system prompt with memory context
         input = [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
         ];
       }
@@ -327,7 +362,7 @@ export class ChatService {
             } as OpenAI.Responses.ResponseInputItem.FunctionCallOutput);
           } else {
             // Execute tool and collect output for next iteration
-            const result = await this.toolExecutor.execute(toolName, args, ctx.tenantId);
+            const result = await this.toolExecutor.execute(toolName, args, ctx.tenantId, ctx.userId);
             subject.next({
               type: 'tool_done',
               toolCallId: itemId,

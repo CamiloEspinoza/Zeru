@@ -314,6 +314,98 @@ export const ACCOUNTING_TOOLS: FunctionTool[] = [
     },
     strict: true,
   },
+
+  // ─── Memory tools ────────────────────────────────────────────────────────────
+
+  {
+    type: 'function',
+    name: 'memory_store',
+    description: `Guarda un hecho, preferencia, decisión o patrón importante en la memoria persistente del asistente.
+Úsala cuando aprendas algo relevante sobre la organización o el usuario que debería recordarse en futuras conversaciones.
+
+Ejemplos de qué guardar:
+- Preferencias contables: "El cliente prefiere que los asientos de IVA usen la cuenta 2.1.02.001"
+- Patrones recurrentes: "Los salarios se registran el último día de cada mes"
+- Decisiones clave: "Se acordó no usar asientos de ajuste automático"
+- Datos del negocio: "El proveedor principal de servicios es Empresa X, RUT 76.xxx.xxx-x"
+- Preferencias del usuario: "El usuario prefiere respuestas breves y directas"
+
+NO guardes: información transitoria, datos ya en el sistema contable, resultados de consultas puntuales.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'string',
+          description: 'El hecho o preferencia a recordar. Debe ser una oración clara y completa.',
+        },
+        category: {
+          type: 'string',
+          enum: ['PREFERENCE', 'FACT', 'PROCEDURE', 'DECISION', 'CONTEXT'],
+          description:
+            'PREFERENCE: preferencias del usuario/organización. FACT: datos objetivos del negocio. PROCEDURE: procedimientos recurrentes. DECISION: decisiones tomadas. CONTEXT: contexto general.',
+        },
+        importance: {
+          type: 'number',
+          description: 'Relevancia del 1 al 10. 10 = crítico para la contabilidad. 5 = útil pero no crítico. 1 = dato secundario.',
+        },
+        scope: {
+          type: 'string',
+          enum: ['tenant', 'user'],
+          description:
+            'tenant = se aplica a toda la organización (compartido con todos sus usuarios). user = preferencia personal del usuario actual.',
+        },
+      },
+      required: ['content', 'category', 'importance', 'scope'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'memory_search',
+    description:
+      'Busca en la memoria persistente del asistente por similitud semántica. Úsala cuando necesites recordar algo específico sobre la organización o el usuario que pueda estar guardado en memoria.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Texto de búsqueda. Puede ser una pregunta o descripción de lo que quieres recordar.',
+        },
+        scope: {
+          type: 'string',
+          enum: ['tenant', 'user', 'all'],
+          description:
+            'tenant = solo memorias de la organización. user = solo memorias del usuario. all = ambos (predeterminado).',
+        },
+      },
+      required: ['query', 'scope'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'memory_delete',
+    description:
+      'Elimina una memoria que ya no es válida, está desactualizada o fue guardada por error. Úsala cuando el usuario corrija información que tenías en memoria o cuando algo ya no aplique.',
+    parameters: {
+      type: 'object',
+      properties: {
+        memoryId: {
+          type: 'string',
+          description: 'ID de la memoria a eliminar (obtenido de memory_search)',
+        },
+        reason: {
+          type: 'string',
+          description: 'Breve motivo de la eliminación (para el log interno)',
+        },
+      },
+      required: ['memoryId', 'reason'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 /** Human-readable labels para las herramientas */
@@ -331,4 +423,7 @@ export const TOOL_LABELS: Record<string, string> = {
   tag_document: 'Clasificando documento',
   link_document_to_entry: 'Vinculando documento a asiento',
   ask_user_question: 'Preguntando al usuario',
+  memory_store: 'Guardando en memoria',
+  memory_search: 'Buscando en memoria',
+  memory_delete: 'Eliminando de memoria',
 };

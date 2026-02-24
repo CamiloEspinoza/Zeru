@@ -27,6 +27,7 @@ model Tenant {
   journalEntries JournalEntry[]
   fiscalPeriods  FiscalPeriod[]
   documents      Document[]
+  memories       Memory[]
 
   @@map("tenants")
 }
@@ -44,6 +45,7 @@ model User {
   memberships   UserTenant[]
   conversations Conversation[]
   documents     Document[]
+  memories      Memory[]
 
   @@map("users")
 }
@@ -151,6 +153,43 @@ model Message {
 
   @@index([conversationId])
   @@map("messages")
+}
+
+// ─── Memory ──────────────────────────────────────────────
+
+enum MemoryCategory {
+  PREFERENCE
+  FACT
+  PROCEDURE
+  DECISION
+  CONTEXT
+
+  @@map("memory_category")
+}
+
+/// Memoria persistente del asistente por tenant/usuario
+model Memory {
+  id         String         @id @default(uuid())
+  content    String
+  category   MemoryCategory @default(CONTEXT)
+  /// Relevancia 1-10; el modelo asigna la importancia al guardar
+  importance Int            @default(5)
+  /// Embedding pgvector(1536) para búsqueda semántica — gestionado via raw SQL
+  embedding  Unsupported("vector(1536)")?
+  isActive   Boolean        @default(true)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// null = memoria de la organización; userId presente = memoria del usuario
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, tenantId])
+  @@map("memories")
 }
 
 // ─── Accounting ──────────────────────────────────────────
