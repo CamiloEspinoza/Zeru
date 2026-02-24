@@ -31,4 +31,23 @@ export class ReportsController {
       endDate,
     );
   }
+
+  @Get('income-statement')
+  incomeStatement(
+    @CurrentTenant() tenantId: string,
+    @Query('year') year: string,
+  ) {
+    const yearNum = year ? parseInt(year, 10) : new Date().getFullYear();
+    return this.reportsService.incomeStatement(tenantId, yearNum);
+  }
+
+  @Get('income-statement/account-entries')
+  incomeStatementAccountEntries(
+    @CurrentTenant() tenantId: string,
+    @Query('accountId') accountId: string,
+    @Query('year') year: string,
+  ) {
+    const yearNum = year ? parseInt(year, 10) : new Date().getFullYear();
+    return this.reportsService.incomeStatementAccountEntries(tenantId, accountId, yearNum);
+  }
 }

@@ -48,3 +48,39 @@ export type CreateAccountSchema = z.infer<typeof createAccountSchema>;
 export type UpdateAccountSchema = z.infer<typeof updateAccountSchema>;
 export type CreateJournalEntrySchema = z.infer<typeof createJournalEntrySchema>;
 export type CreateFiscalPeriodSchema = z.infer<typeof createFiscalPeriodSchema>;
+
+// ─── Process Steps ───────────────────────────────────────────────
+
+const STEP_STATUSES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED'] as const;
+
+export const createProcessStepSchema = z.object({
+  name: z.string().min(1, 'Nombre requerido'),
+  description: z.string().optional(),
+  order: z.number().int().min(0),
+});
+
+export const updateProcessStepSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+export const updateStepCompletionSchema = z.object({
+  fiscalPeriodId: z.string().uuid('Período fiscal requerido'),
+  status: z.enum(STEP_STATUSES),
+  notes: z.string().optional(),
+});
+
+export const reorderStepsSchema = z.object({
+  steps: z.array(
+    z.object({
+      id: z.string().uuid(),
+      order: z.number().int().min(0),
+    }),
+  ),
+});
+
+export type CreateProcessStepSchema = z.infer<typeof createProcessStepSchema>;
+export type UpdateProcessStepSchema = z.infer<typeof updateProcessStepSchema>;
+export type UpdateStepCompletionSchema = z.infer<typeof updateStepCompletionSchema>;
+export type ReorderStepsSchema = z.infer<typeof reorderStepsSchema>;

@@ -81,3 +81,76 @@ export interface CreateFiscalPeriodInput {
   startDate: string;
   endDate: string;
 }
+
+// ─── Income Statement ────────────────────────────────────────────
+
+export interface IncomeStatementRow {
+  account_id: string;
+  code: string;
+  name: string;
+  type: 'REVENUE' | 'EXPENSE';
+  parent_id: string | null;
+  balance: string;
+}
+
+export interface IncomeStatementEntryRow {
+  journal_entry_id: string;
+  entry_date: Date;
+  entry_number: number;
+  description: string;
+  debit: string;
+  credit: string;
+  balance: string;
+}
+
+// ─── Accounting Process ──────────────────────────────────────────
+
+export type StepStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED';
+
+export interface AccountingProcessStep {
+  id: string;
+  name: string;
+  description: string | null;
+  order: number;
+  tenantId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AccountingStepCompletion {
+  id: string;
+  stepId: string;
+  fiscalPeriodId: string;
+  status: StepStatus;
+  completedAt: Date | null;
+  notes: string | null;
+  completedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ProcessStepWithCompletion extends AccountingProcessStep {
+  completion: AccountingStepCompletion | null;
+}
+
+export interface CreateProcessStepInput {
+  name: string;
+  description?: string;
+  order: number;
+}
+
+export interface UpdateProcessStepInput {
+  name?: string;
+  description?: string;
+  order?: number;
+}
+
+export interface UpdateStepCompletionInput {
+  fiscalPeriodId: string;
+  status: StepStatus;
+  notes?: string;
+}
+
+export interface ReorderStepsInput {
+  steps: Array<{ id: string; order: number }>;
+}
