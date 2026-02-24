@@ -19,6 +19,13 @@ export const chatRequestSchema = z.object({
   documentIds: z.array(z.string().uuid()).optional(),
 });
 
+export const updateMemorySchema = z.object({
+  content: z.string().min(1).optional(),
+  category: z.enum(['PREFERENCE', 'FACT', 'PROCEDURE', 'DECISION', 'CONTEXT']).optional(),
+  importance: z.number().int().min(1).max(10).optional(),
+});
+
 export type UpsertAiConfigDto = z.infer<typeof upsertAiConfigSchema>;
 export type ValidateKeyDto = z.infer<typeof validateKeySchema>;
 export type ChatRequestDto = z.infer<typeof chatRequestSchema>;
+export type UpdateMemoryDto = z.infer<typeof updateMemorySchema>;
