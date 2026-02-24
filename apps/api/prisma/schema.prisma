@@ -20,13 +20,14 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    UserTenant[]
-  aiConfig       AiProviderConfig?
-  conversations  Conversation[]
-  accounts       Account[]
-  journalEntries JournalEntry[]
-  fiscalPeriods  FiscalPeriod[]
-  documents      Document[]
+  memberships          UserTenant[]
+  aiConfig             AiProviderConfig?
+  conversations        Conversation[]
+  accounts             Account[]
+  journalEntries       JournalEntry[]
+  fiscalPeriods        FiscalPeriod[]
+  documents            Document[]
+  accountingSteps      AccountingProcessStep[]
 
   @@map("tenants")
 }
@@ -41,9 +42,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships   UserTenant[]
-  conversations Conversation[]
-  documents     Document[]
+  memberships        UserTenant[]
+  conversations      Conversation[]
+  documents          Document[]
+  stepCompletions    AccountingStepCompletion[]
 
   @@map("users")
 }
@@ -244,7 +246,8 @@ model FiscalPeriod {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  journalEntries JournalEntry[]
+  journalEntries      JournalEntry[]
+  stepCompletions     AccountingStepCompletion[]
 
   @@index([tenantId])
   @@map("fiscal_periods")
@@ -253,6 +256,54 @@ model FiscalPeriod {
 enum FiscalPeriodStatus {
   OPEN
   CLOSED
+}
+
+/// Paso del proceso contable configurable por organización
+model AccountingProcessStep {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  order       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  completions AccountingStepCompletion[]
+
+  @@index([tenantId])
+  @@map("accounting_process_steps")
+}
+
+/// Estado de completitud de un paso de proceso para un período fiscal
+model AccountingStepCompletion {
+  id          String     @id @default(uuid())
+  status      StepStatus @default(PENDING)
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  stepId String
+  step   AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  fiscalPeriodId String
+  fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id], onDelete: Cascade)
+
+  completedById String?
+  completedBy   User?  @relation(fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@unique([stepId, fiscalPeriodId])
+  @@index([fiscalPeriodId])
+  @@map("accounting_step_completions")
+}
+
+enum StepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
 }
 
 // ─── Documents ────────────────────────────────────────────

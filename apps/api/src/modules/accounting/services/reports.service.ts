@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import type { IncomeStatementRow, IncomeStatementEntryRow } from '@zeru/shared';
 
 @Injectable()
 export class ReportsService {
@@ -60,6 +61,80 @@ export class ReportsService {
           END AS balance
         FROM movements
         ORDER BY code
+      `,
+    );
+
+    return result;
+  }
+
+  async incomeStatement(tenantId: string, year: number) {
+    const startDate = new Date(`${year}-01-01`);
+    const endDate = new Date(`${year + 1}-01-01`);
+
+    const result = await this.prisma.$queryRaw<IncomeStatementRow[]>(
+      Prisma.sql`
+        SELECT
+          a.id AS account_id,
+          a.code,
+          a.name,
+          a.type,
+          a."parentId" AS parent_id,
+          CASE
+            WHEN a.type = 'REVENUE'
+              THEN (SUM(COALESCE(jel.credit, 0)) - SUM(COALESCE(jel.debit, 0)))::numeric(18,2)::text
+            ELSE
+              (SUM(COALESCE(jel.debit, 0)) - SUM(COALESCE(jel.credit, 0)))::numeric(18,2)::text
+          END AS balance
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel."journalEntryId"
+        JOIN accounts a ON a.id = jel."accountId"
+        WHERE je."tenantId" = ${tenantId}
+          AND je.status = 'POSTED'
+          AND je.date >= ${startDate}
+          AND je.date < ${endDate}
+          AND a.type IN ('REVENUE', 'EXPENSE')
+        GROUP BY a.id, a.code, a.name, a.type, a."parentId"
+        ORDER BY a.code
+      `,
+    );
+
+    return result;
+  }
+
+  async incomeStatementAccountEntries(
+    tenantId: string,
+    accountId: string,
+    year: number,
+  ) {
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, tenantId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account with id ${accountId} not found`);
+    }
+
+    const startDate = new Date(`${year}-01-01`);
+    const endDate = new Date(`${year + 1}-01-01`);
+
+    const result = await this.prisma.$queryRaw<IncomeStatementEntryRow[]>(
+      Prisma.sql`
+        SELECT
+          je.id AS journal_entry_id,
+          je.date AS entry_date,
+          je.number AS entry_number,
+          je.description,
+          jel.debit::numeric(18,2)::text AS debit,
+          jel.credit::numeric(18,2)::text AS credit,
+          SUM(jel.debit - jel.credit) OVER (ORDER BY je.date, je.number)::numeric(18,2)::text AS balance
+        FROM journal_entry_lines jel
+        JOIN journal_entries je ON je.id = jel."journalEntryId"
+        WHERE je."tenantId" = ${tenantId}
+          AND je.status = 'POSTED'
+          AND jel."accountId" = ${accountId}
+          AND je.date >= ${startDate}
+          AND je.date < ${endDate}
+        ORDER BY je.date, je.number
       `,
     );
 

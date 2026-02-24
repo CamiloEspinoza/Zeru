@@ -13,6 +13,7 @@ import {
   Building06Icon,
   UserMultipleIcon,
   ArrowRight01Icon,
+  CheckListIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -66,6 +67,7 @@ const settingsNav: NavItem[] = [
   { title: "Organización", href: "/settings/organization", icon: Building06Icon },
   { title: "Usuarios", href: "/settings/users", icon: UserMultipleIcon },
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
+  { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
 ];
 
 export function NavMain() {

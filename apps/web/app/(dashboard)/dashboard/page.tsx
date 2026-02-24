@@ -1,18 +1,7 @@
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { IncomeStatement } from "./components/income-statement";
+import { AccountingProcessProgress } from "./components/accounting-process-progress";
 
 export default function DashboardPage() {
-  const stats = [
-    { name: "Cuentas", value: "—" },
-    { name: "Asientos del mes", value: "—" },
-    { name: "Período actual", value: "—" },
-    { name: "Usuarios", value: "—" },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -20,17 +9,9 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Bienvenido a Zeru</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.name}>
-            <CardHeader>
-              <CardTitle>{stat.name}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold">{stat.value}</p>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <IncomeStatement />
+        <AccountingProcessProgress />
       </div>
     </div>
   );
