@@ -16,21 +16,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
-import type { IncomeStatementRow, IncomeStatementEntryRow } from "@zeru/shared";
+import type {
+  IncomeStatementRow,
+  IncomeStatementEntryRow,
+  AccountIFRSSection,
+} from "@zeru/shared";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  ArrowRight01Icon,
-  Loading02Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Loading02Icon } from "@hugeicons/core-free-icons";
 import { downloadExcel } from "@/lib/export-excel";
+import { cn } from "@/lib/utils";
+
+// ─── IAS 1 section config ────────────────────────────────────────
+
+interface SectionDef {
+  key: AccountIFRSSection;
+  label: string;
+  /** P&L sign: revenues add, costs subtract from gross/operating/etc. */
+  sign: 1 | -1;
+}
+
+// Ordered sections according to IAS 1 (function method)
+const IAS1_SECTIONS: SectionDef[] = [
+  { key: "REVENUE",            label: "Ingresos de Actividades Ordinarias", sign: 1 },
+  { key: "OTHER_INCOME",       label: "Otros Ingresos",                     sign: 1 },
+  { key: "COST_OF_SALES",      label: "Costo de Ventas",                    sign: -1 },
+  { key: "OPERATING_EXPENSE",  label: "Gastos de Administración y Ventas",  sign: -1 },
+  { key: "FINANCE_INCOME",     label: "Ingresos Financieros",               sign: 1 },
+  { key: "FINANCE_COST",       label: "Gastos Financieros",                 sign: -1 },
+  { key: "TAX_EXPENSE",        label: "Gasto por Impuesto a las Ganancias", sign: -1 },
+];
+
+// Subtotal rows inserted after specific sections
+const SUBTOTAL_AFTER: Partial<Record<AccountIFRSSection, string>> = {
+  COST_OF_SALES:     "Resultado Bruto",
+  OPERATING_EXPENSE: "Resultado Operativo",
+  FINANCE_COST:      "Resultado antes de Impuesto",
+};
+
+// ─── Month abbreviations ─────────────────────────────────────────
 
 const MONTH_ABBR: Record<string, string> = {
   Enero: "Ene", Febrero: "Feb", Marzo: "Mar", Abril: "Abr", Mayo: "May",
@@ -38,7 +64,6 @@ const MONTH_ABBR: Record<string, string> = {
   Octubre: "Oct", Noviembre: "Nov", Diciembre: "Dic",
 };
 
-/** Abrevia el nombre del mes y quita el año (el año ya está en el selector). */
 function monthColumnLabel(name: string): string {
   let out = name;
   for (const [full, abbr] of Object.entries(MONTH_ABBR)) {
@@ -47,58 +72,7 @@ function monthColumnLabel(name: string): string {
   return out.replace(/\s*(?:-\s*)?\d{4}$/, "").trim() || out;
 }
 
-// ─── Tree builder ────────────────────────────────────────────────
-
-interface AccountNode {
-  account_id: string;
-  code: string;
-  name: string;
-  type: "REVENUE" | "EXPENSE";
-  parent_id: string | null;
-  balance: number;
-  children: AccountNode[];
-}
-
-function buildTree(rows: IncomeStatementRow[]): AccountNode[] {
-  const map = new Map<string, AccountNode>();
-
-  for (const row of rows) {
-    map.set(row.account_id, {
-      ...row,
-      balance: parseFloat(row.balance),
-      children: [],
-    });
-  }
-
-  const roots: AccountNode[] = [];
-
-  for (const node of map.values()) {
-    if (node.parent_id && map.has(node.parent_id)) {
-      map.get(node.parent_id)!.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  }
-
-  // For parent nodes without direct entries, sum children
-  function sumChildren(node: AccountNode): number {
-    if (node.children.length === 0) return node.balance;
-    const sum = node.children.reduce((acc, c) => acc + sumChildren(c), 0);
-    node.balance = sum;
-    return sum;
-  }
-
-  roots.forEach(sumChildren);
-  return roots;
-}
-
-function splitByType(roots: AccountNode[]) {
-  const revenue = roots.filter((n) => n.type === "REVENUE");
-  const expense = roots.filter((n) => n.type === "EXPENSE");
-  return { revenue, expense };
-}
-
-// ─── By-month (one column per period) ──────────────────────────────
+// ─── Data types ───────────────────────────────────────────────────
 
 interface RowByMonth {
   account_id: string;
@@ -106,6 +80,7 @@ interface RowByMonth {
   name: string;
   type: string;
   parent_id: string | null;
+  ifrs_section: AccountIFRSSection;
   balances: string[];
 }
 
@@ -115,13 +90,15 @@ interface AccountNodeMulti {
   name: string;
   type: "REVENUE" | "EXPENSE";
   parent_id: string | null;
+  ifrs_section: AccountIFRSSection;
   balances: number[];
   children: AccountNodeMulti[];
 }
 
+// ─── Tree builder ─────────────────────────────────────────────────
+
 function buildTreeMulti(rows: RowByMonth[], periodCount: number): AccountNodeMulti[] {
   const map = new Map<string, AccountNodeMulti>();
-
   for (const row of rows) {
     const balances = row.balances.map((b) => parseFloat(b));
     while (balances.length < periodCount) balances.push(0);
@@ -132,9 +109,7 @@ function buildTreeMulti(rows: RowByMonth[], periodCount: number): AccountNodeMul
       children: [],
     });
   }
-
   const roots: AccountNodeMulti[] = [];
-
   for (const node of map.values()) {
     if (node.parent_id && map.has(node.parent_id)) {
       map.get(node.parent_id)!.children.push(node);
@@ -142,41 +117,57 @@ function buildTreeMulti(rows: RowByMonth[], periodCount: number): AccountNodeMul
       roots.push(node);
     }
   }
-
   function sumChildren(node: AccountNodeMulti): number[] {
     if (node.children.length === 0) return node.balances;
     const n = node.balances.length;
     const sum = new Array(n).fill(0);
     for (const c of node.children) {
-      const childSums = sumChildren(c);
-      for (let i = 0; i < n; i++) sum[i] += childSums[i];
+      const cs = sumChildren(c);
+      for (let i = 0; i < n; i++) sum[i] += cs[i];
     }
     node.balances = sum;
     return sum;
   }
-
   roots.forEach(sumChildren);
   return roots;
 }
 
-function splitByTypeMulti(roots: AccountNodeMulti[]) {
-  const revenue = roots.filter((n) => n.type === "REVENUE");
-  const expense = roots.filter((n) => n.type === "EXPENSE");
-  return { revenue, expense };
+/** Group tree nodes by their ifrs_section */
+function groupBySection(
+  nodes: AccountNodeMulti[]
+): Map<AccountIFRSSection, AccountNodeMulti[]> {
+  const map = new Map<AccountIFRSSection, AccountNodeMulti[]>();
+  for (const node of nodes) {
+    const key = node.ifrs_section || "";
+    if (!map.has(key as AccountIFRSSection)) map.set(key as AccountIFRSSection, []);
+    map.get(key as AccountIFRSSection)!.push(node);
+    // Flatten children that belong to a different section up to root level
+    // (children already inherit section from the query — they stay nested)
+  }
+  return map;
 }
 
-// ─── Entry rows subcomponent ──────────────────────────────────────
+function sectionTotal(nodes: AccountNodeMulti[], periodIdx: number): number {
+  return nodes.reduce((s, n) => s + (n.balances[periodIdx] ?? 0), 0);
+}
 
-interface EntrySubtableProps {
+function sectionTotalAll(nodes: AccountNodeMulti[]): number {
+  return nodes.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0);
+}
+
+// ─── Entry subtable ───────────────────────────────────────────────
+
+function EntrySubtable({
+  accountId,
+  fiscalPeriodId,
+  tenantId,
+}: {
   accountId: string;
   fiscalPeriodId: string;
   tenantId: string;
-}
-
-function EntrySubtable({ accountId, fiscalPeriodId, tenantId }: EntrySubtableProps) {
+}) {
   const [rows, setRows] = useState<IncomeStatementEntryRow[]>([]);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     api
       .get<IncomeStatementEntryRow[]>(
@@ -191,16 +182,11 @@ function EntrySubtable({ accountId, fiscalPeriodId, tenantId }: EntrySubtablePro
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
         <HugeiconsIcon icon={Loading02Icon} className="size-3 animate-spin" />
-        Cargando movimientos...
+        Cargando...
       </div>
     );
-
   if (rows.length === 0)
-    return (
-      <p className="px-3 py-2 text-xs text-muted-foreground">
-        Sin movimientos contabilizados.
-      </p>
-    );
+    return <p className="px-3 py-2 text-xs text-muted-foreground">Sin movimientos.</p>;
 
   return (
     <div className="overflow-x-auto">
@@ -228,18 +214,12 @@ function EntrySubtable({ accountId, fiscalPeriodId, tenantId }: EntrySubtablePro
                   #{row.entry_number}
                 </Link>
               </td>
-              <td className="py-1.5 px-3 max-w-[200px] truncate">
-                {row.description}
+              <td className="py-1.5 px-3 max-w-[200px] truncate">{row.description}</td>
+              <td className="py-1.5 px-3 text-right tabular-nums">
+                {parseFloat(row.debit) > 0 ? formatCLP(parseFloat(row.debit)) : "—"}
               </td>
               <td className="py-1.5 px-3 text-right tabular-nums">
-                {parseFloat(row.debit) > 0
-                  ? formatCLP(parseFloat(row.debit))
-                  : "—"}
-              </td>
-              <td className="py-1.5 px-3 text-right tabular-nums">
-                {parseFloat(row.credit) > 0
-                  ? formatCLP(parseFloat(row.credit))
-                  : "—"}
+                {parseFloat(row.credit) > 0 ? formatCLP(parseFloat(row.credit)) : "—"}
               </td>
             </tr>
           ))}
@@ -249,315 +229,229 @@ function EntrySubtable({ accountId, fiscalPeriodId, tenantId }: EntrySubtablePro
   );
 }
 
-// ─── Account tree node ────────────────────────────────────────────
-
-interface AccountRowProps {
-  node: AccountNode;
-  depth: number;
-  fiscalPeriodId: string;
-  tenantId: string;
-}
-
-function AccountRow({ node, depth, fiscalPeriodId, tenantId }: AccountRowProps) {
-  const [open, setOpen] = useState(false);
-  const [entriesOpen, setEntriesOpen] = useState(false);
-  const isLeaf = node.children.length === 0;
-  const indent = depth * 16;
-
-  const valueColor =
-    node.balance >= 0
-      ? "text-foreground"
-      : "text-destructive";
-
-  return (
-    <>
-      {isLeaf ? (
-        <>
-          <Collapsible open={entriesOpen} onOpenChange={setEntriesOpen}>
-            <CollapsibleTrigger asChild>
-              <div
-                className="flex items-center justify-between py-1.5 px-3 rounded hover:bg-muted/40 cursor-pointer group text-sm"
-                style={{ paddingLeft: `${indent + 12}px` }}
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <HugeiconsIcon
-                    icon={ArrowRight01Icon}
-                    className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 ${entriesOpen ? "rotate-90" : ""}`}
-                  />
-                  <span className="font-mono text-xs text-muted-foreground shrink-0">
-                    {node.code}
-                  </span>
-                  <span className="truncate">{node.name}</span>
-                </div>
-                <span className={`tabular-nums text-xs font-medium shrink-0 ml-4 ${valueColor}`}>
-                  {formatCLP(node.balance)}
-                </span>
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="bg-muted/20 border-l-2 border-border ml-6 my-0.5 rounded-sm">
-                <EntrySubtable
-                  accountId={node.account_id}
-                  fiscalPeriodId={fiscalPeriodId}
-                  tenantId={tenantId}
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </>
-      ) : (
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleTrigger asChild>
-            <div
-              className="flex items-center justify-between py-1.5 px-3 rounded hover:bg-muted/40 cursor-pointer text-sm font-medium"
-              style={{ paddingLeft: `${indent + 12}px` }}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
-                  className={`size-3 shrink-0 text-muted-foreground transition-transform duration-150 ${open ? "rotate-90" : ""}`}
-                />
-                <span className="font-mono text-xs text-muted-foreground shrink-0">
-                  {node.code}
-                </span>
-                <span className="truncate">{node.name}</span>
-              </div>
-              <span className={`tabular-nums text-xs font-semibold shrink-0 ml-4 ${valueColor}`}>
-                {formatCLP(node.balance)}
-              </span>
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            {node.children.map((child) => (
-              <AccountRow
-                key={child.account_id}
-                node={child}
-                depth={depth + 1}
-                fiscalPeriodId={fiscalPeriodId}
-                tenantId={tenantId}
-              />
-            ))}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-    </>
-  );
-}
-
-// ─── Section (Ingresos / Gastos) ──────────────────────────────────
-
-interface SectionProps {
-  label: string;
-  nodes: AccountNode[];
-  total: number;
-  fiscalPeriodId: string;
-  tenantId: string;
-  defaultOpen?: boolean;
-}
-
-function Section({ label, nodes, total, fiscalPeriodId, tenantId, defaultOpen = false }: SectionProps) {
-  const [open, setOpen] = useState(defaultOpen);
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger asChild>
-        <div className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-muted/30 cursor-pointer group">
-          <div className="flex items-center gap-2">
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              className={`size-4 text-muted-foreground transition-transform duration-150 ${open ? "rotate-90" : ""}`}
-            />
-            <span className="font-semibold text-sm">{label}</span>
-          </div>
-          <span className="text-sm font-bold tabular-nums">
-            {formatCLP(total)}
-          </span>
-        </div>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="pl-2">
-        {nodes.map((node) => (
-          <AccountRow
-            key={node.account_id}
-            node={node}
-            depth={0}
-            fiscalPeriodId={fiscalPeriodId}
-            tenantId={tenantId}
-          />
-        ))}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-// ─── Process step (for progress count) ──────────────────────────────
-
-interface ProcessStepWithCompletion {
-  id: string;
-  name: string;
-  completion?: { status: string } | null;
-}
+// ─── Year options ─────────────────────────────────────────────────
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => CURRENT_YEAR - i);
 
-// ─── Main widget ──────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────
 
 export function IncomeStatement() {
   const { tenant } = useTenantContext();
-  const tenantId = tenant?.id ?? (typeof window !== "undefined" ? localStorage.getItem("tenant_id") ?? "" : "");
+  const tenantId =
+    tenant?.id ??
+    (typeof window !== "undefined" ? localStorage.getItem("tenant_id") ?? "" : "");
 
-  const [monthlyYear, setMonthlyYear] = useState(CURRENT_YEAR);
-  const [monthlyData, setMonthlyData] = useState<{
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [data, setData] = useState<{
     periods: Array<{ id: string; name: string }>;
     rows: RowByMonth[];
   } | null>(null);
-  const [monthlyLoading, setMonthlyLoading] = useState(false);
-  const [monthlyError, setMonthlyError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadMonthly = useCallback(() => {
+  const load = useCallback(() => {
     if (!tenantId) return;
-    setMonthlyLoading(true);
-    setMonthlyError(null);
+    setLoading(true);
+    setError(null);
     api
       .get<{ periods: Array<{ id: string; name: string }>; rows: RowByMonth[] }>(
-        `/accounting/reports/income-statement/by-month?year=${monthlyYear}`,
+        `/accounting/reports/income-statement/by-month?year=${year}`,
         { tenantId }
       )
-      .then(setMonthlyData)
+      .then(setData)
       .catch((err) => {
-        setMonthlyData(null);
-        setMonthlyError(err.message ?? "Error al cargar por mes");
+        setData(null);
+        setError(err.message ?? "Error al cargar");
       })
-      .finally(() => setMonthlyLoading(false));
-  }, [tenantId, monthlyYear]);
+      .finally(() => setLoading(false));
+  }, [tenantId, year]);
 
-  useEffect(() => {
-    loadMonthly();
-  }, [loadMonthly]);
+  useEffect(() => { load(); }, [load]);
 
-  const monthlyTree = monthlyData
-    ? buildTreeMulti(monthlyData.rows, monthlyData.periods.length)
-    : [];
-  const { revenue: revenueMulti, expense: expenseMulti } = splitByTypeMulti(monthlyTree);
-  const periodCount = monthlyData?.periods.length ?? 0;
-  const totalRevenueByMonth =
-    periodCount > 0
-      ? (idx: number) =>
-          revenueMulti.reduce((s, n) => s + (n.balances[idx] ?? 0), 0)
-      : () => 0;
-  const totalExpenseByMonth =
-    periodCount > 0
-      ? (idx: number) =>
-          expenseMulti.reduce((s, n) => s + (n.balances[idx] ?? 0), 0)
-      : () => 0;
+  const periodCount = data?.periods.length ?? 0;
+  const tree = data ? buildTreeMulti(data.rows, periodCount) : [];
+  const bySection = groupBySection(tree);
 
-  function renderMonthlyRow(
-    node: AccountNodeMulti,
-    depth: number,
-    periodCount: number
+  // For "ungrouped" accounts (ifrs_section=""), show them at the bottom
+  const fallbackRevenue = (bySection.get("" as AccountIFRSSection) ?? []).filter(
+    (n) => n.type === "REVENUE"
+  );
+  const fallbackExpense = (bySection.get("" as AccountIFRSSection) ?? []).filter(
+    (n) => n.type === "EXPENSE"
+  );
+
+  // ── Subtotal accumulator ──
+  // We track a running P&L total per period column.
+  // Each section contributes with its sign.
+  function computeRunningTotals(upToSectionKey: AccountIFRSSection): number[] {
+    const totals = new Array(Math.max(periodCount, 1)).fill(0);
+    for (const sec of IAS1_SECTIONS) {
+      const nodes = bySection.get(sec.key) ?? [];
+      for (let i = 0; i < periodCount; i++) {
+        totals[i] += sec.sign * sectionTotal(nodes, i);
+      }
+      if (sec.key === upToSectionKey) break;
+    }
+    return totals;
+  }
+
+  function computeRunningTotal(upToSectionKey: AccountIFRSSection): number {
+    return computeRunningTotals(upToSectionKey).reduce((a, b) => a + b, 0);
+  }
+
+  // ── Excel export ──
+  function buildExcelRows(): Record<string, string | number>[] {
+    if (!data || periodCount === 0) return [];
+    const rows: Record<string, string | number>[] = [];
+    const cols = data.periods.map((p) => monthColumnLabel(p.name));
+
+    const toRow = (code: string, name: string, values: number[]) => {
+      const r: Record<string, string | number> = { Código: code, Cuenta: name };
+      cols.forEach((c, i) => { r[c] = values[i] ?? 0; });
+      r["Total"] = values.reduce((a, b) => a + b, 0);
+      return r;
+    };
+
+    for (const sec of IAS1_SECTIONS) {
+      const nodes = bySection.get(sec.key) ?? [];
+      if (nodes.length === 0) continue;
+      rows.push(toRow("", IAS1_SECTIONS.find((s) => s.key === sec.key)!.label,
+        data.periods.map((_, i) => sectionTotal(nodes, i))));
+      function addNodes(ns: AccountNodeMulti[]) {
+        for (const n of ns) {
+          rows.push(toRow(n.code, n.name, n.balances.slice(0, periodCount)));
+          if (n.children.length) addNodes(n.children);
+        }
+      }
+      addNodes(nodes);
+
+      if (SUBTOTAL_AFTER[sec.key]) {
+        const running = computeRunningTotals(sec.key);
+        rows.push(toRow("", SUBTOTAL_AFTER[sec.key]!, running));
+      }
+    }
+
+    // Resultado del período
+    const finalTotals = computeRunningTotals("TAX_EXPENSE");
+    rows.push(toRow("", "Resultado del Período", finalTotals));
+    return rows;
+  }
+
+  const handleExport = () => {
+    const rows = buildExcelRows();
+    if (rows.length === 0) return;
+    downloadExcel(
+      [{ name: "Estado de Resultados", rows }],
+      `estado-de-resultados-${year}.xlsx`
+    );
+  };
+
+  // ── Render a section's account rows ──
+  function renderAccountRows(
+    nodes: AccountNodeMulti[],
+    depth = 0
   ): React.ReactNode {
-    const indent = depth * 16;
-    const total = node.balances.reduce((a, b) => a + b, 0);
-    const valueColor =
-      total >= 0 ? "text-foreground" : "text-destructive";
+    return nodes.map((node) => {
+      const indent = depth * 16;
+      const total = node.balances.reduce((a, b) => a + b, 0);
+      const negative = total < 0;
+      return (
+        <Fragment key={node.account_id}>
+          <tr className="border-b last:border-0 hover:bg-muted/30">
+            <td
+              className="py-1.5 px-2 font-mono text-xs text-muted-foreground"
+              style={{ paddingLeft: `${12 + indent}px` }}
+            >
+              {node.code}
+            </td>
+            <td className="py-1.5 px-2 text-sm">{node.name}</td>
+            {node.balances.slice(0, periodCount).map((val, i) => (
+              <td
+                key={i}
+                className={cn(
+                  "py-1.5 px-2 text-right text-xs tabular-nums",
+                  val < 0 ? "text-destructive" : "text-foreground"
+                )}
+              >
+                {formatCLP(val)}
+              </td>
+            ))}
+            <td
+              className={cn(
+                "py-1.5 px-2 text-right text-xs font-medium tabular-nums",
+                negative ? "text-destructive" : "text-foreground"
+              )}
+            >
+              {formatCLP(total)}
+            </td>
+          </tr>
+          {node.children.length > 0 && renderAccountRows(node.children, depth + 1)}
+        </Fragment>
+      );
+    });
+  }
+
+  // ── Render a section header row ──
+  function renderSectionHeader(sec: SectionDef, nodes: AccountNodeMulti[]) {
+    const totalAll = sectionTotalAll(nodes);
     return (
-      <tr key={node.account_id} className="border-b last:border-0 hover:bg-muted/30">
-        <td className="py-1.5 px-2 font-mono text-xs text-muted-foreground" style={{ paddingLeft: `${12 + indent}px` }}>
-          {node.code}
+      <tr className="border-b bg-muted/30" key={`hdr-${sec.key}`}>
+        <td colSpan={2} className="py-2 px-2 font-semibold text-sm">
+          {sec.label}
         </td>
-        <td className="py-1.5 px-2 text-sm">{node.name}</td>
-        {node.balances.slice(0, periodCount).map((val, i) => (
-          <td key={i} className={`py-1.5 px-2 text-right text-xs tabular-nums ${valueColor}`}>
-            {formatCLP(val)}
+        {data!.periods.map((_, i) => (
+          <td key={i} className="py-2 px-2 text-right text-xs font-semibold tabular-nums">
+            {formatCLP(sectionTotal(nodes, i))}
           </td>
         ))}
-        <td className={`py-1.5 px-2 text-right text-xs font-medium tabular-nums ${valueColor}`}>
-          {formatCLP(total)}
+        <td className="py-2 px-2 text-right text-sm font-bold tabular-nums">
+          {formatCLP(totalAll)}
         </td>
       </tr>
     );
   }
 
-  function renderMonthlySection(
-    label: string,
-    nodes: AccountNodeMulti[],
-    periodCount: number,
-    getTotalByIndex: (i: number) => number
-  ) {
-    const totalAll = nodes.reduce(
-      (s, n) => s + n.balances.reduce((a, b) => a + b, 0),
-      0
-    );
+  // ── Render a subtotal row (e.g. Resultado Bruto) ──
+  function renderSubtotal(label: string, upToSection: AccountIFRSSection) {
+    const running = computeRunningTotals(upToSection);
+    const total = running.reduce((a, b) => a + b, 0);
+    const negative = total < 0;
     return (
-      <>
-        <tr className="border-b bg-muted/30">
-          <td colSpan={2} className="py-2 px-2 font-semibold text-sm">
-            {label}
+      <tr
+        className="border-b border-t bg-muted/50 font-semibold"
+        key={`sub-${upToSection}`}
+      >
+        <td colSpan={2} className="py-2 px-2 text-sm italic text-muted-foreground">
+          {label}
+        </td>
+        {running.map((v, i) => (
+          <td
+            key={i}
+            className={cn(
+              "py-2 px-2 text-right tabular-nums text-xs",
+              v < 0 ? "text-destructive" : "text-foreground"
+            )}
+          >
+            {v >= 0 ? "+" : ""}{formatCLP(v)}
           </td>
-          {monthlyData?.periods.map((_, i) => (
-            <td key={i} className="py-2 px-2 text-right text-xs font-semibold tabular-nums">
-              {formatCLP(getTotalByIndex(i))}
-            </td>
-          ))}
-          <td className="py-2 px-2 text-right text-sm font-bold tabular-nums">
-            {formatCLP(totalAll)}
-          </td>
-        </tr>
-        {nodes.map((node) => (
-          <Fragment key={node.account_id}>
-            {renderMonthlyRow(node, 0, periodCount)}
-            {node.children.map((child) => (
-              <Fragment key={child.account_id}>
-                {renderMonthlyRow(child, 1, periodCount)}
-                {child.children.map((grand) =>
-                  renderMonthlyRow(grand, 2, periodCount)
-                )}
-              </Fragment>
-            ))}
-          </Fragment>
         ))}
-      </>
+        <td
+          className={cn(
+            "py-2 px-2 text-right tabular-nums text-sm font-semibold",
+            negative ? "text-destructive" : "text-foreground"
+          )}
+        >
+          {total >= 0 ? "+" : ""}{formatCLP(total)}
+        </td>
+      </tr>
     );
   }
 
-  function buildExcelRows(): Record<string, string | number>[] {
-    if (!monthlyData || monthlyData.periods.length === 0) return [];
-    const rows: Record<string, string | number>[] = [];
-
-    const toRow = (code: string, name: string, values: number[]) => {
-      const row: Record<string, string | number> = { Código: code, Cuenta: name };
-      monthlyData.periods.forEach((_, i) => {
-        row[monthColumnLabel(monthlyData.periods[i].name)] = values[i] ?? 0;
-      });
-      row["Total"] = values.reduce((a, b) => a + b, 0);
-      return row;
-    };
-
-    rows.push(toRow("", "Ingresos", monthlyData.periods.map((_, i) => totalRevenueByMonth(i))));
-    function addNodes(nodes: AccountNodeMulti[]) {
-      for (const node of nodes) {
-        rows.push(toRow(node.code, node.name, node.balances.slice(0, monthlyData!.periods.length)));
-        if (node.children.length) addNodes(node.children);
-      }
-    }
-    addNodes(revenueMulti);
-
-    rows.push(toRow("", "Gastos", monthlyData.periods.map((_, i) => totalExpenseByMonth(i))));
-    addNodes(expenseMulti);
-
-    const resultByMonth = monthlyData.periods.map((_, i) => totalRevenueByMonth(i) - totalExpenseByMonth(i));
-    rows.push(toRow("", "Resultado", resultByMonth));
-    return rows;
-  }
-
-  const handleExportExcel = () => {
-    const rows = buildExcelRows();
-    if (rows.length === 0) return;
-    downloadExcel(
-      [{ name: "Estado de Resultados", rows }],
-      `estado-de-resultados-${monthlyYear}.xlsx`
-    );
-  };
+  const hasSections = IAS1_SECTIONS.some(
+    (s) => (bySection.get(s.key) ?? []).length > 0
+  );
+  const hasFallback = fallbackRevenue.length > 0 || fallbackExpense.length > 0;
 
   return (
     <Card className="w-full">
@@ -565,10 +459,10 @@ export function IncomeStatement() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2 text-base flex-wrap">
             <span>Estado de Resultados</span>
-            <Select
-              value={String(monthlyYear)}
-              onValueChange={(v) => setMonthlyYear(Number(v))}
-            >
+            <span className="text-xs font-normal text-muted-foreground">
+              IAS 1 — Método de función
+            </span>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
               <SelectTrigger size="sm" className="w-[100px] font-normal">
                 <SelectValue placeholder="Año" />
               </SelectTrigger>
@@ -580,37 +474,38 @@ export function IncomeStatement() {
                 ))}
               </SelectContent>
             </Select>
-            {monthlyData && monthlyData.periods.length > 0 && (
-              <Button variant="outline" size="sm" onClick={handleExportExcel}>
+            {data && periodCount > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExport}>
                 Exportar a Excel
               </Button>
             )}
           </CardTitle>
-          {monthlyData && !monthlyLoading && !monthlyError && (
+          {data && !loading && !error && (
             <span className="text-xs text-muted-foreground">
-              {monthlyData.periods.length} períodos
+              {periodCount} período{periodCount !== 1 ? "s" : ""}
             </span>
           )}
         </div>
       </CardHeader>
       <CardContent className="px-3 pb-3">
-        {monthlyError && (
-          <p className="text-sm text-destructive py-2">{monthlyError}</p>
-        )}
-        {monthlyLoading ? (
+        {error && <p className="text-sm text-destructive py-2">{error}</p>}
+        {loading ? (
           <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground justify-center">
             <HugeiconsIcon icon={Loading02Icon} className="size-4 animate-spin" />
             Cargando...
           </div>
-        ) : monthlyData && monthlyData.periods.length > 0 ? (
+        ) : data && periodCount > 0 ? (
           <div className="overflow-x-auto -mx-1">
             <table className="w-full text-sm border-collapse min-w-[600px]">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 px-2 font-medium w-20">Código</th>
-                  <th className="text-left py-2 px-2 font-medium min-w-[140px]">Cuenta</th>
-                  {monthlyData.periods.map((p) => (
-                    <th key={p.id} className="text-right py-2 px-2 font-medium text-muted-foreground text-xs">
+                  <th className="text-left py-2 px-2 font-medium min-w-[160px]">Cuenta</th>
+                  {data.periods.map((p) => (
+                    <th
+                      key={p.id}
+                      className="text-right py-2 px-2 font-medium text-muted-foreground text-xs"
+                    >
                       {monthColumnLabel(p.name)}
                     </th>
                   ))}
@@ -618,54 +513,102 @@ export function IncomeStatement() {
                 </tr>
               </thead>
               <tbody>
-                {renderMonthlySection(
-                  "Ingresos",
-                  revenueMulti,
-                  monthlyData.periods.length,
-                  totalRevenueByMonth
+                {/* IAS 1 ordered sections */}
+                {IAS1_SECTIONS.map((sec) => {
+                  const nodes = bySection.get(sec.key) ?? [];
+                  if (nodes.length === 0) return null;
+                  return (
+                    <Fragment key={sec.key}>
+                      {renderSectionHeader(sec, nodes)}
+                      {renderAccountRows(nodes)}
+                      {SUBTOTAL_AFTER[sec.key] &&
+                        renderSubtotal(SUBTOTAL_AFTER[sec.key]!, sec.key)}
+                    </Fragment>
+                  );
+                })}
+
+                {/* Fallback: accounts without ifrsSection */}
+                {hasFallback && !hasSections && (
+                  <>
+                    {fallbackRevenue.length > 0 && (
+                      <>
+                        <tr className="border-b bg-muted/30">
+                          <td colSpan={2} className="py-2 px-2 font-semibold text-sm">
+                            Ingresos
+                          </td>
+                          {data.periods.map((_, i) => (
+                            <td key={i} className="py-2 px-2 text-right text-xs font-semibold tabular-nums">
+                              {formatCLP(sectionTotal(fallbackRevenue, i))}
+                            </td>
+                          ))}
+                          <td className="py-2 px-2 text-right font-bold tabular-nums">
+                            {formatCLP(sectionTotalAll(fallbackRevenue))}
+                          </td>
+                        </tr>
+                        {renderAccountRows(fallbackRevenue)}
+                      </>
+                    )}
+                    {fallbackExpense.length > 0 && (
+                      <>
+                        <tr className="border-b bg-muted/30">
+                          <td colSpan={2} className="py-2 px-2 font-semibold text-sm">
+                            Gastos
+                          </td>
+                          {data.periods.map((_, i) => (
+                            <td key={i} className="py-2 px-2 text-right text-xs font-semibold tabular-nums">
+                              {formatCLP(sectionTotal(fallbackExpense, i))}
+                            </td>
+                          ))}
+                          <td className="py-2 px-2 text-right font-bold tabular-nums">
+                            {formatCLP(sectionTotalAll(fallbackExpense))}
+                          </td>
+                        </tr>
+                        {renderAccountRows(fallbackExpense)}
+                      </>
+                    )}
+                  </>
                 )}
-                {renderMonthlySection(
-                  "Gastos",
-                  expenseMulti,
-                  monthlyData.periods.length,
-                  totalExpenseByMonth
-                )}
-                <tr className="border-t-2 bg-muted/50 font-bold">
-                  <td colSpan={2} className="py-2 px-2">
-                    Resultado
-                  </td>
-                  {monthlyData.periods.map((_, i) => {
-                    const res = totalRevenueByMonth(i) - totalExpenseByMonth(i);
-                    return (
-                      <td
-                        key={i}
-                        className={`py-2 px-2 text-right tabular-nums ${res >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
-                      >
-                        {res >= 0 ? "+" : ""}
-                        {formatCLP(res)}
+
+                {/* Resultado del Período (IAS 1.82f) */}
+                {(() => {
+                  const running = computeRunningTotals("TAX_EXPENSE");
+                  const total = running.reduce((a, b) => a + b, 0);
+                  const negative = total < 0;
+                  return (
+                    <tr className="border-t-2 bg-muted/50 font-bold">
+                      <td colSpan={2} className="py-2 px-2 text-sm">
+                        Resultado del Período
                       </td>
-                    );
-                  })}
-                  <td
-                    className={`py-2 px-2 text-right tabular-nums ${revenueMulti.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0) - expenseMulti.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}
-                  >
-                    {(() => {
-                      const total =
-                        revenueMulti.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0) -
-                        expenseMulti.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0);
-                      return (total >= 0 ? "+" : "") + formatCLP(total);
-                    })()}
-                  </td>
-                </tr>
+                      {running.map((v, i) => (
+                        <td
+                          key={i}
+                          className={cn(
+                            "py-2 px-2 text-right tabular-nums",
+                            v >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                          )}
+                        >
+                          {v >= 0 ? "+" : ""}{formatCLP(v)}
+                        </td>
+                      ))}
+                      <td
+                        className={cn(
+                          "py-2 px-2 text-right tabular-nums",
+                          negative ? "text-destructive" : "text-green-600 dark:text-green-400"
+                        )}
+                      >
+                        {total >= 0 ? "+" : ""}{formatCLP(total)}
+                      </td>
+                    </tr>
+                  );
+                })()}
               </tbody>
             </table>
           </div>
-        ) : monthlyData?.periods.length === 0 ? (
+        ) : data?.periods.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No hay períodos fiscales en {monthlyYear}. Crea períodos mensuales en Contabilidad.
+            No hay períodos fiscales en {year}. Crea períodos mensuales en Contabilidad.
           </p>
         ) : null}
-
       </CardContent>
     </Card>
   );

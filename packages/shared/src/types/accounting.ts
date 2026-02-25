@@ -84,12 +84,28 @@ export interface CreateFiscalPeriodInput {
 
 // ─── Income Statement ────────────────────────────────────────────
 
+/**
+ * IFRS IAS 1 P&L section (function method).
+ * Inherited from the nearest ancestor with ifrsSection set.
+ * Empty string when no section is assigned.
+ */
+export type AccountIFRSSection =
+  | 'REVENUE'
+  | 'OTHER_INCOME'
+  | 'COST_OF_SALES'
+  | 'OPERATING_EXPENSE'
+  | 'FINANCE_INCOME'
+  | 'FINANCE_COST'
+  | 'TAX_EXPENSE'
+  | '';
+
 export interface IncomeStatementRow {
   account_id: string;
   code: string;
   name: string;
   type: 'REVENUE' | 'EXPENSE';
   parent_id: string | null;
+  ifrs_section: AccountIFRSSection;
   balance: string;
 }
 

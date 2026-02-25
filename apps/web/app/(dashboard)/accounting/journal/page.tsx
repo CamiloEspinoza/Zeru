@@ -16,7 +16,7 @@ interface JournalEntriesResponse {
 }
 
 /** Entry with lines that include account (from API) */
-interface JournalEntryWithLines extends JournalEntry {
+interface JournalEntryWithLines extends Omit<JournalEntry, "lines"> {
   lines: Array<{
     id: string;
     accountId: string;

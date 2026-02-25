@@ -1,10 +1,15 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SkillsService } from '../ai/services/skills.service';
 import type { RegisterSchema } from '@zeru/shared';
 import { UserRole } from '@prisma/client';
+
+const DEFAULT_SKILLS = [
+  'https://github.com/CamiloEspinoza/ifrs-accounting-standards-advisor',
+];
 
 export interface AuthUser {
   id: string;
@@ -16,10 +21,13 @@ export interface AuthUser {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly skillsService: SkillsService,
   ) {}
 
   /**
@@ -148,6 +156,9 @@ export class AuthService {
       return { tenant, user };
     });
 
+    // Install default skills for the new tenant (non-blocking — errors don't fail registration)
+    void this.installDefaultSkills(result.tenant.id);
+
     const membership = result.user.memberships[0];
     const authUser: AuthUser = {
       id: result.user.id,
@@ -222,6 +233,19 @@ export class AuthService {
       return { success: true };
     } catch {
       throw new ConflictException('Este email ya está en la lista de espera');
+    }
+  }
+
+  private async installDefaultSkills(tenantId: string): Promise<void> {
+    for (const repoUrl of DEFAULT_SKILLS) {
+      try {
+        await this.skillsService.install(tenantId, repoUrl);
+        this.logger.log(`Default skill installed for tenant ${tenantId}: ${repoUrl}`);
+      } catch (err) {
+        this.logger.warn(
+          `Could not install default skill "${repoUrl}" for tenant ${tenantId}: ${(err as Error).message}`,
+        );
+      }
     }
   }
 }

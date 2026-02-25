@@ -203,13 +203,15 @@ model Memory {
 // ─── Accounting ──────────────────────────────────────────
 
 model Account {
-  id        String      @id @default(uuid())
-  code      String
-  name      String
-  type      AccountType
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id           String               @id @default(uuid())
+  code         String
+  name         String
+  type         AccountType
+  /// Sección IFRS IAS 1 (solo en cuentas REVENUE/EXPENSE). Se hereda del ancestro raíz.
+  ifrsSection  AccountIFRSSection?
+  isActive     Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   parentId String?
   parent   Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
@@ -231,6 +233,22 @@ enum AccountType {
   EQUITY
   REVENUE
   EXPENSE
+}
+
+/// Clasificación funcional IFRS (IAS 1) para el Estado de Resultados.
+/// Se asigna a cuentas de tipo REVENUE o EXPENSE para estructurar
+/// la presentación por función: ingresos, costo de ventas, gastos operativos,
+/// resultado financiero e impuesto.
+enum AccountIFRSSection {
+  REVENUE
+  OTHER_INCOME
+  COST_OF_SALES
+  OPERATING_EXPENSE
+  FINANCE_INCOME
+  FINANCE_COST
+  TAX_EXPENSE
+
+  @@map("account_ifrs_section")
 }
 
 model JournalEntry {

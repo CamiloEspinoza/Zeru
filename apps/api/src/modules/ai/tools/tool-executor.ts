@@ -294,107 +294,140 @@ export class ToolExecutor {
       };
     }
 
-    // Standard Chilean chart of accounts — hierarchical structure
-    const template: Array<{ code: string; name: string; type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE'; parentCode: string | null }> = [
-      // Level 1 — Group headers
-      { code: '1', name: 'Activos', type: 'ASSET', parentCode: null },
-      { code: '1.1', name: 'Activo Corriente', type: 'ASSET', parentCode: '1' },
-      { code: '1.2', name: 'Activo No Corriente', type: 'ASSET', parentCode: '1' },
-      { code: '2', name: 'Pasivos', type: 'LIABILITY', parentCode: null },
-      { code: '2.1', name: 'Pasivo Corriente', type: 'LIABILITY', parentCode: '2' },
-      { code: '2.2', name: 'Pasivo No Corriente', type: 'LIABILITY', parentCode: '2' },
-      { code: '3', name: 'Patrimonio', type: 'EQUITY', parentCode: null },
-      { code: '3.1', name: 'Capital', type: 'EQUITY', parentCode: '3' },
-      { code: '4', name: 'Ingresos', type: 'REVENUE', parentCode: null },
-      { code: '4.1', name: 'Ingresos Operacionales', type: 'REVENUE', parentCode: '4' },
-      { code: '4.2', name: 'Otros Ingresos', type: 'REVENUE', parentCode: '4' },
-      { code: '5', name: 'Gastos', type: 'EXPENSE', parentCode: null },
-      { code: '5.1', name: 'Costos', type: 'EXPENSE', parentCode: '5' },
-      { code: '5.2', name: 'Gastos de Administración y Ventas', type: 'EXPENSE', parentCode: '5' },
+    // Standard Chilean chart of accounts aligned with IAS 1 (function method)
+    // ifrsSection: marks the IFRS P&L section for this branch; inherited by all descendants
+    type TemplateAccount = {
+      code: string;
+      name: string;
+      type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+      parentCode: string | null;
+      ifrsSection?: 'REVENUE' | 'OTHER_INCOME' | 'COST_OF_SALES' | 'OPERATING_EXPENSE' | 'FINANCE_INCOME' | 'FINANCE_COST' | 'TAX_EXPENSE';
+    };
 
-      // Level 2 — ASSET sub-groups
-      { code: '1.1.01', name: 'Caja y Bancos', type: 'ASSET', parentCode: '1.1' },
-      { code: '1.1.02', name: 'Cuentas por Cobrar', type: 'ASSET', parentCode: '1.1' },
-      { code: '1.1.03', name: 'Impuestos por Recuperar', type: 'ASSET', parentCode: '1.1' },
-      { code: '1.1.04', name: 'Inventarios', type: 'ASSET', parentCode: '1.1' },
-      { code: '1.1.05', name: 'Otros Activos Corrientes', type: 'ASSET', parentCode: '1.1' },
-      { code: '1.2.01', name: 'Activo Fijo', type: 'ASSET', parentCode: '1.2' },
-      { code: '1.2.02', name: 'Depreciación Acumulada', type: 'ASSET', parentCode: '1.2' },
-      { code: '1.2.03', name: 'Intangibles', type: 'ASSET', parentCode: '1.2' },
+    const template: TemplateAccount[] = [
+      // ── Balance Sheet ─────────────────────────────────────────
+      { code: '1',     name: 'Activos',                          type: 'ASSET',     parentCode: null },
+      { code: '1.1',   name: 'Activo Corriente',                 type: 'ASSET',     parentCode: '1' },
+      { code: '1.2',   name: 'Activo No Corriente',              type: 'ASSET',     parentCode: '1' },
+      { code: '2',     name: 'Pasivos',                          type: 'LIABILITY', parentCode: null },
+      { code: '2.1',   name: 'Pasivo Corriente',                 type: 'LIABILITY', parentCode: '2' },
+      { code: '2.2',   name: 'Pasivo No Corriente',              type: 'LIABILITY', parentCode: '2' },
+      { code: '3',     name: 'Patrimonio',                       type: 'EQUITY',    parentCode: null },
+      { code: '3.1',   name: 'Capital',                          type: 'EQUITY',    parentCode: '3' },
 
-      // Level 2 — LIABILITY sub-groups
+      // ── P&L — Revenue (IAS 1.82a) ─────────────────────────────
+      { code: '4',     name: 'Ingresos',                         type: 'REVENUE',   parentCode: null },
+      { code: '4.1',   name: 'Ingresos de Actividades Ordinarias', type: 'REVENUE', parentCode: '4',   ifrsSection: 'REVENUE' },
+      { code: '4.2',   name: 'Otros Ingresos',                   type: 'REVENUE',   parentCode: '4',   ifrsSection: 'OTHER_INCOME' },
+      { code: '4.3',   name: 'Ingresos Financieros',             type: 'REVENUE',   parentCode: '4',   ifrsSection: 'FINANCE_INCOME' },
+
+      // ── P&L — Expenses (IAS 1.99 — function method) ───────────
+      { code: '5',     name: 'Gastos',                           type: 'EXPENSE',   parentCode: null },
+      { code: '5.1',   name: 'Costo de Ventas',                  type: 'EXPENSE',   parentCode: '5',   ifrsSection: 'COST_OF_SALES' },
+      { code: '5.2',   name: 'Gastos de Administración y Ventas', type: 'EXPENSE',  parentCode: '5',   ifrsSection: 'OPERATING_EXPENSE' },
+      { code: '5.3',   name: 'Gastos Financieros',               type: 'EXPENSE',   parentCode: '5',   ifrsSection: 'FINANCE_COST' },
+      { code: '5.4',   name: 'Gasto por Impuesto a las Ganancias', type: 'EXPENSE', parentCode: '5',   ifrsSection: 'TAX_EXPENSE' },
+
+      // ── Assets — Level 2 ──────────────────────────────────────
+      { code: '1.1.01', name: 'Caja y Bancos',                   type: 'ASSET',     parentCode: '1.1' },
+      { code: '1.1.02', name: 'Cuentas por Cobrar',              type: 'ASSET',     parentCode: '1.1' },
+      { code: '1.1.03', name: 'Impuestos por Recuperar',         type: 'ASSET',     parentCode: '1.1' },
+      { code: '1.1.04', name: 'Inventarios',                     type: 'ASSET',     parentCode: '1.1' },
+      { code: '1.1.05', name: 'Otros Activos Corrientes',        type: 'ASSET',     parentCode: '1.1' },
+      { code: '1.2.01', name: 'Activo Fijo (PPE)',               type: 'ASSET',     parentCode: '1.2' },
+      { code: '1.2.02', name: 'Depreciación Acumulada',          type: 'ASSET',     parentCode: '1.2' },
+      { code: '1.2.03', name: 'Activos Intangibles',             type: 'ASSET',     parentCode: '1.2' },
+
+      // ── Liabilities — Level 2 ─────────────────────────────────
       { code: '2.1.01', name: 'Proveedores y Cuentas por Pagar', type: 'LIABILITY', parentCode: '2.1' },
-      { code: '2.1.02', name: 'Impuestos por Pagar', type: 'LIABILITY', parentCode: '2.1' },
-      { code: '2.1.03', name: 'Remuneraciones por Pagar', type: 'LIABILITY', parentCode: '2.1' },
-      { code: '2.2.01', name: 'Obligaciones Financieras LP', type: 'LIABILITY', parentCode: '2.2' },
+      { code: '2.1.02', name: 'Impuestos por Pagar',             type: 'LIABILITY', parentCode: '2.1' },
+      { code: '2.1.03', name: 'Remuneraciones por Pagar',        type: 'LIABILITY', parentCode: '2.1' },
+      { code: '2.2.01', name: 'Obligaciones Financieras LP',     type: 'LIABILITY', parentCode: '2.2' },
 
-      // Level 2 — EQUITY
-      { code: '3.1.01', name: 'Capital Pagado', type: 'EQUITY', parentCode: '3.1' },
-      { code: '3.1.02', name: 'Reservas', type: 'EQUITY', parentCode: '3.1' },
-      { code: '3.1.03', name: 'Resultados Acumulados', type: 'EQUITY', parentCode: '3.1' },
-      { code: '3.1.04', name: 'Resultado del Ejercicio', type: 'EQUITY', parentCode: '3.1' },
+      // ── Equity — Level 2 ──────────────────────────────────────
+      { code: '3.1.01', name: 'Capital Pagado',                  type: 'EQUITY',    parentCode: '3.1' },
+      { code: '3.1.02', name: 'Reservas',                        type: 'EQUITY',    parentCode: '3.1' },
+      { code: '3.1.03', name: 'Resultados Acumulados',           type: 'EQUITY',    parentCode: '3.1' },
+      { code: '3.1.04', name: 'Resultado del Período',           type: 'EQUITY',    parentCode: '3.1' },
 
-      // Level 3 — Leaf accounts: ASSETS
-      { code: '1.1.01.001', name: 'Caja', type: 'ASSET', parentCode: '1.1.01' },
-      { code: '1.1.01.002', name: 'Banco Cuenta Corriente', type: 'ASSET', parentCode: '1.1.01' },
-      { code: '1.1.02.001', name: 'Clientes', type: 'ASSET', parentCode: '1.1.02' },
-      { code: '1.1.02.002', name: 'Documentos por Cobrar', type: 'ASSET', parentCode: '1.1.02' },
-      { code: '1.1.02.003', name: 'Deudores Varios', type: 'ASSET', parentCode: '1.1.02' },
-      { code: '1.1.03.001', name: 'IVA Crédito Fiscal', type: 'ASSET', parentCode: '1.1.03' },
-      { code: '1.1.03.002', name: 'PPM por Recuperar', type: 'ASSET', parentCode: '1.1.03' },
-      { code: '1.1.04.001', name: 'Inventario Mercaderías', type: 'ASSET', parentCode: '1.1.04' },
-      { code: '1.1.05.001', name: 'Accionistas por Cobrar', type: 'ASSET', parentCode: '1.1.05' },
-      { code: '1.1.05.002', name: 'Gastos Pagados por Anticipado', type: 'ASSET', parentCode: '1.1.05' },
-      { code: '1.2.01.001', name: 'Maquinaria y Equipos', type: 'ASSET', parentCode: '1.2.01' },
-      { code: '1.2.01.002', name: 'Muebles y Útiles', type: 'ASSET', parentCode: '1.2.01' },
-      { code: '1.2.01.003', name: 'Equipos Computacionales', type: 'ASSET', parentCode: '1.2.01' },
-      { code: '1.2.01.004', name: 'Vehículos', type: 'ASSET', parentCode: '1.2.01' },
-      { code: '1.2.02.001', name: 'Depreciación Acum. Maquinaria', type: 'ASSET', parentCode: '1.2.02' },
-      { code: '1.2.02.002', name: 'Depreciación Acum. Muebles', type: 'ASSET', parentCode: '1.2.02' },
-      { code: '1.2.02.003', name: 'Depreciación Acum. Equipos', type: 'ASSET', parentCode: '1.2.02' },
-      { code: '1.2.03.001', name: 'Software y Licencias', type: 'ASSET', parentCode: '1.2.03' },
+      // ── Assets — Level 3 (leaf) ───────────────────────────────
+      { code: '1.1.01.001', name: 'Caja',                                         type: 'ASSET', parentCode: '1.1.01' },
+      { code: '1.1.01.002', name: 'Banco Cuenta Corriente',                       type: 'ASSET', parentCode: '1.1.01' },
+      { code: '1.1.02.001', name: 'Clientes',                                     type: 'ASSET', parentCode: '1.1.02' },
+      { code: '1.1.02.002', name: 'Documentos por Cobrar',                        type: 'ASSET', parentCode: '1.1.02' },
+      { code: '1.1.02.003', name: 'Deudores Varios',                              type: 'ASSET', parentCode: '1.1.02' },
+      { code: '1.1.03.001', name: 'IVA Crédito Fiscal',                           type: 'ASSET', parentCode: '1.1.03' },
+      { code: '1.1.03.002', name: 'PPM por Recuperar',                            type: 'ASSET', parentCode: '1.1.03' },
+      { code: '1.1.04.001', name: 'Inventario de Mercaderías',                    type: 'ASSET', parentCode: '1.1.04' },
+      { code: '1.1.05.001', name: 'Accionistas por Cobrar',                       type: 'ASSET', parentCode: '1.1.05' },
+      { code: '1.1.05.002', name: 'Gastos Pagados por Anticipado',                type: 'ASSET', parentCode: '1.1.05' },
+      { code: '1.2.01.001', name: 'Maquinaria y Equipos',                         type: 'ASSET', parentCode: '1.2.01' },
+      { code: '1.2.01.002', name: 'Muebles y Útiles',                             type: 'ASSET', parentCode: '1.2.01' },
+      { code: '1.2.01.003', name: 'Equipos Computacionales',                      type: 'ASSET', parentCode: '1.2.01' },
+      { code: '1.2.01.004', name: 'Vehículos',                                    type: 'ASSET', parentCode: '1.2.01' },
+      { code: '1.2.02.001', name: 'Depreciación Acum. Maquinaria',                type: 'ASSET', parentCode: '1.2.02' },
+      { code: '1.2.02.002', name: 'Depreciación Acum. Muebles',                   type: 'ASSET', parentCode: '1.2.02' },
+      { code: '1.2.02.003', name: 'Depreciación Acum. Equipos',                   type: 'ASSET', parentCode: '1.2.02' },
+      { code: '1.2.03.001', name: 'Software y Licencias',                         type: 'ASSET', parentCode: '1.2.03' },
 
-      // Level 3 — Leaf accounts: LIABILITIES
-      { code: '2.1.01.001', name: 'Proveedores', type: 'LIABILITY', parentCode: '2.1.01' },
-      { code: '2.1.01.002', name: 'Documentos por Pagar', type: 'LIABILITY', parentCode: '2.1.01' },
-      { code: '2.1.01.003', name: 'Acreedores Varios', type: 'LIABILITY', parentCode: '2.1.01' },
-      { code: '2.1.02.001', name: 'IVA Débito Fiscal', type: 'LIABILITY', parentCode: '2.1.02' },
-      { code: '2.1.02.002', name: 'Retenciones por Pagar', type: 'LIABILITY', parentCode: '2.1.02' },
-      { code: '2.1.02.003', name: 'PPM por Pagar', type: 'LIABILITY', parentCode: '2.1.02' },
-      { code: '2.1.02.004', name: 'Impuesto Renta por Pagar', type: 'LIABILITY', parentCode: '2.1.02' },
-      { code: '2.1.03.001', name: 'Remuneraciones por Pagar', type: 'LIABILITY', parentCode: '2.1.03' },
-      { code: '2.1.03.002', name: 'Cotizaciones Previsionales por Pagar', type: 'LIABILITY', parentCode: '2.1.03' },
-      { code: '2.2.01.001', name: 'Préstamos Bancarios LP', type: 'LIABILITY', parentCode: '2.2.01' },
+      // ── Liabilities — Level 3 (leaf) ─────────────────────────
+      { code: '2.1.01.001', name: 'Proveedores',                                  type: 'LIABILITY', parentCode: '2.1.01' },
+      { code: '2.1.01.002', name: 'Documentos por Pagar',                         type: 'LIABILITY', parentCode: '2.1.01' },
+      { code: '2.1.01.003', name: 'Acreedores Varios',                            type: 'LIABILITY', parentCode: '2.1.01' },
+      { code: '2.1.02.001', name: 'IVA Débito Fiscal',                            type: 'LIABILITY', parentCode: '2.1.02' },
+      { code: '2.1.02.002', name: 'Retenciones por Pagar',                        type: 'LIABILITY', parentCode: '2.1.02' },
+      { code: '2.1.02.003', name: 'PPM por Pagar',                                type: 'LIABILITY', parentCode: '2.1.02' },
+      { code: '2.1.02.004', name: 'Impuesto a la Renta por Pagar',                type: 'LIABILITY', parentCode: '2.1.02' },
+      { code: '2.1.03.001', name: 'Remuneraciones por Pagar',                     type: 'LIABILITY', parentCode: '2.1.03' },
+      { code: '2.1.03.002', name: 'Cotizaciones Previsionales por Pagar',         type: 'LIABILITY', parentCode: '2.1.03' },
+      { code: '2.2.01.001', name: 'Préstamos Bancarios LP',                       type: 'LIABILITY', parentCode: '2.2.01' },
 
-      // Level 3 — Leaf accounts: REVENUE
-      { code: '4.1.01.001', name: 'Ingresos por Ventas Afectas', type: 'REVENUE', parentCode: '4.1' },
-      { code: '4.1.01.002', name: 'Ingresos por Ventas Exentas', type: 'REVENUE', parentCode: '4.1' },
-      { code: '4.2.01.001', name: 'Ingresos Financieros', type: 'REVENUE', parentCode: '4.2' },
-      { code: '4.2.01.002', name: 'Otros Ingresos No Operacionales', type: 'REVENUE', parentCode: '4.2' },
+      // ── Revenue — Level 3 (leaf) ──────────────────────────────
+      { code: '4.1.01.001', name: 'Ingresos por Ventas Afectas (IVA)',            type: 'REVENUE', parentCode: '4.1' },
+      { code: '4.1.01.002', name: 'Ingresos por Ventas Exentas',                  type: 'REVENUE', parentCode: '4.1' },
+      { code: '4.2.01.001', name: 'Otros Ingresos Operacionales',                 type: 'REVENUE', parentCode: '4.2' },
+      { code: '4.2.01.002', name: 'Ganancias por Venta de Activos',               type: 'REVENUE', parentCode: '4.2' },
+      { code: '4.3.01.001', name: 'Intereses Ganados',                            type: 'REVENUE', parentCode: '4.3' },
+      { code: '4.3.01.002', name: 'Diferencias de Cambio Favorables',             type: 'REVENUE', parentCode: '4.3' },
 
-      // Level 3 — Leaf accounts: EXPENSES
-      { code: '5.1.01.001', name: 'Costo de Ventas', type: 'EXPENSE', parentCode: '5.1' },
-      { code: '5.2.01.001', name: 'Remuneraciones', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.01.002', name: 'Cotizaciones Previsionales Empleador', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.02.001', name: 'Arriendos', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.02.002', name: 'Servicios Básicos', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.03.001', name: 'Honorarios Profesionales', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.04.001', name: 'Depreciación del Ejercicio', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.05.001', name: 'Gastos Generales de Administración', type: 'EXPENSE', parentCode: '5.2' },
-      { code: '5.2.06.001', name: 'Gastos Financieros', type: 'EXPENSE', parentCode: '5.2' },
+      // ── Expenses — Level 3 (leaf) ─────────────────────────────
+      // 5.1 Costo de ventas
+      { code: '5.1.01.001', name: 'Costo de Ventas de Mercaderías',               type: 'EXPENSE', parentCode: '5.1' },
+      { code: '5.1.01.002', name: 'Costo de Servicios Prestados',                 type: 'EXPENSE', parentCode: '5.1' },
+      // 5.2 Gastos operativos (distribución + administración)
+      { code: '5.2.01.001', name: 'Remuneraciones y Salarios',                    type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.01.002', name: 'Cotizaciones Previsionales Empleador',         type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.02.001', name: 'Arriendos de Inmuebles',                       type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.02.002', name: 'Servicios Básicos (luz, agua, gas)',           type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.03.001', name: 'Honorarios Profesionales',                     type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.04.001', name: 'Depreciación del Ejercicio (PPE)',             type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.04.002', name: 'Amortización de Intangibles',                  type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.05.001', name: 'Gastos Generales de Administración',           type: 'EXPENSE', parentCode: '5.2' },
+      { code: '5.2.06.001', name: 'Marketing y Publicidad',                       type: 'EXPENSE', parentCode: '5.2' },
+      // 5.3 Gastos financieros
+      { code: '5.3.01.001', name: 'Intereses sobre Préstamos Bancarios',          type: 'EXPENSE', parentCode: '5.3' },
+      { code: '5.3.01.002', name: 'Diferencias de Cambio Desfavorables',          type: 'EXPENSE', parentCode: '5.3' },
+      { code: '5.3.01.003', name: 'Otros Gastos Financieros',                     type: 'EXPENSE', parentCode: '5.3' },
+      // 5.4 Impuesto a las ganancias
+      { code: '5.4.01.001', name: 'Gasto por Impuesto a la Renta (Corriente)',    type: 'EXPENSE', parentCode: '5.4' },
+      { code: '5.4.01.002', name: 'Gasto por Impuesto Diferido',                  type: 'EXPENSE', parentCode: '5.4' },
     ];
 
-    // Create accounts in order (parents first) to resolve parentId correctly
+    // Create accounts in order (parents first); set ifrsSection from the template
     const codeToId = new Map<string, string>();
     let created = 0;
 
     for (const acc of template) {
       const parentId = acc.parentCode ? codeToId.get(acc.parentCode) : undefined;
-      const account = await this.chartOfAccounts.create(tenantId, {
-        code: acc.code,
-        name: acc.name,
-        type: acc.type,
-        parentId,
+      const account = await this.prisma.account.create({
+        data: {
+          code: acc.code,
+          name: acc.name,
+          type: acc.type,
+          parentId: parentId ?? null,
+          tenantId,
+          ifrsSection: acc.ifrsSection ?? null,
+        },
       });
       codeToId.set(acc.code, account.id);
       created++;
@@ -403,7 +436,7 @@ export class ToolExecutor {
     return {
       success: true,
       data: { accountsCreated: created },
-      summary: `Plan de cuentas estándar chileno creado con ${created} cuentas`,
+      summary: `Plan de cuentas estándar chileno (IAS 1 — método de función) creado con ${created} cuentas`,
     };
   }
 

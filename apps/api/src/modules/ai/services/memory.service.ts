@@ -157,19 +157,30 @@ export class MemoryService {
 
   /**
    * Returns the most recent active memories (no vector search).
+   * scope:
+   *   'tenant' → only org-level memories (userId IS NULL)
+   *   'user'   → only personal memories for the given userId
+   *   'all'    → tenant + user memories (default, used for context injection)
    */
   async list(params: {
     tenantId: string;
     userId?: string | null;
-    includeUserScope?: boolean;
+    scope?: 'tenant' | 'user' | 'all';
     limit?: number;
     offset?: number;
   }): Promise<MemoryRecord[]> {
-    const { tenantId, userId, includeUserScope = true, limit = 20, offset = 0 } = params;
+    const { tenantId, userId, scope = 'all', limit = 20, offset = 0 } = params;
 
-    const whereUserId = includeUserScope && userId
-      ? { OR: [{ userId: null }, { userId }] }
-      : { userId: null };
+    let whereUserId: object;
+    if (scope === 'tenant') {
+      whereUserId = { userId: null };
+    } else if (scope === 'user' && userId) {
+      whereUserId = { userId };
+    } else {
+      whereUserId = userId
+        ? { OR: [{ userId: null }, { userId }] }
+        : { userId: null };
+    }
 
     const rows = await this.prisma.memory.findMany({
       where: { tenantId, isActive: true, ...whereUserId },

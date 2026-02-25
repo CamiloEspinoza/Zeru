@@ -35,13 +35,10 @@ export class MemoryController {
   ) {
     const userId = req.user.userId;
 
-    const effectiveIncludeUser = scope !== 'tenant';
-    const effectiveUserId = scope === 'tenant' ? null : userId;
-
     return this.memoryService.list({
       tenantId,
-      userId: effectiveUserId,
-      includeUserScope: effectiveIncludeUser,
+      userId,
+      scope: scope ?? 'all',
       limit: 100,
     });
   }
