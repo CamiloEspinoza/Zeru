@@ -19,6 +19,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_trial_balance: "Obteniendo balance de comprobación",
   tag_document: "Clasificando documento",
   link_document_to_entry: "Vinculando documento a asiento",
+  get_document_journal_entries: "Comprobando si el documento ya tiene asientos",
   ask_user_question: "Preguntando al usuario",
   memory_store: "Guardando en memoria",
   memory_search: "Buscando en memoria",
@@ -467,9 +468,6 @@ export function useChatStream() {
       // Tools that are internal/noisy and shouldn't be shown in history
       const HIDDEN_TOOLS = new Set([
         "update_conversation_title",
-        "memory_store",
-        "memory_search",
-        "memory_delete",
       ]);
 
       // Build MessageBlock[] by grouping DB rows into UI message blocks.
@@ -495,6 +493,20 @@ export function useChatStream() {
             ...last,
             blocks: [...last.blocks, ...pending],
           };
+        } else {
+          // Pending tools/questions belong to the next assistant turn (no thinking yet in DB)
+          const firstId =
+            pending[0].kind === "tool"
+              ? pending[0].state.toolCallId
+              : pending[0].kind === "question"
+                ? pending[0].toolCallId
+                : `assistant-${blocks.length}`;
+          blocks.push({
+            id: firstId,
+            type: "assistant",
+            blocks: [...pending],
+            done: true,
+          });
         }
         pending.length = 0;
       };

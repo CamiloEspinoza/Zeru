@@ -29,10 +29,11 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 1. **Analiza el documento** en busca de transacciones contabilizables (montos, fechas, partes, conceptos).
 2. **Llama a tag_document** con el documentId provisto, asignando la categoría más adecuada y tags descriptivos.
 3. **Extrae y guarda en memoria** todos los datos relevantes del documento (ver sección "Extracción de datos a memoria" más abajo).
-4. **Propone los asientos contables** que reflejan la operación. Usa ask_user_question para confirmar datos ambiguos.
-5. **Crea los asientos** con create_journal_entry (status DRAFT).
-6. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
-7. **Confirma** al usuario lo realizado con un resumen claro.
+4. **Para cada documento adjunto, llama a get_document_journal_entries(documentId).** Si devuelve asientos ya vinculados, **NO crees un asiento nuevo** para ese documento; informa al usuario que el documento ya fue procesado y menciona el asiento existente (número, descripción) para evitar duplicados. Solo crea asientos para documentos que devuelvan 0 asientos.
+5. **Propone los asientos contables** que reflejan la operación (solo para documentos sin asientos previos). Usa ask_user_question para confirmar datos ambiguos.
+6. **Crea los asientos** con create_journal_entry (status DRAFT).
+7. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
+8. **Confirma** al usuario lo realizado con un resumen claro.
 
 ## Extracción de datos a memoria
 
@@ -698,7 +699,7 @@ export class ChatService {
   }
 
   async getConversations(userId: string, tenantId: string) {
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where: { userId, tenantId },
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -709,6 +710,69 @@ export class ChatService {
         _count: { select: { messages: true } },
       },
     });
+
+    if (conversations.length === 0) return [];
+
+    const convIds = conversations.map((c) => c.id);
+    const toolMessages = await this.prisma.message.findMany({
+      where: { conversationId: { in: convIds }, role: 'tool' },
+      select: { conversationId: true, toolName: true, toolArgs: true, toolResult: true },
+    });
+
+    const statsByConv = new Map<
+      string,
+      { postedEntries: number; memoryActions: number; pendingDrafts: number }
+    >();
+
+    for (const cid of convIds) {
+      statsByConv.set(cid, { postedEntries: 0, memoryActions: 0, pendingDrafts: 0 });
+    }
+
+    const createdIdsByConv = new Map<string, Set<string>>();
+    const postedIdsByConv = new Map<string, Set<string>>();
+
+    for (const msg of toolMessages) {
+      const cid = msg.conversationId;
+      const name = msg.toolName ?? '';
+
+      if (name === 'post_journal_entry') {
+        const entryId = (msg.toolArgs as Record<string, unknown>)?.journalEntryId as string | undefined;
+        if (entryId) {
+          const set = postedIdsByConv.get(cid) ?? new Set();
+          set.add(entryId);
+          postedIdsByConv.set(cid, set);
+        }
+        const stats = statsByConv.get(cid)!;
+        stats.postedEntries += 1;
+      } else if (name === 'create_journal_entry') {
+        const result = msg.toolResult as Record<string, unknown> | null;
+        const entryId = result?.id as string | undefined;
+        if (entryId) {
+          const set = createdIdsByConv.get(cid) ?? new Set();
+          set.add(entryId);
+          createdIdsByConv.set(cid, set);
+        }
+      } else if (name === 'memory_store' || name === 'memory_search' || name === 'memory_delete') {
+        const stats = statsByConv.get(cid)!;
+        stats.memoryActions += 1;
+      }
+    }
+
+    for (const cid of convIds) {
+      const created = createdIdsByConv.get(cid) ?? new Set();
+      const posted = postedIdsByConv.get(cid) ?? new Set();
+      let pending = 0;
+      for (const id of created) {
+        if (!posted.has(id)) pending += 1;
+      }
+      const stats = statsByConv.get(cid)!;
+      stats.pendingDrafts = pending;
+    }
+
+    return conversations.map((c) => ({
+      ...c,
+      stats: statsByConv.get(c.id)!,
+    }));
   }
 
   async getMessages(conversationId: string, userId: string, tenantId: string) {

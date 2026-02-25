@@ -16,6 +16,31 @@ interface ConversationSummary {
   id: string;
   title: string;
   updatedAt: string;
+  _count?: { messages: number };
+  stats?: {
+    postedEntries: number;
+    memoryActions: number;
+    pendingDrafts: number;
+  };
+}
+
+function ConversationBadges({ stats }: { stats?: ConversationSummary["stats"] }) {
+  if (!stats || (stats.postedEntries === 0 && stats.memoryActions === 0 && stats.pendingDrafts === 0)) {
+    return null;
+  }
+  return (
+    <p className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-1.5 gap-y-0.5" title="Asientos contabilizados · Acciones en memoria · Asientos por confirmar">
+      {stats.postedEntries > 0 && (
+        <span className="text-green-600 dark:text-green-400" title="Asientos contabilizados">✓ {stats.postedEntries}</span>
+      )}
+      {stats.memoryActions > 0 && (
+        <span title="Guardó/buscó/eliminó en memoria">🧠 {stats.memoryActions}</span>
+      )}
+      {stats.pendingDrafts > 0 && (
+        <span className="text-amber-600 dark:text-amber-400" title="Asientos en borrador por confirmar">○ {stats.pendingDrafts}</span>
+      )}
+    </p>
+  );
 }
 
 function relativeTime(dateStr: string): string {
@@ -118,6 +143,7 @@ export function ConversationsSidebar() {
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {relativeTime(conv.updatedAt)}
                   </p>
+                  {conv.stats && <ConversationBadges stats={conv.stats} />}
                 </div>
                 <button
                   type="button"

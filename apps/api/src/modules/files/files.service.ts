@@ -158,6 +158,28 @@ export class FilesService {
     });
   }
 
+  /** Returns journal entries already linked to a document. Used to avoid duplicate entries. */
+  async getJournalEntriesForDocument(tenantId: string, documentId: string) {
+    const doc = await (this.prisma as any).document.findFirst({
+      where: { id: documentId, tenantId },
+      select: { id: true },
+    });
+    if (!doc) return { entries: [] };
+
+    const links = await (this.prisma as any).documentJournalEntry.findMany({
+      where: { documentId },
+      select: { journalEntryId: true },
+    });
+    const entryIds = links.map((l: { journalEntryId: string }) => l.journalEntryId);
+    if (entryIds.length === 0) return { entries: [] };
+
+    const entries = await (this.prisma as any).journalEntry.findMany({
+      where: { id: { in: entryIds }, tenantId },
+      select: { id: true, number: true, description: true, date: true, status: true },
+    });
+    return { entries };
+  }
+
   /** Associates uploaded documents to a conversation (called after conversation is created/confirmed). */
   async attachToConversation(tenantId: string, docIds: string[], conversationId: string) {
     await (this.prisma as any).document.updateMany({

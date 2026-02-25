@@ -6,17 +6,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
 import type { Account, FiscalPeriod } from "@zeru/shared";
 import { downloadExcel } from "@/lib/export-excel";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
 
 interface AccountWithChildren extends Account {
   children?: AccountWithChildren[];
@@ -35,9 +41,99 @@ function flattenAccounts(accounts: AccountWithChildren[]): Account[] {
   return result;
 }
 
+function getAccountLabel(accounts: AccountWithChildren[], accountId: string): string {
+  const flat = flattenAccounts(accounts);
+  const a = flat.find((x) => x.id === accountId);
+  return a ? `${a.code} - ${a.name}` : "Seleccionar cuenta";
+}
+
+// ─── Tree selector row ─────────────────────────────────────────────
+
+function AccountTreeRow({
+  account,
+  depth,
+  selectedId,
+  onSelect,
+  onClose,
+}: {
+  account: AccountWithChildren;
+  depth: number;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasChildren = (account.children?.length ?? 0) > 0;
+  const indent = depth * 16;
+
+  const handleSelect = () => {
+    onSelect(account.id);
+    onClose();
+  };
+
+  return (
+    <div className="min-w-0">
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div
+          className={cn(
+            "flex items-center gap-1.5 py-1.5 pr-2 rounded-md cursor-pointer text-sm",
+            "hover:bg-muted/60",
+            selectedId === account.id && "bg-primary/10 text-primary"
+          )}
+          style={{ paddingLeft: `${indent + 8}px` }}
+        >
+          {hasChildren ? (
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="shrink-0 p-0.5 rounded hover:bg-muted"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  className={cn(
+                    "size-3.5 text-muted-foreground transition-transform",
+                    open && "rotate-90"
+                  )}
+                />
+              </button>
+            </CollapsibleTrigger>
+          ) : (
+            <span className="w-[22px] shrink-0" />
+          )}
+          <button
+            type="button"
+            className="flex-1 text-left min-w-0 flex items-center gap-2"
+            onClick={handleSelect}
+          >
+            <span className="font-mono text-xs text-muted-foreground shrink-0">
+              {account.code}
+            </span>
+            <span className="truncate">{account.name}</span>
+          </button>
+        </div>
+        <CollapsibleContent>
+          {(account.children ?? []).map((child) => (
+            <AccountTreeRow
+              key={child.id}
+              account={child}
+              depth={depth + 1}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onClose={onClose}
+            />
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
 interface GeneralLedgerRow {
   entry_date: string;
   entry_number: number;
+  account_code?: string;
+  account_name?: string;
   description: string;
   debit: string;
   credit: string;
@@ -46,7 +142,7 @@ interface GeneralLedgerRow {
 
 export default function GeneralLedgerPage() {
   const { tenant } = useTenantContext();
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTree, setAccountsTree] = useState<AccountWithChildren[]>([]);
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [startDate, setStartDate] = useState("");
@@ -55,6 +151,9 @@ export default function GeneralLedgerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+
+  const accountsFlat = flattenAccounts(accountsTree);
 
   useEffect(() => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
@@ -65,7 +164,7 @@ export default function GeneralLedgerPage() {
       api.get<FiscalPeriod[]>("/accounting/fiscal-periods", { tenantId }),
     ])
       .then(([accs, perds]) => {
-        setAccounts(flattenAccounts(accs));
+        setAccountsTree(accs);
         setPeriods(perds);
         if (perds.length > 0) {
           const p = perds[0];
@@ -103,7 +202,7 @@ export default function GeneralLedgerPage() {
 
   const handleExportExcel = () => {
     const accountLabel =
-      accounts.find((a) => a.id === selectedAccountId)?.name ?? "Cuenta";
+      accountsFlat.find((a) => a.id === selectedAccountId)?.name ?? "Cuenta";
     const rows = data.map((row) => ({
       Fecha: row.entry_date,
       Asiento: row.entry_number,
@@ -135,22 +234,37 @@ export default function GeneralLedgerPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label>Cuenta</Label>
-              <Select
-                value={selectedAccountId}
-                onValueChange={setSelectedAccountId}
-                disabled={!accounts.length}
-              >
-                <SelectTrigger className="w-[220px]">
-                  <SelectValue placeholder="Seleccionar cuenta" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.code} - {a.name}
-                    </SelectItem>
+              <DropdownMenu open={accountDropdownOpen} onOpenChange={setAccountDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-[280px] justify-between font-normal"
+                    disabled={!accountsTree.length}
+                  >
+                    <span className="truncate">
+                      {selectedAccountId
+                        ? getAccountLabel(accountsTree, selectedAccountId)
+                        : "Seleccionar cuenta"}
+                    </span>
+                    <HugeiconsIcon
+                      icon={ArrowRight01Icon}
+                      className="size-3.5 shrink-0 rotate-90 text-muted-foreground"
+                    />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[280px] max-h-[320px] overflow-y-auto p-1">
+                  {accountsTree.map((acc) => (
+                    <AccountTreeRow
+                      key={acc.id}
+                      account={acc}
+                      depth={0}
+                      selectedId={selectedAccountId}
+                      onSelect={setSelectedAccountId}
+                      onClose={() => setAccountDropdownOpen(false)}
+                    />
                   ))}
-                </SelectContent>
-              </Select>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="space-y-2">
               <Label>Desde</Label>
@@ -201,6 +315,9 @@ export default function GeneralLedgerPage() {
                   <tr className="border-b">
                     <th className="text-left py-2 px-3 font-medium">Fecha</th>
                     <th className="text-left py-2 px-3 font-medium">Asiento</th>
+                    {data.some((r) => r.account_code != null) && (
+                      <th className="text-left py-2 px-3 font-medium">Cuenta</th>
+                    )}
                     <th className="text-left py-2 px-3 font-medium">Descripción</th>
                     <th className="text-right py-2 px-3 font-medium">Debe</th>
                     <th className="text-right py-2 px-3 font-medium">Haber</th>
@@ -214,6 +331,15 @@ export default function GeneralLedgerPage() {
                         {new Date(row.entry_date).toLocaleDateString("es-CL")}
                       </td>
                       <td className="py-2 px-3">#{row.entry_number}</td>
+                      {data.some((r) => r.account_code != null) && (
+                        <td className="py-2 px-3 text-muted-foreground">
+                          {row.account_code != null ? (
+                            <span className="font-mono text-xs">{row.account_code}{row.account_name ? ` — ${row.account_name}` : ""}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      )}
                       <td className="py-2 px-3">{row.description}</td>
                       <td className="py-2 px-3 text-right">
                         {parseFloat(row.debit) > 0

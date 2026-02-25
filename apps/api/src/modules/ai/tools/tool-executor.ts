@@ -67,6 +67,9 @@ export class ToolExecutor {
         case 'link_document_to_entry':
           return await this.linkDocumentToEntry(args, tenantId);
 
+        case 'get_document_journal_entries':
+          return await this.getDocumentJournalEntries(args, tenantId);
+
         case 'ask_user_question':
           // This tool is handled by the chat service directly (sends question event to client)
           return { success: true, data: null, summary: 'Pregunta enviada al usuario' };
@@ -231,6 +234,28 @@ export class ToolExecutor {
       success: true,
       data: { documentId: args.documentId, journalEntryId: args.journalEntryId },
       summary: `Documento vinculado al asiento`,
+    };
+  }
+
+  private async getDocumentJournalEntries(
+    args: Record<string, unknown>,
+    tenantId: string,
+  ): Promise<ToolExecutionResult> {
+    const { entries } = await this.files.getJournalEntriesForDocument(
+      tenantId,
+      String(args.documentId),
+    );
+    const count = entries.length;
+    const summary =
+      count === 0
+        ? 'El documento no tiene asientos vinculados; se puede crear uno nuevo.'
+        : count === 1
+          ? `El documento ya tiene 1 asiento vinculado (evitar duplicar).`
+          : `El documento ya tiene ${count} asientos vinculados (evitar duplicar).`;
+    return {
+      success: true,
+      data: { entries },
+      summary,
     };
   }
 

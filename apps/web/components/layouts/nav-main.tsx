@@ -67,6 +67,7 @@ const settingsNav: NavItem[] = [
   { title: "Organización", href: "/settings/organization", icon: Building06Icon },
   { title: "Usuarios", href: "/settings/users", icon: UserMultipleIcon },
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
+  { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
 ];
 
@@ -141,6 +142,8 @@ export function NavMain() {
                     ? pathname === "/dashboard"
                     : item.href === "/assistant/new"
                     ? pathname.startsWith("/assistant")
+                    : item.href === "/settings/ai"
+                    ? pathname === "/settings/ai"
                     : pathname === item.href || pathname.startsWith(item.href + "/")
                 }
                 tooltip={item.title}

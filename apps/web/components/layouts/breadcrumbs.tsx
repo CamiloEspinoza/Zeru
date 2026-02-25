@@ -24,6 +24,7 @@ const LABELS: Record<string, string> = {
   users: "Usuarios",
   appearance: "Apariencia",
   ai: "Asistente IA",
+  memory: "Memoria",
   assistant: "Asistente",
   documents: "Documentos",
 };

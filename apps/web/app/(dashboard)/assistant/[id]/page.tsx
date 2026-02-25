@@ -267,6 +267,7 @@ export default function AssistantChatPage() {
   const [isDragging, setIsDragging] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
@@ -274,6 +275,18 @@ export default function AssistantChatPage() {
   // Ref so loadHistory can check current messages without needing them in deps
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
+
+  // Scroll automático: se desactiva si el usuario hace scroll hacia arriba; se reactiva si vuelve abajo
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const SCROLL_BOTTOM_THRESHOLD = 100;
+
+  const handleScrollContainerScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const { scrollTop, clientHeight, scrollHeight } = el;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setAutoScrollEnabled(distanceFromBottom <= SCROLL_BOTTOM_THRESHOLD);
+  }, []);
 
   // Asientos en borrador creados en esta conversación que aún no se han contabilizado
   const { postedEntryIds, pendingDraftEntries } = useMemo(() => {
@@ -306,10 +319,11 @@ export default function AssistantChatPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
   }, []);
 
-  // Auto-scroll
+  // Auto-scroll solo si el usuario no ha hecho scroll hacia arriba (o ya volvió abajo)
   useEffect(() => {
+    if (!autoScrollEnabled) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, autoScrollEnabled]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -452,6 +466,9 @@ export default function AssistantChatPage() {
     const text = input.trim();
     if ((!text && !pendingFiles.length) || streaming || anyUploading) return;
 
+    // Al enviar, volver a seguir el scroll para ver la nueva respuesta
+    setAutoScrollEnabled(true);
+
     // Collect only successfully uploaded docs
     const docs: AttachedDoc[] = pendingFiles
       .filter((p) => p.status === "done" && p.documentId)
@@ -517,7 +534,11 @@ export default function AssistantChatPage() {
       </div>
 
       {/* Message list */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScrollContainerScroll}
+        className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4"
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
@@ -711,7 +732,7 @@ export default function AssistantChatPage() {
                     }
                     return null;
                   })}
-                  {/* Placeholder bloque de razonamiento mientras esperamos el primer evento del stream */}
+                  {/* Loader inicial: aún no hay ningún bloque (conectando) */}
                   {msg.blocks.length === 0 && streaming && !msg.done && (
                     <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
                       <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
@@ -743,6 +764,32 @@ export default function AssistantChatPage() {
                           Esperando respuesta del modelo…
                         </p>
                       </div>
+                    </div>
+                  )}
+                  {/* Loader entre turnos: tools terminaron, esperando siguiente respuesta del LLM */}
+                  {msg.blocks.length > 0 &&
+                    streaming &&
+                    !msg.done &&
+                    (() => {
+                      const last = msg.blocks[msg.blocks.length - 1];
+                      const waitingAfterTools =
+                        last?.kind === "tool" && last.state.status === "done";
+                      return waitingAfterTools;
+                    })() && (
+                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
+                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <span className="flex gap-0.5">
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+                          </span>
+                          Pensando...
+                        </span>
+                      </div>
+                      <p className="px-3 pb-3 pt-0 text-xs text-muted-foreground/70 italic">
+                        Esperando respuesta del modelo…
+                      </p>
                     </div>
                   )}
                 </div>

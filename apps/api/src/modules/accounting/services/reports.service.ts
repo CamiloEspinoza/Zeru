@@ -237,6 +237,29 @@ export class ReportsService {
     return result;
   }
 
+  /**
+   * Returns the given account id plus all descendant account ids (recursive by parentId).
+   */
+  private getAccountAndDescendantIds(
+    accounts: Array<{ id: string; parentId: string | null }>,
+    rootId: string,
+  ): string[] {
+    const byParent = new Map<string, Array<{ id: string; parentId: string | null }>>();
+    for (const a of accounts) {
+      const key = a.parentId ?? '__root';
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key)!.push(a);
+    }
+    const ids: string[] = [];
+    function collect(id: string) {
+      ids.push(id);
+      const children = byParent.get(id) ?? [];
+      for (const c of children) collect(c.id);
+    }
+    collect(rootId);
+    return ids;
+  }
+
   async generalLedger(
     tenantId: string,
     accountId: string,
@@ -251,10 +274,18 @@ export class ReportsService {
       throw new NotFoundException(`Account with id ${accountId} not found`);
     }
 
+    const accounts = await this.prisma.account.findMany({
+      where: { tenantId },
+      select: { id: true, parentId: true },
+    });
+    const accountIds = this.getAccountAndDescendantIds(accounts, accountId);
+
     const result = await this.prisma.$queryRaw<
       Array<{
         entry_date: Date;
         entry_number: number;
+        account_code: string;
+        account_name: string;
         description: string;
         debit: string;
         credit: string;
@@ -266,20 +297,25 @@ export class ReportsService {
           SELECT
             je.date AS entry_date,
             je.number AS entry_number,
+            a.code AS account_code,
+            a.name AS account_name,
             je.description,
             jel.debit::numeric(18,2) AS debit,
             jel.credit::numeric(18,2) AS credit
           FROM journal_entry_lines jel
           JOIN journal_entries je ON je.id = jel."journalEntryId"
+          JOIN accounts a ON a.id = jel."accountId"
           WHERE je."tenantId" = ${tenantId}
             AND je.status = 'POSTED'
-            AND jel."accountId" = ${accountId}
+            AND jel."accountId" IN (${Prisma.join(accountIds)})
             AND je.date >= ${new Date(startDate)}::date
             AND je.date < (${new Date(endDate)}::date + INTERVAL '1 day')
         )
         SELECT
           entry_date,
           entry_number,
+          account_code,
+          account_name,
           description,
           debit::text,
           credit::text,

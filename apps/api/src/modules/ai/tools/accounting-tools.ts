@@ -263,6 +263,24 @@ export const ACCOUNTING_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
+    name: 'get_document_journal_entries',
+    description:
+      'Consulta si un documento ya tiene asientos contables vinculados. DEBES llamarla ANTES de crear un asiento para un documento adjunto. Si devuelve asientos, NO crees uno nuevo; informa al usuario que el documento ya fue procesado y menciona el asiento existente para evitar duplicados.',
+    parameters: {
+      type: 'object',
+      properties: {
+        documentId: {
+          type: 'string',
+          description: 'ID del documento adjunto a consultar',
+        },
+      },
+      required: ['documentId'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
     name: 'update_conversation_title',
     description:
       'Actualiza el título de la conversación actual con un nombre descriptivo y conciso. Llama esta herramienta en cuanto tengas suficiente contexto para entender de qué trata la conversación. Puedes llamarla más de una vez si el tema evoluciona. El título debe ser breve (máximo 6 palabras), claro y en el mismo idioma del usuario.',
@@ -427,6 +445,7 @@ export const TOOL_LABELS: Record<string, string> = {
   get_trial_balance: 'Obteniendo balance de comprobación',
   tag_document: 'Clasificando documento',
   link_document_to_entry: 'Vinculando documento a asiento',
+  get_document_journal_entries: 'Comprobando si el documento ya tiene asientos',
   ask_user_question: 'Preguntando al usuario',
   memory_store: 'Guardando en memoria',
   memory_search: 'Buscando en memoria',
