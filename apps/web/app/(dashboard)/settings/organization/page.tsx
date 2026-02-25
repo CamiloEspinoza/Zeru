@@ -14,6 +14,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+function TenantIdField({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="flex items-center gap-2">
+      <code className="flex-1 font-mono text-xs bg-muted border rounded px-3 py-2 select-all break-all">
+        {value}
+      </code>
+      <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
+        {copied ? "¡Copiado!" : "Copiar"}
+      </Button>
+    </div>
+  );
+}
+
 export default function OrganizationSettingsPage() {
   const { tenant } = useTenantContext();
   const [formData, setFormData] = useState<UpdateTenantInput>({
@@ -132,6 +151,21 @@ export default function OrganizationSettingsPage() {
               {saving ? "Guardando..." : "Guardar"}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Identificadores de la organización</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium">Tenant ID</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Úsalo como header <code className="font-mono bg-muted px-1 rounded">X-Tenant-Id</code> al hacer llamadas a la API pública.
+            </p>
+            <TenantIdField value={tenant.id} />
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -14,6 +14,7 @@ import {
   UserMultipleIcon,
   ArrowRight01Icon,
   CheckListIcon,
+  Key01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -70,6 +71,7 @@ const settingsNav: NavItem[] = [
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
+  { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
 ];
 
 export function NavMain() {

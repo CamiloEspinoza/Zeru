@@ -28,6 +28,7 @@
     "@nestjs/jwt": "^11",
     "@nestjs/passport": "^11",
     "@nestjs/platform-express": "^11",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^6",
     "@zeru/shared": "workspace:*",
     "bcrypt": "^5",

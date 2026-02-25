@@ -30,6 +30,7 @@ model Tenant {
   accountingSteps      AccountingProcessStep[]
   memories       Memory[]
   agentSkills    AgentSkill[]
+  apiKeys        ApiKey[]
 
   @@map("tenants")
 }
@@ -50,6 +51,7 @@ model User {
   stepCompletions    AccountingStepCompletion[]
   memories              Memory[]
   journalEntriesCreated JournalEntry[]
+  apiKeys               ApiKey[]
 
   @@map("users")
 }
@@ -487,6 +489,25 @@ model AgentSkillFile {
   @@unique([skillId, path])
   @@index([skillId])
   @@map("agent_skill_files")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  scopes      String[]
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  lastUsedAt  DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([keyHash])
+  @@map("api_keys")
 }
 
 /// Registro de emails en lista de espera

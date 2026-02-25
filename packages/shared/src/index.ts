@@ -4,6 +4,7 @@ export * from './types/tenant';
 export * from './types/user';
 export * from './types/accounting';
 export * from './types/ai';
+export * from './types/api-keys';
 
 export * from './schemas/auth.schema';
 export * from './schemas/tenant.schema';

@@ -38,6 +38,15 @@ export const createJournalEntrySchema = z.object({
     ),
 });
 
+export const batchJournalEntryItemSchema = createJournalEntrySchema.extend({
+  external_id: z.string().min(1).max(128).optional(),
+});
+
+export const createBatchJournalEntriesSchema = z.object({
+  auto_post: z.boolean().optional().default(false),
+  entries: z.array(batchJournalEntryItemSchema).min(1).max(1000),
+});
+
 export const createFiscalPeriodSchema = z.object({
   name: z.string().min(1, 'Nombre requerido'),
   startDate: z.string().date('Fecha inicio inválida'),
@@ -47,6 +56,10 @@ export const createFiscalPeriodSchema = z.object({
 export type CreateAccountSchema = z.infer<typeof createAccountSchema>;
 export type UpdateAccountSchema = z.infer<typeof updateAccountSchema>;
 export type CreateJournalEntrySchema = z.infer<typeof createJournalEntrySchema>;
+export type BatchJournalEntryItemSchema = z.infer<typeof batchJournalEntryItemSchema>;
+export type CreateBatchJournalEntriesSchema = z.infer<
+  typeof createBatchJournalEntriesSchema
+>;
 export type CreateFiscalPeriodSchema = z.infer<typeof createFiscalPeriodSchema>;
 
 // ─── Process Steps ───────────────────────────────────────────────

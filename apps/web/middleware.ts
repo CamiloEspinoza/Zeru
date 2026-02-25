@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Routes accessible without authentication
-const PUBLIC_ROUTES = ["/login", "/register", "/"];
+const PUBLIC_ROUTES = ["/login", "/register", "/", "/docs"];
 // Auth-only routes that should redirect to dashboard when logged in
 const AUTH_ONLY_ROUTES = ["/login", "/register"];
 
