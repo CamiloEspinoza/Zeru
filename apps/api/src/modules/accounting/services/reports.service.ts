@@ -333,6 +333,7 @@ export class ReportsService {
 
     const result = await this.prisma.$queryRaw<
       Array<{
+        journal_entry_id: string;
         entry_date: Date;
         entry_number: number;
         account_code: string;
@@ -346,6 +347,7 @@ export class ReportsService {
       Prisma.sql`
         WITH lines AS (
           SELECT
+            je.id AS journal_entry_id,
             je.date AS entry_date,
             je.number AS entry_number,
             a.code AS account_code,
@@ -363,6 +365,7 @@ export class ReportsService {
             AND je.date < (${new Date(endDate)}::date + INTERVAL '1 day')
         )
         SELECT
+          journal_entry_id,
           entry_date,
           entry_number,
           account_code,

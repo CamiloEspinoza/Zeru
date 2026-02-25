@@ -33,6 +33,7 @@ export class ToolExecutor {
     args: Record<string, unknown>,
     tenantId: string,
     userId?: string,
+    options?: { conversationId?: string },
   ): Promise<ToolExecutionResult> {
     try {
       switch (name) {
@@ -43,7 +44,7 @@ export class ToolExecutor {
           return await this.createAccount(args, tenantId);
 
         case 'create_journal_entry':
-          return await this.createJournalEntry(args, tenantId);
+          return await this.createJournalEntry(args, tenantId, userId, options?.conversationId);
 
         case 'create_fiscal_period':
           return await this.createFiscalPeriod(args, tenantId);
@@ -156,6 +157,8 @@ export class ToolExecutor {
   private async createJournalEntry(
     args: Record<string, unknown>,
     tenantId: string,
+    userId?: string,
+    conversationId?: string,
   ): Promise<ToolExecutionResult> {
     type LineArg = { accountCode: string; debit: number; credit: number; description?: string };
     const rawLines = args.lines as LineArg[];
@@ -185,12 +188,25 @@ export class ToolExecutor {
       });
     }
 
-    const entry = await this.journalEntries.create(tenantId, {
-      date: String(args.date),
-      description: String(args.description),
-      fiscalPeriodId: String(args.fiscalPeriodId),
-      lines,
-    });
+    const meta =
+      userId !== undefined
+        ? {
+            createdById: userId,
+            createdVia: 'ASSISTANT' as const,
+            conversationId: conversationId ?? null,
+          }
+        : undefined;
+
+    const entry = await this.journalEntries.create(
+      tenantId,
+      {
+        date: String(args.date),
+        description: String(args.description),
+        fiscalPeriodId: String(args.fiscalPeriodId),
+        lines,
+      },
+      meta,
+    );
 
     const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
     return {

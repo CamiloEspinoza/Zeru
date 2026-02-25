@@ -27,6 +27,8 @@ export interface UpdateAccountInput {
 
 export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'VOIDED';
 
+export type JournalEntrySource = 'ASSISTANT' | 'MANUAL';
+
 export interface JournalEntry {
   id: string;
   number: number;
@@ -38,6 +40,12 @@ export interface JournalEntry {
   lines: JournalEntryLine[];
   createdAt: Date;
   updatedAt: Date;
+  /** Usuario que creó el asiento (si está registrado). */
+  createdBy?: { id: string; firstName: string; lastName: string; email?: string } | null;
+  /** Origen: asistente IA o manual. */
+  createdVia?: JournalEntrySource | null;
+  /** Conversación del asistente donde se creó (solo si createdVia = ASSISTANT). */
+  conversation?: { id: string; title: string } | null;
 }
 
 export interface JournalEntryLine {

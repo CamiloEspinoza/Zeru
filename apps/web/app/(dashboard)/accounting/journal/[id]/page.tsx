@@ -4,15 +4,44 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
 import type { JournalEntry, JournalEntryLine, JournalEntryStatus } from "@zeru/shared";
 
+interface LinkedDocument {
+  id: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+}
+
+interface Creator {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email?: string;
+}
+
+interface ConversationRef {
+  id: string;
+  title: string;
+}
+
 interface JournalEntryWithLines extends JournalEntry {
   lines: (JournalEntryLine & { account?: { code: string; name: string } })[];
+  documents?: LinkedDocument[];
+  createdBy?: Creator | null;
+  createdVia?: "ASSISTANT" | "MANUAL" | null;
+  conversation?: ConversationRef | null;
 }
 
 const STATUS_BADGE: Record<
@@ -33,6 +62,24 @@ export default function JournalEntryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [openingDocId, setOpeningDocId] = useState<string | null>(null);
+
+  const handleViewDocument = async (documentId: string) => {
+    const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
+    if (!tenantId) return;
+    setOpeningDocId(documentId);
+    try {
+      const doc = await api.get<{ downloadUrl: string }>(
+        `/files/${documentId}`,
+        { tenantId }
+      );
+      if (doc.downloadUrl) window.open(doc.downloadUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setError("No se pudo abrir el documento");
+    } finally {
+      setOpeningDocId(null);
+    }
+  };
 
   useEffect(() => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
@@ -149,6 +196,50 @@ export default function JournalEntryDetailPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Información de creación</CardTitle>
+          <CardDescription>
+            Quién creó el asiento, cuándo y desde dónde (asistente o manual).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Creado el </span>
+            {new Date(entry.createdAt).toLocaleDateString("es-CL", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+          {entry.createdBy && (
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">Creado por </span>
+              {[entry.createdBy.firstName, entry.createdBy.lastName].filter(Boolean).join(" ") || entry.createdBy.email || "—"}
+            </p>
+          )}
+          <p className="text-muted-foreground">
+            <span className="font-medium text-foreground">Origen </span>
+            {entry.createdVia === "ASSISTANT"
+              ? "Asistente IA"
+              : entry.createdVia === "MANUAL"
+                ? "Manual (formulario)"
+                : "—"}
+          </p>
+          {entry.conversation && (
+            <p>
+              <Button variant="link" className="h-auto p-0 text-primary" asChild>
+                <Link href={`/assistant/${entry.conversation.id}`}>
+                  Ver conversación: {entry.conversation.title || "Sin título"}
+                </Link>
+              </Button>
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Líneas</CardTitle>
         </CardHeader>
         <CardContent>
@@ -199,6 +290,37 @@ export default function JournalEntryDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {entry.documents && entry.documents.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Documentos relacionados</CardTitle>
+            <CardDescription>
+              Documentos vinculados a este asiento. Puedes abrirlos para revisar el comprobante de origen.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {entry.documents.map((doc) => (
+                <li
+                  key={doc.id}
+                  className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-sm"
+                >
+                  <span className="truncate font-medium">{doc.name}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={openingDocId === doc.id}
+                    onClick={() => handleViewDocument(doc.id)}
+                  >
+                    {openingDocId === doc.id ? "Abriendo…" : "Ver documento"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

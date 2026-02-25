@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatEvent, QuestionPayload, ToolStartEvent, ToolDoneEvent, TitleUpdateEvent } from "@zeru/shared";
 
 const API_BASE =
@@ -112,9 +112,15 @@ export type MessageBlock =
 export function useChatStream() {
   const [messages, setMessages] = useState<MessageBlock[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>();
+  const conversationIdRef = useRef<string | undefined>(undefined);
   const [conversationTitle, setConversationTitle] = useState<string | undefined>();
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Keep ref in sync so handleEvent callbacks can read the latest value
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   // Updater for the last assistant message's blocks array
   const updateLastAssistantBlocks = useCallback(
@@ -323,6 +329,7 @@ export function useChatStream() {
 
         case "tool_done": {
           const toolDoneEvent = event as ToolDoneEvent;
+          const name = toolDoneEvent.name;
           updateLastAssistantBlocks((blocks) =>
             blocks.map((b) =>
               b.kind === "tool" && b.state.toolCallId === toolDoneEvent.toolCallId
@@ -338,6 +345,17 @@ export function useChatStream() {
                 : b
             )
           );
+          if (
+            toolDoneEvent.success &&
+            (name === "create_journal_entry" || name === "post_journal_entry") &&
+            typeof window !== "undefined"
+          ) {
+            window.dispatchEvent(
+              new CustomEvent("conversation-stats-delta", {
+                detail: { conversationId: conversationIdRef.current, toolName: name },
+              })
+            );
+          }
           break;
         }
 

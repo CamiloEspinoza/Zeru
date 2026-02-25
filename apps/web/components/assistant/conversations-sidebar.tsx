@@ -75,6 +75,37 @@ export function ConversationsSidebar() {
     fetchConversations();
   }, [fetchConversations, pathname]);
 
+  // Update stats in-place when journal entries are created/posted (no API call)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { conversationId: cid, toolName } = (e as CustomEvent).detail ?? {};
+      if (!cid) return;
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== cid) return c;
+          const stats = c.stats ?? { postedEntries: 0, memoryActions: 0, pendingDrafts: 0 };
+          if (toolName === "create_journal_entry") {
+            return { ...c, updatedAt: new Date().toISOString(), stats: { ...stats, pendingDrafts: stats.pendingDrafts + 1 } };
+          }
+          if (toolName === "post_journal_entry") {
+            return {
+              ...c,
+              updatedAt: new Date().toISOString(),
+              stats: {
+                ...stats,
+                postedEntries: stats.postedEntries + 1,
+                pendingDrafts: Math.max(0, stats.pendingDrafts - 1),
+              },
+            };
+          }
+          return c;
+        })
+      );
+    };
+    window.addEventListener("conversation-stats-delta", handler);
+    return () => window.removeEventListener("conversation-stats-delta", handler);
+  }, []);
+
   async function handleDelete(id: string, e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();

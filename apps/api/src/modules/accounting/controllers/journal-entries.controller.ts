@@ -12,6 +12,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import {
   createJournalEntrySchema,
   type CreateJournalEntrySchema,
@@ -46,10 +47,14 @@ export class JournalEntriesController {
   @Post()
   create(
     @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
     @Body(new ZodValidationPipe(createJournalEntrySchema))
     body: CreateJournalEntrySchema,
   ) {
-    return this.journalEntriesService.create(tenantId, body);
+    return this.journalEntriesService.create(tenantId, body, {
+      createdById: userId,
+      createdVia: 'MANUAL',
+    });
   }
 
   @Patch(':id/post')

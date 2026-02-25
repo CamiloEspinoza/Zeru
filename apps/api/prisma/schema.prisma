@@ -48,7 +48,8 @@ model User {
   conversations      Conversation[]
   documents          Document[]
   stepCompletions    AccountingStepCompletion[]
-  memories      Memory[]
+  memories              Memory[]
+  journalEntriesCreated JournalEntry[]
 
   @@map("users")
 }
@@ -124,8 +125,9 @@ model Conversation {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  messages  Message[]
-  documents Document[]
+  messages      Message[]
+  documents     Document[]
+  journalEntries JournalEntry[]
 
   @@index([userId])
   @@index([tenantId])
@@ -251,6 +253,14 @@ enum AccountIFRSSection {
   @@map("account_ifrs_section")
 }
 
+/// Origen del asiento: asistente IA o manual (formulario)
+enum JournalEntrySource {
+  ASSISTANT
+  MANUAL
+
+  @@map("journal_entry_source")
+}
+
 model JournalEntry {
   id          String             @id @default(uuid())
   number      Int
@@ -259,6 +269,15 @@ model JournalEntry {
   status      JournalEntryStatus @default(DRAFT)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+
+  /// Usuario que creó el asiento (manual o quien confirmó en el asistente)
+  createdById  String?
+  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  /// Origen: asistente o manual
+  createdVia   JournalEntrySource?
+  /// Conversación del asistente donde se creó (solo si createdVia = ASSISTANT)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   fiscalPeriodId String
   fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
@@ -272,6 +291,8 @@ model JournalEntry {
   @@unique([number, tenantId])
   @@index([tenantId])
   @@index([date])
+  @@index([createdById])
+  @@index([conversationId])
   @@map("journal_entries")
 }
 

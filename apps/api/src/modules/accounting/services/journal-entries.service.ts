@@ -6,6 +6,12 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { CreateJournalEntrySchema } from '@zeru/shared';
 
+export interface CreateJournalEntryMeta {
+  createdById: string;
+  createdVia: 'ASSISTANT' | 'MANUAL';
+  conversationId?: string | null;
+}
+
 @Injectable()
 export class JournalEntriesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,12 +24,10 @@ export class JournalEntriesService {
     const perPage = query?.perPage ?? 10;
     const skip = (page - 1) * perPage;
 
-    const client = this.prisma.forTenant(tenantId) as any;
-
-    const where = query?.status ? { status: query.status } : {};
+    const where = query?.status ? { status: query.status, tenantId } : { tenantId };
 
     const [entries, total] = await Promise.all([
-      client.journalEntry.findMany({
+      (this.prisma as any).journalEntry.findMany({
         where,
         skip,
         take: perPage,
@@ -34,9 +38,15 @@ export class JournalEntriesService {
               account: true,
             },
           },
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true },
+          },
+          conversation: {
+            select: { id: true, title: true },
+          },
         },
       }),
-      client.journalEntry.count({ where }),
+      (this.prisma as any).journalEntry.count({ where }),
     ]);
 
     return {
@@ -51,15 +61,27 @@ export class JournalEntriesService {
   }
 
   async findById(id: string, tenantId: string) {
-    const client = this.prisma.forTenant(tenantId) as any;
-
-    const entry = await client.journalEntry.findUnique({
-      where: { id },
+    // Use main prisma so include of documents (DocumentJournalEntry + Document) is not filtered by tenant extension
+    const entry = await (this.prisma as any).journalEntry.findFirst({
+      where: { id, tenantId },
       include: {
         lines: {
           include: {
             account: true,
           },
+        },
+        documents: {
+          include: {
+            document: {
+              select: { id: true, name: true, mimeType: true, sizeBytes: true },
+            },
+          },
+        },
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        conversation: {
+          select: { id: true, title: true },
         },
       },
     });
@@ -68,10 +90,19 @@ export class JournalEntriesService {
       throw new NotFoundException(`Journal entry with id ${id} not found`);
     }
 
-    return entry;
+    // Normalize to documents[] with document shape for the API response
+    const documents = (entry.documents ?? []).map(
+      (d: { document: { id: string; name: string; mimeType: string; sizeBytes: number } }) => d.document,
+    );
+    const { documents: _docRel, ...rest } = entry;
+    return { ...rest, documents };
   }
 
-  async create(tenantId: string, data: CreateJournalEntrySchema) {
+  async create(
+    tenantId: string,
+    data: CreateJournalEntrySchema,
+    meta?: CreateJournalEntryMeta,
+  ) {
     const client = this.prisma.forTenant(tenantId) as any;
 
     const maxEntry = await client.journalEntry.findFirst({
@@ -82,7 +113,7 @@ export class JournalEntriesService {
     const nextNumber = (maxEntry?.number ?? 0) + 1;
 
     return this.prisma.$transaction(async (tx) => {
-      const entry = await tx.journalEntry.create({
+      const entry = await (tx as any).journalEntry.create({
         data: {
           tenantId,
           number: nextNumber,
@@ -90,6 +121,11 @@ export class JournalEntriesService {
           description: data.description,
           fiscalPeriodId: data.fiscalPeriodId,
           status: 'DRAFT',
+          ...(meta && {
+            createdById: meta.createdById,
+            createdVia: meta.createdVia,
+            conversationId: meta.conversationId ?? null,
+          }),
           lines: {
             create: data.lines.map((line) => ({
               accountId: line.accountId,

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,40 +28,64 @@ interface TrialBalanceRow {
 
 export default function TrialBalancePage() {
   const { tenant } = useTenantContext();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
-  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [data, setData] = useState<TrialBalanceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const periodId = searchParams.get("fiscalPeriodId") ?? "";
+
+  const setFilter = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams();
+      if (value) params.set("fiscalPeriodId", value);
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [router, pathname]
+  );
+
+  // Load periods once, set default if no URL param
   useEffect(() => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
     if (!tenantId) return;
 
     api
       .get<FiscalPeriod[]>("/accounting/fiscal-periods", { tenantId })
-      .then((periods) => {
-        setPeriods(periods);
-        if (periods.length > 0 && !selectedPeriodId) {
-          setSelectedPeriodId(periods[0].id);
+      .then((perds) => {
+        setPeriods(perds);
+        if (!periodId && perds.length > 0) {
+          setFilter(perds[0].id);
         }
       })
       .catch((err) => setError(err.message ?? "Error al cargar períodos"));
   }, [tenant?.id]);
 
+  // Fetch report whenever periodId changes
+  const lastFetchRef = useRef<string | null>(null);
+
   useEffect(() => {
-    const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
-    if (!tenantId || !selectedPeriodId) return;
+    const tenantId = tenant?.id ?? (typeof window !== "undefined" ? localStorage.getItem("tenant_id") : null);
+    if (!tenantId || !periodId || periods.length === 0) return;
+    if (!periods.some((p) => p.id === periodId)) return;
+    if (lastFetchRef.current === periodId) return;
+    lastFetchRef.current = periodId;
 
     setLoading(true);
     setError(null);
-    const url = `/accounting/reports/trial-balance?fiscalPeriodId=${selectedPeriodId}`;
     api
-      .get<TrialBalanceRow[]>(url, { tenantId })
+      .get<TrialBalanceRow[]>(
+        `/accounting/reports/trial-balance?fiscalPeriodId=${periodId}`,
+        { tenantId }
+      )
       .then(setData)
       .catch((err) => setError(err.message ?? "Error al cargar reporte"))
       .finally(() => setLoading(false));
-  }, [tenant?.id, selectedPeriodId]);
+  }, [tenant?.id, periodId, periods]);
 
   return (
     <div className="space-y-6">
@@ -74,8 +99,8 @@ export default function TrialBalancePage() {
             <div className="space-y-2">
               <Label>Período fiscal</Label>
               <Select
-                value={selectedPeriodId}
-                onValueChange={setSelectedPeriodId}
+                value={periodId}
+                onValueChange={setFilter}
                 disabled={!periods.length}
               >
                 <SelectTrigger className="w-[200px]">

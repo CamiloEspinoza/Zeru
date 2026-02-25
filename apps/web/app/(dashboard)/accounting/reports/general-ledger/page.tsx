@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -47,8 +49,6 @@ function getAccountLabel(accounts: AccountWithChildren[], accountId: string): st
   return a ? `${a.code} - ${a.name}` : "Seleccionar cuenta";
 }
 
-// ─── Tree selector row ─────────────────────────────────────────────
-
 function AccountTreeRow({
   account,
   depth,
@@ -65,11 +65,6 @@ function AccountTreeRow({
   const [open, setOpen] = useState(false);
   const hasChildren = (account.children?.length ?? 0) > 0;
   const indent = depth * 16;
-
-  const handleSelect = () => {
-    onSelect(account.id);
-    onClose();
-  };
 
   return (
     <div className="min-w-0">
@@ -104,7 +99,10 @@ function AccountTreeRow({
           <button
             type="button"
             className="flex-1 text-left min-w-0 flex items-center gap-2"
-            onClick={handleSelect}
+            onClick={() => {
+              onSelect(account.id);
+              onClose();
+            }}
           >
             <span className="font-mono text-xs text-muted-foreground shrink-0">
               {account.code}
@@ -130,6 +128,7 @@ function AccountTreeRow({
 }
 
 interface GeneralLedgerRow {
+  journal_entry_id: string;
   entry_date: string;
   entry_number: number;
   account_code?: string;
@@ -142,19 +141,40 @@ interface GeneralLedgerRow {
 
 export default function GeneralLedgerPage() {
   const { tenant } = useTenantContext();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Reference data (loaded once)
   const [accountsTree, setAccountsTree] = useState<AccountWithChildren[]>([]);
   const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [refDataReady, setRefDataReady] = useState(false);
+
+  // Report results
   const [data, setData] = useState<GeneralLedgerRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
 
+  // URL is the single source of truth for filters
+  const accountId = searchParams.get("accountId") ?? "";
+  const startDate = searchParams.get("startDate") ?? "";
+  const endDate = searchParams.get("endDate") ?? "";
+
   const accountsFlat = flattenAccounts(accountsTree);
 
+  const setFilter = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value) params.set(key, value);
+      else params.delete(key);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
+
+  // Load reference data (accounts + periods) once
   useEffect(() => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
     if (!tenantId) return;
@@ -166,30 +186,41 @@ export default function GeneralLedgerPage() {
       .then(([accs, perds]) => {
         setAccountsTree(accs);
         setPeriods(perds);
-        if (perds.length > 0) {
-          const p = perds[0];
-          setStartDate(p.startDate.toString().slice(0, 10));
-          setEndDate(p.endDate.toString().slice(0, 10));
+
+        // Set defaults only if URL has no filters yet
+        const hasUrlFilters = searchParams.get("accountId") || searchParams.get("startDate") || searchParams.get("endDate");
+        if (!hasUrlFilters) {
+          const flat = flattenAccounts(accs);
+          const params = new URLSearchParams();
+          if (flat.length > 0) params.set("accountId", flat[0].id);
+          if (perds.length > 0) {
+            params.set("startDate", perds[0].startDate.toString().slice(0, 10));
+            params.set("endDate", perds[0].endDate.toString().slice(0, 10));
+          }
+          if (params.toString()) {
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+          }
         }
-        if (accs.length > 0 && !selectedAccountId) {
-          setSelectedAccountId(flattenAccounts(accs)[0].id);
-        }
+        setRefDataReady(true);
       })
       .catch((err) => setError(err.message ?? "Error al cargar datos"));
   }, [tenant?.id]);
 
-  const handleSearch = () => {
-    const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
-    if (!tenantId || !selectedAccountId || !startDate || !endDate) return;
+  // Auto-search when URL has all 3 filters and ref data is ready
+  const lastFetchKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const tenantId = tenant?.id ?? (typeof window !== "undefined" ? localStorage.getItem("tenant_id") : null);
+    if (!accountId || !startDate || !endDate || !tenantId || !refDataReady) return;
+
+    const key = `${accountId}|${startDate}|${endDate}`;
+    if (lastFetchKeyRef.current === key) return;
+    lastFetchKeyRef.current = key;
 
     setLoading(true);
     setError(null);
     setHasSearched(true);
-    const params = new URLSearchParams({
-      accountId: selectedAccountId,
-      startDate,
-      endDate,
-    });
+    const params = new URLSearchParams({ accountId, startDate, endDate });
     api
       .get<GeneralLedgerRow[]>(
         `/accounting/reports/general-ledger?${params.toString()}`,
@@ -198,11 +229,22 @@ export default function GeneralLedgerPage() {
       .then(setData)
       .catch((err) => setError(err.message ?? "Error al cargar reporte"))
       .finally(() => setLoading(false));
+  }, [tenant?.id, refDataReady, accountId, startDate, endDate]);
+
+  const handleSearch = () => {
+    // Force re-fetch even if the same filters (user pressed "Buscar" explicitly)
+    lastFetchKeyRef.current = null;
+    // Re-trigger the effect by ensuring searchParams reflect current state
+    const params = new URLSearchParams();
+    if (accountId) params.set("accountId", accountId);
+    if (startDate) params.set("startDate", startDate);
+    if (endDate) params.set("endDate", endDate);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   const handleExportExcel = () => {
     const accountLabel =
-      accountsFlat.find((a) => a.id === selectedAccountId)?.name ?? "Cuenta";
+      accountsFlat.find((a) => a.id === accountId)?.name ?? "Cuenta";
     const rows = data.map((row) => ({
       Fecha: row.entry_date,
       Asiento: row.entry_number,
@@ -242,8 +284,8 @@ export default function GeneralLedgerPage() {
                     disabled={!accountsTree.length}
                   >
                     <span className="truncate">
-                      {selectedAccountId
-                        ? getAccountLabel(accountsTree, selectedAccountId)
+                      {accountId
+                        ? getAccountLabel(accountsTree, accountId)
                         : "Seleccionar cuenta"}
                     </span>
                     <HugeiconsIcon
@@ -258,8 +300,8 @@ export default function GeneralLedgerPage() {
                       key={acc.id}
                       account={acc}
                       depth={0}
-                      selectedId={selectedAccountId}
-                      onSelect={setSelectedAccountId}
+                      selectedId={accountId}
+                      onSelect={(id) => setFilter("accountId", id)}
                       onClose={() => setAccountDropdownOpen(false)}
                     />
                   ))}
@@ -271,7 +313,7 @@ export default function GeneralLedgerPage() {
               <Input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => setFilter("startDate", e.target.value)}
                 className="w-[140px]"
               />
             </div>
@@ -280,7 +322,7 @@ export default function GeneralLedgerPage() {
               <Input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => setFilter("endDate", e.target.value)}
                 className="w-[140px]"
               />
             </div>
@@ -326,11 +368,18 @@ export default function GeneralLedgerPage() {
                 </thead>
                 <tbody>
                   {data.map((row, i) => (
-                    <tr key={i} className="border-b last:border-0">
+                    <tr key={`${row.journal_entry_id}-${i}`} className="border-b last:border-0">
                       <td className="py-2 px-3">
                         {new Date(row.entry_date).toLocaleDateString("es-CL")}
                       </td>
-                      <td className="py-2 px-3">#{row.entry_number}</td>
+                      <td className="py-2 px-3">
+                        <Link
+                          href={`/accounting/journal/${row.journal_entry_id}`}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          #{row.entry_number}
+                        </Link>
+                      </td>
                       {data.some((r) => r.account_code != null) && (
                         <td className="py-2 px-3 text-muted-foreground">
                           {row.account_code != null ? (

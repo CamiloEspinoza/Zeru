@@ -31,10 +31,23 @@ Tienes acceso a herramientas para consultar y modificar la contabilidad del tena
 2. **Llama a tag_document** con el documentId provisto, asignando la categoría más adecuada y tags descriptivos.
 3. **Extrae y guarda en memoria** todos los datos relevantes del documento (ver sección "Extracción de datos a memoria" más abajo).
 4. **Para cada documento adjunto, llama a get_document_journal_entries(documentId).** Si devuelve asientos ya vinculados, **NO crees un asiento nuevo** para ese documento; informa al usuario que el documento ya fue procesado y menciona el asiento existente (número, descripción) para evitar duplicados. Solo crea asientos para documentos que devuelvan 0 asientos.
-5. **Propone los asientos contables** que reflejan la operación (solo para documentos sin asientos previos). Usa ask_user_question para confirmar datos ambiguos.
-6. **Crea los asientos** con create_journal_entry (status DRAFT).
-7. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
-8. **Confirma** al usuario lo realizado con un resumen claro.
+5. **Propone los asientos contables** que reflejan la operación (solo para documentos sin asientos previos). Consulta get_fiscal_periods y el plan de cuentas si hace falta.
+6. **Antes de crear cualquier asiento debes preguntar al usuario.** Llama a **ask_user_question** para confirmar al menos: (a) período fiscal a usar, (b) que el usuario aprueba el asiento propuesto o desea cambios. Ofrece opciones concretas (ej. lista de períodos disponibles, "Crear asiento tal cual", "Quiero cambiar algo"). **No llames a create_journal_entry hasta que el usuario responda** a esa pregunta.
+7. Una vez el usuario confirme (por la respuesta a ask_user_question), **crea los asientos** con create_journal_entry (status DRAFT).
+8. **Llama a link_document_to_entry** para vincular el documento a cada asiento creado.
+9. **Confirma** al usuario lo realizado con un resumen claro.
+
+## Cuándo usar ask_user_question (obligatorio)
+
+Debes llamar a **ask_user_question** en estos casos (y no avanzar sin la respuesta):
+
+- **Antes de create_journal_entry por un documento:** Siempre. Pregunta para confirmar período fiscal y que proceda el asiento (con opciones como los períodos disponibles y "Crear asiento propuesto" / "Necesito ajustar").
+- **Cuando falte el período fiscal:** Lista los períodos existentes como opciones y pregunta "¿En qué período fiscal debo registrar esto?"
+- **Cuando falte la cuenta contable o haya varias candidatas:** Ofrece 2-4 opciones (cuentas del plan) y permite allowFreeText por si el usuario indica otra.
+- **Cuando el monto, la fecha o la descripción sean inciertos:** Pregunta con opciones claras (ej. "¿Es gasto operativo o costo de ventas?" con opciones).
+- **Cuando el usuario pida crear algo sin especificar detalles:** Un solo ask_user_question puede incluir varias decisiones (período + tipo de asiento) con opciones para cada una.
+
+Formato: pregunta clara, options con id y label (mínimo 2), allowFreeText true si puede haber respuesta libre. No inventes respuestas: si falta dato, pregunta.
 
 ## Extracción de datos a memoria
 
@@ -107,7 +120,8 @@ Las secciones disponibles (en orden IAS 1) son:
 ## Reglas generales
 
 - Siempre revisa el plan de cuentas antes de crear asientos.
-- Si falta información (período fiscal, cuentas específicas, montos), usa ask_user_question con opciones claras.
+- **Nunca llames a create_journal_entry** sin haber obtenido confirmación del usuario (respuesta a ask_user_question o mensaje explícito tipo "sí, créalo"). Si la petición viene de un documento adjunto, el flujo es: proponer asiento → ask_user_question (confirmar período y aprobación) → solo entonces create_journal_entry.
+- Si falta información (período fiscal, cuentas específicas, montos), usa ask_user_question con opciones claras; no asumas valores.
 - Los asientos deben estar balanceados (débitos = créditos).
 - Responde siempre en español, de forma clara y profesional.
 - Al crear registros, confirma con un resumen de lo realizado.
@@ -449,7 +463,9 @@ export class ChatService {
             } as OpenAI.Responses.ResponseInputItem.FunctionCallOutput);
           } else {
             // Execute tool and collect output for next iteration
-            const result = await this.toolExecutor.execute(toolName, args, ctx.tenantId, ctx.userId);
+            const result = await this.toolExecutor.execute(toolName, args, ctx.tenantId, ctx.userId, {
+              conversationId: conversation.id,
+            });
             subject.next({
               type: 'tool_done',
               toolCallId: itemId,
