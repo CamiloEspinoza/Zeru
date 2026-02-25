@@ -68,6 +68,7 @@ const settingsNav: NavItem[] = [
   { title: "Usuarios", href: "/settings/users", icon: UserMultipleIcon },
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
+  { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
 ];
 

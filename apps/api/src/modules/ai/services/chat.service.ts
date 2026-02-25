@@ -4,6 +4,7 @@ import { Subject } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { AiConfigService } from './ai-config.service';
 import { MemoryService } from './memory.service';
+import { SkillsService } from './skills.service';
 import { ToolExecutor } from '../tools/tool-executor';
 import { ACCOUNTING_TOOLS, TOOL_LABELS } from '../tools/accounting-tools';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -152,6 +153,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
     private readonly memoryService: MemoryService,
+    private readonly skillsService: SkillsService,
   ) {}
 
   async streamChat(ctx: ChatStreamContext, subject: Subject<ChatEvent>): Promise<void> {
@@ -175,16 +177,23 @@ export class ChatService {
     const openai = new OpenAI({ apiKey });
     const isNewConversation = !ctx.conversationId;
 
-    // Build system prompt with injected memory context
-    const memoryContext = await this.memoryService.getContextForConversation({
-      tenantId: ctx.tenantId,
-      userId: ctx.userId,
-      userMessage: ctx.message,
-    });
+    // Build system prompt with injected skills + memory context
+    const [memoryContext, skillsPrompt] = await Promise.all([
+      this.memoryService.getContextForConversation({
+        tenantId: ctx.tenantId,
+        userId: ctx.userId,
+        userMessage: ctx.message,
+      }),
+      this.skillsService.getActiveSkillsPrompt(ctx.tenantId),
+    ]);
 
-    const systemPrompt = memoryContext
-      ? `${BASE_SYSTEM_PROMPT}\n\n## Memoria cargada para esta conversación\n\n${memoryContext}`
-      : BASE_SYSTEM_PROMPT;
+    let systemPrompt = BASE_SYSTEM_PROMPT;
+    if (skillsPrompt) {
+      systemPrompt += `\n\n## Skills instalados\n\n${skillsPrompt}`;
+    }
+    if (memoryContext) {
+      systemPrompt += `\n\n## Memoria cargada para esta conversación\n\n${memoryContext}`;
+    }
 
     // Associate uploaded documents with this conversation and resolve for OpenAI
     let resolvedDocs: ResolvedDocument[] = [];

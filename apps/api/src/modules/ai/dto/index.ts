@@ -19,6 +19,17 @@ export const chatRequestSchema = z.object({
   documentIds: z.array(z.string().uuid()).optional(),
 });
 
+export const installSkillSchema = z.object({
+  repoUrl: z.string().url('URL inválida').min(1, 'La URL es requerida'),
+});
+
+export const toggleSkillSchema = z.object({
+  isActive: z.boolean(),
+});
+
+export type InstallSkillDto = z.infer<typeof installSkillSchema>;
+export type ToggleSkillDto = z.infer<typeof toggleSkillSchema>;
+
 export const updateMemorySchema = z.object({
   content: z.string().min(1).optional(),
   category: z.enum(['PREFERENCE', 'FACT', 'PROCEDURE', 'DECISION', 'CONTEXT']).optional(),

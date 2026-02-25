@@ -6,6 +6,7 @@ import { FiscalPeriodsService } from '../../accounting/services/fiscal-periods.s
 import { ReportsService } from '../../accounting/services/reports.service';
 import { FilesService } from '../../files/files.service';
 import { MemoryService } from '../services/memory.service';
+import { SkillsService } from '../services/skills.service';
 import { DocumentCategory, MemoryCategory } from '@prisma/client';
 
 export interface ToolExecutionResult {
@@ -24,6 +25,7 @@ export class ToolExecutor {
     private readonly reports: ReportsService,
     private readonly files: FilesService,
     private readonly memory: MemoryService,
+    private readonly skills: SkillsService,
   ) {}
 
   async execute(
@@ -82,6 +84,9 @@ export class ToolExecutor {
 
         case 'memory_delete':
           return await this.memoryDelete(args, tenantId);
+
+        case 'get_skill_reference':
+          return await this.getSkillReference(args, tenantId);
 
         default:
           return {
@@ -537,6 +542,26 @@ export class ToolExecutor {
       success: deleted,
       data: { memoryId: args.memoryId, deleted },
       summary: deleted ? 'Memoria eliminada' : 'Memoria no encontrada',
+    };
+  }
+
+  private async getSkillReference(
+    args: Record<string, unknown>,
+    tenantId: string,
+  ): Promise<ToolExecutionResult> {
+    const content = await this.skills.getSkillReference(
+      tenantId,
+      String(args.skill_name),
+      String(args.file_path),
+    );
+
+    const isError = content.startsWith('Error:');
+    return {
+      success: !isError,
+      data: { content },
+      summary: isError
+        ? content
+        : `Referencia cargada: ${args.file_path} (${content.length} caracteres)`,
     };
   }
 }

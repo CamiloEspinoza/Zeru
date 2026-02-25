@@ -29,6 +29,7 @@ model Tenant {
   documents            Document[]
   accountingSteps      AccountingProcessStep[]
   memories       Memory[]
+  agentSkills    AgentSkill[]
 
   @@map("tenants")
 }
@@ -407,6 +408,46 @@ model DocumentJournalEntry {
 
   @@unique([documentId, journalEntryId])
   @@map("document_journal_entries")
+}
+
+// ─── Agent Skills ─────────────────────────────────────────
+
+/// Skill instalado por un tenant para extender las capacidades del agente de IA
+model AgentSkill {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  repoUrl     String
+  /// Contenido del SKILL.md (body sin frontmatter)
+  content     String
+  version     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  files AgentSkillFile[]
+
+  @@unique([tenantId, repoUrl])
+  @@index([tenantId])
+  @@map("agent_skills")
+}
+
+/// Archivo de referencia o script perteneciente a un AgentSkill
+model AgentSkillFile {
+  id      String @id @default(uuid())
+  /// Ruta relativa dentro del skill, ej: "references/api_docs.md"
+  path    String
+  content String
+
+  skillId String
+  skill   AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, path])
+  @@index([skillId])
+  @@map("agent_skill_files")
 }
 
 /// Registro de emails en lista de espera

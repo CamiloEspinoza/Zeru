@@ -429,6 +429,30 @@ NO guardes: información transitoria, datos ya en el sistema contable, resultado
     },
     strict: true,
   },
+  {
+    type: 'function',
+    name: 'get_skill_reference',
+    description:
+      'Carga el contenido de un archivo de referencia o script de un skill instalado. Úsala cuando las instrucciones de un skill indiquen que debes consultar un archivo específico de references/ o scripts/ para obtener documentación detallada, esquemas, plantillas u otro material de referencia.',
+    parameters: {
+      type: 'object',
+      properties: {
+        skill_name: {
+          type: 'string',
+          description:
+            'Nombre del skill tal como aparece en la sección "Skills instalados" del system prompt.',
+        },
+        file_path: {
+          type: 'string',
+          description:
+            'Ruta relativa del archivo dentro del skill, por ejemplo "references/api_docs.md" o "scripts/helper.py".',
+        },
+      },
+      required: ['skill_name', 'file_path'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
 ];
 
 /** Human-readable labels para las herramientas */
@@ -450,4 +474,5 @@ export const TOOL_LABELS: Record<string, string> = {
   memory_store: 'Guardando en memoria',
   memory_search: 'Buscando en memoria',
   memory_delete: 'Eliminando de memoria',
+  get_skill_reference: 'Cargando referencia del skill',
 };
