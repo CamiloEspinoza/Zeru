@@ -30,11 +30,8 @@ export function MarketingNav() {
     >
       <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-500 text-white font-bold text-sm shadow-lg shadow-teal-500/20 group-hover:shadow-teal-500/40 transition-shadow">
-            Z
-          </div>
-          <span className="font-semibold text-white tracking-tight">Zeru</span>
+        <Link href="/" className="font-semibold text-white tracking-tight hover:text-white/90 transition-colors">
+          Zeru
         </Link>
 
         {/* Desktop links */}

@@ -51,7 +51,7 @@ export function TeamSwitcher() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="bg-teal-500 text-white flex size-8 items-center justify-center rounded-md text-sm font-bold shrink-0">
+              <div className="bg-black text-white flex size-8 items-center justify-center rounded-md text-sm font-bold shrink-0">
                 Z
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">

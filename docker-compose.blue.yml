@@ -1,0 +1,49 @@
+services:
+  api-blue:
+    image: ghcr.io/camiloespinoza/zeru/api:${IMAGE_TAG:-latest}
+    container_name: zeru-api-blue
+    restart: unless-stopped
+    env_file: /opt/zeru/.env.production
+    environment:
+      API_PORT: "3000"
+    ports:
+      - "3100:3000"
+    networks:
+      - zeru-infra
+    depends_on:
+      - infra-check
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  web-blue:
+    image: ghcr.io/camiloespinoza/zeru/web:${IMAGE_TAG:-latest}
+    container_name: zeru-web-blue
+    restart: unless-stopped
+    env_file: /opt/zeru/.env.production
+    environment:
+      PORT: "3000"
+    ports:
+      - "3200:3000"
+    networks:
+      - zeru-infra
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # Dummy service to verify infra network is reachable before starting app
+  infra-check:
+    image: busybox
+    command: sh -c "echo 'infra network ok'"
+    networks:
+      - zeru-infra
+
+networks:
+  zeru-infra:
+    external: true
