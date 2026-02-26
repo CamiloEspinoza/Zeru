@@ -121,6 +121,12 @@ export interface TitleUpdateEvent {
   title: string;
 }
 
+/** Conversación creada/identificada — emitido justo después de ensureConversation */
+export interface ConversationStartedEvent {
+  type: 'conversation_started';
+  conversationId: string;
+}
+
 /** Error durante el stream */
 export interface ErrorEvent {
   type: 'error';
@@ -128,6 +134,7 @@ export interface ErrorEvent {
 }
 
 export type ChatEvent =
+  | ConversationStartedEvent
   | ThinkingEvent
   | TextDeltaEvent
   | ToolStartEvent

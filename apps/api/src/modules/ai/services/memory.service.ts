@@ -3,9 +3,11 @@ import OpenAI from 'openai';
 import { MemoryCategory } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiConfigService } from './ai-config.service';
+import { BackgroundQueueService } from './background-queue.service';
 
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMENSIONS = 1536;
+const EMBEDDING_TIMEOUT_MS = 15_000;
 
 export interface MemoryRecord {
   id: string;
@@ -24,23 +26,31 @@ export interface MemoryRecord {
 @Injectable()
 export class MemoryService {
   private readonly logger = new Logger(MemoryService.name);
+  private openaiClientCache = new Map<string, OpenAI>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiConfig: AiConfigService,
+    private readonly backgroundQueue: BackgroundQueueService,
   ) {}
 
-  /**
-   * Generates an embedding vector for the given text using the tenant's OpenAI key.
-   */
+  private getOpenAIClient(apiKey: string): OpenAI {
+    let client = this.openaiClientCache.get(apiKey);
+    if (!client) {
+      client = new OpenAI({ apiKey, timeout: EMBEDDING_TIMEOUT_MS });
+      this.openaiClientCache.set(apiKey, client);
+    }
+    return client;
+  }
+
   private async generateEmbedding(tenantId: string, text: string): Promise<number[] | null> {
     const apiKey = await this.aiConfig.getDecryptedApiKey(tenantId);
     if (!apiKey) {
-      this.logger.warn(`No API key for tenant ${tenantId}, skipping embedding generation`);
+      this.logger.warn(`No API key for tenant ${tenantId}, skipping embedding`);
       return null;
     }
 
-    const openai = new OpenAI({ apiKey });
+    const openai = this.getOpenAIClient(apiKey);
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,
       input: text,
@@ -49,17 +59,31 @@ export class MemoryService {
     return response.data[0].embedding;
   }
 
-  /**
-   * Formats a float array as a pgvector literal: '[0.1,0.2,...]'
-   */
   private formatVector(embedding: number[]): string {
     return `[${embedding.join(',')}]`;
   }
 
   /**
-   * Stores a memory with semantic embedding.
-   * If the tenant has no API key, the memory is stored without an embedding
-   * (it will still be returned in list() but not via semantic search).
+   * Saves the embedding vector for a memory record.
+   * Called from the background queue — safe to retry.
+   */
+  private async saveEmbedding(memoryId: string, tenantId: string, content: string): Promise<void> {
+    const embedding = await this.generateEmbedding(tenantId, content);
+    if (!embedding) return;
+
+    const vector = this.formatVector(embedding);
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE memories SET embedding = $1::vector, "updatedAt" = $2 WHERE id = $3 AND "tenantId" = $4`,
+      vector,
+      new Date(),
+      memoryId,
+      tenantId,
+    );
+  }
+
+  /**
+   * Stores a memory instantly (DB insert without embedding) and enqueues
+   * embedding generation as a background job with automatic retries.
    */
   async store(params: {
     tenantId: string;
@@ -71,42 +95,33 @@ export class MemoryService {
   }): Promise<MemoryRecord> {
     const { tenantId, userId, content, category, importance, documentId } = params;
 
-    const embedding = await this.generateEmbedding(tenantId, content).catch((err) => {
-      this.logger.error(`Failed to generate embedding: ${err.message}`);
-      return null;
-    });
-
     const id = crypto.randomUUID();
     const now = new Date();
 
-    if (embedding) {
-      const vector = this.formatVector(embedding);
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO memories (id, content, category, importance, embedding, "isActive", "createdAt", "updatedAt", "tenantId", "userId", "documentId")
-         VALUES ($1, $2, $3::\"memory_category\", $4, $5::vector, true, $6, $7, $8, $9, $10)`,
+    await this.prisma.memory.create({
+      data: {
         id,
         content,
         category,
         importance,
-        vector,
-        now,
-        now,
         tenantId,
         userId,
-        documentId ?? null,
-      );
-    } else {
-      await this.prisma.memory.create({
-        data: { id, content, category, importance, tenantId, userId, documentId: documentId ?? null, createdAt: now, updatedAt: now },
-      });
-    }
+        documentId: documentId ?? null,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+
+    this.backgroundQueue.enqueue({
+      name: `embedding:${id.slice(0, 8)}`,
+      fn: () => this.saveEmbedding(id, tenantId, content),
+    });
 
     return { id, content, category, importance, isActive: true, createdAt: now, updatedAt: now, tenantId, userId, documentId: documentId ?? null };
   }
 
   /**
    * Semantic similarity search over memories for a given tenant.
-   * Searches both tenant-scope (userId=null) and user-scope (userId=userId) memories.
    * Falls back to recency-ordered list when no embedding can be generated.
    */
   async search(params: {
@@ -131,7 +146,6 @@ export class MemoryService {
     } else if (scope === 'user' && userId) {
       scopeClause = `"tenantId" = '${tenantId}' AND "userId" = '${userId}'`;
     } else {
-      // 'all': tenant-wide + the specific user's personal memories
       if (userId) {
         scopeClause = `"tenantId" = '${tenantId}' AND ("userId" IS NULL OR "userId" = '${userId}')`;
       } else {
@@ -157,10 +171,6 @@ export class MemoryService {
 
   /**
    * Returns the most recent active memories (no vector search).
-   * scope:
-   *   'tenant' → only org-level memories (userId IS NULL)
-   *   'user'   → only personal memories for the given userId
-   *   'all'    → tenant + user memories (default, used for context injection)
    */
   async list(params: {
     tenantId: string;
@@ -204,9 +214,6 @@ export class MemoryService {
     return rows as MemoryRecord[];
   }
 
-  /**
-   * Soft-deletes a memory (sets isActive=false).
-   */
   async delete(memoryId: string, tenantId: string): Promise<boolean> {
     const memory = await this.prisma.memory.findFirst({
       where: { id: memoryId, tenantId, isActive: true },
@@ -223,7 +230,8 @@ export class MemoryService {
   }
 
   /**
-   * Updates the content of a memory and regenerates its embedding.
+   * Updates a memory's content/metadata. If content changed, enqueues
+   * a background job to regenerate the embedding.
    */
   async update(params: {
     memoryId: string;
@@ -243,29 +251,15 @@ export class MemoryService {
     const newCategory = category ?? memory.category;
     const newImportance = importance ?? memory.importance;
 
+    await this.prisma.memory.update({
+      where: { id: memoryId },
+      data: { content: newContent, category: newCategory, importance: newImportance },
+    });
+
     if (content && content !== memory.content) {
-      const embedding = await this.generateEmbedding(tenantId, newContent).catch(() => null);
-      if (embedding) {
-        const vector = this.formatVector(embedding);
-        await this.prisma.$executeRawUnsafe(
-          `UPDATE memories SET content = $1, category = $2::\"memory_category\", importance = $3, embedding = $4::vector, "updatedAt" = $5 WHERE id = $6`,
-          newContent,
-          newCategory,
-          newImportance,
-          vector,
-          new Date(),
-          memoryId,
-        );
-      } else {
-        await this.prisma.memory.update({
-          where: { id: memoryId },
-          data: { content: newContent, category: newCategory, importance: newImportance },
-        });
-      }
-    } else {
-      await this.prisma.memory.update({
-        where: { id: memoryId },
-        data: { category: newCategory, importance: newImportance },
+      this.backgroundQueue.enqueue({
+        name: `embedding-update:${memoryId.slice(0, 8)}`,
+        fn: () => this.saveEmbedding(memoryId, tenantId, newContent),
       });
     }
 

@@ -36,6 +36,51 @@ function getAuthHeaders(): Record<string, string> {
   };
 }
 
+// ─── SSE stream reader ────────────────────────────────────────────────────────
+
+const INACTIVITY_TIMEOUT_MS = 90_000;
+
+async function readSSEStream(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  onEvent: (event: ChatEvent) => void,
+): Promise<void> {
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const readPromise = reader.read();
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      const id = setTimeout(
+        () => reject(new Error("Stream inactivity timeout")),
+        INACTIVITY_TIMEOUT_MS,
+      );
+      readPromise.then(() => clearTimeout(id), () => clearTimeout(id));
+    });
+
+    const { done, value } = await Promise.race([readPromise, timeoutPromise]);
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const raw = line.slice(6).trim();
+      if (raw === "[DONE]") return;
+
+      let event: ChatEvent;
+      try {
+        event = JSON.parse(raw);
+      } catch {
+        continue;
+      }
+
+      onEvent(event);
+    }
+  }
+}
+
 // ─── File upload ─────────────────────────────────────────────────────────────
 
 export interface PendingFile {
@@ -199,47 +244,28 @@ export function useChatStream() {
         const reader = res.body?.getReader();
         if (!reader) throw new Error("No stream");
 
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (raw === "[DONE]") break;
-
-            let event: ChatEvent;
-            try {
-              event = JSON.parse(raw);
-            } catch {
-              continue;
-            }
-
-            handleEvent(event);
-          }
-        }
+        await readSSEStream(reader, handleEvent);
       } catch (err) {
         if ((err as Error)?.name !== "AbortError") {
+          const isTimeout = (err as Error)?.message?.includes("inactivity timeout");
+          const errorText = isTimeout
+            ? "La conexión con el asistente se interrumpió. Intenta enviar tu mensaje de nuevo."
+            : "Error al conectar con el asistente.";
           updateLastAssistantBlocks((blocks) => {
-            const hasText = blocks.some((b) => b.kind === "text");
+            const updated = blocks.map((b) =>
+              b.kind === "tool" && b.state.status === "running"
+                ? { ...b, state: { ...b.state, status: "error" as const, summary: "Conexión perdida" } }
+                : b
+            );
+            const hasText = updated.some((b) => b.kind === "text");
             if (hasText) {
-              return blocks.map((b) =>
+              return updated.map((b) =>
                 b.kind === "text"
-                  ? { ...b, text: b.text || "Error al conectar con el asistente." }
+                  ? { ...b, text: b.text || errorText }
                   : b
               );
             }
-            return [
-              ...blocks,
-              { kind: "text", text: "Error al conectar con el asistente." },
-            ];
+            return [...updated, { kind: "text" as const, text: errorText }];
           });
           updateLastAssistant(() => ({ done: true }));
         }
@@ -254,6 +280,10 @@ export function useChatStream() {
   const handleEvent = useCallback(
     (event: ChatEvent) => {
       switch (event.type) {
+        case "conversation_started":
+          setConversationId(event.conversationId);
+          break;
+
         case "thinking":
           updateLastAssistantBlocks((blocks) => {
             const last = blocks[blocks.length - 1];
@@ -458,9 +488,11 @@ export function useChatStream() {
         fetch(`${API_BASE}/ai/conversations/${convId}/messages`, { headers: getAuthHeaders() }),
       ]);
 
+      let isStreaming = false;
       if (convRes.ok) {
-        const conv = (await convRes.json()) as { title?: string };
+        const conv = (await convRes.json()) as { title?: string; isStreaming?: boolean };
         if (conv.title) setConversationTitle(conv.title);
+        isStreaming = conv.isStreaming ?? false;
       }
 
       const res = msgRes;
@@ -620,10 +652,41 @@ export function useChatStream() {
 
       setMessages(blocks);
       setConversationId(convId);
+
+      // If a stream is still active for this conversation, reconnect to it
+      if (isStreaming) {
+        // Append an in-progress assistant block for the ongoing turn
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.type === "assistant" && !last.done) return prev;
+          return [
+            ...prev,
+            { id: crypto.randomUUID(), type: "assistant" as const, blocks: [], done: false },
+          ];
+        });
+        setStreaming(true);
+
+        try {
+          const streamRes = await fetch(`${API_BASE}/ai/conversations/${convId}/stream`, {
+            headers: getAuthHeaders(),
+          });
+
+          if (streamRes.status === 200 && streamRes.body) {
+            const reader = streamRes.body.getReader();
+            await readSSEStream(reader, handleEvent);
+          }
+          // 204 = stream already finished before we connected, nothing to do
+        } catch {
+          // Ignore reconnection errors — user can still interact
+        } finally {
+          setStreaming(false);
+          updateLastAssistant(() => ({ done: true }));
+        }
+      }
     } catch {
       // Fail silently — user can still start a new message
     }
-  }, []);
+  }, [handleEvent, updateLastAssistant]);
 
   return {
     messages,

@@ -20,6 +20,9 @@
     "Prisma-Local": {
       "command": "npx",
       "args": ["-y", "prisma", "mcp"]
+    },
+    "zeru-docs": {
+      "url": "http://localhost:3017/api/mcp/sse"
     }
   }
 }

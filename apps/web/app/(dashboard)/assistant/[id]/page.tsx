@@ -345,13 +345,13 @@ export default function AssistantChatPage() {
     }
   }, [isNew, params.id, reset, loadHistory]);
 
-  // After streaming completes on a /new conversation, navigate to the real URL
-  // so the browser history and breadcrumbs reflect the actual conversation.
+  // As soon as we know the conversation ID (conversation_started event fires early),
+  // replace the /new URL so the browser history and back-navigation work correctly.
   useEffect(() => {
-    if (isNew && !streaming && conversationId) {
+    if (isNew && conversationId) {
       router.replace(`/assistant/${conversationId}`);
     }
-  }, [isNew, streaming, conversationId, router]);
+  }, [isNew, conversationId, router]);
 
   // Cleanup preview URLs on unmount
   useEffect(() => {

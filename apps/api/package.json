@@ -22,6 +22,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.996.0",
     "@aws-sdk/s3-request-presigner": "^3.996.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@nestjs/common": "^11",
     "@nestjs/config": "^4",
     "@nestjs/core": "^11",
@@ -29,6 +30,7 @@
     "@nestjs/passport": "^11",
     "@nestjs/platform-express": "^11",
     "@nestjs/throttler": "^6.5.0",
+    "@orbit-codes/nestjs-mcp": "^1.1.0",
     "@prisma/client": "^6",
     "@zeru/shared": "workspace:*",
     "bcrypt": "^5",

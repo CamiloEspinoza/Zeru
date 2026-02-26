@@ -10,6 +10,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { FilesModule } from './modules/files/files.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { PublicApiModule } from './modules/public-api/public-api.module';
+import { ZeruMcpModule } from './modules/mcp/mcp.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
@@ -25,6 +26,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     FilesModule,
     ApiKeysModule,
     PublicApiModule,
+    ZeruMcpModule,
   ],
 })
 export class AppModule implements NestModule {

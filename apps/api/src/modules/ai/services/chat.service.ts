@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { AiConfigService } from './ai-config.service';
 import { MemoryService } from './memory.service';
 import { SkillsService } from './skills.service';
+import { ActiveStreamsRegistry } from './active-streams.registry';
 import { ToolExecutor } from '../tools/tool-executor';
 import { ACCOUNTING_TOOLS, TOOL_LABELS } from '../tools/accounting-tools';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -192,6 +193,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
     private readonly memoryService: MemoryService,
+    private readonly activeStreams: ActiveStreamsRegistry,
     private readonly skillsService: SkillsService,
   ) {}
 
@@ -211,6 +213,8 @@ export class ChatService {
     }
 
     const conversation = await this.ensureConversation(ctx);
+    subject.next({ type: 'conversation_started', conversationId: conversation.id });
+    this.activeStreams.register(conversation.id, subject);
     await this.saveMessage(conversation.id, 'user', { type: 'text', text: ctx.message });
 
     const openai = new OpenAI({ apiKey });
@@ -247,6 +251,7 @@ export class ChatService {
       const message = err instanceof Error ? err.message : 'Error inesperado';
       subject.next({ type: 'error', message });
     } finally {
+      this.activeStreams.unregister(conversation.id);
       subject.complete();
     }
   }
@@ -742,10 +747,12 @@ export class ChatService {
   }
 
   async getConversation(conversationId: string, userId: string, tenantId: string) {
-    return this.prisma.conversation.findFirst({
+    const conv = await this.prisma.conversation.findFirst({
       where: { id: conversationId, userId, tenantId },
       select: { id: true, title: true, createdAt: true, updatedAt: true },
     });
+    if (!conv) return null;
+    return { ...conv, isStreaming: this.activeStreams.isActive(conv.id) };
   }
 
   async getConversations(userId: string, tenantId: string) {
