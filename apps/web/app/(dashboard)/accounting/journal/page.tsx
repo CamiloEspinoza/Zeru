@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 
 const PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
-export default function JournalPage() {
+function JournalPageContent() {
   const { tenant } = useTenantContext();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -312,5 +312,13 @@ export default function JournalPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function JournalPage() {
+  return (
+    <Suspense>
+      <JournalPageContent />
+    </Suspense>
   );
 }
