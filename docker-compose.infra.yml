@@ -29,11 +29,43 @@ services:
       timeout: 5s
       retries: 5
 
+  nginx:
+    image: nginx:alpine
+    container_name: zeru-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - zeru-upstream:/etc/nginx/conf.d/upstream
+    networks:
+      - zeru-infra
+      - traefik-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      # Route zeruapp.com
+      - "traefik.http.routers.zeru.rule=Host(`zeruapp.com`)"
+      - "traefik.http.routers.zeru.entrypoints=websecure"
+      - "traefik.http.routers.zeru.tls.certresolver=myresolver"
+      - "traefik.http.services.zeru.loadbalancer.server.port=80"
+      # Route *.zeruapp.com
+      - "traefik.http.routers.zeru-wildcard.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.zeruapp.com`)"
+      - "traefik.http.routers.zeru-wildcard.entrypoints=websecure"
+      - "traefik.http.routers.zeru-wildcard.tls.certresolver=myresolver"
+      - "traefik.http.routers.zeru-wildcard.service=zeru"
+
 volumes:
   pgdata:
   redisdata:
+  zeru-upstream:
 
 networks:
   zeru-infra:
     name: zeru-infra
     driver: bridge
+  traefik-network:
+    external: true
+    name: ${TRAEFIK_NETWORK:-infrastructure_staging-network}

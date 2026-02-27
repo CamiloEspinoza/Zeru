@@ -5,6 +5,12 @@
 #   curl -fsSL https://raw.githubusercontent.com/CamiloEspinoza/Zeru/main/scripts/install.sh | bash
 #
 # The script is idempotent — safe to re-run after partial failures.
+#
+# Supports two modes:
+#   - Traefik mode:  Detected automatically when a Traefik container or its
+#                    Docker network already exists. Nginx runs inside the Zeru
+#                    Docker stack; host Nginx, Certbot, and UFW are skipped.
+#   - Standalone:    Nginx is installed on the host with Certbot for TLS.
 
 set -euo pipefail
 
@@ -19,6 +25,36 @@ die()  { echo -e "\033[1;31m[ERROR]\033[0m $*" >&2; exit 1; }
 ask()  { read -rp "$(echo -e "\033[1;36m$1\033[0m ") " "$2"; }
 
 [[ $EUID -ne 0 ]] && die "Run as root: sudo bash install.sh"
+
+# ─── Detect Traefik ──────────────────────────────────────────────────────────
+HAS_TRAEFIK=false
+TRAEFIK_NETWORK=""
+
+# Check for a running or stopped Traefik container
+if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qi traefik; then
+    HAS_TRAEFIK=true
+    # Try to find the Traefik network automatically
+    TRAEFIK_NETWORK=$(docker inspect traefik --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' 2>/dev/null | awk '{print $1}' || true)
+fi
+
+# Fallback: check for known Traefik networks
+if [[ "$HAS_TRAEFIK" == "false" ]]; then
+    for net in infrastructure_staging-network infrastructure_production-network; do
+        if docker network inspect "$net" &>/dev/null; then
+            HAS_TRAEFIK=true
+            TRAEFIK_NETWORK="$net"
+            break
+        fi
+    done
+fi
+
+if [[ "$HAS_TRAEFIK" == "true" ]]; then
+    log "Traefik detected (network: ${TRAEFIK_NETWORK:-auto})"
+    log "Mode: Nginx will run as a container behind Traefik"
+else
+    log "No Traefik detected"
+    log "Mode: Nginx will be installed on the host with Certbot"
+fi
 
 # ─── Step 1: Update system ────────────────────────────────────────────────────
 log "1/11 — Updating system packages..."
@@ -37,18 +73,26 @@ fi
 log "Docker: $(docker --version)"
 log "Docker Compose: $(docker compose version)"
 
-# ─── Step 3: Install Nginx + Certbot ─────────────────────────────────────────
-log "3/11 — Installing Nginx + Certbot..."
-apt-get install -y -qq nginx certbot python3-certbot-nginx
-systemctl enable --now nginx
-log "Nginx: $(nginx -v 2>&1)"
+# ─── Step 3: Install Nginx + Certbot (standalone mode only) ──────────────────
+if [[ "$HAS_TRAEFIK" == "true" ]]; then
+    log "3/11 — Skipping host Nginx + Certbot (Traefik handles TLS)"
+else
+    log "3/11 — Installing Nginx + Certbot..."
+    apt-get install -y -qq nginx certbot python3-certbot-nginx
+    systemctl enable --now nginx
+    log "Nginx: $(nginx -v 2>&1)"
+fi
 
-# ─── Step 4: Configure firewall ───────────────────────────────────────────────
-log "4/11 — Configuring UFW firewall..."
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw --force enable
-log "UFW status: $(ufw status | head -1)"
+# ─── Step 4: Configure firewall (standalone mode only) ───────────────────────
+if [[ "$HAS_TRAEFIK" == "true" ]]; then
+    log "4/11 — Skipping UFW configuration (Traefik manages ports)"
+else
+    log "4/11 — Configuring UFW firewall..."
+    ufw allow OpenSSH
+    ufw allow 'Nginx Full'
+    ufw --force enable
+    log "UFW status: $(ufw status | head -1)"
+fi
 
 # ─── Step 5: Create deploy user ───────────────────────────────────────────────
 log "5/11 — Creating '$DEPLOY_USER' user..."
@@ -111,7 +155,7 @@ else
     log "You will now be prompted for production secrets. Press Ctrl+C to abort."
     echo ""
 
-    ask "Domain name (e.g. app.zeru.cl):" DOMAIN
+    ask "Domain name (e.g. zeruapp.com):" DOMAIN
     ask "Postgres password:" POSTGRES_PASSWORD
     JWT_SECRET=$(openssl rand -hex 32)
     ENCRYPTION_KEY=$(openssl rand -hex 32)
@@ -140,6 +184,13 @@ NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
 NEXT_PUBLIC_REGISTER_TOKEN=${REGISTER_TOKEN}
 EOF
 
+    # If Traefik mode, also write the Traefik network name
+    if [[ "$HAS_TRAEFIK" == "true" && -n "$TRAEFIK_NETWORK" ]]; then
+        echo "" >> "$ZERU_DIR/.env.production"
+        echo "# ── Traefik ───────────────────────────────────────────────────────────────────" >> "$ZERU_DIR/.env.production"
+        echo "TRAEFIK_NETWORK=${TRAEFIK_NETWORK}" >> "$ZERU_DIR/.env.production"
+    fi
+
     chmod 600 "$ZERU_DIR/.env.production"
     chown "$DEPLOY_USER:$DEPLOY_USER" "$ZERU_DIR/.env.production"
     log ".env.production created"
@@ -150,31 +201,34 @@ fi
 export $(grep -v '^#' "$ZERU_DIR/.env.production" | grep -v '^$' | xargs)
 
 # ─── Step 9: Configure Nginx ──────────────────────────────────────────────────
-log "9/11 — Configuring Nginx..."
-cp "$ZERU_DIR/nginx/nginx.conf" /etc/nginx/sites-available/zeru
-ln -sf /etc/nginx/sites-available/zeru /etc/nginx/sites-enabled/zeru
-rm -f /etc/nginx/sites-enabled/default
+if [[ "$HAS_TRAEFIK" == "true" ]]; then
+    log "9/11 — Skipping host Nginx config (Nginx runs as container in infra stack)"
+else
+    log "9/11 — Configuring host Nginx..."
+    cp "$ZERU_DIR/nginx/nginx.conf" /etc/nginx/sites-available/zeru
+    ln -sf /etc/nginx/sites-available/zeru /etc/nginx/sites-enabled/zeru
+    rm -f /etc/nginx/sites-enabled/default
 
-# Create initial upstream pointing to blue
-mkdir -p /etc/nginx/conf.d
-cat > /etc/nginx/conf.d/zeru-upstream.conf << 'EOF'
+    # Create initial upstream pointing to blue
+    mkdir -p /etc/nginx/conf.d
+    cat > /etc/nginx/conf.d/zeru-upstream.conf << 'EOF'
 upstream zeru_api { server 127.0.0.1:3100; }
 upstream zeru_web { server 127.0.0.1:3200; }
 EOF
 
-nginx -t && systemctl reload nginx
-log "Nginx configured and reloaded"
+    nginx -t && systemctl reload nginx
+    log "Nginx configured and reloaded"
+fi
 
-# ─── Step 10: Start infrastructure (Postgres + Redis) ────────────────────────
+# ─── Step 10: Start infrastructure (Postgres + Redis + Nginx if Traefik) ─────
 log "10/11 — Starting infrastructure services..."
-# Run docker compose as deploy user (added to docker group)
 docker network create zeru-infra 2>/dev/null || warn "Network 'zeru-infra' already exists"
 
 cd "$ZERU_DIR"
 docker compose -f docker-compose.infra.yml --env-file .env.production up -d
-log "Waiting 15s for Postgres to be ready..."
+log "Waiting for services to be healthy..."
 sleep 15
-docker compose -f docker-compose.infra.yml ps
+docker compose -f docker-compose.infra.yml --env-file .env.production ps
 
 # ─── Step 11: First deploy ────────────────────────────────────────────────────
 log "11/11 — Running first deployment..."
@@ -200,12 +254,21 @@ if [[ "${START_NOW,,}" == "y" ]]; then
     log "Running Prisma migrations..."
     docker exec zeru-api-blue npx prisma migrate deploy
 
+    # Write initial upstream config
+    UPSTREAM_CONTENT="upstream zeru_api { server zeru-api-blue:3000; }
+upstream zeru_web { server zeru-web-blue:3000; }"
+
+    if docker inspect zeru-nginx &>/dev/null; then
+        docker exec zeru-nginx sh -c "mkdir -p /etc/nginx/conf.d/upstream && echo '$UPSTREAM_CONTENT' > /etc/nginx/conf.d/upstream/zeru-upstream.conf"
+        docker exec zeru-nginx nginx -s reload
+    fi
+
     echo "blue" > "$ZERU_DIR/.active"
     chown "$DEPLOY_USER:$DEPLOY_USER" "$ZERU_DIR/.active"
 
     log "Verifying health..."
-    curl -sf http://localhost:3100/api && log "API OK" || warn "API not yet responding — check: docker logs zeru-api-blue"
-    curl -sf http://localhost:3200 && log "Web OK" || warn "Web not yet responding — check: docker logs zeru-web-blue"
+    docker exec zeru-api-blue wget -qO- http://localhost:3000/api > /dev/null 2>&1 && log "API OK" || warn "API not yet responding — check: docker logs zeru-api-blue"
+    docker exec zeru-web-blue wget -qO- http://localhost:3000 > /dev/null 2>&1 && log "Web OK" || warn "Web not yet responding — check: docker logs zeru-web-blue"
 else
     log "Skipping first deploy. Run manually later:"
     echo "  cd $ZERU_DIR"
@@ -214,19 +277,21 @@ else
     echo "  echo 'blue' > $ZERU_DIR/.active"
 fi
 
-# ─── HTTPS with Certbot (optional) ───────────────────────────────────────────
-echo ""
-ask "Configure HTTPS with Certbot now? (y/N):" SETUP_HTTPS
-if [[ "${SETUP_HTTPS,,}" == "y" ]]; then
-    DOMAIN_FOR_CERT="${DOMAIN:-}"
-    if [[ -z "$DOMAIN_FOR_CERT" ]]; then
-        ask "Enter domain for SSL certificate:" DOMAIN_FOR_CERT
+# ─── HTTPS with Certbot (standalone mode only) ───────────────────────────────
+if [[ "$HAS_TRAEFIK" == "false" ]]; then
+    echo ""
+    ask "Configure HTTPS with Certbot now? (y/N):" SETUP_HTTPS
+    if [[ "${SETUP_HTTPS,,}" == "y" ]]; then
+        DOMAIN_FOR_CERT="${DOMAIN:-}"
+        if [[ -z "$DOMAIN_FOR_CERT" ]]; then
+            ask "Enter domain for SSL certificate:" DOMAIN_FOR_CERT
+        fi
+        certbot --nginx -d "$DOMAIN_FOR_CERT"
+        systemctl enable certbot.timer 2>/dev/null || true
+        log "HTTPS configured for $DOMAIN_FOR_CERT"
+    else
+        warn "Skipping HTTPS. Run later: certbot --nginx -d your-domain.com"
     fi
-    certbot --nginx -d "$DOMAIN_FOR_CERT"
-    systemctl enable certbot.timer 2>/dev/null || true
-    log "HTTPS configured for $DOMAIN_FOR_CERT"
-else
-    warn "Skipping HTTPS. Run later: certbot --nginx -d your-domain.com"
 fi
 
 # ─── Summary ──────────────────────────────────────────────────────────────────
@@ -237,6 +302,11 @@ echo "╠═══════════════════════�
 echo "║  App directory : $ZERU_DIR"
 echo "║  Deploy user   : $DEPLOY_USER"
 echo "║  Active color  : $(cat $ZERU_DIR/.active 2>/dev/null || echo 'not set')"
+if [[ "$HAS_TRAEFIK" == "true" ]]; then
+echo "║  Proxy mode    : Traefik → Nginx container → app"
+else
+echo "║  Proxy mode    : Host Nginx + Certbot"
+fi
 echo "║"
 echo "║  Useful commands:"
 echo "║    cat $ZERU_DIR/.active            → active color"

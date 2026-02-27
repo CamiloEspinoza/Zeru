@@ -6,8 +6,6 @@ services:
     env_file: /opt/zeru/.env.production
     environment:
       API_PORT: "3000"
-    ports:
-      - "3101:3000"
     networks:
       - zeru-infra
     depends_on:
@@ -26,8 +24,6 @@ services:
     env_file: /opt/zeru/.env.production
     environment:
       PORT: "3000"
-    ports:
-      - "3201:3000"
     networks:
       - zeru-infra
     healthcheck:
