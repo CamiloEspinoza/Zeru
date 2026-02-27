@@ -101,23 +101,46 @@ En tu repositorio GitHub ve a **Settings → Secrets and variables → Actions**
 
 | Secret | Valor |
 |--------|-------|
-| `SSH_PRIVATE_KEY` | Contenido completo de `~/.ssh/zeru_deploy` |
-| `SSH_HOST` | IP pública del servidor |
-| `SSH_USER` | `deploy` (el script lo crea automáticamente) |
-| `GHCR_TOKEN` | GitHub Personal Access Token con scope `write:packages` |
+| `SERVER_SSH_KEY` | Contenido completo de `~/.ssh/zeru_deploy` (clave privada) |
+| `SERVER_HOST` | IP pública del servidor |
+| `SERVER_USER` | `deploy` (el script lo crea automáticamente) |
+| `GHCR_TOKEN` | GitHub Personal Access Token con scopes `write:packages` + `read:packages` |
+| `NEXT_PUBLIC_API_URL` | URL pública de la API, ej: `https://app.zeru.cl/api` |
 
-Para crear el `GHCR_TOKEN`: ve a **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)** y genera uno con scope `write:packages`.
+Para crear el `GHCR_TOKEN`: ve a **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)** y genera uno con scopes `write:packages` y `read:packages`.
+
+> `GHCR_TOKEN` es necesario tanto en repos públicos como privados: el job de build lo usa para publicar imágenes, y el job de deploy lo usa para que el servidor pueda descargarlas (`docker pull`).
 
 ---
 
 ### Paso 3 — Instalar Zeru en el servidor
 
-Conéctate al servidor como **root** y ejecuta el script de instalación:
+Conéctate al servidor como **root** y ejecuta el script de instalación.
 
+**Repositorio público:**
 ```bash
 ssh root@tu-servidor-ip
 curl -fsSL https://raw.githubusercontent.com/CamiloEspinoza/Zeru/main/scripts/install.sh | bash
 ```
+
+**Repositorio privado:**
+
+El script necesita un token para clonar el repo. Crea un GitHub Personal Access Token con scope `repo` (read-only) y pásalo como variable de entorno:
+
+```bash
+ssh root@tu-servidor-ip
+
+# Descarga el script primero (también requiere token si el repo es privado)
+curl -fsSL \
+  -H "Authorization: token TU_GITHUB_PAT" \
+  -H "Accept: application/vnd.github.v3.raw" \
+  https://api.github.com/repos/CamiloEspinoza/Zeru/contents/scripts/install.sh \
+  -o install.sh
+
+GH_CLONE_TOKEN=TU_GITHUB_PAT bash install.sh
+```
+
+> El token solo se usa durante la instalación para clonar el repo. Las imágenes Docker las descarga el propio script usando las credenciales de `ghcr.io` que se piden de forma interactiva.
 
 El script es interactivo y realiza automáticamente los siguientes pasos:
 
@@ -134,6 +157,22 @@ El script es interactivo y realiza automáticamente los siguientes pasos:
 11. Opcionalmente hace el primer deploy y configura HTTPS con Certbot
 
 > El script es idempotente: es seguro volver a ejecutarlo si algo falla a mitad.
+
+---
+
+### Nota sobre imágenes privadas en ghcr.io
+
+Cuando el repositorio es privado, las imágenes en `ghcr.io` también son privadas. El servidor necesita autenticarse con Docker para poder descargarlas.
+
+El script de instalación te pedirá usuario y token de GitHub cuando elijas hacer el primer deploy interactivo. Para los deploys automáticos via GitHub Actions, el workflow ya incluye `docker login ghcr.io` usando el `GHCR_TOKEN` secret antes de ejecutar `deploy.sh`.
+
+Si necesitas autenticarte manualmente en el servidor:
+
+```bash
+echo "TU_GITHUB_PAT" | docker login ghcr.io -u TU_USUARIO_GITHUB --password-stdin
+```
+
+Esta autenticación se guarda en `/root/.docker/config.json` y persiste entre reinicios.
 
 ---
 

@@ -99,4 +99,6 @@ jobs:
             set -euo pipefail
             IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
             echo "Deploying tag: $IMAGE_TAG"
+            # Authenticate to ghcr.io (required for private repositories)
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             bash /opt/zeru/scripts/deploy.sh "$IMAGE_TAG"

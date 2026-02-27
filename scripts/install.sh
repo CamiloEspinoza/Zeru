@@ -11,6 +11,7 @@ set -euo pipefail
 REPO_URL="https://github.com/CamiloEspinoza/Zeru.git"
 ZERU_DIR="/opt/zeru"
 DEPLOY_USER="deploy"
+GH_CLONE_TOKEN=""   # Set via env: GH_CLONE_TOKEN=ghp_xxx bash install.sh
 
 log()  { echo -e "\033[1;32m[ZERU INSTALL]\033[0m $*"; }
 warn() { echo -e "\033[1;33m[WARN]\033[0m $*"; }
@@ -83,11 +84,19 @@ fi
 
 # ─── Step 7: Clone repo and set up directory structure ───────────────────────
 log "7/11 — Setting up $ZERU_DIR..."
+
+# Build authenticated clone URL if a token was provided (required for private repos)
+if [[ -n "$GH_CLONE_TOKEN" ]]; then
+    CLONE_URL="${REPO_URL/https:\/\//https://${GH_CLONE_TOKEN}@}"
+else
+    CLONE_URL="$REPO_URL"
+fi
+
 if [[ -d "$ZERU_DIR/.git" ]]; then
     warn "Repo already cloned at $ZERU_DIR — pulling latest..."
     git -C "$ZERU_DIR" pull
 else
-    git clone "$REPO_URL" "$ZERU_DIR"
+    git clone "$CLONE_URL" "$ZERU_DIR"
 fi
 mkdir -p "$ZERU_DIR/scripts" "$ZERU_DIR/nginx"
 chmod +x "$ZERU_DIR/scripts/deploy.sh"
