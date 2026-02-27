@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { registerSchema } from "@zeru/shared";
@@ -337,7 +337,7 @@ function RegisterForm() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const searchParams = useSearchParams();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
 
@@ -360,5 +360,13 @@ export default function RegisterPage() {
     <AuthShell>
       {hasAccess ? <RegisterForm /> : <WaitlistForm />}
     </AuthShell>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterPageContent />
+    </Suspense>
   );
 }
