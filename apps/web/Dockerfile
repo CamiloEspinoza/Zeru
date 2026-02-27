@@ -26,6 +26,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 COPY --from=installer /app .
 COPY --from=pruner /app/out/full/ .
+# Root tsconfig needed by packages/shared (turbo prune does not include root files)
+COPY --from=pruner /app/tsconfig.base.json ./tsconfig.base.json
 # Turbo builds @zeru/shared first (dependsOn: ["^build"]), then @zeru/web
 RUN pnpm turbo run build --filter @zeru/web
 

@@ -24,6 +24,8 @@ WORKDIR /app
 COPY --from=installer /app .
 # Overwrite with full pruned source
 COPY --from=pruner /app/out/full/ .
+# Root tsconfig needed by packages/shared (turbo prune does not include root files)
+COPY --from=pruner /app/tsconfig.base.json ./tsconfig.base.json
 # Prisma client must be generated before nest build (provides TypeScript types)
 RUN pnpm --filter @zeru/api exec prisma generate
 # Turbo respects dependsOn: builds @zeru/shared first, then @zeru/api
