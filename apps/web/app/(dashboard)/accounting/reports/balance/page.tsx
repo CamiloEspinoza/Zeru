@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ interface TrialBalanceRow {
   balance: string;
 }
 
-export default function TrialBalancePage() {
+function TrialBalancePageContent() {
   const { tenant } = useTenantContext();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -154,5 +154,13 @@ export default function TrialBalancePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function TrialBalancePage() {
+  return (
+    <Suspense>
+      <TrialBalancePageContent />
+    </Suspense>
   );
 }

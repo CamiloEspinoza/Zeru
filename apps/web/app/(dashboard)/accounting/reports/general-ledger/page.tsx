@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -139,7 +139,7 @@ interface GeneralLedgerRow {
   running_balance: string;
 }
 
-export default function GeneralLedgerPage() {
+function GeneralLedgerPageContent() {
   const { tenant } = useTenantContext();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -416,5 +416,13 @@ export default function GeneralLedgerPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function GeneralLedgerPage() {
+  return (
+    <Suspense>
+      <GeneralLedgerPageContent />
+    </Suspense>
   );
 }
