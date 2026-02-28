@@ -95,7 +95,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT }}
-          timeout: 300s
+          timeout: 30s
+          debug: true
           script: |
             set -euo pipefail
             IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
