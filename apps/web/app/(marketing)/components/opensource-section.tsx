@@ -31,7 +31,7 @@ const pillars = [
 
 export function OpenSourceSection() {
   return (
-    <section id="opensource" className="py-28 px-6 relative">
+    <section id="opensource" className="py-28 px-6 relative overflow-hidden">
       {/* Divider line */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-24 bg-gradient-to-b from-transparent via-white/10 to-transparent" />
 
@@ -50,6 +50,17 @@ export function OpenSourceSection() {
             gestión. Zeru es gratuito y sus costos operativos recaen directamente
             en quien los genera.
           </p>
+          <div className="inline-flex items-center gap-2.5 mt-5 px-4 py-2.5 rounded-xl border border-teal-500/20 bg-teal-500/5 text-left">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-400" />
+            </span>
+            <span className="text-sm text-white/70">
+              Estamos preparando el repositorio para ser{" "}
+              <span className="text-teal-400 font-semibold">open source</span>{" "}
+              — pronto podrás clonar, contribuir y desplegar tu propia instancia.
+            </span>
+          </div>
         </div>
 
         {/* Pillars grid */}

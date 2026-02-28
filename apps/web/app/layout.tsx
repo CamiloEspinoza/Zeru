@@ -10,7 +10,10 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "Zeru",
+  title: {
+    default: "Zeru",
+    template: "%s | Zeru",
+  },
   description: "Gestión empresarial con agentes de inteligencia artificial",
 };
 

@@ -47,7 +47,7 @@ export function MarketingFooter() {
                 { label: "Funcionalidades", href: "#funcionalidades" },
                 { label: "Roadmap", href: "#roadmap" },
                 { label: "Open Source", href: "#opensource" },
-                { label: "Documentación", href: "#", note: "pronto" },
+                { label: "Documentación", href: "/documents" },
               ].map((l) => (
                 <li key={l.label}>
                   <a

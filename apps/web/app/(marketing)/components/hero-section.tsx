@@ -4,7 +4,7 @@ import { HeroTypewriter } from "./hero-typewriter";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
+    <section className="relative min-h-[100dvh] flex items-start sm:items-center pt-20 sm:pt-16 overflow-hidden">
       {/* Background gradient mesh */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full bg-teal-500/10 blur-[120px]" />
@@ -21,7 +21,7 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-6 py-24 grid lg:grid-cols-2 gap-16 items-center">
+      <div className="relative max-w-6xl mx-auto px-6 py-12 sm:py-24 grid lg:grid-cols-2 gap-16 items-center">
         {/* Left: copy */}
         <div className="space-y-8 fade-in-up">
           {/* Badge */}
