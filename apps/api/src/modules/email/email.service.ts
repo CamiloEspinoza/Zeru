@@ -3,8 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { EmailConfigService, type DecryptedEmailConfig } from '../email-config/email-config.service';
 
-const CODE_EXPIRY_MINUTES = 10;
-
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -18,7 +16,7 @@ export class EmailService {
    * Envía un código de login al email del usuario.
    * Busca credenciales SES del tenant del usuario; si no las encuentra, usa env vars como fallback.
    */
-  async sendLoginCode(to: string, code: string): Promise<void> {
+  async sendLoginCode(to: string, code: string, expiryMinutes = 10): Promise<void> {
     const creds = await this.resolveCredentials(to);
 
     const command = new SendEmailCommand({
@@ -33,7 +31,7 @@ export class EmailService {
           },
           Text: {
             Charset: 'UTF-8',
-            Data: `Tu código de acceso a Zeru es: ${code}\n\nEste código expira en ${CODE_EXPIRY_MINUTES} minutos.\nSi no solicitaste este código, ignora este mensaje.`,
+            Data: `Tu código de acceso a Zeru es: ${code}\n\nEste código expira en ${expiryMinutes} minutos.\nSi no solicitaste este código, ignora este mensaje.`,
           },
         },
       },
@@ -149,7 +147,7 @@ export class EmailService {
             <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#2dd4bf;font-family:'Courier New',monospace">${code}</span>
           </div>
           <p style="color:rgba(255,255,255,0.4);font-size:13px;line-height:1.6;margin:0">
-            Este código expira en <strong style="color:rgba(255,255,255,0.6)">${CODE_EXPIRY_MINUTES} minutos</strong>.<br>
+            Este código expira en <strong style="color:rgba(255,255,255,0.6)">${expiryMinutes} minutos</strong>.<br>
             Si no solicitaste este código, puedes ignorar este mensaje.
           </p>
         </td></tr>

@@ -81,7 +81,10 @@ export class AuthService {
       data: { email, codeHash, expiresAt },
     });
 
-    await this.emailService.sendLoginCode(email, code);
+    await this.emailService.sendLoginCode(email, code, CODE_EXPIRY_MINUTES);
+
+    // Limpiar códigos expirados de forma oportunista (no bloqueante)
+    void this.pruneExpiredCodes();
 
     return { expiresAt: expiresAt.toISOString() };
   }
@@ -409,6 +412,24 @@ export class AuthService {
       return { success: true };
     } catch {
       throw new ConflictException('Este email ya está en la lista de espera');
+    }
+  }
+
+  private async pruneExpiredCodes(): Promise<void> {
+    try {
+      const { count } = await this.prisma.loginCode.deleteMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: new Date() } },
+            { usedAt: { not: null } },
+          ],
+        },
+      });
+      if (count > 0) {
+        this.logger.log(`Pruned ${count} expired/used login codes`);
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to prune login codes: ${(err as Error).message}`);
     }
   }
 

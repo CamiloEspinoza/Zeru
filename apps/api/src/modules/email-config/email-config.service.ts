@@ -53,6 +53,7 @@ export class EmailConfigService {
   /**
    * Busca la configuración de email para cualquier tenant al que pertenezca el email dado.
    * Se usa para el flujo de login (sin tenant context).
+   * Prioriza la config más recientemente actualizada para orden determinístico.
    */
   async findConfigForEmail(email: string): Promise<DecryptedEmailConfig | null> {
     const config = await this.prisma.emailConfig.findFirst({
@@ -65,6 +66,7 @@ export class EmailConfigService {
           },
         },
       },
+      orderBy: { updatedAt: 'desc' },
     });
 
     if (!config) return null;
