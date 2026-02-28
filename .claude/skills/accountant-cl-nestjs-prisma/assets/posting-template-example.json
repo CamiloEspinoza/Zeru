@@ -1,0 +1,57 @@
+{
+  "code": "CL_SALE_DTE_33_AR",
+  "version": 1,
+  "description": "Venta afecta DTE 33 a crédito (CxC)",
+  "activeFrom": "2026-01-01",
+  "activeTo": null,
+  "conditions": {
+    "sourceType": [
+      "dte_sale"
+    ],
+    "dteType": [
+      33
+    ],
+    "paymentTerms": [
+      "credit"
+    ]
+  },
+  "inputs": [
+    "netAmount",
+    "taxAmount",
+    "totalAmount",
+    "accounts.ar",
+    "accounts.revenue",
+    "accounts.ivaDebito"
+  ],
+  "lines": [
+    {
+      "side": "debit",
+      "accountRef": "accounts.ar",
+      "amountExpr": "totalAmount",
+      "partnerRef": "partnerId"
+    },
+    {
+      "side": "credit",
+      "accountRef": "accounts.revenue",
+      "amountExpr": "netAmount"
+    },
+    {
+      "side": "credit",
+      "accountRef": "accounts.ivaDebito",
+      "amountExpr": "taxAmount",
+      "taxCode": "IVA_DEBITO_19"
+    }
+  ],
+  "validations": [
+    "totalAmount = netAmount + taxAmount + exemptAmount(optional)",
+    "sum(debits)=sum(credits)",
+    "period is open",
+    "accounts active"
+  ],
+  "outputMetadata": {
+    "createsJournalEntry": true,
+    "createsTaxTransaction": true,
+    "journalSourceType": "dte_sale",
+    "taxDirection": "output"
+  }
+}
