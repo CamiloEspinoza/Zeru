@@ -58,7 +58,7 @@ docker compose -f "docker-compose.$NEW.yml" up -d --remove-orphans
 
 # ─── 4. Run Prisma migrations ─────────────────────────────────────────────────
 log "Running database migrations..."
-docker exec "zeru-api-$NEW" npx prisma migrate deploy || die "Prisma migration failed"
+docker exec -w /app/apps/api "zeru-api-$NEW" pnpm exec prisma migrate deploy || die "Prisma migration failed"
 
 # ─── 5. Health check (max 90 s) ───────────────────────────────────────────────
 log "Waiting for $NEW API to be healthy..."
