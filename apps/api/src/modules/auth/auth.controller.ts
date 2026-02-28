@@ -8,35 +8,43 @@ import {
   BadRequestException,
   HttpCode,
 } from '@nestjs/common';
-import type { UserRole } from '@prisma/client';
-import { AuthService } from './auth.service';
+import { AuthService, type AuthUser } from './auth.service';
 import { LocalAuthGuard } from '../../common/guards/local-auth.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { registerSchema } from './dto/register.dto';
-import type { RegisterSchema } from '@zeru/shared';
-
-interface AuthenticatedUser {
-  id: string;
-  email: string;
-  tenantId: string;
-  role: UserRole;
-  membershipId: string;
-}
-
-interface TenantSelectionResult {
-  requiresTenantSelection: true;
-  tenants: Array<{ id: string; name: string; slug: string; role: UserRole }>;
-}
+import type { RegisterSchema, TenantSelectionRequired } from '@zeru/shared';
+import { sendCodeSchema, verifyCodeSchema } from '@zeru/shared';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // ─── Passwordless code flow ────────────────────────────────────────────────
+
+  @Post('send-code')
+  @HttpCode(200)
+  async sendCode(
+    @Body(new ZodValidationPipe(sendCodeSchema)) body: { email: string },
+  ) {
+    return this.authService.sendLoginCode(body.email);
+  }
+
+  @Post('verify-code')
+  @HttpCode(200)
+  async verifyCode(
+    @Body(new ZodValidationPipe(verifyCodeSchema))
+    body: { email: string; code: string; tenantId?: string },
+  ) {
+    return this.authService.verifyLoginCode(body.email, body.code, body.tenantId);
+  }
+
+  // ─── Password-based flow (kept for backwards compatibility) ────────────────
+
   @Post('login')
   @UseGuards(LocalAuthGuard)
   async login(
-    @Request() req: { user: AuthenticatedUser | TenantSelectionResult },
+    @Request() req: { user: AuthUser | TenantSelectionRequired },
   ) {
     const user = req.user;
 

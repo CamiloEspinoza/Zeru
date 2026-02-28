@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.996.0",
+    "@aws-sdk/client-ses": "^3.996.0",
     "@aws-sdk/s3-request-presigner": "^3.996.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@nestjs/common": "^11",

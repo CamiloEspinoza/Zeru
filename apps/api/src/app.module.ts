@@ -13,6 +13,8 @@ import { PublicApiModule } from './modules/public-api/public-api.module';
 import { ZeruMcpModule } from './modules/mcp/mcp.module';
 import { EncryptionModule } from './common/services/encryption.module';
 import { StorageConfigModule } from './modules/storage-config/storage-config.module';
+import { EmailConfigModule } from './modules/email-config/email-config.module';
+import { EmailModule } from './modules/email/email.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
@@ -20,6 +22,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     EncryptionModule,
+    EmailModule,
     PrismaModule,
     AuthModule,
     TenantsModule,
@@ -27,6 +30,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     AccountingModule,
     AiModule,
     StorageConfigModule,
+    EmailConfigModule,
     FilesModule,
     ApiKeysModule,
     PublicApiModule,

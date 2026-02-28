@@ -24,6 +24,7 @@ model Tenant {
   memberships          UserTenant[]
   aiConfig             AiProviderConfig?
   storageConfig        StorageConfig?
+  emailConfig          EmailConfig?
   conversations        Conversation[]
   accounts             Account[]
   journalEntries       JournalEntry[]
@@ -125,6 +126,23 @@ model StorageConfig {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("storage_configs")
+}
+
+/// Configuración de AWS SES para envío de correos por tenant
+model EmailConfig {
+  id                   String   @id @default(uuid())
+  region               String   @default("us-east-1")
+  encryptedAccessKeyId String
+  encryptedSecretKey   String
+  encryptedFromEmail   String
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("email_configs")
 }
 
 /// Sesion de chat entre un usuario y el asistente IA
@@ -527,6 +545,20 @@ model ApiKey {
 
   @@index([keyHash])
   @@map("api_keys")
+}
+
+/// Código de login passwordless (6 dígitos enviados por email)
+model LoginCode {
+  id        String    @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@map("login_codes")
 }
 
 /// Registro de emails en lista de espera
