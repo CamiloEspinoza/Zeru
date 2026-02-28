@@ -1,28 +1,33 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { EmailConfigService, type DecryptedEmailConfig } from '../email-config/email-config.service';
 
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly ses: SESClient;
-  private readonly fromEmail: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.fromEmail = this.config.get<string>('AWS_SES_FROM_EMAIL') ?? 'noreply@zeru.cl';
+  constructor(
+    private readonly config: ConfigService,
+    private readonly emailConfigService: EmailConfigService,
+  ) {}
 
-    this.ses = new SESClient({
-      region: this.config.get<string>('AWS_SES_REGION') ?? 'us-east-1',
+  /**
+   * Envía un código de login al email del usuario.
+   * Busca credenciales SES del tenant del usuario; si no las encuentra, usa env vars como fallback.
+   */
+  async sendLoginCode(to: string, code: string): Promise<void> {
+    const creds = await this.resolveCredentials(to);
+    const client = new SESClient({
+      region: creds.region,
       credentials: {
-        accessKeyId: this.config.get<string>('AWS_SES_ACCESS_KEY_ID') ?? '',
-        secretAccessKey: this.config.get<string>('AWS_SES_SECRET_ACCESS_KEY') ?? '',
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
       },
     });
-  }
 
-  async sendLoginCode(to: string, code: string): Promise<void> {
     const command = new SendEmailCommand({
-      Source: this.fromEmail,
+      Source: creds.fromEmail,
       Destination: { ToAddresses: [to] },
       Message: {
         Subject: { Data: `${code} — Tu código de acceso a Zeru`, Charset: 'UTF-8' },
@@ -40,12 +45,86 @@ export class EmailService {
     });
 
     try {
-      await this.ses.send(command);
+      await client.send(command);
       this.logger.log(`Login code sent to ${to}`);
     } catch (err) {
       this.logger.error(`Failed to send login code to ${to}: ${(err as Error).message}`);
       throw err;
+    } finally {
+      client.destroy();
     }
+  }
+
+  /**
+   * Envía un email genérico usando las credenciales del tenant dado.
+   * Fallback a env vars si no hay config de tenant.
+   */
+  async sendEmail(
+    tenantId: string,
+    to: string,
+    subject: string,
+    html: string,
+    text?: string,
+  ): Promise<void> {
+    const creds = await this.resolveCredentialsByTenant(tenantId);
+    const client = new SESClient({
+      region: creds.region,
+      credentials: {
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+      },
+    });
+
+    const command = new SendEmailCommand({
+      Source: creds.fromEmail,
+      Destination: { ToAddresses: [to] },
+      Message: {
+        Subject: { Data: subject, Charset: 'UTF-8' },
+        Body: {
+          Html: { Charset: 'UTF-8', Data: html },
+          ...(text ? { Text: { Charset: 'UTF-8', Data: text } } : {}),
+        },
+      },
+    });
+
+    try {
+      await client.send(command);
+    } catch (err) {
+      this.logger.error(`Failed to send email to ${to}: ${(err as Error).message}`);
+      throw err;
+    } finally {
+      client.destroy();
+    }
+  }
+
+  // ─── Private ──────────────────────────────────────────────────────────────
+
+  /**
+   * Resuelve credenciales SES para un destinatario (usado en login, sin tenant context).
+   * Busca la config de los tenants del usuario, fallback a env vars.
+   */
+  private async resolveCredentials(recipientEmail: string): Promise<DecryptedEmailConfig> {
+    const tenantConfig = await this.emailConfigService.findConfigForEmail(recipientEmail);
+    if (tenantConfig) return tenantConfig;
+    return this.envFallback();
+  }
+
+  /**
+   * Resuelve credenciales SES para un tenant específico (con tenant context).
+   */
+  private async resolveCredentialsByTenant(tenantId: string): Promise<DecryptedEmailConfig> {
+    const tenantConfig = await this.emailConfigService.getDecryptedConfig(tenantId);
+    if (tenantConfig) return tenantConfig;
+    return this.envFallback();
+  }
+
+  private envFallback(): DecryptedEmailConfig {
+    return {
+      region: this.config.get<string>('AWS_SES_REGION') ?? 'us-east-1',
+      accessKeyId: this.config.get<string>('AWS_SES_ACCESS_KEY_ID') ?? '',
+      secretAccessKey: this.config.get<string>('AWS_SES_SECRET_ACCESS_KEY') ?? '',
+      fromEmail: this.config.get<string>('AWS_SES_FROM_EMAIL') ?? 'noreply@zeru.cl',
+    };
   }
 
   private buildLoginCodeHtml(code: string): string {

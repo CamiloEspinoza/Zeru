@@ -13,6 +13,7 @@ import { PublicApiModule } from './modules/public-api/public-api.module';
 import { ZeruMcpModule } from './modules/mcp/mcp.module';
 import { EncryptionModule } from './common/services/encryption.module';
 import { StorageConfigModule } from './modules/storage-config/storage-config.module';
+import { EmailConfigModule } from './modules/email-config/email-config.module';
 import { EmailModule } from './modules/email/email.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
@@ -29,6 +30,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     AccountingModule,
     AiModule,
     StorageConfigModule,
+    EmailConfigModule,
     FilesModule,
     ApiKeysModule,
     PublicApiModule,

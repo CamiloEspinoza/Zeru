@@ -16,6 +16,7 @@ import {
   CheckListIcon,
   Key01Icon,
   HardDriveIcon,
+  Mail01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -72,6 +73,7 @@ const settingsNav: NavItem[] = [
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
   { title: "Almacenamiento", href: "/settings/storage", icon: HardDriveIcon },
+  { title: "Email (SES)", href: "/settings/email", icon: Mail01Icon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
 ];
