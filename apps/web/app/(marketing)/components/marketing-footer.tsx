@@ -52,14 +52,9 @@ export function MarketingFooter() {
                 <li key={l.label}>
                   <a
                     href={l.href}
-                    className="text-sm text-white/40 hover:text-white/70 transition-colors flex items-center gap-1.5"
+                    className="text-sm text-white/40 hover:text-white/70 transition-colors"
                   >
                     {l.label}
-                    {l.note && (
-                      <span className="text-[10px] px-1 py-0.5 rounded bg-white/5 text-white/25">
-                        {l.note}
-                      </span>
-                    )}
                   </a>
                 </li>
               ))}
