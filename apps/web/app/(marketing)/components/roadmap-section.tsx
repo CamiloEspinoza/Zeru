@@ -124,7 +124,7 @@ export function RoadmapSection() {
   };
 
   return (
-    <section id="roadmap" className="py-28 px-6 relative">
+    <section id="roadmap" className="py-28 px-6 relative overflow-hidden">
       {/* Background accent */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-teal-500/5 blur-[100px]" />
