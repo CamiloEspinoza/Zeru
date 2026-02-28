@@ -1,5 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
@@ -7,32 +6,41 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { StorageConfigService, type DecryptedStorageConfig } from '../storage-config/storage-config.service';
 
 @Injectable()
 export class S3Service {
-  private readonly client: S3Client;
-  private readonly bucket: string;
+  constructor(private readonly storageConfigService: StorageConfigService) {}
 
-  constructor(private readonly config: ConfigService) {
-    this.client = new S3Client({
-      region: this.config.get<string>('AWS_REGION') ?? 'us-east-1',
+  private async getContext(tenantId: string): Promise<{ client: S3Client; bucket: string }> {
+    const config = await this.storageConfigService.getDecryptedConfig(tenantId);
+    if (!config) {
+      throw new BadRequestException(
+        'Configura tus credenciales de almacenamiento en Ajustes → Almacenamiento',
+      );
+    }
+
+    const client = new S3Client({
+      region: config.region,
       credentials: {
-        accessKeyId: this.config.get<string>('AWS_ACCESS_KEY_ID') ?? '',
-        secretAccessKey: this.config.get<string>('AWS_SECRET_ACCESS_KEY') ?? '',
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
       },
     });
-    this.bucket = this.config.get<string>('AWS_S3_BUCKET') ?? '';
+
+    return { client, bucket: config.bucket };
   }
 
   /**
    * Uploads a buffer to S3.
    * Key format: tenants/{tenantId}/documents/{uuid}/{filename}
    */
-  async upload(key: string, buffer: Buffer, mimeType: string): Promise<void> {
+  async upload(tenantId: string, key: string, buffer: Buffer, mimeType: string): Promise<void> {
+    const { client, bucket } = await this.getContext(tenantId);
     try {
-      await this.client.send(
+      await client.send(
         new PutObjectCommand({
-          Bucket: this.bucket,
+          Bucket: bucket,
           Key: key,
           Body: buffer,
           ContentType: mimeType,
@@ -42,36 +50,44 @@ export class S3Service {
       throw new InternalServerErrorException(
         `Error uploading file to S3: ${(err as Error).message}`,
       );
+    } finally {
+      client.destroy();
     }
   }
 
   /**
    * Returns a presigned GET URL valid for the given duration.
    */
-  async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
+  async getPresignedUrl(tenantId: string, key: string, expiresIn = 3600): Promise<string> {
+    const { client, bucket } = await this.getContext(tenantId);
     try {
       return await getSignedUrl(
-        this.client,
-        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+        client,
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
         { expiresIn },
       );
     } catch (err) {
       throw new InternalServerErrorException(
         `Error generating presigned URL: ${(err as Error).message}`,
       );
+    } finally {
+      client.destroy();
     }
   }
 
   /** Deletes an object from S3. */
-  async delete(key: string): Promise<void> {
+  async delete(tenantId: string, key: string): Promise<void> {
+    const { client, bucket } = await this.getContext(tenantId);
     try {
-      await this.client.send(
-        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      await client.send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key }),
       );
     } catch (err) {
       throw new InternalServerErrorException(
         `Error deleting file from S3: ${(err as Error).message}`,
       );
+    } finally {
+      client.destroy();
     }
   }
 

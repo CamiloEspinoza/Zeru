@@ -11,18 +11,22 @@ import { FilesModule } from './modules/files/files.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { PublicApiModule } from './modules/public-api/public-api.module';
 import { ZeruMcpModule } from './modules/mcp/mcp.module';
+import { EncryptionModule } from './common/services/encryption.module';
+import { StorageConfigModule } from './modules/storage-config/storage-config.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    EncryptionModule,
     PrismaModule,
     AuthModule,
     TenantsModule,
     UsersModule,
     AccountingModule,
     AiModule,
+    StorageConfigModule,
     FilesModule,
     ApiKeysModule,
     PublicApiModule,

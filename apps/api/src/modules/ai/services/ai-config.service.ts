@@ -1,38 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EncryptionService } from '../../../common/services/encryption.service';
 import { AiProvider } from '@prisma/client';
-
-const ALGORITHM = 'aes-256-cbc';
-const IV_LENGTH = 16;
 
 @Injectable()
 export class AiConfigService {
-  private readonly encryptionKey: Buffer;
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    const key = this.config.get<string>('ENCRYPTION_KEY') ?? '';
-    this.encryptionKey = Buffer.from(key.padEnd(64, '0').slice(0, 64), 'hex');
-  }
-
-  private encrypt(text: string): string {
-    const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, this.encryptionKey, iv);
-    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-    return `${iv.toString('hex')}:${encrypted.toString('hex')}`;
-  }
-
-  private decrypt(encryptedText: string): string {
-    const [ivHex, encryptedHex] = encryptedText.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const encrypted = Buffer.from(encryptedHex, 'hex');
-    const decipher = createDecipheriv(ALGORITHM, this.encryptionKey, iv);
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString('utf8');
-  }
+    private readonly encryption: EncryptionService,
+  ) {}
 
   async getConfig(tenantId: string) {
     const config = await this.prisma.aiProviderConfig.findUnique({
@@ -60,7 +36,7 @@ export class AiConfigService {
     });
 
     if (!config || !config.isActive) return null;
-    return this.decrypt(config.encryptedApiKey);
+    return this.encryption.decrypt(config.encryptedApiKey);
   }
 
   async getFullConfig(tenantId: string) {
@@ -88,7 +64,7 @@ export class AiConfigService {
       };
     }
 
-    const encryptedApiKey = this.encrypt(data.apiKey);
+    const encryptedApiKey = this.encryption.encrypt(data.apiKey);
 
     const config = await this.prisma.aiProviderConfig.upsert({
       where: { tenantId },

@@ -22,6 +22,7 @@ model Tenant {
 
   memberships          UserTenant[]
   aiConfig             AiProviderConfig?
+  storageConfig        StorageConfig?
   conversations        Conversation[]
   accounts             Account[]
   journalEntries       JournalEntry[]
@@ -106,6 +107,23 @@ model AiProviderConfig {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("ai_provider_configs")
+}
+
+/// Configuracion de almacenamiento S3 por tenant
+model StorageConfig {
+  id                   String   @id @default(uuid())
+  region               String   @default("us-east-1")
+  encryptedAccessKeyId String
+  encryptedSecretKey   String
+  encryptedBucket      String
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("storage_configs")
 }
 
 /// Sesion de chat entre un usuario y el asistente IA

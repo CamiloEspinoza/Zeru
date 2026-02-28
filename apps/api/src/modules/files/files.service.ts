@@ -36,7 +36,7 @@ export class FilesService {
     const docId = randomUUID();
     const s3Key = S3Service.buildKey(tenantId, docId, input.name);
 
-    await this.s3.upload(s3Key, input.buffer, input.mimeType);
+    await this.s3.upload(tenantId, s3Key, input.buffer, input.mimeType);
 
     const doc = await (this.prisma as any).document.create({
       data: {
@@ -115,7 +115,7 @@ export class FilesService {
 
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
-    const downloadUrl = await this.s3.getPresignedUrl(doc.s3Key, 3600);
+    const downloadUrl = await this.s3.getPresignedUrl(tenantId, doc.s3Key, 3600);
     return { ...doc, downloadUrl };
   }
 
@@ -202,7 +202,7 @@ export class FilesService {
     });
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
-    await this.s3.delete(doc.s3Key);
+    await this.s3.delete(tenantId, doc.s3Key);
     await (this.prisma as any).document.delete({ where: { id: docId } });
     return { deleted: true };
   }
