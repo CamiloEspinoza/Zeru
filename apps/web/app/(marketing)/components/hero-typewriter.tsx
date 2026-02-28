@@ -69,12 +69,37 @@ function renderVisible(phrase: Segment[], charIdx: number) {
 export function HeroTypewriter() {
   const [renderState, setRenderState] = useState({ phraseIdx: 0, charIdx: 0 });
 
-  const animation = useRef({ phraseIdx: 0, charIdx: 0, phase: "typing" as "typing" | "deleting" });
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const animation = useRef({
+    phraseIdx: 0,
+    charIdx: 0,
+    phase: "typing" as "typing" | "deleting",
+    pauseUntil: 0,
+    lastTick: 0,
+  });
 
   useEffect(() => {
-    function tick() {
+    let rafId: number;
+
+    function loop(now: number) {
       const s = animation.current;
+
+      // Handle pause between typing and deleting
+      if (s.pauseUntil > 0) {
+        if (now < s.pauseUntil) {
+          rafId = requestAnimationFrame(loop);
+          return;
+        }
+        s.pauseUntil = 0;
+      }
+
+      const speed = s.phase === "typing" ? TYPE_SPEED : DELETE_SPEED;
+
+      if (now - s.lastTick < speed) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+
+      s.lastTick = now;
       const total = phraseLength(PHRASES[s.phraseIdx]);
 
       if (s.phase === "typing") {
@@ -82,12 +107,8 @@ export function HeroTypewriter() {
         setRenderState({ phraseIdx: s.phraseIdx, charIdx: s.charIdx });
 
         if (s.charIdx >= total) {
-          timerRef.current = setTimeout(() => {
-            s.phase = "deleting";
-            timerRef.current = setTimeout(tick, DELETE_SPEED);
-          }, PAUSE_AFTER);
-        } else {
-          timerRef.current = setTimeout(tick, TYPE_SPEED);
+          s.phase = "deleting";
+          s.pauseUntil = now + PAUSE_AFTER;
         }
       } else {
         s.charIdx--;
@@ -96,21 +117,39 @@ export function HeroTypewriter() {
         if (s.charIdx <= 0) {
           s.phraseIdx = (s.phraseIdx + 1) % PHRASES.length;
           s.phase = "typing";
-          timerRef.current = setTimeout(tick, TYPE_SPEED);
-        } else {
-          timerRef.current = setTimeout(tick, DELETE_SPEED);
         }
       }
+
+      rafId = requestAnimationFrame(loop);
     }
 
-    timerRef.current = setTimeout(tick, TYPE_SPEED);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
   }, []);
 
   return (
-    <span className="inline-block min-h-[1.1em]">
-      {renderVisible(PHRASES[renderState.phraseIdx], renderState.charIdx)}
-      <span className="ml-0.5 inline-block w-0.5 h-[0.85em] bg-teal-400 align-middle animate-pulse rounded-sm" />
+    <span className="grid">
+      {/* Invisible sizers – every phrase occupies the same grid cell so the
+          tallest one determines the container height, preventing layout shift
+          when phrases of different lengths rotate. */}
+      {PHRASES.map((phrase, idx) => (
+        <span
+          key={idx}
+          className="col-start-1 row-start-1 invisible pointer-events-none"
+          aria-hidden="true"
+        >
+          {phrase.map((seg, j) => (
+            <span key={j}>{seg.text}</span>
+          ))}
+          {/* Account for cursor width in sizing */}
+          <span className="ml-0.5 inline-block w-0.5" />
+        </span>
+      ))}
+      {/* Visible animated text */}
+      <span className="col-start-1 row-start-1">
+        {renderVisible(PHRASES[renderState.phraseIdx], renderState.charIdx)}
+        <span className="ml-0.5 inline-block w-0.5 h-[0.85em] bg-teal-400 align-middle animate-pulse rounded-sm" />
+      </span>
     </span>
   );
 }
