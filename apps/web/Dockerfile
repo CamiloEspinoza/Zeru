@@ -22,7 +22,9 @@ FROM base AS builder
 WORKDIR /app
 # NEXT_PUBLIC_* vars must be present at build time (baked into static assets)
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_REGISTER_TOKEN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_REGISTER_TOKEN=$NEXT_PUBLIC_REGISTER_TOKEN
 
 COPY --from=installer /app .
 COPY --from=pruner /app/out/full/ .
