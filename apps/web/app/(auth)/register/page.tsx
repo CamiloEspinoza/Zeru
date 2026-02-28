@@ -210,7 +210,7 @@ function RegisterForm() {
       if (response.tenantId) {
         localStorage.setItem("tenantId", response.tenantId);
       }
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear cuenta");
     } finally {

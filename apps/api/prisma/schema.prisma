@@ -16,9 +16,10 @@ model Tenant {
   rut       String?
   address   String?
   phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive              Boolean   @default(true)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   memberships          UserTenant[]
   aiConfig             AiProviderConfig?

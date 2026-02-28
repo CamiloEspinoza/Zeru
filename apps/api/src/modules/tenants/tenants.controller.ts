@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -31,5 +32,15 @@ export class TenantsController {
     @Body(new ZodValidationPipe(updateTenantSchema)) body: UpdateTenantSchema,
   ) {
     return this.tenantsService.update(tenantId, body);
+  }
+
+  @Get('current/onboarding-status')
+  getOnboardingStatus(@CurrentTenant() tenantId: string) {
+    return this.tenantsService.getOnboardingStatus(tenantId);
+  }
+
+  @Post('current/complete-onboarding')
+  completeOnboarding(@CurrentTenant() tenantId: string) {
+    return this.tenantsService.completeOnboarding(tenantId);
   }
 }
