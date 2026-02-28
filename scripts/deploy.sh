@@ -65,7 +65,8 @@ log "Waiting for $NEW API to be healthy..."
 MAX_RETRIES=18
 SLEEP_SEC=5
 for i in $(seq 1 $MAX_RETRIES); do
-    if docker exec "zeru-api-$NEW" wget -qO- --spider http://localhost:3000/api/users 2>&1 | grep -q '401\|200'; then
+    HEALTH_OUTPUT=$(docker exec "zeru-api-$NEW" wget -qO- --spider http://localhost:3000/api/users 2>&1 || true)
+    if echo "$HEALTH_OUTPUT" | grep -q '401\|200'; then
         log "API health check passed (attempt $i)"
         break
     fi
