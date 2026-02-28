@@ -1,3 +1,5 @@
+name: zeru-blue
+
 services:
   api-blue:
     image: ghcr.io/camiloespinoza/zeru/api:${IMAGE_TAG:-latest}

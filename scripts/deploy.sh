@@ -54,7 +54,7 @@ docker compose -f "docker-compose.$NEW.yml" pull
 
 # ─── 3. Start idle color ──────────────────────────────────────────────────────
 log "Starting $NEW stack..."
-docker compose -f "docker-compose.$NEW.yml" up -d --remove-orphans
+docker compose -f "docker-compose.$NEW.yml" up -d
 
 # ─── 4. Run Prisma migrations ─────────────────────────────────────────────────
 log "Running database migrations..."

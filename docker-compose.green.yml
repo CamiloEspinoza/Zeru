@@ -1,3 +1,5 @@
+name: zeru-green
+
 services:
   api-green:
     image: ghcr.io/camiloespinoza/zeru/api:${IMAGE_TAG:-latest}

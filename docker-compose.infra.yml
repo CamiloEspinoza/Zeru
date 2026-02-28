@@ -1,6 +1,10 @@
+name: zeru-infra
+
 services:
   postgres:
     image: pgvector/pgvector:pg17
+    container_name: zeru-postgres
+    hostname: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -18,6 +22,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: zeru-redis
+    hostname: redis
     restart: unless-stopped
     volumes:
       - redisdata:/data
@@ -59,8 +65,11 @@ services:
 
 volumes:
   pgdata:
+    name: zeru_pgdata
   redisdata:
+    name: zeru_redisdata
   zeru-upstream:
+    name: zeru_zeru-upstream
 
 networks:
   zeru-infra:
