@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { registerSchema } from './dto/register.dto';
 import type { RegisterSchema } from '@zeru/shared';
+import { sendCodeSchema, verifyCodeSchema } from '@zeru/shared';
 
 interface AuthenticatedUser {
   id: string;
@@ -32,6 +33,27 @@ interface TenantSelectionResult {
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  // ─── Passwordless code flow ────────────────────────────────────────────────
+
+  @Post('send-code')
+  @HttpCode(200)
+  async sendCode(
+    @Body(new ZodValidationPipe(sendCodeSchema)) body: { email: string },
+  ) {
+    return this.authService.sendLoginCode(body.email);
+  }
+
+  @Post('verify-code')
+  @HttpCode(200)
+  async verifyCode(
+    @Body(new ZodValidationPipe(verifyCodeSchema))
+    body: { email: string; code: string; tenantId?: string },
+  ) {
+    return this.authService.verifyLoginCode(body.email, body.code, body.tenantId);
+  }
+
+  // ─── Password-based flow (kept for backwards compatibility) ────────────────
 
   @Post('login')
   @UseGuards(LocalAuthGuard)

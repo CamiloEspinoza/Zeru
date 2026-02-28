@@ -529,6 +529,20 @@ model ApiKey {
   @@map("api_keys")
 }
 
+/// Código de login passwordless (6 dígitos enviados por email)
+model LoginCode {
+  id        String    @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@map("login_codes")
+}
+
 /// Registro de emails en lista de espera
 model WaitlistEntry {
   id        String   @id @default(uuid())

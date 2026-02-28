@@ -33,3 +33,19 @@ export interface TenantSelectionRequired {
   requiresTenantSelection: true;
   tenants: Array<{ id: string; name: string; slug: string; role: UserRole }>;
 }
+
+// ─── Passwordless code flow ──────────────────────────────
+
+export interface SendCodeRequest {
+  email: string;
+}
+
+export interface SendCodeResponse {
+  expiresAt: string;
+}
+
+export interface VerifyCodeRequest {
+  email: string;
+  code: string;
+  tenantId?: string;
+}
