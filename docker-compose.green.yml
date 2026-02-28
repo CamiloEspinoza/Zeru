@@ -13,7 +13,7 @@ services:
     depends_on:
       - infra-check
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- --spider http://localhost:3000/api/users 2>&1 | grep -q '401\\|200' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -29,7 +29,7 @@ services:
     networks:
       - zeru-infra
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://0.0.0.0:3000 > /dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
