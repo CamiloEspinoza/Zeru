@@ -19,7 +19,7 @@ export const sendCodeSchema = z.object({
 
 export const verifyCodeSchema = z.object({
   email: z.string().email('Email inválido'),
-  code: z.string().length(6, 'El código debe tener 6 dígitos'),
+  code: z.string().length(6).regex(/^\d{6}$/, 'El código debe tener 6 dígitos'),
   tenantId: z.string().uuid().optional(),
 });
 

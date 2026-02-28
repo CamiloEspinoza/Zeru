@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException, BadRequestExcepti
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { createHash, randomInt } from 'crypto';
+import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SkillsService } from '../ai/services/skills.service';
 import { EmailService } from '../email/email.service';
@@ -52,7 +52,7 @@ export class AuthService {
 
     if (!user || !user.isActive) {
       // No revelar si el email existe o no — devolver respuesta idéntica
-      this.logger.warn(`Login code requested for unknown email: ${email}`);
+      this.logger.warn(`Login code requested for unknown email: ${email.replace(/(.{2}).*@/, '$1***@')}`);
       const fakeExpiry = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60_000);
       return { expiresAt: fakeExpiry.toISOString() };
     }
@@ -109,20 +109,19 @@ export class AuthService {
       throw new UnauthorizedException('Demasiados intentos. Solicita un nuevo código');
     }
 
-    // Incrementar intentos
-    await this.prisma.loginCode.update({
-      where: { id: loginCode.id },
-      data: { attempts: { increment: 1 } },
-    });
-
-    if (loginCode.codeHash !== codeHash) {
+    if (!timingSafeEqual(Buffer.from(loginCode.codeHash, 'hex'), Buffer.from(codeHash, 'hex'))) {
+      // Incrementar intentos solo en fallo
+      await this.prisma.loginCode.update({
+        where: { id: loginCode.id },
+        data: { attempts: { increment: 1 } },
+      });
       throw new UnauthorizedException('Código incorrecto');
     }
 
-    // Marcar como usado
+    // Marcar como usado e incrementar intentos en una sola operación
     await this.prisma.loginCode.update({
       where: { id: loginCode.id },
-      data: { usedAt: new Date() },
+      data: { attempts: { increment: 1 }, usedAt: new Date() },
     });
 
     // Si se proporcionó tenantId, hacer login directo
@@ -136,9 +135,7 @@ export class AuthService {
       include: {
         memberships: {
           where: { isActive: true },
-          include: {
-            tenant: { select: { id: true, name: true, slug: true, isActive: true } },
-          },
+          select: { id: true, role: true, tenantId: true, tenant: { select: { id: true, name: true, slug: true, isActive: true } } },
         },
       },
     });
@@ -147,24 +144,32 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    const tenants = user.memberships
-      .filter((m) => m.tenant.isActive)
-      .map((m) => ({
+    const activeMemberships = user.memberships.filter((m) => m.tenant.isActive);
+
+    if (activeMemberships.length === 0) {
+      throw new UnauthorizedException('Sin organizaciones activas');
+    }
+
+    if (activeMemberships.length === 1) {
+      const m = activeMemberships[0];
+      return this.login({
+        id: user.id,
+        email: user.email,
+        tenantId: m.tenantId,
+        role: m.role,
+        membershipId: m.id,
+      });
+    }
+
+    return {
+      requiresTenantSelection: true as const,
+      tenants: activeMemberships.map((m) => ({
         id: m.tenant.id,
         name: m.tenant.name,
         slug: m.tenant.slug,
         role: m.role,
-      }));
-
-    if (tenants.length === 0) {
-      throw new UnauthorizedException('Sin organizaciones activas');
-    }
-
-    if (tenants.length === 1) {
-      return this.loginByEmail(email, tenants[0].id);
-    }
-
-    return { requiresTenantSelection: true as const, tenants };
+      })),
+    };
   }
 
   /**

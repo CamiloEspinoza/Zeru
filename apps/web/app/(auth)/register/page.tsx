@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { registerSchema } from "@zeru/shared";
 import type { AuthTokens } from "@zeru/shared";
 import { api } from "@/lib/api-client";
-import { setAuthCookie } from "@/lib/auth-cookies";
+import { storeTokens } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -204,12 +204,7 @@ function RegisterForm() {
         "/auth/register",
         result.data
       );
-      localStorage.setItem("access_token", response.accessToken);
-      setAuthCookie(response.accessToken);
-      localStorage.setItem("refresh_token", response.refreshToken);
-      if (response.tenantId) {
-        localStorage.setItem("tenantId", response.tenantId);
-      }
+      storeTokens(response);
       router.push("/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear cuenta");

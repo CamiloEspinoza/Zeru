@@ -55,35 +55,26 @@ export class EmailConfigService {
    * Se usa para el flujo de login (sin tenant context).
    */
   async findConfigForEmail(email: string): Promise<DecryptedEmailConfig | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: {
-        memberships: {
-          where: { isActive: true },
-          include: {
-            tenant: {
-              include: { emailConfig: true },
-            },
+    const config = await this.prisma.emailConfig.findFirst({
+      where: {
+        isActive: true,
+        tenant: {
+          isActive: true,
+          memberships: {
+            some: { user: { email }, isActive: true },
           },
         },
       },
     });
 
-    if (!user) return null;
+    if (!config) return null;
 
-    for (const membership of user.memberships) {
-      const cfg = membership.tenant.emailConfig;
-      if (cfg?.isActive) {
-        return {
-          region: cfg.region,
-          accessKeyId: this.encryption.decrypt(cfg.encryptedAccessKeyId),
-          secretAccessKey: this.encryption.decrypt(cfg.encryptedSecretKey),
-          fromEmail: this.encryption.decrypt(cfg.encryptedFromEmail),
-        };
-      }
-    }
-
-    return null;
+    return {
+      region: config.region,
+      accessKeyId: this.encryption.decrypt(config.encryptedAccessKeyId),
+      secretAccessKey: this.encryption.decrypt(config.encryptedSecretKey),
+      fromEmail: this.encryption.decrypt(config.encryptedFromEmail),
+    };
   }
 
   async upsert(tenantId: string, data: {

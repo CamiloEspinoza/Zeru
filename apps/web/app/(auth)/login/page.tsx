@@ -10,7 +10,7 @@ import type {
   UserRole,
 } from "@zeru/shared";
 import { api } from "@/lib/api-client";
-import { setAuthCookie } from "@/lib/auth-cookies";
+import { storeTokens } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -45,30 +45,22 @@ function OrgBadge({ role }: { role: UserRole }) {
   );
 }
 
-function storeTokens(tokens: AuthTokens) {
-  localStorage.setItem("access_token", tokens.accessToken);
-  setAuthCookie(tokens.accessToken);
-  localStorage.setItem("refresh_token", tokens.refreshToken);
-  if (tokens.tenantId) {
-    localStorage.setItem("tenantId", tokens.tenantId);
-  }
-}
-
 /** Countdown hook — returns remaining seconds. */
 function useCountdown(expiresAt: string | null) {
   const [remaining, setRemaining] = useState(0);
 
   useEffect(() => {
     if (!expiresAt) return;
-    function tick() {
+    const id = setInterval(() => {
       const diff = Math.max(
         0,
         Math.floor((new Date(expiresAt!).getTime() - Date.now()) / 1000),
       );
       setRemaining(diff);
-    }
-    tick();
-    const id = setInterval(tick, 1000);
+      if (diff <= 0) clearInterval(id);
+    }, 1000);
+    // Compute initial value synchronously
+    setRemaining(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)));
     return () => clearInterval(id);
   }, [expiresAt]);
 
@@ -141,8 +133,7 @@ export default function LoginPage() {
       setError(null);
       setLoading(true);
 
-      const emailForVerify =
-        step.kind === "code" ? step.email : step.email;
+      const emailForVerify = step.email;
 
       try {
         const res = await api.post<AuthTokens | TenantSelectionRequired>(

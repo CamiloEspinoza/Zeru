@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { EmailConfigService, type DecryptedEmailConfig } from '../email-config/email-config.service';
 
+const CODE_EXPIRY_MINUTES = 10;
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -18,13 +20,6 @@ export class EmailService {
    */
   async sendLoginCode(to: string, code: string): Promise<void> {
     const creds = await this.resolveCredentials(to);
-    const client = new SESClient({
-      region: creds.region,
-      credentials: {
-        accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey,
-      },
-    });
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
@@ -38,20 +33,18 @@ export class EmailService {
           },
           Text: {
             Charset: 'UTF-8',
-            Data: `Tu código de acceso a Zeru es: ${code}\n\nEste código expira en 10 minutos.\nSi no solicitaste este código, ignora este mensaje.`,
+            Data: `Tu código de acceso a Zeru es: ${code}\n\nEste código expira en ${CODE_EXPIRY_MINUTES} minutos.\nSi no solicitaste este código, ignora este mensaje.`,
           },
         },
       },
     });
 
     try {
-      await client.send(command);
-      this.logger.log(`Login code sent to ${to}`);
+      await this.withSesClient(creds, (client) => client.send(command));
+      this.logger.log(`Login code sent to ${this.maskEmail(to)}`);
     } catch (err) {
-      this.logger.error(`Failed to send login code to ${to}: ${(err as Error).message}`);
+      this.logger.error(`Failed to send login code to ${this.maskEmail(to)}: ${(err as Error).message}`);
       throw err;
-    } finally {
-      client.destroy();
     }
   }
 
@@ -67,13 +60,6 @@ export class EmailService {
     text?: string,
   ): Promise<void> {
     const creds = await this.resolveCredentialsByTenant(tenantId);
-    const client = new SESClient({
-      region: creds.region,
-      credentials: {
-        accessKeyId: creds.accessKeyId,
-        secretAccessKey: creds.secretAccessKey,
-      },
-    });
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
@@ -88,16 +74,36 @@ export class EmailService {
     });
 
     try {
-      await client.send(command);
+      await this.withSesClient(creds, (client) => client.send(command));
     } catch (err) {
-      this.logger.error(`Failed to send email to ${to}: ${(err as Error).message}`);
+      this.logger.error(`Failed to send email to ${this.maskEmail(to)}: ${(err as Error).message}`);
       throw err;
+    }
+  }
+
+  // ─── Private ──────────────────────────────────────────────────────────────
+
+  private async withSesClient<T>(
+    creds: DecryptedEmailConfig,
+    fn: (client: SESClient) => Promise<T>,
+  ): Promise<T> {
+    const client = new SESClient({
+      region: creds.region,
+      credentials: {
+        accessKeyId: creds.accessKeyId,
+        secretAccessKey: creds.secretAccessKey,
+      },
+    });
+    try {
+      return await fn(client);
     } finally {
       client.destroy();
     }
   }
 
-  // ─── Private ──────────────────────────────────────────────────────────────
+  private maskEmail(email: string): string {
+    return email.replace(/(.{2}).*@/, '$1***@');
+  }
 
   /**
    * Resuelve credenciales SES para un destinatario (usado en login, sin tenant context).
@@ -143,7 +149,7 @@ export class EmailService {
             <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#2dd4bf;font-family:'Courier New',monospace">${code}</span>
           </div>
           <p style="color:rgba(255,255,255,0.4);font-size:13px;line-height:1.6;margin:0">
-            Este código expira en <strong style="color:rgba(255,255,255,0.6)">10 minutos</strong>.<br>
+            Este código expira en <strong style="color:rgba(255,255,255,0.6)">${CODE_EXPIRY_MINUTES} minutos</strong>.<br>
             Si no solicitaste este código, puedes ignorar este mensaje.
           </p>
         </td></tr>

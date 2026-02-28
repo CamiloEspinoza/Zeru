@@ -32,20 +32,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-
-const AWS_REGIONS = [
-  { value: "us-east-1", label: "US East (N. Virginia)" },
-  { value: "us-east-2", label: "US East (Ohio)" },
-  { value: "us-west-1", label: "US West (N. California)" },
-  { value: "us-west-2", label: "US West (Oregon)" },
-  { value: "sa-east-1", label: "South America (São Paulo)" },
-  { value: "eu-west-1", label: "Europe (Ireland)" },
-  { value: "eu-west-2", label: "Europe (London)" },
-  { value: "eu-central-1", label: "Europe (Frankfurt)" },
-  { value: "ap-southeast-1", label: "Asia Pacific (Singapore)" },
-  { value: "ap-southeast-2", label: "Asia Pacific (Sydney)" },
-  { value: "ap-northeast-1", label: "Asia Pacific (Tokyo)" },
-];
+import { AWS_REGIONS } from "@/lib/aws-regions";
 
 interface StorageConfig {
   region?: string;
@@ -54,26 +41,9 @@ interface StorageConfig {
   bucket?: string;
 }
 
-type ValidationStatus = "idle" | "validating" | "valid" | "invalid";
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+import { SaveIndicator, type SaveStatus } from "@/components/config/save-indicator";
 
-function SaveIndicator({ status, error }: { status: SaveStatus; error: string }) {
-  if (status === "idle") return null;
-  return (
-    <span
-      className={cn(
-        "text-xs transition-opacity",
-        status === "saving" && "text-muted-foreground",
-        status === "saved" && "text-green-600 dark:text-green-400",
-        status === "error" && "text-destructive",
-      )}
-    >
-      {status === "saving" && "Guardando..."}
-      {status === "saved" && "Guardado"}
-      {status === "error" && (error || "Error al guardar")}
-    </span>
-  );
-}
+type ValidationStatus = "idle" | "validating" | "valid" | "invalid";
 
 interface StorageConfigFormProps {
   onConfigured?: () => void;

@@ -5,7 +5,7 @@ import type { UserProfile, AuthTokens } from "@zeru/shared";
 import { api } from "@/lib/api-client";
 import { clearAuthCookie, setAuthCookie } from "@/lib/auth-cookies";
 
-function storeTokens(tokens: AuthTokens) {
+export function storeTokens(tokens: AuthTokens) {
   localStorage.setItem("access_token", tokens.accessToken);
   setAuthCookie(tokens.accessToken);
   if (tokens.refreshToken) {
