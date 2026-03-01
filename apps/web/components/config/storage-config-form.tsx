@@ -96,7 +96,9 @@ export function StorageConfigForm({
     (opts: { region: string; accessKeyId: string; secretAccessKey: string; bucket: string }) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
 
-      if (!opts.accessKeyId.trim() || !opts.secretAccessKey.trim() || !opts.bucket.trim()) {
+      const hasNewCreds = opts.accessKeyId.trim() && opts.secretAccessKey.trim();
+      const hasStoredCreds = config.hasCredentials;
+      if ((!hasNewCreds && !hasStoredCreds) || !opts.bucket.trim()) {
         setValidationStatus("idle");
         return;
       }
@@ -319,10 +321,10 @@ export function StorageConfigForm({
               type="text"
               placeholder={config.hasCredentials ? "AKIA... (dejar vacío para no cambiar)" : "AKIA..."}
               value={accessKeyId}
-              onChange={(e) => {
-                setAccessKeyId(e.target.value);
-                if (e.target.value && secretAccessKey && bucket) {
-                  triggerValidation({ accessKeyId: e.target.value });
+              onChange={(e) => setAccessKeyId(e.target.value)}
+              onBlur={() => {
+                if (accessKeyId && secretAccessKey && bucket) {
+                  triggerValidation({ accessKeyId });
                 }
               }}
               disabled={isBusy}
@@ -339,10 +341,10 @@ export function StorageConfigForm({
                 type={showSecret ? "text" : "password"}
                 placeholder={config.hasCredentials ? "(dejar vacío para no cambiar)" : "Tu secret access key"}
                 value={secretAccessKey}
-                onChange={(e) => {
-                  setSecretAccessKey(e.target.value);
-                  if (accessKeyId && e.target.value && bucket) {
-                    triggerValidation({ secretAccessKey: e.target.value });
+                onChange={(e) => setSecretAccessKey(e.target.value)}
+                onBlur={() => {
+                  if (accessKeyId && secretAccessKey && bucket) {
+                    triggerValidation({ secretAccessKey });
                   }
                 }}
                 disabled={isBusy}
@@ -383,10 +385,17 @@ export function StorageConfigForm({
                 type="text"
                 placeholder={config.bucket ?? "mi-bucket-s3"}
                 value={bucket}
-                onChange={(e) => {
-                  setBucket(e.target.value);
-                  if (accessKeyId && secretAccessKey && e.target.value) {
-                    triggerValidation({ bucket: e.target.value });
+                onChange={(e) => setBucket(e.target.value)}
+                onBlur={() => {
+                  if (bucket.trim() && (config.hasCredentials || (accessKeyId && secretAccessKey))) {
+                    triggerValidation({ bucket });
+                  }
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (pasted.trim()) {
+                    // Let React update state first, then validate
+                    setTimeout(() => triggerValidation({ bucket: pasted.trim() }), 0);
                   }
                 }}
                 disabled={isBusy}

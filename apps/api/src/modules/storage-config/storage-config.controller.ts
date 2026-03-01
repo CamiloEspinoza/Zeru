@@ -24,9 +24,10 @@ export class StorageConfigController {
 
   @Post('validate')
   async validate(
+    @CurrentTenant() tenantId: string,
     @Body(new ZodValidationPipe(validateStorageConfigSchema)) body: ValidateStorageConfigDto,
   ) {
-    return this.storageConfigService.validateCredentials(body);
+    return this.storageConfigService.validateCredentials(tenantId, body);
   }
 
   @Put()

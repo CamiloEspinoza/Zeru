@@ -52,12 +52,25 @@ export class StorageConfigService {
 
   async upsert(tenantId: string, data: {
     region: string;
-    accessKeyId: string;
-    secretAccessKey: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
     bucket: string;
   }) {
-    const encryptedAccessKeyId = this.encryption.encrypt(data.accessKeyId);
-    const encryptedSecretKey = this.encryption.encrypt(data.secretAccessKey);
+    let accessKeyId = data.accessKeyId?.trim() || '';
+    let secretAccessKey = data.secretAccessKey?.trim() || '';
+
+    // Fallback to stored credentials when not provided
+    if (!accessKeyId || !secretAccessKey) {
+      const stored = await this.getDecryptedConfig(tenantId);
+      if (!stored && (!accessKeyId || !secretAccessKey)) {
+        throw new BadRequestException('Se requieren Access Key ID y Secret Access Key.');
+      }
+      accessKeyId = accessKeyId || stored!.accessKeyId;
+      secretAccessKey = secretAccessKey || stored!.secretAccessKey;
+    }
+
+    const encryptedAccessKeyId = this.encryption.encrypt(accessKeyId);
+    const encryptedSecretKey = this.encryption.encrypt(secretAccessKey);
     const encryptedBucket = this.encryption.encrypt(data.bucket);
 
     const config = await this.prisma.storageConfig.upsert({
@@ -90,18 +103,31 @@ export class StorageConfigService {
     };
   }
 
-  async validateCredentials(data: {
-    region: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    bucket: string;
-  }): Promise<{ valid: boolean; error?: string }> {
+  async validateCredentials(
+    tenantId: string,
+    data: {
+      region: string;
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      bucket: string;
+    },
+  ): Promise<{ valid: boolean; error?: string }> {
+    let accessKeyId = data.accessKeyId?.trim() || '';
+    let secretAccessKey = data.secretAccessKey?.trim() || '';
+
+    // Fallback to stored credentials when not provided
+    if (!accessKeyId || !secretAccessKey) {
+      const stored = await this.getDecryptedConfig(tenantId);
+      if (!stored) {
+        return { valid: false, error: 'No hay credenciales configuradas. Ingresa Access Key ID y Secret Access Key.' };
+      }
+      accessKeyId = accessKeyId || stored.accessKeyId;
+      secretAccessKey = secretAccessKey || stored.secretAccessKey;
+    }
+
     const client = new S3Client({
       region: data.region,
-      credentials: {
-        accessKeyId: data.accessKeyId,
-        secretAccessKey: data.secretAccessKey,
-      },
+      credentials: { accessKeyId, secretAccessKey },
     });
 
     try {
