@@ -36,7 +36,7 @@ export class EmailService {
         Body: {
           Html: {
             Charset: 'UTF-8',
-            Data: this.buildLoginCodeHtml(code),
+            Data: this.buildLoginCodeHtml(code, expiryMinutes),
           },
           Text: {
             Charset: 'UTF-8',
@@ -135,7 +135,7 @@ export class EmailService {
     };
   }
 
-  private buildLoginCodeHtml(code: string): string {
+  private buildLoginCodeHtml(code: string, expiryMinutes: number): string {
     return `
 <!DOCTYPE html>
 <html lang="es">
