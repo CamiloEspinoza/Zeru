@@ -52,6 +52,7 @@ services:
       retries: 3
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=infrastructure_staging-network"
       # Route zeruapp.com
       - "traefik.http.routers.zeru.rule=Host(`zeruapp.com`)"
       - "traefik.http.routers.zeru.entrypoints=websecure"
