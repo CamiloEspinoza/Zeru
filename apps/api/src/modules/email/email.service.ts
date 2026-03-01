@@ -10,14 +10,23 @@ export class EmailService {
   constructor(
     private readonly config: ConfigService,
     private readonly emailConfigService: EmailConfigService,
-  ) {}
+  ) {
+    const keyId = this.config.get<string>('AWS_SES_ACCESS_KEY_ID');
+    if (!keyId) {
+      this.logger.warn(
+        'AWS_SES_ACCESS_KEY_ID not configured — system emails (login codes) will fail. ' +
+        'Configure AWS_SES_* env vars in .env.production.',
+      );
+    }
+  }
 
   /**
    * Envía un código de login al email del usuario.
-   * Busca credenciales SES del tenant del usuario; si no las encuentra, usa env vars como fallback.
+   * Siempre usa las credenciales SES del sistema (env vars) — los login codes
+   * son emails de plataforma, no del tenant.
    */
   async sendLoginCode(to: string, code: string, expiryMinutes = 10): Promise<void> {
-    const creds = await this.resolveCredentials(to);
+    const creds = this.systemCredentials();
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
@@ -104,25 +113,20 @@ export class EmailService {
   }
 
   /**
-   * Resuelve credenciales SES para un destinatario (usado en login, sin tenant context).
-   * Busca la config de los tenants del usuario, fallback a env vars.
-   */
-  private async resolveCredentials(recipientEmail: string): Promise<DecryptedEmailConfig> {
-    const tenantConfig = await this.emailConfigService.findConfigForEmail(recipientEmail);
-    if (tenantConfig) return tenantConfig;
-    return this.envFallback();
-  }
-
-  /**
-   * Resuelve credenciales SES para un tenant específico (con tenant context).
+   * Resuelve credenciales SES para un tenant específico (alertas, notificaciones).
+   * Usa la config del tenant; fallback a credenciales del sistema si no hay config.
    */
   private async resolveCredentialsByTenant(tenantId: string): Promise<DecryptedEmailConfig> {
     const tenantConfig = await this.emailConfigService.getDecryptedConfig(tenantId);
     if (tenantConfig) return tenantConfig;
-    return this.envFallback();
+    return this.systemCredentials();
   }
 
-  private envFallback(): DecryptedEmailConfig {
+  /**
+   * Credenciales SES del sistema (env vars). Usadas para emails de plataforma
+   * (login codes, registro, etc.) — independientes de cualquier tenant.
+   */
+  private systemCredentials(): DecryptedEmailConfig {
     return {
       region: this.config.get<string>('AWS_SES_REGION') ?? 'us-east-1',
       accessKeyId: this.config.get<string>('AWS_SES_ACCESS_KEY_ID') ?? '',

@@ -8,9 +8,9 @@ export default function EmailSettingsPage() {
       <div>
         <h1 className="text-2xl font-bold">Email</h1>
         <p className="text-muted-foreground mt-1">
-          Configura las credenciales de Amazon SES para el envío de correos
-          transaccionales de tu organización (códigos de acceso, notificaciones,
-          etc.).
+          Configura las credenciales de Amazon SES para el envío de alertas y
+          notificaciones de tu organización. Los correos de acceso (códigos de
+          login) se envían desde la cuenta del sistema.
         </p>
       </div>
 
