@@ -101,6 +101,26 @@ jobs:
             set -euo pipefail
             IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
             echo "Deploying tag: $IMAGE_TAG"
+
+            # Inject/update AWS SES system credentials into .env.production
+            ENV_FILE="/opt/zeru/.env.production"
+            declare -A SES_VARS=(
+              ["AWS_SES_REGION"]="${{ secrets.AWS_SES_REGION }}"
+              ["AWS_SES_ACCESS_KEY_ID"]="${{ secrets.AWS_SES_ACCESS_KEY_ID }}"
+              ["AWS_SES_SECRET_ACCESS_KEY"]="${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}"
+              ["AWS_SES_FROM_EMAIL"]="${{ secrets.AWS_SES_FROM_EMAIL }}"
+            )
+            for key in "${!SES_VARS[@]}"; do
+              val="${SES_VARS[$key]}"
+              if [[ -n "$val" ]]; then
+                if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+                  sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+                else
+                  echo "${key}=${val}" >> "$ENV_FILE"
+                fi
+              fi
+            done
+
             # Authenticate to ghcr.io (required for private repositories)
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
             bash /opt/zeru/scripts/deploy.sh "$IMAGE_TAG"
