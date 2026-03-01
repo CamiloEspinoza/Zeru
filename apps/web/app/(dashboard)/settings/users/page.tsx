@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import type { UserInTenant } from "@zeru/shared";
 import { Badge } from "@/components/ui/badge";
@@ -10,12 +10,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CreateUserDialog } from "@/components/users/create-user-dialog";
+
+const ROLE_LABELS: Record<string, string> = {
+  OWNER: "Propietario",
+  ADMIN: "Administrador",
+  ACCOUNTANT: "Contador",
+  VIEWER: "Solo lectura",
+};
 
 export default function UsersSettingsPage() {
   const [users, setUsers] = useState<UserInTenant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchUsers = useCallback(() => {
+    setLoading(true);
     api
       .get<{ data: UserInTenant[] }>("/users")
       .then((res) => setUsers(res.data ?? []))
@@ -23,8 +32,13 @@ export default function UsersSettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
+      case "OWNER":
       case "ADMIN":
         return "default";
       case "ACCOUNTANT":
@@ -39,7 +53,10 @@ export default function UsersSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Usuarios</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Usuarios</h1>
+        <CreateUserDialog onCreated={fetchUsers} />
+      </div>
 
       <Card>
         <CardHeader>
@@ -78,7 +95,7 @@ export default function UsersSettingsPage() {
                         <td className="py-3 px-4">{user.email}</td>
                         <td className="py-3 px-4">
                           <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {user.role}
+                            {ROLE_LABELS[user.role] ?? user.role}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
