@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type {
@@ -11,8 +11,15 @@ import type {
 } from "@zeru/shared";
 import { api } from "@/lib/api-client";
 import { storeTokens } from "@/hooks/use-auth";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import {
   Field,
   FieldDescription,
@@ -89,8 +96,6 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const codeInputRef = useRef<HTMLInputElement>(null);
-
   // ── Step 1: Request code ──────────────────────────────────────────────────
 
   async function handleSendCode(e: React.FormEvent) {
@@ -116,14 +121,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
-  // Auto-focus code input when entering code step
-  useEffect(() => {
-    if (step.kind === "code") {
-      // Small delay to allow DOM to render
-      requestAnimationFrame(() => codeInputRef.current?.focus());
-    }
-  }, [step.kind]);
 
   // ── Step 2: Verify code ───────────────────────────────────────────────────
 
@@ -264,7 +261,6 @@ export default function LoginPage() {
           setCode={setCode}
           error={error}
           loading={loading}
-          codeInputRef={codeInputRef}
           onSubmit={handleCodeSubmit}
           onResend={handleResend}
           onBack={() => {
@@ -349,7 +345,6 @@ function CodeStep({
   setCode,
   error,
   loading,
-  codeInputRef,
   onSubmit,
   onResend,
   onBack,
@@ -360,7 +355,6 @@ function CodeStep({
   setCode: (v: string) => void;
   error: string | null;
   loading: boolean;
-  codeInputRef: React.RefObject<HTMLInputElement | null>;
   onSubmit: (e: React.FormEvent) => void;
   onResend: () => void;
   onBack: () => void;
@@ -388,23 +382,27 @@ function CodeStep({
             <FieldLabel htmlFor="code" className="text-white/70">
               Código de acceso
             </FieldLabel>
-            <Input
-              ref={codeInputRef}
-              id="code"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
+            <InputOTP
               maxLength={6}
+              pattern={REGEXP_ONLY_DIGITS}
               value={code}
-              onChange={(e) => {
-                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setCode(v);
-              }}
-              placeholder="000000"
-              autoComplete="one-time-code"
+              onChange={setCode}
               disabled={loading}
-              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60 h-14 text-center text-2xl tracking-[0.3em] font-mono"
-            />
+              autoFocus
+              containerClassName="justify-center"
+            >
+              <InputOTPGroup>
+                <InputOTPSlot index={0} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+                <InputOTPSlot index={1} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+                <InputOTPSlot index={2} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+              </InputOTPGroup>
+              <InputOTPSeparator className="text-white/20" />
+              <InputOTPGroup>
+                <InputOTPSlot index={3} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+                <InputOTPSlot index={4} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+                <InputOTPSlot index={5} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
+              </InputOTPGroup>
+            </InputOTP>
           </Field>
 
           {/* Timer */}

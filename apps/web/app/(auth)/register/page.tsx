@@ -176,7 +176,6 @@ function RegisterForm() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [tenantName, setTenantName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -189,7 +188,6 @@ function RegisterForm() {
       firstName,
       lastName,
       email,
-      password,
       tenantName,
     });
 
@@ -268,22 +266,6 @@ function RegisterForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@email.com"
               autoComplete="email"
-              disabled={loading}
-              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="password" className="text-white/70">
-              Contraseña
-            </FieldLabel>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="new-password"
               disabled={loading}
               className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
             />

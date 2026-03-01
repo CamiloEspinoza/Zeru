@@ -304,8 +304,6 @@ export class AuthService {
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '');
 
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-
     const result = await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: { name: data.tenantName, slug },
@@ -314,7 +312,6 @@ export class AuthService {
       const user = await tx.user.create({
         data: {
           email: data.email,
-          password: hashedPassword,
           firstName: data.firstName,
           lastName: data.lastName,
           memberships: {
