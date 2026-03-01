@@ -1,10 +1,41 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { UpdateTenantSchema } from '@zeru/shared';
+import type { CreateTenantSchema, UpdateTenantSchema } from '@zeru/shared';
 
 @Injectable()
 export class TenantsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Create a new organization and add the requesting user as OWNER */
+  async create(userId: string, data: CreateTenantSchema) {
+    const existing = await this.prisma.tenant.findUnique({ where: { slug: data.slug } });
+    if (existing) {
+      throw new ConflictException('Ya existe una organización con ese identificador (slug)');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          name: data.name,
+          slug: data.slug,
+          rut: data.rut,
+          address: data.address,
+          phone: data.phone,
+        },
+      });
+
+      await tx.userTenant.create({
+        data: {
+          userId,
+          tenantId: tenant.id,
+          role: UserRole.OWNER,
+        },
+      });
+
+      return tenant;
+    });
+  }
 
   async findById(id: string) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
