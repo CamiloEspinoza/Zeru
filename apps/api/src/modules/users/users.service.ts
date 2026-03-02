@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
@@ -103,7 +104,8 @@ export class UsersService {
     }
 
     // Usuario nuevo: crear usuario + membresía en una transacción
-    const hashedPassword = await bcrypt.hash(data.password, 10);
+    // Password random ya que el login es por código de email
+    const hashedPassword = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
 
     const result = await this.prisma.user.create({
       data: {
