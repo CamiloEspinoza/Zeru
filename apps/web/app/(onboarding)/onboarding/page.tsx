@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { AiConfigForm } from "@/components/config/ai-config-form";
 import { StorageConfigForm } from "@/components/config/storage-config-form";
+import { EmailConfigForm } from "@/components/config/email-config-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +24,10 @@ const STEPS = [
     description: "Conecta tu cuenta de OpenAI para habilitar el contador virtual.",
   },
   {
-    id: "storage",
-    title: "Almacenamiento",
-    description: "Conecta Amazon S3 para guardar y analizar documentos.",
+    id: "aws",
+    title: "Amazon Web Services",
+    description:
+      "Configura S3 para almacenar documentos y SES para el envío de correos.",
   },
 ] as const;
 
@@ -128,15 +130,37 @@ export default function OnboardingPage() {
           <AiConfigForm
             showDeleteAction={false}
             onConfigured={() => setStepsDone((prev) => ({ ...prev, ai: true }))}
+            docsHref="/docs/setup-credentials#openai"
           />
         )}
         {currentStep === 1 && (
-          <StorageConfigForm
-            showDeleteAction={false}
-            onConfigured={() =>
-              setStepsDone((prev) => ({ ...prev, storage: true }))
-            }
-          />
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-lg font-semibold mb-1">Almacenamiento (S3)</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Conecta Amazon S3 para guardar y analizar documentos.
+              </p>
+              <StorageConfigForm
+                showDeleteAction={false}
+                onConfigured={() =>
+                  setStepsDone((prev) => ({ ...prev, storage: true }))
+                }
+                docsHref="/docs/setup-credentials#aws"
+              />
+            </div>
+
+            <div className="border-t pt-8">
+              <h2 className="text-lg font-semibold mb-1">Email (SES)</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configura Amazon SES para enviar alertas y notificaciones.
+                Esta configuración es opcional.
+              </p>
+              <EmailConfigForm
+                showDeleteAction={false}
+                docsHref="/docs/setup-credentials#aws"
+              />
+            </div>
+          </div>
         )}
       </div>
 

@@ -90,7 +90,7 @@ export function OnboardingBanner() {
                   href="/settings/storage"
                   className="underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-100"
                 >
-                  Configurar Almacenamiento (AWS S3)
+                  Configurar Almacenamiento y Email (AWS)
                 </Link>
               </li>
             )}

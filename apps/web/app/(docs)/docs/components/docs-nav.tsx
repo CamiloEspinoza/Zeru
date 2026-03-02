@@ -23,6 +23,12 @@ const nav = [
       { label: "Reportes", href: "/docs/reports" },
     ],
   },
+  {
+    group: "Guías",
+    items: [
+      { label: "Obtener credenciales", href: "/docs/setup-credentials" },
+    ],
+  },
 ];
 
 export function DocsNav() {

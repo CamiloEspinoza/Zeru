@@ -13,7 +13,7 @@ export default function AiSettingsPage() {
         </p>
       </div>
 
-      <AiConfigForm />
+      <AiConfigForm docsHref="/docs/setup-credentials#openai" />
     </div>
   );
 }
