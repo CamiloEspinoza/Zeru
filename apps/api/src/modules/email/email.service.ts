@@ -56,6 +56,39 @@ export class EmailService {
   }
 
   /**
+   * Envía un email de bienvenida cuando un usuario es agregado a una organización.
+   * Usa credenciales del sistema — es un email de plataforma.
+   */
+  async sendWelcomeEmail(to: string, firstName: string, tenantName: string): Promise<void> {
+    const creds = this.systemCredentials();
+
+    const command = new SendEmailCommand({
+      Source: creds.fromEmail,
+      Destination: { ToAddresses: [to] },
+      Message: {
+        Subject: { Data: `Te han agregado a ${tenantName} en Zeru`, Charset: 'UTF-8' },
+        Body: {
+          Html: {
+            Charset: 'UTF-8',
+            Data: this.buildWelcomeHtml(firstName, tenantName),
+          },
+          Text: {
+            Charset: 'UTF-8',
+            Data: `Hola ${firstName},\n\nTe han agregado a la organización "${tenantName}" en Zeru.\n\nPuedes iniciar sesión con tu email en https://app.zeru.cl/login\n\nSe te enviará un código de acceso para ingresar.`,
+          },
+        },
+      },
+    });
+
+    try {
+      await this.withSesClient(creds, (client) => client.send(command));
+      this.logger.log(`Welcome email sent to ${this.maskEmail(to)} for tenant "${tenantName}"`);
+    } catch (err) {
+      this.logger.error(`Failed to send welcome email to ${this.maskEmail(to)}: ${(err as Error).message}`);
+    }
+  }
+
+  /**
    * Envía un email genérico usando las credenciales del tenant dado.
    * Fallback a env vars si no hay config de tenant.
    */
@@ -133,6 +166,41 @@ export class EmailService {
       secretAccessKey: this.config.get<string>('AWS_SES_SECRET_ACCESS_KEY') ?? '',
       fromEmail: this.config.get<string>('AWS_SES_FROM_EMAIL') ?? 'noreply@zeru.cl',
     };
+  }
+
+  private buildWelcomeHtml(firstName: string, tenantName: string): string {
+    return `
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 0">
+    <tr><td align="center">
+      <table width="420" cellpadding="0" cellspacing="0" style="background:#141414;border-radius:16px;border:1px solid rgba(255,255,255,0.06);padding:48px 40px">
+        <tr><td>
+          <h1 style="color:#ffffff;font-size:20px;font-weight:700;margin:0 0 8px">Zeru</h1>
+          <p style="color:rgba(255,255,255,0.5);font-size:14px;margin:0 0 32px">Bienvenido a tu organización</p>
+          <p style="color:rgba(255,255,255,0.7);font-size:15px;line-height:1.6;margin:0 0 24px">
+            Hola <strong style="color:#ffffff">${firstName}</strong>,
+          </p>
+          <p style="color:rgba(255,255,255,0.5);font-size:14px;line-height:1.6;margin:0 0 32px">
+            Te han agregado a la organización <strong style="color:#2dd4bf">${tenantName}</strong> en Zeru.
+            Ya puedes iniciar sesión con tu email — se te enviará un código de acceso.
+          </p>
+          <div style="text-align:center;margin-bottom:32px">
+            <a href="https://app.zeru.cl/login" style="display:inline-block;background:#14b8a6;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;padding:12px 32px;border-radius:8px">
+              Iniciar sesión
+            </a>
+          </div>
+          <p style="color:rgba(255,255,255,0.3);font-size:12px;line-height:1.5;margin:0">
+            Si no reconoces esta invitación, puedes ignorar este mensaje.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`.trim();
   }
 
   private buildLoginCodeHtml(code: string, expiryMinutes: number): string {
