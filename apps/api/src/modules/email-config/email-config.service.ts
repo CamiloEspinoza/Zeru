@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { SESClient, GetAccountCommand } from '@aws-sdk/client-ses';
+import { SESClient, GetSendQuotaCommand } from '@aws-sdk/client-ses';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EncryptionService } from '../../common/services/encryption.service';
 
@@ -134,7 +134,7 @@ export class EmailConfigService {
     });
 
     try {
-      await client.send(new GetAccountCommand({}));
+      await client.send(new GetSendQuotaCommand({}));
       return { valid: true };
     } catch (err: unknown) {
       const error = err as { name?: string; $metadata?: { httpStatusCode?: number } };
