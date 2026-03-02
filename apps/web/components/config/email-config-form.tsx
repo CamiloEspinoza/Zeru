@@ -430,7 +430,7 @@ export function EmailConfigForm({
             <div className="relative">
               <Input
                 id="ses-fromEmail"
-                type="email"
+                type="text"
                 placeholder={config.fromEmail ?? "noreply@tudominio.com"}
                 value={fromEmail}
                 onChange={(e) => {

@@ -42,14 +42,12 @@ export function CreateUserDialog({ onCreated }: CreateUserDialogProps) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [password, setPassword] = useState("");
   const [role, setRole] = useState<string>("VIEWER");
 
   function reset() {
     setEmail("");
     setFirstName("");
     setLastName("");
-    setPassword("");
     setRole("VIEWER");
     setError("");
   }
@@ -64,7 +62,6 @@ export function CreateUserDialog({ onCreated }: CreateUserDialogProps) {
         email,
         firstName,
         lastName,
-        password,
         role,
       });
       setOpen(false);
@@ -133,19 +130,6 @@ export function CreateUserDialog({ onCreated }: CreateUserDialogProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="juan@ejemplo.com"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                placeholder="Mínimo 8 caracteres"
               />
             </div>
 
