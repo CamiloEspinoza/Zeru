@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { UserRole } from '@prisma/client';
 import type { CreateUserSchema, UpdateUserSchema } from './dto';
 
@@ -25,7 +26,12 @@ const membershipSelect = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /** Lista todos los usuarios de un tenant (via membresías) */
   async findAll(tenantId: string, query?: { page?: number; perPage?: number }) {
@@ -77,6 +83,11 @@ export class UsersService {
   /** Crea un usuario nuevo y lo invita al tenant, o invita a uno existente */
   async create(tenantId: string, data: CreateUserSchema) {
     const role = (data.role as UserRole) ?? UserRole.OWNER;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+    const tenantName = tenant?.name ?? 'tu organización';
 
     // Si el usuario ya existe, solo crear membresía
     let user = await this.prisma.user.findUnique({ where: { email: data.email } });
@@ -94,6 +105,8 @@ export class UsersService {
         data: { userId: user.id, tenantId, role },
         include: { user: { select: userSelect } },
       });
+
+      void this.sendWelcomeEmail(data.email, user.firstName, tenantName);
 
       return {
         ...membership.user,
@@ -125,12 +138,22 @@ export class UsersService {
     const membership = result.memberships[0];
     const { password: _, memberships: __, ...userFields } = result;
 
+    void this.sendWelcomeEmail(data.email, data.firstName, tenantName);
+
     return {
       ...userFields,
       role: membership.role,
       membershipId: membership.id,
       membershipActive: membership.isActive,
     };
+  }
+
+  private async sendWelcomeEmail(email: string, firstName: string, tenantName: string): Promise<void> {
+    try {
+      await this.emailService.sendWelcomeEmail(email, firstName, tenantName);
+    } catch (err) {
+      this.logger.warn(`Could not send welcome email to ${email}: ${(err as Error).message}`);
+    }
   }
 
   /** Actualiza datos base del usuario */
