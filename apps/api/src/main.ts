@@ -13,8 +13,13 @@ async function bootstrap() {
   const port = config.get<number>('API_PORT', 3001);
 
   app.setGlobalPrefix('api');
+  const corsOrigin = config.get('CORS_ORIGIN', 'http://localhost:3027');
+  const origins = corsOrigin.includes(',')
+    ? corsOrigin.split(',').map((o: string) => o.trim())
+    : corsOrigin;
+
   app.enableCors({
-    origin: config.get('CORS_ORIGIN', 'http://localhost:3027'),
+    origin: origins,
     credentials: true,
   });
 

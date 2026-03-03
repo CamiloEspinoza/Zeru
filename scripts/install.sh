@@ -179,7 +179,7 @@ ENCRYPTION_KEY=${ENCRYPTION_KEY}
 # ── App ───────────────────────────────────────────────────────────────────────
 NODE_ENV=production
 API_PORT=3000
-CORS_ORIGIN=https://${DOMAIN}
+CORS_ORIGIN=https://${DOMAIN},https://www.${DOMAIN}
 NEXT_PUBLIC_API_URL=https://${DOMAIN}/api
 NEXT_PUBLIC_REGISTER_TOKEN=${REGISTER_TOKEN}
 EOF
@@ -286,11 +286,11 @@ if [[ "$HAS_TRAEFIK" == "false" ]]; then
         if [[ -z "$DOMAIN_FOR_CERT" ]]; then
             ask "Enter domain for SSL certificate:" DOMAIN_FOR_CERT
         fi
-        certbot --nginx -d "$DOMAIN_FOR_CERT"
+        certbot --nginx -d "$DOMAIN_FOR_CERT" -d "www.$DOMAIN_FOR_CERT"
         systemctl enable certbot.timer 2>/dev/null || true
         log "HTTPS configured for $DOMAIN_FOR_CERT"
     else
-        warn "Skipping HTTPS. Run later: certbot --nginx -d your-domain.com"
+        warn "Skipping HTTPS. Run later: certbot --nginx -d your-domain.com -d www.your-domain.com"
     fi
 fi
 
