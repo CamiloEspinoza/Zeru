@@ -50,7 +50,7 @@ export function useAuth() {
     const tokens = await api.post<AuthTokens>("/auth/switch-tenant", { tenantId });
     storeTokens(tokens);
     // Reload para que todos los providers y queries se reinicialicen con el nuevo tenant
-    window.location.href = "/dashboard";
+    window.location.reload();
   };
 
   const logout = () => {
