@@ -290,6 +290,35 @@ export class SkillsService {
     return skill;
   }
 
+  /**
+   * Installs a skill directly from content (no GitHub fetch needed).
+   * Used for bundled/default skills.
+   */
+  async installFromContent(tenantId: string, params: {
+    name: string;
+    description: string;
+    repoUrl: string;
+    content: string;
+    version?: string;
+  }) {
+    const existing = await this.prisma.agentSkill.findUnique({
+      where: { tenantId_repoUrl: { tenantId, repoUrl: params.repoUrl } },
+    });
+    if (existing) return existing;
+
+    return this.prisma.agentSkill.create({
+      data: {
+        tenantId,
+        repoUrl: params.repoUrl,
+        name: params.name,
+        description: params.description,
+        version: params.version ?? '1.0.0',
+        content: params.content,
+        isActive: true,
+      },
+    });
+  }
+
   async list(tenantId: string) {
     return this.prisma.agentSkill.findMany({
       where: { tenantId },

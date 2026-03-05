@@ -16,6 +16,7 @@ import {
   CheckListIcon,
   Key01Icon,
   HardDriveIcon,
+  Linkedin01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -61,6 +62,16 @@ const appNav: NavItem[] = [
       { title: "Reportes", href: "/accounting/reports" },
     ],
   },
+  {
+    title: "LinkedIn",
+    href: "/linkedin",
+    icon: Linkedin01Icon,
+    items: [
+      { title: "Agente", href: "/linkedin/new" },
+      { title: "Posts", href: "/linkedin/posts" },
+      { title: "Configuración", href: "/settings/linkedin" },
+    ],
+  },
 ];
 
 const settingsNav: NavItem[] = [
@@ -71,6 +82,7 @@ const settingsNav: NavItem[] = [
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
+  { title: "LinkedIn", href: "/settings/linkedin", icon: Linkedin01Icon },
   { title: "Almacenamiento y Email", href: "/settings/storage", icon: HardDriveIcon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
