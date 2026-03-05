@@ -127,16 +127,50 @@ export class JournalEntriesService {
     data: CreateJournalEntrySchema,
     meta?: CreateJournalEntryMeta,
   ) {
-    const client = this.prisma.forTenant(tenantId) as any;
-
-    const maxEntry = await client.journalEntry.findFirst({
-      orderBy: { number: 'desc' },
-      select: { number: true },
+    // Validate fiscal period exists and is OPEN
+    const fiscalPeriod = await (this.prisma as any).fiscalPeriod.findFirst({
+      where: { id: data.fiscalPeriodId, tenantId },
+      select: { id: true, status: true },
     });
 
-    const nextNumber = (maxEntry?.number ?? 0) + 1;
+    if (!fiscalPeriod) {
+      throw new BadRequestException(
+        `El período fiscal ${data.fiscalPeriodId} no existe`,
+      );
+    }
+    if (fiscalPeriod.status !== 'OPEN') {
+      throw new BadRequestException(
+        `El período fiscal ${data.fiscalPeriodId} está cerrado`,
+      );
+    }
+
+    // Validate all account IDs exist in the tenant
+    const accountIds = Array.from(
+      new Set(data.lines.map((line) => line.accountId)),
+    );
+    const accounts = await (this.prisma as any).account.findMany({
+      where: { tenantId, id: { in: accountIds } },
+      select: { id: true },
+    });
+    const validAccountIds = new Set<string>(
+      accounts.map((a: { id: string }) => a.id),
+    );
+    const missingAccounts = accountIds.filter((id) => !validAccountIds.has(id));
+    if (missingAccounts.length > 0) {
+      throw new BadRequestException(
+        `Una o más cuentas no existen en el tenant: ${missingAccounts.join(', ')}`,
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
+      // Get next number inside the transaction to avoid race conditions
+      const maxEntry = await (tx as any).journalEntry.findFirst({
+        where: { tenantId },
+        orderBy: { number: 'desc' },
+        select: { number: true },
+      });
+      const nextNumber = (maxEntry?.number ?? 0) + 1;
+
       const entry = await (tx as any).journalEntry.create({
         data: {
           tenantId,
@@ -283,16 +317,16 @@ export class JournalEntriesService {
 
     const createdResults: BatchCreateResultItem[] = [];
     if (validEntries.length > 0) {
-      const client = this.prisma.forTenant(tenantId) as any;
-      const maxEntry = await client.journalEntry.findFirst({
-        orderBy: { number: 'desc' },
-        select: { number: true },
-      });
-      let nextNumber = (maxEntry?.number ?? 0) + 1;
-
       const status = options?.autoPost ? 'POSTED' : 'DRAFT';
 
       await this.prisma.$transaction(async (tx) => {
+        // Get next number inside the transaction to avoid race conditions
+        const maxEntry = await (tx as any).journalEntry.findFirst({
+          where: { tenantId },
+          orderBy: { number: 'desc' },
+          select: { number: true },
+        });
+        let nextNumber = (maxEntry?.number ?? 0) + 1;
         for (const item of validEntries) {
           const created = await (tx as any).journalEntry.create({
             data: {
