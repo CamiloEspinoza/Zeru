@@ -28,7 +28,7 @@ export function ImagePreviewCard({
       <img
         src={image.imageUrl}
         alt="Generated image"
-        className="w-full object-cover max-h-80"
+        className="w-full object-contain max-h-[520px] bg-muted/20"
       />
 
       {onUseInPost && (

@@ -199,4 +199,108 @@ export class LinkedInApiService {
 
     return imageUrn;
   }
+
+  /**
+   * Resolves a LinkedIn vanity name to a person URN using the Voyager API.
+   * Requires the user's li_at session cookie (separate from the OAuth token).
+   * Throws a special NO_SESSION_COOKIE error if the cookie is not configured.
+   */
+  async resolvePersonUrn(
+    tenantId: string,
+    vanityName: string,
+  ): Promise<{ urn: string; displayName: string; plainId: number }> {
+    const liAt = await this.authService.getDecryptedSessionCookie(tenantId);
+    if (!liAt) {
+      const err = new BadRequestException('NO_SESSION_COOKIE');
+      (err as unknown as Record<string, unknown>)['isNoSessionCookie'] = true;
+      throw err;
+    }
+
+    const csrfToken = `ajax:${Date.now()}`;
+
+    // Use the newer "dash" Voyager endpoint (the old /profileView endpoint returns 410)
+    const response = await fetch(
+      `https://www.linkedin.com/voyager/api/identity/dash/profiles?q=memberIdentity&memberIdentity=${encodeURIComponent(vanityName)}`,
+      {
+        headers: {
+          Cookie: `li_at=${liAt}; JSESSIONID="${csrfToken}"`,
+          'csrf-token': csrfToken,
+          'x-restli-protocol-version': '2.0.0',
+          'accept': 'application/vnd.linkedin.normalized+json+2.1',
+          'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'x-li-lang': 'es_ES',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        `Error al acceder al perfil "${vanityName}" en LinkedIn (${response.status}). ` +
+        `La cookie de sesión puede haber expirado — vuelve a copiarla desde tu browser.`,
+      );
+    }
+
+    const data = await response.json() as {
+      included?: Array<{
+        $type?: string;
+        firstName?: string;
+        lastName?: string;
+        objectUrn?: string;
+        publicIdentifier?: string;
+      }>;
+    };
+
+    const profile = data.included?.find(
+      (item) => item.publicIdentifier === vanityName,
+    ) ?? data.included?.find((item) => item.objectUrn?.includes(':member:'));
+
+    const plainId = this.extractPlainIdFromUrn(profile?.objectUrn ?? '');
+    if (!plainId) {
+      throw new BadRequestException(
+        `No se pudo extraer el ID del perfil "${vanityName}"`,
+      );
+    }
+
+    const displayName =
+      [profile?.firstName, profile?.lastName].filter(Boolean).join(' ') || vanityName;
+
+    return { urn: `urn:li:person:${plainId}`, displayName, plainId };
+  }
+
+  /**
+   * Resolves a LinkedIn company vanity name (from URL /company/{vanityName}) to an organization URN
+   * using the official Organizations API.
+   */
+  async resolveOrganizationUrn(
+    tenantId: string,
+    vanityName: string,
+  ): Promise<{ urn: string; displayName: string; orgId: number }> {
+    const response = await this.request<{
+      elements?: Array<{ id: number; localizedName?: string; name?: { localized?: { es_ES?: string; en_US?: string } } }>;
+    }>(tenantId, `/rest/organizations?q=vanityName&vanityName=${encodeURIComponent(vanityName)}`, {
+      method: 'GET',
+    });
+
+    const org = response.elements?.[0];
+    if (!org) {
+      throw new BadRequestException(`No se encontró la empresa "${vanityName}" en LinkedIn`);
+    }
+
+    const displayName =
+      org.localizedName ??
+      org.name?.localized?.es_ES ??
+      org.name?.localized?.en_US ??
+      vanityName;
+
+    return {
+      urn: `urn:li:organization:${org.id}`,
+      displayName,
+      orgId: org.id,
+    };
+  }
+
+  private extractPlainIdFromUrn(urn: string): number | null {
+    const match = urn.match(/:member:(\d+)$/);
+    return match ? parseInt(match[1], 10) : null;
+  }
 }

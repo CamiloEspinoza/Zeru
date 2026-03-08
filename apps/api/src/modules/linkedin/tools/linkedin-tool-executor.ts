@@ -165,13 +165,14 @@ export class LinkedInToolExecutor {
   private async generateImage(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
     const prompt = String(args.prompt ?? '');
     const aspectRatio = String(args.aspect_ratio ?? '1:1');
+    const model = (args.model === 'pro' ? 'pro' : 'flash') as 'flash' | 'pro';
 
-    const result = await this.geminiService.generateImage(tenantId, prompt, aspectRatio);
+    const result = await this.geminiService.generateImage(tenantId, prompt, aspectRatio, model);
 
     return {
       success: true,
       data: { s3Key: result.s3Key, imageUrl: result.s3Url, mimeType: result.mimeType },
-      summary: `Imagen generada y guardada en S3 (${aspectRatio})`,
+      summary: `Imagen generada con Gemini ${model === 'pro' ? '3 Pro' : '3.1 Flash'} y guardada en S3 (${aspectRatio})`,
     };
   }
 

@@ -51,7 +51,7 @@ export function LinkedInSidebar() {
       await api.delete(`/linkedin/conversations/${id}`);
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (pathname === `/linkedin/${id}`) {
-        router.push("/linkedin/new");
+        router.push("/assistant/new");
       }
     } finally {
       setDeletingId(null);
@@ -69,7 +69,7 @@ export function LinkedInSidebar() {
           Conversaciones
         </span>
         <Link
-          href="/linkedin/new"
+          href="/assistant/new"
           className="flex items-center justify-center size-6 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           title="Nueva conversación"
         >
@@ -116,7 +116,7 @@ export function LinkedInSidebar() {
             return (
               <Link
                 key={conv.id}
-                href={`/linkedin/${conv.id}`}
+                href={`/assistant/${conv.id}`}
                 className={cn(
                   "group relative flex items-start gap-2 px-3 py-2.5 mx-1 rounded-lg transition-colors",
                   isActive

@@ -76,6 +76,7 @@ export class ChatController {
         conversationId: body.conversationId,
         questionToolCallId: body.questionToolCallId,
         documentIds: body.documentIds,
+        uploadedImage: body.uploadedImage,
       },
       subject,
     );

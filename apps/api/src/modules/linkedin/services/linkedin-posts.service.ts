@@ -254,6 +254,18 @@ export class LinkedInPostsService {
     });
   }
 
+  async reschedule(tenantId: string, postId: string, scheduledAt: Date) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    if (!['PENDING_APPROVAL', 'DRAFT', 'SCHEDULED'].includes(post.status)) {
+      throw new BadRequestException(`No se puede programar un post en estado ${post.status}`);
+    }
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: { status: 'SCHEDULED', scheduledAt },
+    });
+  }
+
   async list(tenantId: string, filters: ListPostsFilters = {}) {
     const page = filters.page ?? 1;
     const perPage = filters.perPage ?? 20;

@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
 
 export function MarketingNav() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -50,18 +52,29 @@ export function MarketingNav() {
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-2">
-          <Link
-            href="/login"
-            className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
-          >
-            Iniciar sesión
-          </Link>
-          <Link
-            href="/register"
-            className="px-4 py-1.5 text-sm bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium transition-colors shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
-          >
-            Crear cuenta gratis
-          </Link>
+          {!loading && user ? (
+            <Link
+              href="/dashboard"
+              className="px-4 py-1.5 text-sm bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium transition-colors shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
+            >
+              Ir al Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+              >
+                Iniciar sesión
+              </Link>
+              <Link
+                href="/register"
+                className="px-4 py-1.5 text-sm bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium transition-colors shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
+              >
+                Crear cuenta gratis
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -97,18 +110,29 @@ export function MarketingNav() {
             </a>
           ))}
           <div className="pt-3 flex flex-col gap-2">
-            <Link
-              href="/login"
-              className="py-2 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
-            >
-              Iniciar sesión
-            </Link>
-            <Link
-              href="/register"
-              className="py-2 text-sm text-center bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium"
-            >
-              Crear cuenta gratis
-            </Link>
+            {!loading && user ? (
+              <Link
+                href="/dashboard"
+                className="py-2 text-sm text-center bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium"
+              >
+                Ir al Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="py-2 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  href="/register"
+                  className="py-2 text-sm text-center bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium"
+                >
+                  Crear cuenta gratis
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

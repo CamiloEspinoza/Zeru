@@ -41,6 +41,8 @@ const PILLAR_COLORS: Record<string, string> = {
   "behind-the-scenes": "border-l-pink-500",
 };
 
+const BULK_ELIGIBLE = ["PENDING_APPROVAL", "SCHEDULED", "DRAFT"];
+
 export default function LinkedInPostsPage() {
   const [posts, setPosts] = useState<LinkedInPost[]>([]);
   const [total, setTotal] = useState(0);
@@ -49,8 +51,13 @@ export default function LinkedInPostsPage() {
   const [page, setPage] = useState(1);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
+  // Selection state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAction, setBulkAction] = useState<"publish" | "cancel" | null>(null);
+
   const fetchPosts = useCallback(() => {
     setLoading(true);
+    setSelected(new Set());
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
     params.set("page", String(page));
@@ -90,6 +97,50 @@ export default function LinkedInPostsPage() {
     }
   };
 
+  // Bulk actions
+  const selectablePosts = posts.filter((p) => BULK_ELIGIBLE.includes(p.status));
+  const allSelected = selectablePosts.length > 0 && selectablePosts.every((p) => selected.has(p.id));
+  const someSelected = selected.size > 0;
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(selectablePosts.map((p) => p.id)));
+    }
+  };
+
+  const handleBulkPublish = async () => {
+    if (bulkAction || selected.size === 0) return;
+    setBulkAction("publish");
+    try {
+      await Promise.allSettled([...selected].map((id) => api.post(`/linkedin/posts/${id}/publish`, {})));
+      fetchPosts();
+    } finally {
+      setBulkAction(null);
+    }
+  };
+
+  const handleBulkCancel = async () => {
+    if (bulkAction || selected.size === 0) return;
+    setBulkAction("cancel");
+    try {
+      await Promise.allSettled([...selected].map((id) => api.post(`/linkedin/posts/${id}/cancel`, {})));
+      fetchPosts();
+    } finally {
+      setBulkAction(null);
+    }
+  };
+
   const totalPages = Math.ceil(total / 20);
 
   return (
@@ -117,6 +168,47 @@ export default function LinkedInPostsPage() {
           </div>
         </div>
 
+        {/* Bulk action bar */}
+        {someSelected && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#0A66C2]/30 bg-[#0A66C2]/5 px-4 py-3">
+            <span className="text-sm font-medium text-foreground">
+              {selected.size} post{selected.size !== 1 ? "s" : ""} seleccionado{selected.size !== 1 ? "s" : ""}
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handleBulkPublish}
+                disabled={!!bulkAction}
+                className="flex items-center gap-1.5 rounded-lg bg-[#0A66C2] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#004182] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {bulkAction === "publish" ? (
+                  <>
+                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Publicando…
+                  </>
+                ) : (
+                  "Publicar seleccionados"
+                )}
+              </button>
+              <button
+                onClick={handleBulkCancel}
+                disabled={!!bulkAction}
+                className="rounded-lg border border-border px-4 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {bulkAction === "cancel" ? "Cancelando…" : "Cancelar seleccionados"}
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                className="rounded-lg px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Posts list */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
@@ -136,18 +228,51 @@ export default function LinkedInPostsPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Select all row */}
+            {selectablePosts.length > 1 && (
+              <div className="flex items-center gap-2 px-1 pb-1">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-border accent-[#0A66C2] cursor-pointer"
+                  id="select-all"
+                />
+                <label htmlFor="select-all" className="text-xs text-muted-foreground cursor-pointer select-none">
+                  Seleccionar todos los posts accionables ({selectablePosts.length})
+                </label>
+              </div>
+            )}
+
             {posts.map((post) => {
               const statusInfo = STATUS_CONFIG[post.status] ?? { label: post.status, classes: "bg-muted text-muted-foreground" };
               const pillarColor = post.contentPillar ? PILLAR_COLORS[post.contentPillar] ?? "border-l-muted" : "border-l-muted";
+              const isSelectable = BULK_ELIGIBLE.includes(post.status);
+              const isSelected = selected.has(post.id);
+
               return (
                 <div
                   key={post.id}
                   className={cn(
-                    "rounded-xl border border-border bg-card p-4 border-l-4",
-                    pillarColor
+                    "rounded-xl border border-border bg-card p-4 border-l-4 transition-colors",
+                    pillarColor,
+                    isSelected && "ring-2 ring-[#0A66C2]/40 border-[#0A66C2]/30"
                   )}
                 >
                   <div className="flex items-start gap-4">
+                    {/* Checkbox */}
+                    {isSelectable && (
+                      <div className="pt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(post.id)}
+                          className="h-4 w-4 rounded border-border accent-[#0A66C2] cursor-pointer"
+                        />
+                      </div>
+                    )}
+                    {!isSelectable && <div className="w-4" />}
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-2">
                         <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium", statusInfo.classes)}>
@@ -196,7 +321,12 @@ export default function LinkedInPostsPage() {
                           disabled={actionLoading === post.id}
                           className="rounded-lg bg-[#0A66C2] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#004182] transition-colors disabled:opacity-50"
                         >
-                          {actionLoading === post.id ? "..." : "Publicar"}
+                          {actionLoading === post.id ? (
+                            <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                            </svg>
+                          ) : "Publicar"}
                         </button>
                       )}
                       {["PENDING_APPROVAL", "SCHEDULED", "DRAFT"].includes(post.status) && (

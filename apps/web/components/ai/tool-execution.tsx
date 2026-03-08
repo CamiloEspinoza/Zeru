@@ -22,6 +22,7 @@ const TOOL_ICONS: Record<string, string> = {
   list_fiscal_periods: "📅",
   get_trial_balance: "⚖️",
   ask_user_question: "❓",
+  get_skill_reference: "📚",
 };
 
 export function ToolExecution({
@@ -36,22 +37,39 @@ export function ToolExecution({
   const icon = TOOL_ICONS[name] ?? "🔧";
   const hasDetails = (args && Object.keys(args).length > 0) || result !== undefined;
 
+  const isSkillRef = name === "get_skill_reference";
+  const skillName = isSkillRef && args?.skill_name ? String(args.skill_name) : null;
+  const skillFilePath = isSkillRef && args?.file_path ? String(args.file_path) : null;
+
   return (
     <div
       className={cn(
         "my-1 rounded border text-xs transition-colors",
-        status === "running" && "border-border/50 bg-muted/20",
-        status === "done" && "border-green-200/60 bg-green-50/30 dark:border-green-800/40 dark:bg-green-950/20",
-        status === "error" && "border-destructive/30 bg-destructive/5"
+        isSkillRef
+          ? status === "running"
+            ? "border-purple-200/50 bg-purple-50/30 dark:border-purple-800/40 dark:bg-purple-950/20"
+            : status === "done"
+            ? "border-purple-300/60 bg-purple-50/40 dark:border-purple-700/40 dark:bg-purple-950/20"
+            : "border-destructive/30 bg-destructive/5"
+          : status === "running"
+          ? "border-border/50 bg-muted/20"
+          : status === "done"
+          ? "border-green-200/60 bg-green-50/30 dark:border-green-800/40 dark:bg-green-950/20"
+          : "border-destructive/30 bg-destructive/5"
       )}
     >
       <div className="flex items-center gap-2 px-3 py-2">
         {/* Status indicator */}
         {status === "running" ? (
-          <div className="h-3 w-3 rounded-full border border-muted-foreground/40 border-t-muted-foreground animate-spin flex-shrink-0" />
+          <div className={cn(
+            "h-3 w-3 rounded-full border animate-spin flex-shrink-0",
+            isSkillRef
+              ? "border-purple-400/60 border-t-purple-500"
+              : "border-muted-foreground/40 border-t-muted-foreground"
+          )} />
         ) : status === "done" ? (
           <svg
-            className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0"
+            className={cn("h-3 w-3 flex-shrink-0", isSkillRef ? "text-purple-600 dark:text-purple-400" : "text-green-600 dark:text-green-400")}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -70,9 +88,17 @@ export function ToolExecution({
         )}
 
         {/* Icon + label */}
-        <span className="text-muted-foreground">
-          <span className="mr-1">{icon}</span>
-          <span className={cn(status === "running" && "animate-pulse")}>{label}</span>
+          <span className={cn("flex items-center gap-1", isSkillRef ? "text-purple-700 dark:text-purple-300" : "text-muted-foreground")}>
+          <span>{icon}</span>
+          <span className={cn(status === "running" && "animate-pulse")}>
+            {isSkillRef && skillName ? (
+              skillFilePath
+                ? <>Leyendo referencia <span className="font-semibold">{skillName}</span><span className="opacity-60 text-[10px] ml-1">/{skillFilePath}</span></>
+                : <>Consultando skill <span className="font-semibold">{skillName}</span></>
+            ) : (
+              label
+            )}
+          </span>
         </span>
 
         {/* Summary on done */}

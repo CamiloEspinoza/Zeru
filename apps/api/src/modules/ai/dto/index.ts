@@ -17,6 +17,10 @@ export const chatRequestSchema = z.object({
   questionToolCallId: z.string().optional(),
   /** IDs of documents already uploaded via POST /files/upload */
   documentIds: z.array(z.string().uuid()).optional(),
+  /** Uploaded image metadata (for social media post creation) */
+  uploadedImage: z
+    .object({ s3Key: z.string(), imageUrl: z.string() })
+    .optional(),
 });
 
 export const installSkillSchema = z.object({
@@ -36,7 +40,12 @@ export const updateMemorySchema = z.object({
   importance: z.number().int().min(1).max(10).optional(),
 });
 
+export const upsertGeminiConfigSchema = z.object({
+  apiKey: z.string().min(1, 'API key requerida'),
+});
+
 export type UpsertAiConfigDto = z.infer<typeof upsertAiConfigSchema>;
 export type ValidateKeyDto = z.infer<typeof validateKeySchema>;
 export type ChatRequestDto = z.infer<typeof chatRequestSchema>;
 export type UpdateMemoryDto = z.infer<typeof updateMemorySchema>;
+export type UpsertGeminiConfigDto = z.infer<typeof upsertGeminiConfigSchema>;

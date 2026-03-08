@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EncryptionModule } from '../../common/services/encryption.module';
@@ -17,7 +17,7 @@ import { LinkedInController } from './controllers/linkedin.controller';
     ScheduleModule.forRoot(),
     PrismaModule,
     EncryptionModule,
-    AiModule,
+    forwardRef(() => AiModule),
   ],
   controllers: [LinkedInController],
   providers: [
@@ -29,6 +29,6 @@ import { LinkedInController } from './controllers/linkedin.controller';
     LinkedInAgentService,
     LinkedInToolExecutor,
   ],
-  exports: [LinkedInAuthService, LinkedInPostsService],
+  exports: [LinkedInAuthService, LinkedInApiService, LinkedInPostsService, GeminiImageService],
 })
 export class LinkedInModule {}

@@ -131,7 +131,7 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
     type: 'function',
     name: 'generate_image',
     description:
-      'Genera una imagen con Google Gemini 2.5 Flash para usarla en un post de LinkedIn. Devuelve la URL de la imagen generada y su S3 key. Usa prompts descriptivos y profesionales.',
+      'Genera una imagen con Google Gemini para usarla en un post de LinkedIn. Usa "flash" (Gemini 3.1 Flash, más rápido y económico) para la mayoría de los casos, y "pro" (Gemini 3 Pro, mayor calidad) solo cuando el usuario pida explícitamente mejor calidad. Devuelve la URL de la imagen generada y su S3 key.',
     parameters: {
       type: 'object',
       properties: {
@@ -144,8 +144,39 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
           enum: ['1:1', '4:3', '3:4', '16:9', '9:16'],
           description: 'Relación de aspecto de la imagen. 1:1 para posts cuadrados (recomendado para LinkedIn). 16:9 para banners.',
         },
+        model: {
+          type: 'string',
+          enum: ['flash', 'pro'],
+          description: 'Modelo a usar: "flash" = Gemini 3.1 Flash (rápido, económico, recomendado por defecto). "pro" = Gemini 3 Pro (mayor calidad, más lento y costoso).',
+        },
       },
-      required: ['prompt', 'aspect_ratio'],
+      required: ['prompt', 'aspect_ratio', 'model'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'resolve_linkedin_mention',
+    description:
+      'Resuelve una URL de perfil o empresa de LinkedIn al URN necesario para mencionar en un post. ' +
+      'Para personas usa URLs como linkedin.com/in/nombre. Para empresas usa linkedin.com/company/nombre. ' +
+      'Devuelve el URN y el nombre para construir la mención con formato @[Nombre](urn:li:person:ID) u @[Empresa](urn:li:organization:ID).',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description:
+            'URL del perfil de LinkedIn. Ejemplos: "https://www.linkedin.com/in/juanpablo/", "https://www.linkedin.com/company/platzi/", o simplemente el vanity name "juanpablo" o "platzi".',
+        },
+        type: {
+          type: 'string',
+          enum: ['person', 'organization'],
+          description: '"person" para perfiles personales (/in/), "organization" para empresas (/company/).',
+        },
+      },
+      required: ['url', 'type'],
       additionalProperties: false,
     },
     strict: true,
@@ -350,6 +381,7 @@ export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   schedule_linkedin_post: 'Programando post de LinkedIn',
   bulk_schedule_posts: 'Programando calendario de contenido',
   generate_image: 'Generando imagen con Gemini',
+  resolve_linkedin_mention: 'Buscando perfil en LinkedIn',
   get_linkedin_connection_status: 'Verificando conexión de LinkedIn',
   get_post_history: 'Consultando historial de posts',
   get_scheduled_posts: 'Consultando posts programados',

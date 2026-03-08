@@ -20,7 +20,7 @@ Eres un estratega de contenido y copywriter experto en LinkedIn. Conoces los alg
 
 - **Crear posts**: Texto, con imágenes (generadas por Gemini) o con artículos/URLs
 - **Programar publicaciones**: Una a la vez o calendarios completos de 30, 60, 90 días
-- **Generar imágenes**: Con Google Gemini 2.5 Flash para ilustrar los posts
+- **Generar imágenes**: Con Google Gemini 3.1 Flash (model: "flash", por defecto) o Gemini 3 Pro (model: "pro", si el usuario pide mayor calidad) para ilustrar los posts
 - **Gestionar calendario**: Ver posts programados, cancelar, reeditar
 - **Estrategia de contenido**: Definir pilares, frecuencia y mix de formatos
 
@@ -39,10 +39,15 @@ Eres un estratega de contenido y copywriter experto en LinkedIn. Conoces los alg
 4. Usa bulk_schedule_posts para programar todos de una vez
 5. Confirma el número de posts programados y muestra un resumen por pilar
 
-### Para posts con imagen:
+### Para posts con imagen generada por Gemini:
 1. Primero usa generate_image con un prompt detallado y profesional
 2. Muestra la URL de la imagen al usuario
 3. Luego crea el post con media_type=IMAGE y los datos de la imagen
+
+### Para posts con imagen subida por el usuario:
+1. Si el mensaje contiene \`[El usuario ha adjuntado una imagen...]\`, usa directamente el s3_key y url indicados
+2. NO uses generate_image cuando el usuario ya proporcionó una imagen
+3. Crea el post con media_type=IMAGE, image_s3_key={s3_key del mensaje}, media_url={url del mensaje}
 
 ## Mejores prácticas de LinkedIn que debes aplicar
 
@@ -84,7 +89,7 @@ Usa memory_store para guardar:
 
 ## Título de conversación
 
-Actualiza el título con update_conversation_title en cuanto entiendas el objetivo de la sesión.
+**En conversaciones nuevas: llama a update_conversation_title como tu PRIMERA herramienta, antes de cualquier otra.** Con solo leer el mensaje del usuario tienes suficiente contexto para generar un título descriptivo (máximo 6 palabras, sin comillas, en el mismo idioma del usuario). Actualízalo si el tema evoluciona.
 
 ## Idioma y tono
 
@@ -101,6 +106,7 @@ export interface LinkedInChatContext {
   message: string;
   conversationId?: string;
   questionToolCallId?: string;
+  uploadedImage?: { s3Key: string; imageUrl: string };
 }
 
 @Injectable()
@@ -134,6 +140,12 @@ export class LinkedInAgentService {
     const conversation = await this.ensureConversation(ctx);
     subject.next({ type: 'conversation_started', conversationId: conversation.id });
     this.activeStreams.register(conversation.id, subject);
+
+    // Augment message with uploaded image context
+    const effectiveMessage = ctx.uploadedImage
+      ? `${ctx.message}\n\n[El usuario ha adjuntado una imagen para usar en el post]\n- s3_key: ${ctx.uploadedImage.s3Key}\n- url: ${ctx.uploadedImage.imageUrl}`
+      : ctx.message;
+
     await this.saveMessage(conversation.id, 'user', { type: 'text', text: ctx.message });
 
     const openai = new OpenAI({ apiKey });
@@ -157,7 +169,7 @@ export class LinkedInAgentService {
     }
 
     try {
-      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx, subject, isNewConversation, systemPrompt });
+      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx: { ...ctx, message: effectiveMessage }, subject, isNewConversation, systemPrompt });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error inesperado';
       subject.next({ type: 'error', message });

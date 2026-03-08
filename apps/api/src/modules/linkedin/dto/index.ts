@@ -9,6 +9,10 @@ export const linkedInChatSchema = z.object({
   message: z.string().min(1, 'Mensaje requerido'),
   conversationId: z.string().uuid().optional(),
   questionToolCallId: z.string().optional(),
+  uploadedImage: z.object({
+    s3Key: z.string(),
+    imageUrl: z.string(),
+  }).optional(),
 });
 
 export const linkedInUpdateConfigSchema = z.object({

@@ -23,6 +23,7 @@ model Tenant {
 
   memberships          UserTenant[]
   aiConfig             AiProviderConfig?
+  geminiConfig         GeminiConfig?
   storageConfig        StorageConfig?
   emailConfig          EmailConfig?
   conversations        Conversation[]
@@ -112,6 +113,20 @@ model AiProviderConfig {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("ai_provider_configs")
+}
+
+/// API key de Google Gemini por tenant (para generación de imágenes)
+model GeminiConfig {
+  id              String   @id @default(uuid())
+  encryptedApiKey String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("gemini_configs")
 }
 
 /// Configuracion de almacenamiento S3 por tenant
@@ -591,6 +606,8 @@ model LinkedInConnection {
   personUrn     String
   profileName   String?
   profileImage  String?
+  /// Cookie li_at encriptada — necesaria para Voyager API (menciones a personas)
+  liAtCookie    String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

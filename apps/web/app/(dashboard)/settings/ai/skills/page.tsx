@@ -47,6 +47,68 @@ interface Skill {
 type InstallStatus = "idle" | "installing" | "success" | "error";
 type SyncStatus = "idle" | "syncing";
 
+/**
+ * Parses any supported skill input into a canonical GitHub URL.
+ *
+ * Supported formats:
+ *   npx skills add owner/repo@skills/copywriting
+ *   npx skills add https://github.com/owner/repo --skill copywriting
+ *   owner/repo@skills/copywriting
+ *   https://github.com/owner/repo/tree/main/skills/copywriting
+ *
+ * The `npx skills` CLI uses the convention that skills live under a `skills/`
+ * subfolder inside the repo. When the `--skill` flag value doesn't already
+ * contain a `/`, we prepend `skills/` to match that convention.
+ * For the `@skill` shorthand, the path is used as-is (so users can write
+ * `owner/repo@skills/copywriting` for explicitness, or rely on auto-prefix).
+ */
+function normalizeSkillInput(raw: string): string {
+  let input = raw.trim();
+
+  // Strip CLI prefix variations
+  for (const prefix of ["npx skills add ", "skills add "]) {
+    if (input.startsWith(prefix)) {
+      input = input.slice(prefix.length).trim();
+      break;
+    }
+  }
+
+  // Handle "URL --skill skillname" flag form
+  // Mirrors the `npx skills` CLI: --skill value → skills/<value> subfolder
+  const skillFlagMatch = input.match(/^(.+?)\s+(?:--skill|-s)\s+(\S+)$/);
+  if (skillFlagMatch) {
+    const base = skillFlagMatch[1].trim().replace(/\/$/, "");
+    const rawSkillName = skillFlagMatch[2].trim();
+    // If the value already contains a slash it's already a full path; otherwise
+    // assume the conventional `skills/<name>` subfolder layout
+    const skillPath = rawSkillName.includes("/") ? rawSkillName : `skills/${rawSkillName}`;
+    const baseUrl = base.startsWith("http") ? base : `https://github.com/${base}`;
+    return `${baseUrl}/tree/main/${skillPath}`;
+  }
+
+  // Handle "owner/repo@skill-path" shorthand (path used as-is)
+  const atMatch = input.match(/^([^@:/]+\/[^@:/]+)@(.+)$/);
+  if (atMatch) {
+    return `https://github.com/${atMatch[1]}/tree/main/${atMatch[2]}`;
+  }
+
+  // Ensure full URL for bare "owner/repo"
+  if (!input.startsWith("http") && /^[^/]+\/[^/]/.test(input)) {
+    return `https://github.com/${input}`;
+  }
+
+  return input;
+}
+
+function isSkillCommand(raw: string): boolean {
+  const t = raw.trim();
+  return (
+    t.startsWith("npx skills add ") ||
+    t.startsWith("skills add ") ||
+    /^[^@:/]+\/[^@:/]+@.+$/.test(t)
+  );
+}
+
 function GitHubIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -264,6 +326,7 @@ export default function SkillsPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [installStatus, setInstallStatus] = useState<InstallStatus>("idle");
   const [installError, setInstallError] = useState("");
+  const [wasCommand, setWasCommand] = useState(false);
 
   useEffect(() => {
     api
@@ -272,6 +335,9 @@ export default function SkillsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const parsedRepoUrl = normalizeSkillInput(repoUrl);
+  const showParsedPreview = repoUrl.trim() !== "" && parsedRepoUrl !== repoUrl.trim();
 
   const handleInstall = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,10 +348,11 @@ export default function SkillsPage() {
 
     try {
       const skill = await api.post<Skill>("/ai/skills", {
-        repoUrl: repoUrl.trim(),
+        repoUrl: parsedRepoUrl,
       });
       setSkills((prev) => [skill, ...prev]);
       setRepoUrl("");
+      setWasCommand(false);
       setInstallStatus("success");
       setTimeout(() => setInstallStatus("idle"), 2500);
     } catch (err: unknown) {
@@ -320,6 +387,69 @@ export default function SkillsPage() {
 
   const isInstalling = installStatus === "installing";
 
+  const recommendedSkills = [
+    {
+      name: "Social Content",
+      description: "Crear, programar y optimizar contenido para LinkedIn, Twitter/X, Instagram, TikTok y más. Incluye calendarios de contenido, hilos virales y estrategia de crecimiento.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/social-content",
+      command: "npx skills add coreyhaines31/marketingskills --skill social-content",
+      tags: ["linkedin", "redes sociales"],
+    },
+    {
+      name: "Copywriting",
+      description: "Redacción persuasiva para landing pages, homepages, páginas de precios y features. Headlines, CTAs, propuestas de valor y copy above-the-fold.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/copywriting",
+      command: "npx skills add coreyhaines31/marketingskills --skill copywriting",
+      tags: ["copy", "conversión"],
+    },
+    {
+      name: "Content Strategy",
+      description: "Planificación de contenido, clusters de temas, calendario editorial y pilares de contenido. Para decidir qué crear, no solo cómo escribirlo.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/content-strategy",
+      command: "npx skills add coreyhaines31/marketingskills --skill content-strategy",
+      tags: ["estrategia", "contenido"],
+    },
+    {
+      name: "Email Sequence",
+      description: "Secuencias de email automatizadas: bienvenida, nurture, reactivación y onboarding. Flujos de múltiples emails para cualquier etapa del funnel.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/email-sequence",
+      command: "npx skills add coreyhaines31/marketingskills --skill email-sequence",
+      tags: ["email", "automatización"],
+    },
+    {
+      name: "Marketing Psychology",
+      description: "Principios psicológicos aplicados al marketing: sesgos cognitivos, persuasión, prueba social, escasez, anclaje y ciencia del comportamiento.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/marketing-psychology",
+      command: "npx skills add coreyhaines31/marketingskills --skill marketing-psychology",
+      tags: ["psicología", "persuasión"],
+    },
+    {
+      name: "Ad Creative",
+      description: "Generar variaciones de copy para ads: headlines, descripciones, texto principal para Facebook, Google, LinkedIn y más. Escala y testeo de creativos.",
+      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/ad-creative",
+      command: "npx skills add coreyhaines31/marketingskills --skill ad-creative",
+      tags: ["ads", "paid media"],
+    },
+  ];
+
+  const handleInstallRecommended = async (url: string) => {
+    setRepoUrl(url);
+    setInstallStatus("installing");
+    setInstallError("");
+    try {
+      const skill = await api.post<Skill>("/ai/skills", { repoUrl: url });
+      setSkills((prev) => [skill, ...prev]);
+      setRepoUrl("");
+      setWasCommand(false);
+      setInstallStatus("success");
+      setTimeout(() => setInstallStatus("idle"), 2500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al instalar el skill";
+      setInstallError(msg);
+      setInstallStatus("error");
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -329,6 +459,78 @@ export default function SkillsPage() {
           instrucciones se inyectan en el contexto del agente.
         </p>
       </div>
+
+      {/* Recommended skills */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Skills recomendados para marketing</CardTitle>
+          <CardDescription>
+            Instala estos skills para potenciar las capacidades de copywriting y redes sociales del asistente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {recommendedSkills.map((rec) => {
+            const alreadyInstalled = skills.some((s) => s.repoUrl === rec.url);
+            return (
+              <div
+                key={rec.url}
+                className="flex items-start gap-3 rounded-lg border border-border p-3"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30 text-base">
+                  📚
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{rec.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{rec.description}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {rec.tags.map(tag => (
+                      <span key={tag} className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  {"command" in rec && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRepoUrl(rec.command as string);
+                        setWasCommand(true);
+                        document.getElementById("repoUrl")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        document.getElementById("repoUrl")?.focus();
+                      }}
+                      className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                      title="Copiar comando al campo de instalación"
+                    >
+                      <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      {rec.command as string}
+                    </button>
+                  )}
+                </div>
+                {alreadyInstalled ? (
+                  <span className="shrink-0 text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-0.5">
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Instalado
+                  </span>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 h-7 text-xs"
+                    disabled={isInstalling}
+                    onClick={() => handleInstallRecommended(rec.url)}
+                  >
+                    Instalar
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -340,17 +542,30 @@ export default function SkillsPage() {
         <CardContent>
           <form onSubmit={handleInstall} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="repoUrl">URL del repositorio</Label>
+              <Label htmlFor="repoUrl">URL o comando de instalación</Label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <GitHubIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  {wasCommand ? (
+                    <svg
+                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  ) : (
+                    <GitHubIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  )}
                   <Input
                     id="repoUrl"
-                    type="url"
-                    placeholder="https://github.com/owner/repo/tree/main/skill-name"
+                    type="text"
+                    placeholder="https://github.com/owner/repo  ·  owner/repo@skill  ·  npx skills add …"
                     value={repoUrl}
                     onChange={(e) => {
-                      setRepoUrl(e.target.value);
+                      const val = e.target.value;
+                      setRepoUrl(val);
+                      setWasCommand(isSkillCommand(val));
                       if (installStatus === "error") {
                         setInstallStatus("idle");
                         setInstallError("");
@@ -358,7 +573,7 @@ export default function SkillsPage() {
                     }}
                     disabled={isInstalling}
                     className={cn(
-                      "pl-9",
+                      "pl-9 font-mono text-xs",
                       installStatus === "error" && "border-destructive focus-visible:ring-destructive",
                       installStatus === "success" && "border-green-500 focus-visible:ring-green-500"
                     )}
@@ -381,6 +596,18 @@ export default function SkillsPage() {
                   )}
                 </Button>
               </div>
+
+              {/* Parsed URL preview when input is a CLI command or shorthand */}
+              {showParsedPreview && (
+                <div className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+                  <svg className="h-3.5 w-3.5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs text-muted-foreground">Instalará desde:</span>
+                  <span className="text-xs font-mono text-primary truncate">{parsedRepoUrl}</span>
+                </div>
+              )}
+
               {installStatus === "error" && installError && (
                 <p className="text-xs text-destructive">{installError}</p>
               )}
@@ -389,6 +616,10 @@ export default function SkillsPage() {
                   Skill instalado correctamente
                 </p>
               )}
+
+              <p className="text-xs text-muted-foreground">
+                Acepta: URL de GitHub · <span className="font-mono">owner/repo@skill</span> · <span className="font-mono">npx skills add …</span>
+              </p>
             </div>
           </form>
         </CardContent>

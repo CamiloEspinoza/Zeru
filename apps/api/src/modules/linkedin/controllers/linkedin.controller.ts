@@ -8,10 +8,14 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
   Request,
   Res,
   NotFoundException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { Subject } from 'rxjs';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -21,6 +25,7 @@ import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { LinkedInAuthService } from '../services/linkedin-auth.service';
 import { LinkedInPostsService } from '../services/linkedin-posts.service';
 import { LinkedInAgentService } from '../services/linkedin-agent.service';
+import { GeminiImageService } from '../services/gemini-image.service';
 import { ActiveStreamsRegistry } from '../../ai/services/active-streams.registry';
 import {
   linkedInCallbackSchema,
@@ -42,6 +47,7 @@ export class LinkedInController {
     private readonly postsService: LinkedInPostsService,
     private readonly agentService: LinkedInAgentService,
     private readonly activeStreams: ActiveStreamsRegistry,
+    private readonly geminiImageService: GeminiImageService,
   ) {}
 
   // ─── Auth ───────────────────────────────────────────────
@@ -68,6 +74,27 @@ export class LinkedInController {
   async disconnect(@CurrentTenant() tenantId: string) {
     await this.authService.disconnect(tenantId);
     return { disconnected: true };
+  }
+
+  // ─── Image Upload ───────────────────────────────────────
+
+  @Post('upload-image')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  async uploadImage(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Solo se permiten imágenes (JPEG, PNG, WEBP, GIF)');
+    }
+    return this.geminiImageService.uploadUserImage(
+      tenantId,
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+    );
   }
 
   // ─── Agent Chat ──────────────────────────────────────────
@@ -108,6 +135,7 @@ export class LinkedInController {
         message: body.message,
         conversationId: body.conversationId,
         questionToolCallId: body.questionToolCallId,
+        uploadedImage: body.uploadedImage,
       },
       subject,
     );
@@ -199,6 +227,34 @@ export class LinkedInController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.postsService.cancel(tenantId, postId);
+  }
+
+  @Post('posts/:id/reschedule')
+  async reschedulePost(
+    @Param('id') postId: string,
+    @Body() body: { scheduledAt: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.scheduledAt) throw new Error('scheduledAt is required');
+    return this.postsService.reschedule(tenantId, postId, new Date(body.scheduledAt));
+  }
+
+  // ─── Session cookie (li_at) ───────────────────────────────
+
+  @Put('session-cookie')
+  async saveSessionCookie(
+    @Body() body: { liAtCookie: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.liAtCookie?.trim()) throw new Error('liAtCookie is required');
+    await this.authService.saveSessionCookie(tenantId, body.liAtCookie);
+    return { saved: true };
+  }
+
+  @Get('session-cookie/status')
+  async getSessionCookieStatus(@CurrentTenant() tenantId: string) {
+    const has = await this.authService.hasSessionCookie(tenantId);
+    return { configured: has };
   }
 
   // ─── Config ──────────────────────────────────────────────

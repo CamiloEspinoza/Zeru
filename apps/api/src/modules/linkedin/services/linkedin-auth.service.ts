@@ -155,6 +155,26 @@ export class LinkedInAuthService {
     await this.prisma.linkedInConnection.deleteMany({ where: { tenantId } });
   }
 
+  async saveSessionCookie(tenantId: string, liAtCookie: string): Promise<void> {
+    const connection = await this.prisma.linkedInConnection.findUnique({ where: { tenantId } });
+    if (!connection) throw new BadRequestException('LinkedIn no conectado. Conecta tu cuenta primero.');
+    await this.prisma.linkedInConnection.update({
+      where: { tenantId },
+      data: { liAtCookie: this.encryption.encrypt(liAtCookie.trim()) },
+    });
+  }
+
+  async getDecryptedSessionCookie(tenantId: string): Promise<string | null> {
+    const connection = await this.prisma.linkedInConnection.findUnique({ where: { tenantId } });
+    if (!connection?.liAtCookie) return null;
+    return this.encryption.decrypt(connection.liAtCookie);
+  }
+
+  async hasSessionCookie(tenantId: string): Promise<boolean> {
+    const connection = await this.prisma.linkedInConnection.findUnique({ where: { tenantId } });
+    return !!connection?.liAtCookie;
+  }
+
   async getDecryptedToken(tenantId: string): Promise<string> {
     const connection = await this.prisma.linkedInConnection.findUnique({
       where: { tenantId },
