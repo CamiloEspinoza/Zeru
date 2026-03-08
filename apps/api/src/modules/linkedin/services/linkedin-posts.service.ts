@@ -177,6 +177,28 @@ export class LinkedInPostsService {
     return created;
   }
 
+  private async processCommentaryMentions(tenantId: string, commentary: string): Promise<string> {
+    const urlMentionPattern = /@\[(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9\-_%]+)\]/g;
+
+    let processed = commentary;
+    const matches = [...commentary.matchAll(urlMentionPattern)];
+
+    for (const match of matches) {
+      const fullMatch = match[0];
+      const vanityName = decodeURIComponent(match[1]);
+
+      const person = await this.apiService.resolvePersonByVanityUrl(tenantId, vanityName);
+      if (person) {
+        const displayName = `${person.firstName} ${person.lastName}`.trim();
+        processed = processed.replace(fullMatch, `@[${displayName}](${person.personUrn})`);
+      } else {
+        processed = processed.replace(fullMatch, vanityName);
+      }
+    }
+
+    return processed;
+  }
+
   async publish(tenantId: string, postId: string): Promise<void> {
     const post = await this.prisma.linkedInPost.findFirst({
       where: { id: postId, tenantId },
@@ -185,16 +207,16 @@ export class LinkedInPostsService {
     if (post.status === 'PUBLISHED') return;
 
     try {
+      const processedContent = await this.processCommentaryMentions(tenantId, post.content);
       let result: { postId: string | null };
 
       if (post.mediaType === 'IMAGE' && post.imageS3Key) {
-        // Upload image to LinkedIn first
         const imageUrn = await this.uploadImageFromS3(tenantId, post.imageS3Key, post.mediaUrl);
-        result = await this.apiService.createImagePost(tenantId, post.content, imageUrn, post.visibility);
+        result = await this.apiService.createImagePost(tenantId, processedContent, imageUrn, post.visibility);
       } else if (post.mediaType === 'ARTICLE' && post.mediaUrl) {
-        result = await this.apiService.createArticlePost(tenantId, post.content, post.mediaUrl, 'Artículo', undefined, post.visibility);
+        result = await this.apiService.createArticlePost(tenantId, processedContent, post.mediaUrl, 'Artículo', undefined, post.visibility);
       } else {
-        result = await this.apiService.createTextPost(tenantId, post.content, post.visibility);
+        result = await this.apiService.createTextPost(tenantId, processedContent, post.visibility);
       }
 
       await this.prisma.linkedInPost.update({
