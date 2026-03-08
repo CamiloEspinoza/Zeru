@@ -293,6 +293,25 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
+    name: 'search_linkedin_person',
+    description:
+      'Busca una persona de LinkedIn por URL de perfil para obtener su URN. Usa esto cuando necesites mencionar a alguien en un post. El usuario debe proporcionar la URL del perfil (ej: linkedin.com/in/nombre).',
+    parameters: {
+      type: 'object',
+      properties: {
+        profile_url: {
+          type: 'string',
+          description:
+            'URL del perfil de LinkedIn (ej: "linkedin.com/in/juan-perez" o "https://www.linkedin.com/in/juan-perez").',
+        },
+      },
+      required: ['profile_url'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
     name: 'memory_store',
     description: 'Guarda información importante en memoria persistente (preferencias de contenido, audiencia, decisiones de estilo).',
     parameters: {
@@ -359,5 +378,6 @@ export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   update_conversation_title: 'Actualizando título',
   memory_store: 'Guardando en memoria',
   memory_search: 'Buscando en memoria',
+  search_linkedin_person: 'Buscando persona en LinkedIn',
   get_skill_reference: 'Cargando referencia del skill',
 };

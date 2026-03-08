@@ -57,6 +57,36 @@ export class LinkedInApiService {
     return {} as T;
   }
 
+  async resolvePersonByVanityUrl(
+    tenantId: string,
+    vanityName: string,
+  ): Promise<{ personUrn: string; firstName: string; lastName: string } | null> {
+    try {
+      const headers = await this.getHeaders(tenantId);
+      const response = await fetch(
+        `${LINKEDIN_API_BASE}/rest/people/(vanityName:${vanityName})`,
+        { method: 'GET', headers },
+      );
+
+      if (!response.ok) {
+        this.logger.warn(`Could not resolve vanity URL "${vanityName}": ${response.status}`);
+        return null;
+      }
+
+      const data = (await response.json()) as { id?: string; firstName?: string; lastName?: string };
+      if (!data.id) return null;
+
+      return {
+        personUrn: `urn:li:person:${data.id}`,
+        firstName: data.firstName ?? '',
+        lastName: data.lastName ?? '',
+      };
+    } catch (error) {
+      this.logger.warn(`Failed to resolve vanity URL "${vanityName}":`, error);
+      return null;
+    }
+  }
+
   async createTextPost(
     tenantId: string,
     commentary: string,

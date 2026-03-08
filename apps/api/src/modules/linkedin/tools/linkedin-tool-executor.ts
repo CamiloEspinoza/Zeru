@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { MemoryService } from '../../ai/services/memory.service';
 import { SkillsService } from '../../ai/services/skills.service';
 import { LinkedInAuthService } from '../services/linkedin-auth.service';
+import { LinkedInApiService } from '../services/linkedin-api.service';
 import { LinkedInPostsService } from '../services/linkedin-posts.service';
 import { GeminiImageService } from '../services/gemini-image.service';
 
@@ -21,6 +22,7 @@ export class LinkedInToolExecutor {
     private readonly memory: MemoryService,
     private readonly skills: SkillsService,
     private readonly authService: LinkedInAuthService,
+    private readonly apiService: LinkedInApiService,
     private readonly postsService: LinkedInPostsService,
     private readonly geminiService: GeminiImageService,
   ) {}
@@ -72,6 +74,9 @@ export class LinkedInToolExecutor {
 
         case 'memory_search':
           return await this.searchMemory(args, tenantId, userId);
+
+        case 'search_linkedin_person':
+          return await this.searchLinkedInPerson(args, tenantId);
 
         case 'get_skill_reference':
           return await this.getSkillReference(args, tenantId);
@@ -257,6 +262,46 @@ export class LinkedInToolExecutor {
       limit: 10,
     });
     return { success: true, data: results, summary: `${results.length} memorias encontradas` };
+  }
+
+  private async searchLinkedInPerson(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const profileUrl = String(args.profile_url ?? '');
+
+    const vanityMatch = profileUrl.match(
+      /(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9\-_%]+)/,
+    );
+    if (!vanityMatch) {
+      return {
+        success: false,
+        data: null,
+        summary: 'URL de perfil inválida. Usa el formato: linkedin.com/in/nombre-persona',
+      };
+    }
+
+    const vanityName = decodeURIComponent(vanityMatch[1]);
+    const person = await this.apiService.resolvePersonByVanityUrl(tenantId, vanityName);
+
+    if (!person) {
+      return {
+        success: true,
+        data: { resolved: false, vanityName },
+        summary: `No se pudo resolver el perfil "${vanityName}". El usuario puede proporcionar el URN directamente o usar el formato @[Nombre](urn:li:person:xxx) en el post.`,
+      };
+    }
+
+    const displayName = `${person.firstName} ${person.lastName}`.trim();
+    return {
+      success: true,
+      data: {
+        resolved: true,
+        personUrn: person.personUrn,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        displayName,
+        mentionSyntax: `@[${displayName}](${person.personUrn})`,
+      },
+      summary: `Persona encontrada: ${displayName} (${person.personUrn}). Usa @[${displayName}](${person.personUrn}) en el post para mencionarla.`,
+    };
   }
 
   private async getSkillReference(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
