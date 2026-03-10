@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 
-export default function LinkedInOAuthRedirect() {
+function LinkedInOAuthRedirectContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -109,5 +109,13 @@ export default function LinkedInOAuthRedirect() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LinkedInOAuthRedirect() {
+  return (
+    <Suspense>
+      <LinkedInOAuthRedirectContent />
+    </Suspense>
   );
 }
