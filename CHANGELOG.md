@@ -1,3 +1,10 @@
+## [0.3.2](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.1...v0.3.2) (2026-03-10)
+
+
+### Bug Fixes
+
+* correct msg.type check and always run build on main push ([5e40918](https://github.com/CamiloEspinoza/Zeru/commit/5e40918106d1fed9e94e00c4c34daaa37aa960ee))
+
 ## [0.3.1](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.0...v0.3.1) (2026-03-10)
 
 
