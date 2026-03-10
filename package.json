@@ -21,7 +21,8 @@
     "prepare": "husky",
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",
-    "commitlint": "commitlint --edit"
+    "commitlint": "commitlint --edit",
+    "release:branch": "bash scripts/create-release-branch.sh"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.0",
