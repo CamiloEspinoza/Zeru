@@ -495,7 +495,7 @@ export default function AssistantChatPage() {
   const pendingPosts = useMemo(() => {
     const result: { id: string }[] = [];
     for (const msg of messages) {
-      if (msg.role !== "assistant") continue;
+      if (msg.type !== "assistant") continue;
       for (const block of msg.blocks) {
         if (
           block.kind === "tool" &&

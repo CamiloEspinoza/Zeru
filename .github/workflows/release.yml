@@ -92,7 +92,7 @@ jobs:
     needs: [release]
     if: |
       always() && (
-        (needs.release.result == 'success' && needs.release.outputs.new_release_published == 'true') ||
+        needs.release.result == 'success' ||
         (needs.release.result == 'skipped' && github.event.inputs.tag != '')
       )
     permissions:
