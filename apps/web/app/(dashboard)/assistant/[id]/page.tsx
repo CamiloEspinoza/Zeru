@@ -473,7 +473,7 @@ export default function AssistantChatPage() {
 
   const handlePublishPost = useCallback(async (postId: string) => {
     try {
-      await api.post(`/linkedin/posts/${postId}/publish`);
+      await api.post(`/linkedin/posts/${postId}/publish`, {});
     } catch {
       // Ignore, the post list will reflect real state on refresh
     }
@@ -481,7 +481,7 @@ export default function AssistantChatPage() {
 
   const handleCancelPost = useCallback(async (postId: string) => {
     try {
-      await api.post(`/linkedin/posts/${postId}/cancel`);
+      await api.post(`/linkedin/posts/${postId}/cancel`, {});
     } catch {
       // Ignore
     }
@@ -520,7 +520,7 @@ export default function AssistantChatPage() {
     if (pendingPosts.length === 0 || isBulkPublishing) return;
     setIsBulkPublishing(true);
     try {
-      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/publish`)));
+      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/publish`, {})));
     } finally {
       setIsBulkPublishing(false);
     }
@@ -530,7 +530,7 @@ export default function AssistantChatPage() {
     if (pendingPosts.length === 0 || isBulkCancelling) return;
     setIsBulkCancelling(true);
     try {
-      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/cancel`)));
+      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/cancel`, {})));
     } finally {
       setIsBulkCancelling(false);
     }
