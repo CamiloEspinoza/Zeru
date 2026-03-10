@@ -23,6 +23,7 @@ import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { LinkedInAuthService } from '../services/linkedin-auth.service';
+import { LinkedInApiService } from '../services/linkedin-api.service';
 import { LinkedInPostsService } from '../services/linkedin-posts.service';
 import { LinkedInAgentService } from '../services/linkedin-agent.service';
 import { GeminiImageService } from '../services/gemini-image.service';
@@ -44,6 +45,7 @@ import type { ChatEvent } from '@zeru/shared';
 export class LinkedInController {
   constructor(
     private readonly authService: LinkedInAuthService,
+    private readonly apiService: LinkedInApiService,
     private readonly postsService: LinkedInPostsService,
     private readonly agentService: LinkedInAgentService,
     private readonly activeStreams: ActiveStreamsRegistry,
@@ -255,6 +257,53 @@ export class LinkedInController {
   async getSessionCookieStatus(@CurrentTenant() tenantId: string) {
     const has = await this.authService.hasSessionCookie(tenantId);
     return { configured: has };
+  }
+
+  // ─── Community Management OAuth ──────────────────────────
+
+  @Post('community/setup-organization')
+  async setupOrganization(
+    @Body() body: { companyUrl?: string; organizationUrn?: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    // Accept direct URN (e.g. urn:li:organization:12345)
+    if (body.organizationUrn?.trim()) {
+      await this.postsService.updateConfig(tenantId, { organizationUrn: body.organizationUrn.trim() });
+      return { organizationUrn: body.organizationUrn.trim() };
+    }
+
+    if (!body.companyUrl?.trim()) throw new BadRequestException('companyUrl u organizationUrn son requeridos');
+    const vanityMatch = body.companyUrl.match(/linkedin\.com\/company\/([a-zA-Z0-9\-_]+)/);
+    if (!vanityMatch) throw new BadRequestException('URL de empresa inválida. Usa el formato: linkedin.com/company/nombre-empresa');
+    const vanityName = vanityMatch[1];
+
+    const org = await this.apiService.resolveOrganizationUrnViaVoyager(tenantId, vanityName);
+    await this.postsService.updateConfig(tenantId, { organizationUrn: org.urn });
+    return { organizationUrn: org.urn, displayName: org.displayName };
+  }
+
+  @Get('community/auth/url')
+  getCommunityAuthUrl(@CurrentTenant() tenantId: string) {
+    return { url: this.authService.getCommunityAuthUrl(tenantId) };
+  }
+
+  @Post('community/auth/callback')
+  async handleCommunityCallback(
+    @Body(new ZodValidationPipe(linkedInCallbackSchema)) body: LinkedInCallbackDto,
+  ) {
+    return this.authService.handleCommunityCallback(body.code, body.state);
+  }
+
+  @Get('community/connection')
+  async getCommunityConnection(@CurrentTenant() tenantId: string) {
+    const connected = await this.authService.hasCommunityConnection(tenantId);
+    return { connected };
+  }
+
+  @Delete('community/connection')
+  async disconnectCommunity(@CurrentTenant() tenantId: string) {
+    await this.authService.disconnectCommunity(tenantId);
+    return { disconnected: true };
   }
 
   // ─── Config ──────────────────────────────────────────────

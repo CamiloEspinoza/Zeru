@@ -27,11 +27,14 @@ export default function LinkedInOAuthRedirect() {
       return;
     }
 
+    const isCommunity = state.includes(":cm:");
+    const endpoint = isCommunity ? "/linkedin/community/auth/callback" : "/linkedin/auth/callback";
+
     api
-      .post<{ personUrn: string; profileName?: string }>("/linkedin/auth/callback", { code, state })
+      .post(endpoint, { code, state })
       .then(() => {
         setStatus("success");
-        setTimeout(() => router.replace("/linkedin"), 1500);
+        setTimeout(() => router.replace("/settings/linkedin"), 1500);
       })
       .catch((err: unknown) => {
         setErrorMessage(err instanceof Error ? err.message : "Error al conectar con LinkedIn");

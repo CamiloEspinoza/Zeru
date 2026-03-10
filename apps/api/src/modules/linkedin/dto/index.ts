@@ -19,6 +19,7 @@ export const linkedInUpdateConfigSchema = z.object({
   autoPublish: z.boolean().optional(),
   defaultVisibility: z.enum(['PUBLIC', 'CONNECTIONS']).optional(),
   contentPillars: z.array(z.string()).optional(),
+  organizationUrn: z.string().optional(),
 });
 
 export const linkedInListPostsSchema = z.object({

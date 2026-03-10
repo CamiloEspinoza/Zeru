@@ -1,8 +1,9 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { LinkedInAuthService } from './linkedin-auth.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 const LINKEDIN_API_BASE = 'https://api.linkedin.com';
-const LINKEDIN_VERSION = '202504';
+const LINKEDIN_VERSION = '202601';
 
 interface LinkedInHeaders extends Record<string, string> {
   Authorization: string;
@@ -15,7 +16,10 @@ interface LinkedInHeaders extends Record<string, string> {
 export class LinkedInApiService {
   private readonly logger = new Logger(LinkedInApiService.name);
 
-  constructor(private readonly authService: LinkedInAuthService) {}
+  constructor(
+    private readonly authService: LinkedInAuthService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private async getHeaders(tenantId: string): Promise<LinkedInHeaders> {
     const token = await this.authService.getDecryptedToken(tenantId);
@@ -61,6 +65,57 @@ export class LinkedInApiService {
     tenantId: string,
     vanityName: string,
   ): Promise<{ personUrn: string; firstName: string; lastName: string } | null> {
+    const communityToken = await this.authService.getDecryptedCommunityToken(tenantId);
+    if (communityToken) {
+      return this.resolvePersonViaCommunityApi(tenantId, vanityName, communityToken);
+    }
+    return this.resolvePersonViaMainApi(tenantId, vanityName);
+  }
+
+  private async resolvePersonViaCommunityApi(
+    tenantId: string,
+    vanityName: string,
+    communityToken: string,
+  ): Promise<{ personUrn: string; firstName: string; lastName: string } | null> {
+    try {
+      const orgUrn = await this.getOrganizationUrn(tenantId);
+      if (!orgUrn) {
+        this.logger.warn(`Community API available but no organizationUrn configured for tenant ${tenantId}, falling back`);
+        return this.resolvePersonViaMainApi(tenantId, vanityName);
+      }
+
+      const profileUrl = `https://www.linkedin.com/in/${vanityName}`;
+      const url = `${LINKEDIN_API_BASE}/rest/vanityUrl?q=vanityUrlAsOrganization&vanityUrl=${encodeURIComponent(profileUrl)}&organization=${encodeURIComponent(orgUrn)}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${communityToken}`,
+          'LinkedIn-Version': LINKEDIN_VERSION,
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`Community vanityUrl API failed for "${vanityName}": ${response.status} — falling back`);
+        return this.resolvePersonViaMainApi(tenantId, vanityName);
+      }
+
+      const data = await response.json() as { elements?: Array<{ member?: string }> };
+      const personUrn = data.elements?.[0]?.member;
+      if (!personUrn) return null;
+
+      return { personUrn, firstName: '', lastName: '' };
+    } catch (error) {
+      this.logger.warn(`Community vanityUrl resolution failed for "${vanityName}":`, error);
+      return this.resolvePersonViaMainApi(tenantId, vanityName);
+    }
+  }
+
+  private async resolvePersonViaMainApi(
+    tenantId: string,
+    vanityName: string,
+  ): Promise<{ personUrn: string; firstName: string; lastName: string } | null> {
     try {
       const headers = await this.getHeaders(tenantId);
       const response = await fetch(
@@ -85,6 +140,11 @@ export class LinkedInApiService {
       this.logger.warn(`Failed to resolve vanity URL "${vanityName}":`, error);
       return null;
     }
+  }
+
+  private async getOrganizationUrn(tenantId: string): Promise<string | null> {
+    const config = await this.prisma.linkedInAgentConfig.findUnique({ where: { tenantId } });
+    return config?.organizationUrn ?? null;
   }
 
   async createTextPost(
@@ -327,6 +387,72 @@ export class LinkedInApiService {
       displayName,
       orgId: org.id,
     };
+  }
+
+  /**
+   * Resolves a LinkedIn company vanity name to an organization URN using the Voyager API.
+   * Uses the user's li_at session cookie (no special API permissions needed).
+   */
+  async resolveOrganizationUrnViaVoyager(
+    tenantId: string,
+    vanityName: string,
+  ): Promise<{ urn: string; displayName: string; orgId: number }> {
+    const liAt = await this.authService.getDecryptedSessionCookie(tenantId);
+    if (!liAt) {
+      throw new BadRequestException(
+        'Se necesita la cookie de sesión (li_at) para resolver la empresa. ' +
+        'Configúrala en Settings → LinkedIn → Session Cookie.',
+      );
+    }
+
+    const csrfToken = `ajax:${Date.now()}`;
+    const response = await fetch(
+      `https://www.linkedin.com/voyager/api/organization/companies?q=universalName&universalName=${encodeURIComponent(vanityName)}`,
+      {
+        headers: {
+          Cookie: `li_at=${liAt}; JSESSIONID="${csrfToken}"`,
+          'csrf-token': csrfToken,
+          'x-restli-protocol-version': '2.0.0',
+          accept: 'application/vnd.linkedin.normalized+json+2.1',
+          'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        `No se pudo acceder al perfil de empresa "${vanityName}" (${response.status}). ` +
+        `Verifica que la cookie de sesión esté vigente.`,
+      );
+    }
+
+    const data = await response.json() as {
+      included?: Array<{
+        $type?: string;
+        entityUrn?: string;
+        name?: string;
+        localizedName?: string;
+        universalName?: string;
+      }>;
+    };
+
+    const company = data.included?.find(
+      (item) =>
+        item.universalName === vanityName ||
+        item.entityUrn?.includes(':organization:') ||
+        item.entityUrn?.includes(':company:'),
+    );
+
+    const urnStr = company?.entityUrn ?? '';
+    const idMatch = urnStr.match(/:(?:organization|company):(\d+)/);
+    if (!idMatch) {
+      throw new BadRequestException(`No se pudo extraer el ID de la empresa "${vanityName}"`);
+    }
+
+    const orgId = parseInt(idMatch[1], 10);
+    const displayName = company?.localizedName ?? company?.name ?? vanityName;
+
+    return { urn: `urn:li:organization:${orgId}`, displayName, orgId };
   }
 
   private extractPlainIdFromUrn(urn: string): number | null {

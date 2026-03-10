@@ -286,7 +286,7 @@ export class LinkedInToolExecutor {
       return {
         success: true,
         data: { resolved: false, vanityName },
-        summary: `No se pudo resolver el perfil "${vanityName}". El usuario puede proporcionar el URN directamente o usar el formato @[Nombre](urn:li:person:xxx) en el post.`,
+        summary: `No se pudo resolver el perfil "${vanityName}". El usuario puede proporcionar el URN directamente o usar el formato @[Nombre](urn:li:member:xxx) en el post.`,
       };
     }
 

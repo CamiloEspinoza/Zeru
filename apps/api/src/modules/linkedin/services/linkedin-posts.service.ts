@@ -199,6 +199,36 @@ export class LinkedInPostsService {
     return processed;
   }
 
+  /**
+   * Escapes reserved characters for LinkedIn API (Little Text Format).
+   * Parentheses () in plain text cause truncation — they must be escaped as \( and \).
+   * Parentheses inside mentions @[Name](urn:...) must NOT be escaped.
+   */
+  private escapeLinkedInCommentary(commentary: string): string {
+    const mentionPattern = /@\[[^\]]*\]\(urn:[^)]+\)/g;
+    const parts: string[] = [];
+    let lastIndex = 0;
+    let match;
+    // eslint-disable-next-line no-cond-assign
+    while ((match = mentionPattern.exec(commentary)) !== null) {
+      const before = commentary
+        .slice(lastIndex, match.index)
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)');
+      parts.push(before);
+      parts.push(match[0]);
+      lastIndex = match.index + match[0].length;
+    }
+    const after = commentary
+      .slice(lastIndex)
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)');
+    parts.push(after);
+    return parts.join('');
+  }
+
   async publish(tenantId: string, postId: string): Promise<void> {
     const post = await this.prisma.linkedInPost.findFirst({
       where: { id: postId, tenantId },
@@ -207,7 +237,8 @@ export class LinkedInPostsService {
     if (post.status === 'PUBLISHED') return;
 
     try {
-      const processedContent = await this.processCommentaryMentions(tenantId, post.content);
+      const withMentions = await this.processCommentaryMentions(tenantId, post.content);
+      const processedContent = this.escapeLinkedInCommentary(withMentions);
       let result: { postId: string | null };
 
       if (post.mediaType === 'IMAGE' && post.imageS3Key) {
@@ -361,7 +392,7 @@ export class LinkedInPostsService {
     return config;
   }
 
-  async updateConfig(tenantId: string, data: { autoPublish?: boolean; defaultVisibility?: string; contentPillars?: string[] }) {
+  async updateConfig(tenantId: string, data: { autoPublish?: boolean; defaultVisibility?: string; contentPillars?: string[]; organizationUrn?: string }) {
     await this.getOrCreateConfig(tenantId);
     return this.prisma.linkedInAgentConfig.update({
       where: { tenantId },
@@ -369,6 +400,7 @@ export class LinkedInPostsService {
         ...(data.autoPublish !== undefined ? { autoPublish: data.autoPublish } : {}),
         ...(data.defaultVisibility ? { defaultVisibility: data.defaultVisibility } : {}),
         ...(data.contentPillars ? { contentPillars: data.contentPillars } : {}),
+        ...(data.organizationUrn !== undefined ? { organizationUrn: data.organizationUrn } : {}),
       },
     });
   }

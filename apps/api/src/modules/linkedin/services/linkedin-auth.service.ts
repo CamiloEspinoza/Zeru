@@ -34,6 +34,14 @@ export class LinkedInAuthService {
     return this.config.getOrThrow<string>('LINKEDIN_CLIENT_SECRET');
   }
 
+  private get communityClientId() {
+    return this.config.getOrThrow<string>('LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_ID');
+  }
+
+  private get communityClientSecret() {
+    return this.config.getOrThrow<string>('LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_SECRET');
+  }
+
   private get redirectUri() {
     const webPort = this.config.get('WEB_PORT', '3027');
     const nodeEnv = this.config.get('NODE_ENV', 'development');
@@ -43,18 +51,18 @@ export class LinkedInAuthService {
     return `http://localhost:${webPort}/oauth-linkedin-redirect`;
   }
 
-  private signState(tenantId: string): string {
+  private signState(payload: string): string {
     const secret = this.config.get('JWT_SECRET', 'change-me');
-    return createHmac('sha256', secret).update(tenantId).digest('hex').slice(0, 16) + ':' + tenantId;
+    return createHmac('sha256', secret).update(payload).digest('hex').slice(0, 16) + ':' + payload;
   }
 
   private verifyState(state: string): string {
     const parts = state.split(':');
     if (parts.length < 2) throw new BadRequestException('Estado OAuth inválido');
-    const tenantId = parts.slice(1).join(':');
-    const expected = this.signState(tenantId).split(':')[0];
+    const payload = parts.slice(1).join(':');
+    const expected = this.signState(payload).split(':')[0];
     if (parts[0] !== expected) throw new UnauthorizedException('Estado OAuth no válido');
-    return tenantId;
+    return payload;
   }
 
   getAuthUrl(tenantId: string): string {
@@ -67,6 +75,118 @@ export class LinkedInAuthService {
       scope: 'openid profile w_member_social',
     });
     return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  }
+
+  getCommunityAuthUrl(tenantId: string): string {
+    const state = this.signState(`cm:${tenantId}`);
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.communityClientId,
+      redirect_uri: this.redirectUri,
+      state,
+      scope: 'r_organization_followers',
+    });
+    return `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+  }
+
+  async handleCommunityCallback(code: string, state: string): Promise<{ tenantId: string }> {
+    const payload = this.verifyState(state);
+    if (!payload.startsWith('cm:')) throw new BadRequestException('Estado OAuth inválido para Community Management');
+    const tenantId = payload.slice(3);
+
+    const tokenResponse = await fetch(LINKEDIN_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: this.redirectUri,
+        client_id: this.communityClientId,
+        client_secret: this.communityClientSecret,
+      }).toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const err = await tokenResponse.text();
+      this.logger.error('LinkedIn community token exchange failed', err);
+      throw new BadRequestException('Error al obtener token de Community Management');
+    }
+
+    const tokenData = await tokenResponse.json() as {
+      access_token: string;
+      expires_in: number;
+      refresh_token?: string;
+    };
+
+    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+    await this.prisma.linkedInConnection.update({
+      where: { tenantId },
+      data: {
+        communityAccessToken: this.encryption.encrypt(tokenData.access_token),
+        communityRefreshToken: tokenData.refresh_token ? this.encryption.encrypt(tokenData.refresh_token) : null,
+        communityExpiresAt: expiresAt,
+      },
+    });
+
+    return { tenantId };
+  }
+
+  async getDecryptedCommunityToken(tenantId: string): Promise<string | null> {
+    const connection = await this.prisma.linkedInConnection.findUnique({ where: { tenantId } });
+    if (!connection?.communityAccessToken) return null;
+    if (connection.communityExpiresAt && connection.communityExpiresAt < new Date()) {
+      if (connection.communityRefreshToken) {
+        return this.refreshCommunityToken(tenantId, connection.communityRefreshToken);
+      }
+      return null;
+    }
+    return this.encryption.decrypt(connection.communityAccessToken);
+  }
+
+  async hasCommunityConnection(tenantId: string): Promise<boolean> {
+    const connection = await this.prisma.linkedInConnection.findUnique({ where: { tenantId } });
+    return !!connection?.communityAccessToken;
+  }
+
+  async disconnectCommunity(tenantId: string): Promise<void> {
+    await this.prisma.linkedInConnection.update({
+      where: { tenantId },
+      data: {
+        communityAccessToken: null,
+        communityRefreshToken: null,
+        communityExpiresAt: null,
+      },
+    });
+  }
+
+  private async refreshCommunityToken(tenantId: string, encryptedRefreshToken: string): Promise<string | null> {
+    try {
+      const refreshToken = this.encryption.decrypt(encryptedRefreshToken);
+      const response = await fetch(LINKEDIN_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: this.communityClientId,
+          client_secret: this.communityClientSecret,
+        }).toString(),
+      });
+      if (!response.ok) return null;
+      const data = await response.json() as { access_token: string; expires_in: number; refresh_token?: string };
+      await this.prisma.linkedInConnection.update({
+        where: { tenantId },
+        data: {
+          communityAccessToken: this.encryption.encrypt(data.access_token),
+          communityExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+          ...(data.refresh_token ? { communityRefreshToken: this.encryption.encrypt(data.refresh_token) } : {}),
+        },
+      });
+      return data.access_token;
+    } catch {
+      return null;
+    }
   }
 
   async handleCallback(code: string, state: string): Promise<LinkedInConnectionInfo> {

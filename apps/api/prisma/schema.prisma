@@ -608,6 +608,10 @@ model LinkedInConnection {
   profileImage  String?
   /// Cookie li_at encriptada — necesaria para Voyager API (menciones a personas)
   liAtCookie    String?
+  /// Token de la app Community Management (r_organization_followers) — encriptado
+  communityAccessToken  String?
+  communityRefreshToken String?
+  communityExpiresAt    DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -663,6 +667,8 @@ model LinkedInAgentConfig {
   defaultVisibility String   @default("PUBLIC")
   /// Pilares de contenido configurados: ["thought-leadership", "tips", ...]
   contentPillars    Json?
+  /// URN de la organización para People Typeahead API — urn:li:organization:xxx
+  organizationUrn   String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

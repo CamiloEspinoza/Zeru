@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "pnpm run ensure-infra && turbo dev",
+    "ensure-infra": "bash scripts/ensure-infra.sh",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
