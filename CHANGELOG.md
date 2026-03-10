@@ -1,3 +1,10 @@
+## [0.3.3](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.2...v0.3.3) (2026-03-10)
+
+
+### Bug Fixes
+
+* wrap useSearchParams in Suspense on oauth-linkedin-redirect page ([c61ab47](https://github.com/CamiloEspinoza/Zeru/commit/c61ab474fa0142c3835bf59a2cce5db29e9d0c55))
+
 ## [0.3.2](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.1...v0.3.2) (2026-03-10)
 
 
