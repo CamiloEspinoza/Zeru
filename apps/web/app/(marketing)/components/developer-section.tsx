@@ -170,7 +170,7 @@ export function DeveloperSection() {
           <div className="lg:col-span-2 space-y-5">
             {/* Quote */}
             <div className="rounded-2xl border border-teal-500/20 bg-teal-500/5 p-6 fade-in-up" style={{ animationDelay: "100ms" }}>
-              <div className="text-teal-500/40 text-5xl font-serif leading-none mb-2">"</div>
+              <div className="text-teal-500/40 text-5xl font-serif leading-none mb-2">&ldquo;</div>
               <blockquote className="text-white/80 text-sm leading-relaxed font-medium italic">
                 La tecnología que no cambia comportamientos solo automatiza el
                 pasado.

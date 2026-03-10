@@ -317,7 +317,6 @@ export class ZeruMcpService {
   async handleSse(req: Request, res: Response): Promise<void> {
     const auth = await this.authenticateRequest(req);
     const server = this.buildServer(auth ?? undefined);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const transport = new SSEServerTransport('/api/mcp/messages', res as any);
     const sessionId = transport.sessionId;
     this.transports.set(sessionId, transport);
@@ -348,7 +347,6 @@ export class ZeruMcpService {
     }
 
     const transport = this.transports.get(sessionId)!;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await transport.handlePostMessage(req as any, res as any, (req as any).body);
   }
 }

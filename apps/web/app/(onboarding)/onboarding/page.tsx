@@ -35,7 +35,7 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
-  const [stepsDone, setStepsDone] = useState({ ai: false, storage: false });
+  const [, setStepsDone] = useState({ ai: false, storage: false });
   const [completing, setCompleting] = useState(false);
 
   useEffect(() => {

@@ -53,21 +53,21 @@ function OrgBadge({ role }: { role: UserRole }) {
 }
 
 /** Countdown hook — returns remaining seconds. */
+function computeRemaining(expiresAt: string | null) {
+  if (!expiresAt) return 0;
+  return Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
+}
+
 function useCountdown(expiresAt: string | null) {
-  const [remaining, setRemaining] = useState(0);
+  const [remaining, setRemaining] = useState(() => computeRemaining(expiresAt));
 
   useEffect(() => {
     if (!expiresAt) return;
     const id = setInterval(() => {
-      const diff = Math.max(
-        0,
-        Math.floor((new Date(expiresAt!).getTime() - Date.now()) / 1000),
-      );
+      const diff = computeRemaining(expiresAt);
       setRemaining(diff);
       if (diff <= 0) clearInterval(id);
     }, 1000);
-    // Compute initial value synchronously
-    setRemaining(Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000)));
     return () => clearInterval(id);
   }, [expiresAt]);
 

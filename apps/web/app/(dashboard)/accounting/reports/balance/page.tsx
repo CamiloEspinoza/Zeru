@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -63,7 +63,7 @@ function TrialBalancePageContent() {
         }
       })
       .catch((err) => setError(err.message ?? "Error al cargar períodos"));
-  }, [tenant?.id]);
+  }, [tenant?.id, periodId, setFilter]);
 
   // Fetch report whenever periodId changes
   const lastFetchRef = useRef<string | null>(null);
@@ -75,13 +75,15 @@ function TrialBalancePageContent() {
     if (lastFetchRef.current === periodId) return;
     lastFetchRef.current = periodId;
 
-    setLoading(true);
-    setError(null);
-    api
-      .get<TrialBalanceRow[]>(
-        `/accounting/reports/trial-balance?fiscalPeriodId=${periodId}`,
-        { tenantId }
-      )
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        return api.get<TrialBalanceRow[]>(
+          `/accounting/reports/trial-balance?fiscalPeriodId=${periodId}`,
+          { tenantId }
+        );
+      })
       .then(setData)
       .catch((err) => setError(err.message ?? "Error al cargar reporte"))
       .finally(() => setLoading(false));

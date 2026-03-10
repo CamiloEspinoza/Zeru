@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import {
-  API_KEY_SCOPES,
   API_KEY_SCOPE_LABELS,
   type ApiKey,
   type ApiKeyScope,
@@ -103,7 +102,7 @@ export default function ApiKeysPage() {
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const fetchKeys = async () => {
+  const fetchKeys = useCallback(async () => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
     if (!tenantId) return;
     setLoading(true);
@@ -116,11 +115,11 @@ export default function ApiKeysPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenant?.id]);
 
   useEffect(() => {
-    fetchKeys();
-  }, [tenant?.id]);
+    Promise.resolve().then(fetchKeys);
+  }, [fetchKeys]);
 
   const toggleScope = (scope: ApiKeyScope) => {
     setSelectedScopes((prev) => {

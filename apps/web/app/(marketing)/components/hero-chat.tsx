@@ -9,15 +9,7 @@ const THINKING_TEXT =
 const TYPEWRITER_DURATION = THINKING_TEXT.length * 28;
 const CYCLE_PAUSE = 3500; // pause at the end before resetting
 
-const STEPS = [
-  "user-message",
-  "thinking",
-  "tool",
-  "assistant-response",
-  "approval-card",
-] as const;
-
-type Step = (typeof STEPS)[number];
+type Step = "user-message" | "thinking" | "tool" | "assistant-response" | "approval-card";
 
 function useChatCycle() {
   const [visible, setVisible] = useState<Set<Step>>(new Set());

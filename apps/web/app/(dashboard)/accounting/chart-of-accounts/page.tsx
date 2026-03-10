@@ -43,7 +43,7 @@ export default function ChartOfAccountsPage() {
   useEffect(() => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
     if (!tenantId) {
-      setLoading(false);
+      Promise.resolve().then(() => setLoading(false));
       return;
     }
 

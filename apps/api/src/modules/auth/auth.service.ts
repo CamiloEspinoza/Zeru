@@ -290,12 +290,10 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: (this.config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: (this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d') as any,
     });
 

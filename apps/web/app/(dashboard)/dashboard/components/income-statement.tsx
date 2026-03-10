@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, Fragment } from "react";
-import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -19,13 +18,9 @@ import {
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
-import type {
-  IncomeStatementRow,
-  IncomeStatementEntryRow,
-  AccountIFRSSection,
-} from "@zeru/shared";
+import type { AccountIFRSSection } from "@zeru/shared";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowRight01Icon, Loading02Icon } from "@hugeicons/core-free-icons";
+import { Loading02Icon } from "@hugeicons/core-free-icons";
 import { downloadExcel } from "@/lib/export-excel";
 import { cn } from "@/lib/utils";
 
@@ -155,80 +150,6 @@ function sectionTotalAll(nodes: AccountNodeMulti[]): number {
   return nodes.reduce((s, n) => s + n.balances.reduce((a, b) => a + b, 0), 0);
 }
 
-// ─── Entry subtable ───────────────────────────────────────────────
-
-function EntrySubtable({
-  accountId,
-  fiscalPeriodId,
-  tenantId,
-}: {
-  accountId: string;
-  fiscalPeriodId: string;
-  tenantId: string;
-}) {
-  const [rows, setRows] = useState<IncomeStatementEntryRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    api
-      .get<IncomeStatementEntryRow[]>(
-        `/accounting/reports/income-statement/account-entries?accountId=${accountId}&fiscalPeriodId=${fiscalPeriodId}`,
-        { tenantId }
-      )
-      .then(setRows)
-      .finally(() => setLoading(false));
-  }, [accountId, fiscalPeriodId, tenantId]);
-
-  if (loading)
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-        <HugeiconsIcon icon={Loading02Icon} className="size-3 animate-spin" />
-        Cargando...
-      </div>
-    );
-  if (rows.length === 0)
-    return <p className="px-3 py-2 text-xs text-muted-foreground">Sin movimientos.</p>;
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b text-muted-foreground">
-            <th className="text-left py-1.5 px-3 font-medium">Fecha</th>
-            <th className="text-left py-1.5 px-3 font-medium">Asiento</th>
-            <th className="text-left py-1.5 px-3 font-medium">Descripción</th>
-            <th className="text-right py-1.5 px-3 font-medium">Debe</th>
-            <th className="text-right py-1.5 px-3 font-medium">Haber</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
-              <td className="py-1.5 px-3">
-                {new Date(row.entry_date).toLocaleDateString("es-CL")}
-              </td>
-              <td className="py-1.5 px-3">
-                <Link
-                  href={`/accounting/journal/${row.journal_entry_id}`}
-                  className="text-primary underline-offset-2 hover:underline"
-                >
-                  #{row.entry_number}
-                </Link>
-              </td>
-              <td className="py-1.5 px-3 max-w-[200px] truncate">{row.description}</td>
-              <td className="py-1.5 px-3 text-right tabular-nums">
-                {parseFloat(row.debit) > 0 ? formatCLP(parseFloat(row.debit)) : "—"}
-              </td>
-              <td className="py-1.5 px-3 text-right tabular-nums">
-                {parseFloat(row.credit) > 0 ? formatCLP(parseFloat(row.credit)) : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 // ─── Year options ─────────────────────────────────────────────────
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -267,7 +188,7 @@ export function IncomeStatement() {
       .finally(() => setLoading(false));
   }, [tenantId, year]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { Promise.resolve().then(load); }, [load]);
 
   const periodCount = data?.periods.length ?? 0;
   const tree = data ? buildTreeMulti(data.rows, periodCount) : [];
@@ -294,10 +215,6 @@ export function IncomeStatement() {
       if (sec.key === upToSectionKey) break;
     }
     return totals;
-  }
-
-  function computeRunningTotal(upToSectionKey: AccountIFRSSection): number {
-    return computeRunningTotals(upToSectionKey).reduce((a, b) => a + b, 0);
   }
 
   // ── Excel export ──

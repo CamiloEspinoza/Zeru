@@ -19,7 +19,6 @@ import { AiModule } from '../ai/ai.module';
       useFactory: (config: ConfigService): JwtModuleOptions => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           expiresIn: (config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
         },
       }),

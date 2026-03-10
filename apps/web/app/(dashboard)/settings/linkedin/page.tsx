@@ -24,7 +24,7 @@ const DEFAULT_PILLARS = ["thought-leadership", "tips", "case-study", "industry-n
 
 export default function LinkedInSettingsPage() {
   const [connection, setConnection] = useState<LinkedInConnectionInfo | null>(null);
-  const [config, setConfig] = useState<LinkedInConfig | null>(null);
+  const [, setConfig] = useState<LinkedInConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);

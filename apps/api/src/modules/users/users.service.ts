@@ -16,7 +16,7 @@ const userSelect = {
   updatedAt: true,
 } as const;
 
-const membershipSelect = {
+const _membershipSelect = {
   id: true,
   role: true,
   isActive: true,
@@ -90,7 +90,7 @@ export class UsersService {
     const tenantName = tenant?.name ?? 'tu organización';
 
     // Si el usuario ya existe, solo crear membresía
-    let user = await this.prisma.user.findUnique({ where: { email: data.email } });
+    const user = await this.prisma.user.findUnique({ where: { email: data.email } });
 
     if (user) {
       const existing = await this.prisma.userTenant.findUnique({

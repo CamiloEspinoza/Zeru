@@ -155,7 +155,7 @@ export function StorageConfigForm({
         }
       }, 800);
     },
-    [onConfigured],
+    [onConfigured, config.hasCredentials],
   );
 
   const triggerValidation = (overrides: Partial<{

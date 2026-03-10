@@ -209,7 +209,6 @@ export class LinkedInPostsService {
     const parts: string[] = [];
     let lastIndex = 0;
     let match;
-    // eslint-disable-next-line no-cond-assign
     while ((match = mentionPattern.exec(commentary)) !== null) {
       const before = commentary
         .slice(lastIndex, match.index)
@@ -271,7 +270,6 @@ export class LinkedInPostsService {
 
   private async uploadImageFromS3(tenantId: string, s3Key: string, _mediaUrl?: string | null): Promise<string> {
     const { GetObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
-    const { ConfigService } = await import('@nestjs/config');
 
     // Re-download from S3 (we have credentials in env)
     const client = new S3Client({

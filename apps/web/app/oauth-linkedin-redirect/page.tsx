@@ -1,31 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
 
 export default function LinkedInOAuthRedirect() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [errorMessage, setErrorMessage] = useState("");
+
+  const code = searchParams.get("code");
+  const state = searchParams.get("state");
+  const urlError = searchParams.get("error");
+
+  const validationError = useMemo(() => {
+    if (urlError) return searchParams.get("error_description") ?? "Autorización denegada por LinkedIn";
+    if (!code || !state) return "Parámetros inválidos en la respuesta de LinkedIn";
+    return null;
+  }, [urlError, code, state, searchParams]);
+
+  const [apiResult, setApiResult] = useState<{ status: "loading" | "success" | "error"; error: string }>({
+    status: "loading",
+    error: "",
+  });
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const state = searchParams.get("state");
-    const error = searchParams.get("error");
-
-    if (error) {
-      setErrorMessage(searchParams.get("error_description") ?? "Autorización denegada por LinkedIn");
-      setStatus("error");
-      return;
-    }
-
-    if (!code || !state) {
-      setErrorMessage("Parámetros inválidos en la respuesta de LinkedIn");
-      setStatus("error");
-      return;
-    }
+    if (validationError || !code || !state) return;
 
     const isCommunity = state.includes(":cm:");
     const endpoint = isCommunity ? "/linkedin/community/auth/callback" : "/linkedin/auth/callback";
@@ -33,14 +32,19 @@ export default function LinkedInOAuthRedirect() {
     api
       .post(endpoint, { code, state })
       .then(() => {
-        setStatus("success");
+        setApiResult({ status: "success", error: "" });
         setTimeout(() => router.replace("/settings/linkedin"), 1500);
       })
       .catch((err: unknown) => {
-        setErrorMessage(err instanceof Error ? err.message : "Error al conectar con LinkedIn");
-        setStatus("error");
+        setApiResult({
+          status: "error",
+          error: err instanceof Error ? err.message : "Error al conectar con LinkedIn",
+        });
       });
-  }, [searchParams, router]);
+  }, [validationError, code, state, router]);
+
+  const status = validationError ? "error" : apiResult.status;
+  const errorMessage = validationError ?? apiResult.error;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
