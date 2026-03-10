@@ -1,3 +1,10 @@
+## [0.3.1](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.0...v0.3.1) (2026-03-10)
+
+
+### Bug Fixes
+
+* pass empty body to api.post calls for linkedin publish/cancel ([70e5740](https://github.com/CamiloEspinoza/Zeru/commit/70e5740d2673c62f7b0ce65015fd4d2ae7eed2ed))
+
 # [0.3.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.2.0...v0.3.0) (2026-03-10)
 
 
