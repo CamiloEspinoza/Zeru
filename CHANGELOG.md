@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.3...v0.4.0) (2026-03-10)
+
+
+### Features
+
+* add openai developer docs mcp server ([3d31927](https://github.com/CamiloEspinoza/Zeru/commit/3d31927a16cc2e8a565b384a951fccae17c50629))
+
 ## [0.3.3](https://github.com/CamiloEspinoza/Zeru/compare/v0.3.2...v0.3.3) (2026-03-10)
 
 
