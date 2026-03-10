@@ -56,12 +56,67 @@ export class SkillsService {
 
   // ─── URL parsing ────────────────────────────────────────────────────────────
 
+  /**
+   * Normalises any supported skill input string into a canonical GitHub URL.
+   *
+   * Supported formats:
+   *   1. Full GitHub URL (with or without /tree/…):
+   *        https://github.com/owner/repo/tree/main/skill-path
+   *   2. npx skills add command:
+   *        npx skills add owner/repo@skill
+   *        npx skills add https://github.com/owner/repo --skill skillname
+   *   3. Short "owner/repo@skill" notation:
+   *        owner/repo@skill-path
+   *   4. Plain "owner/repo" (installs from repo root):
+   *        owner/repo
+   */
+  normalizeSkillInput(raw: string): string {
+    let input = raw.trim();
+
+    // Strip CLI prefix variations
+    for (const prefix of ['npx skills add ', 'skills add ']) {
+      if (input.startsWith(prefix)) {
+        input = input.slice(prefix.length).trim();
+        break;
+      }
+    }
+
+    // Handle "URL --skill skillname" flag form
+    // Mirrors the `npx skills` CLI: --skill value → skills/<value> subfolder
+    const skillFlagMatch = input.match(/^(.+?)\s+(?:--skill|-s)\s+(\S+)$/);
+    if (skillFlagMatch) {
+      const base = skillFlagMatch[1].trim().replace(/\/$/, '');
+      const rawSkillName = skillFlagMatch[2].trim();
+      // If value already has a slash it's a full path; otherwise use conventional skills/<name>
+      const skillPath = rawSkillName.includes('/')
+        ? rawSkillName
+        : `skills/${rawSkillName}`;
+      const baseUrl = base.startsWith('http')
+        ? base
+        : `https://github.com/${base}`;
+      return `${baseUrl}/tree/main/${skillPath}`;
+    }
+
+    // Handle "owner/repo@skill" shorthand (possibly without https://)
+    const atMatch = input.match(/^([^@:/]+\/[^@:/]+)@(.+)$/);
+    if (atMatch) {
+      return `https://github.com/${atMatch[1]}/tree/main/${atMatch[2]}`;
+    }
+
+    // Ensure full URL for bare "owner/repo" or "owner/repo/tree/…"
+    if (!input.startsWith('http') && /^[^/]+\/[^/]/.test(input)) {
+      return `https://github.com/${input}`;
+    }
+
+    return input;
+  }
+
   parseGitHubUrl(rawUrl: string): ParsedGitHubUrl {
+    const normalized = this.normalizeSkillInput(rawUrl);
+
     let url: URL;
     try {
-      url = new URL(
-        rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`,
-      );
+      url = new URL(normalized);
     } catch {
       throw new BadRequestException(`URL inválida: ${rawUrl}`);
     }
@@ -249,8 +304,8 @@ export class SkillsService {
   // ─── CRUD ───────────────────────────────────────────────────────────────────
 
   async install(tenantId: string, repoUrl: string) {
-    // Normalise URL (strip trailing slash)
-    const normalizedUrl = repoUrl.trim().replace(/\/$/, '');
+    // Normalise URL (parse CLI commands, shorthands, strip trailing slash)
+    const normalizedUrl = this.normalizeSkillInput(repoUrl).replace(/\/$/, '');
 
     // Check for duplicates
     const existing = await this.prisma.agentSkill.findUnique({
@@ -288,6 +343,35 @@ export class SkillsService {
     });
 
     return skill;
+  }
+
+  /**
+   * Installs a skill directly from content (no GitHub fetch needed).
+   * Used for bundled/default skills.
+   */
+  async installFromContent(tenantId: string, params: {
+    name: string;
+    description: string;
+    repoUrl: string;
+    content: string;
+    version?: string;
+  }) {
+    const existing = await this.prisma.agentSkill.findUnique({
+      where: { tenantId_repoUrl: { tenantId, repoUrl: params.repoUrl } },
+    });
+    if (existing) return existing;
+
+    return this.prisma.agentSkill.create({
+      data: {
+        tenantId,
+        repoUrl: params.repoUrl,
+        name: params.name,
+        description: params.description,
+        version: params.version ?? '1.0.0',
+        content: params.content,
+        isActive: true,
+      },
+    });
   }
 
   async list(tenantId: string) {
@@ -356,52 +440,46 @@ export class SkillsService {
 
   // ─── Prompt & tool helpers ──────────────────────────────────────────────────
 
-  /** Returns the system prompt block with all active skills for a tenant */
+  /**
+   * Returns only the skill index for the system prompt: name + description per skill.
+   * Full instructions are loaded on demand via get_skill_reference (progressive disclosure).
+   */
   async getActiveSkillsPrompt(tenantId: string): Promise<string> {
     const skills = await this.prisma.agentSkill.findMany({
       where: { tenantId, isActive: true },
-      include: { files: { select: { path: true } } },
+      select: { name: true, description: true },
       orderBy: { createdAt: 'asc' },
     });
 
     if (skills.length === 0) return '';
 
-    const blocks = skills.map((skill) => {
-      const refList =
-        skill.files.length > 0
-          ? [
-              '### Archivos de referencia disponibles',
-              `Usa get_skill_reference con skill_name="${skill.name}" y la ruta del archivo para cargar:`,
-              ...skill.files.map((f) => `- ${f.path}`),
-              '',
-            ].join('\n')
-          : '';
+    const lines = skills.map(
+      (s) => `- **${s.name}**: ${s.description ?? ''}`,
+    );
 
-      return [
-        `## Skill: ${skill.name}`,
-        skill.description ? skill.description : '',
-        '',
-        refList,
-        '### Instrucciones',
-        skill.content,
-      ]
-        .join('\n')
-        .trim();
-    });
-
-    return blocks.join('\n\n---\n\n');
+    return [
+      'Tienes acceso a los siguientes skills especializados.',
+      'Cuando necesites usar uno, llama primero a `get_skill_reference` con solo `skill_name` para cargar sus instrucciones completas.',
+      'Si el skill tiene archivos de referencia, también puedes cargarlos con `get_skill_reference` indicando `file_path`.',
+      '',
+      ...lines,
+    ].join('\n');
   }
 
-  /** Returns the content of a specific reference file for a skill */
+  /**
+   * Returns the content of a skill.
+   * - Without file_path: returns the full SKILL.md instructions (main use case).
+   * - With file_path: returns a specific references/ or scripts/ file.
+   */
   async getSkillReference(
     tenantId: string,
     skillName: string,
-    filePath: string,
+    filePath?: string,
   ): Promise<string> {
     const skill = await this.prisma.agentSkill.findFirst({
       where: { tenantId, name: skillName, isActive: true },
       include: {
-        files: { where: { path: filePath } },
+        files: filePath ? { where: { path: filePath } } : false,
       },
     });
 
@@ -409,10 +487,17 @@ export class SkillsService {
       return `Error: No se encontró un skill activo con nombre "${skillName}"`;
     }
 
-    if (skill.files.length === 0) {
+    // No file_path → return full SKILL.md content
+    if (!filePath) {
+      return skill.content;
+    }
+
+    // With file_path → return specific reference file
+    const files = (skill as typeof skill & { files?: { content: string }[] }).files ?? [];
+    if (files.length === 0) {
       return `Error: El skill "${skillName}" no tiene un archivo en la ruta "${filePath}"`;
     }
 
-    return skill.files[0].content;
+    return files[0].content;
   }
 }

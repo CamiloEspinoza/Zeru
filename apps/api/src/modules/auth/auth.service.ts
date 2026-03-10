@@ -121,14 +121,12 @@ export class AuthService {
       throw new UnauthorizedException('Código incorrecto');
     }
 
-    // Marcar como usado e incrementar intentos en una sola operación
-    await this.prisma.loginCode.update({
-      where: { id: loginCode.id },
-      data: { attempts: { increment: 1 }, usedAt: new Date() },
-    });
-
-    // Si se proporcionó tenantId, hacer login directo
+    // Si se proporcionó tenantId, marcar como usado y hacer login directo
     if (tenantId) {
+      await this.prisma.loginCode.update({
+        where: { id: loginCode.id },
+        data: { attempts: { increment: 1 }, usedAt: new Date() },
+      });
       return this.loginByEmail(email, tenantId);
     }
 
@@ -154,6 +152,11 @@ export class AuthService {
     }
 
     if (activeMemberships.length === 1) {
+      // Solo marcar como usado cuando el login se completa efectivamente
+      await this.prisma.loginCode.update({
+        where: { id: loginCode.id },
+        data: { attempts: { increment: 1 }, usedAt: new Date() },
+      });
       const m = activeMemberships[0];
       return this.login({
         id: user.id,
@@ -164,6 +167,7 @@ export class AuthService {
       });
     }
 
+    // Múltiples tenants: NO marcar como usado aún, se marcará cuando el usuario seleccione uno
     return {
       requiresTenantSelection: true as const,
       tenants: activeMemberships.map((m) => ({
@@ -286,12 +290,10 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: (this.config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expiresIn: (this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d') as any,
     });
 

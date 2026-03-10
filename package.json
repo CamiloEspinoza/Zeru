@@ -1,9 +1,15 @@
 {
   "name": "zeru",
+  "version": "0.2.0",
   "private": true,
   "packageManager": "pnpm@9.15.4",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CamiloEspinoza/Zeru.git"
+  },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "pnpm run ensure-infra && turbo dev",
+    "ensure-infra": "bash scripts/ensure-infra.sh",
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
@@ -11,9 +17,22 @@
     "db:migrate": "turbo db:migrate",
     "db:reset": "turbo db:reset",
     "db:seed": "turbo db:seed",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "prepare": "husky",
+    "release": "semantic-release",
+    "release:dry": "semantic-release --dry-run",
+    "commitlint": "commitlint --edit",
+    "release:branch": "bash scripts/create-release-branch.sh"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.0",
+    "husky": "^9.1.7",
+    "semantic-release": "^24.2.0",
     "turbo": "^2.8.11"
   }
 }

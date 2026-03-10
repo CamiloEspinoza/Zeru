@@ -1,0 +1,31 @@
+/** @type {import('@commitlint/types').UserConfig} */
+const CONVENTIONAL_HEADER = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?:\s+.+/;
+
+module.exports = {
+  extends: ['@commitlint/config-conventional'],
+  rules: {
+    'header-max-length': [2, 'always', 100],
+    'body-max-line-length': [2, 'always', 200],
+    'type-enum': [
+      2,
+      'always',
+      [
+        'feat',
+        'fix',
+        'docs',
+        'style',
+        'refactor',
+        'perf',
+        'test',
+        'build',
+        'ci',
+        'chore',
+        'revert',
+      ],
+    ],
+  },
+  ignores: [(commit) => {
+    const header = commit.split('\n')[0];
+    return !CONVENTIONAL_HEADER.test(header);
+  }],
+};

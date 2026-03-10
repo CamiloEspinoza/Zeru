@@ -11,9 +11,10 @@ ${BASE_URL}/api
 Todas las rutas de la API pública usan el prefijo /api/v1/.
 
 ## Autenticación
-Cada petición requiere dos headers:
+Cada petición requiere el header:
 - Authorization: Bearer zk_<tu_api_key>
-- X-Tenant-Id: <uuid_de_tu_organización>
+
+La organización (tenant) se resuelve automáticamente a partir de la API key.
 
 ## Formato de respuesta
 - Listas: { object: "list", data: [...], total: number, has_more: boolean }
@@ -27,11 +28,15 @@ Cada petición requiere dos headers:
 - /api/v1/reports/general-ledger — Libro mayor por cuenta
 - /api/v1/reports/income-statement — Estado de resultados IFRS
 
+## Integración MCP (Model Context Protocol)
+Zeru expone un servidor MCP en /api/mcp/sse que permite a agentes de IA operar la contabilidad directamente.
+- Sin API key: solo herramientas de documentación (list_endpoints, get_docs).
+- Con API key (header Authorization): herramientas operacionales según los scopes de la key (list_accounts, create_journal_entry, post_journal_entry, etc.).
+
 ## Inicio rápido
 1. Genera una API key desde Configuración → API Keys en la app de Zeru.
-2. Copia tu Tenant ID desde Configuración → Organización.
-3. Llama a ${BASE_URL}/api/v1/fiscal-periods para obtener los períodos activos.
-4. Usa el fiscalPeriodId de un período OPEN para crear asientos.`,
+2. Llama a GET /api/v1/fiscal-periods para obtener los períodos activos.
+3. Usa el fiscalPeriodId de un período OPEN para crear asientos.`,
 
   authentication: `# Autenticación
 
@@ -41,13 +46,13 @@ La API de Zeru usa API keys para autenticar las peticiones.
 | Header | Valor | Descripción |
 |--------|-------|-------------|
 | Authorization | Bearer zk_... | Tu API key completa |
-| X-Tenant-Id | uuid | UUID de tu organización |
+
+El tenant se resuelve automáticamente a partir de la API key. No es necesario enviar X-Tenant-Id.
 
 ## Ejemplo
 \`\`\`bash
 curl ${BASE_URL}/api/v1/accounts \\
-  -H "Authorization: Bearer zk_your_api_key_here" \\
-  -H "X-Tenant-Id: 8a3f1b2c-..."
+  -H "Authorization: Bearer zk_your_api_key_here"
 \`\`\`
 
 ## Scopes disponibles

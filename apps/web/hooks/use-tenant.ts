@@ -29,18 +29,17 @@ export function useTenant() {
   useEffect(() => {
     const tenantId = localStorage.getItem("tenantId");
 
-    // En rutas del dashboard sin tenantId: limpiar sesión y enviar a login
     const isDashboard = pathname?.startsWith("/dashboard") ?? false;
     if (isDashboard && !tenantId) {
       clearTenantFromStorage();
       clearAuthFromStorage();
-      setLoading(false);
+      Promise.resolve().then(() => setLoading(false));
       router.replace("/login");
       return;
     }
 
     if (!tenantId) {
-      setLoading(false);
+      Promise.resolve().then(() => setLoading(false));
       return;
     }
 

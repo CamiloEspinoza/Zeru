@@ -316,22 +316,17 @@ function RegisterForm() {
 
 function RegisterPageContent() {
   const searchParams = useSearchParams();
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+
+  const urlToken = searchParams.get("token");
+  const storedToken = typeof window !== "undefined" ? localStorage.getItem(REGISTER_TOKEN_KEY) : null;
+  const token = urlToken ?? storedToken;
+  const hasAccess = Boolean(VALID_TOKEN && token === VALID_TOKEN);
 
   useEffect(() => {
-    const urlToken = searchParams.get("token");
-    const storedToken = localStorage.getItem(REGISTER_TOKEN_KEY);
-    const token = urlToken ?? storedToken;
-    const valid = Boolean(VALID_TOKEN && token === VALID_TOKEN);
-
-    if (valid && urlToken) {
+    if (hasAccess && urlToken) {
       localStorage.setItem(REGISTER_TOKEN_KEY, urlToken);
     }
-
-    setHasAccess(valid);
-  }, [searchParams]);
-
-  if (hasAccess === null) return null;
+  }, [hasAccess, urlToken]);
 
   return (
     <AuthShell>

@@ -7,7 +7,7 @@ import { MemoryService } from './memory.service';
 import { SkillsService } from './skills.service';
 import { ActiveStreamsRegistry } from './active-streams.registry';
 import { ToolExecutor } from '../tools/tool-executor';
-import { ACCOUNTING_TOOLS, TOOL_LABELS } from '../tools/accounting-tools';
+import { UNIFIED_TOOLS, TOOL_LABELS } from '../tools/accounting-tools';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FilesService } from '../../files/files.service';
 import type { ChatEvent, QuestionPayload } from '@zeru/shared';
@@ -49,6 +49,10 @@ Debes llamar a **ask_user_question** en estos casos (y no avanzar sin la respues
 - **Cuando el usuario pida crear algo sin especificar detalles:** Un solo ask_user_question puede incluir varias decisiones (período + tipo de asiento) con opciones para cada una.
 
 Formato: pregunta clara, options con id y label (mínimo 2), allowFreeText true si puede haber respuesta libre. No inventes respuestas: si falta dato, pregunta.
+
+**NUNCA uses ask_user_question para posts de LinkedIn.** La UI tiene su propio mecanismo de aprobación (PostPreviewCard). Llamar ask_user_question para posts genera preguntas duplicadas visibles al usuario. Solo usa ask_user_question para el módulo contable.
+
+⛔ Para LinkedIn posts: ni preguntas previas, ni mostrar borrador, ni pedir confirmación. Ve directo a generate_image → create_linkedin_post. El PostPreviewCard hace el resto.
 
 ## Extracción de datos a memoria
 
@@ -134,9 +138,11 @@ Las secciones disponibles (en orden IAS 1) son:
 
 ## Título de la conversación
 
-- Cuando entiendas con claridad de qué trata la conversación, llama a **update_conversation_title** con un título descriptivo (máximo 6 palabras, sin comillas, en el mismo idioma del usuario).
-- Puedes actualizarlo en cualquier momento si el tema de la conversación evoluciona o se vuelve más específico.
-- No es necesario esperar al final — llámalo en cuanto tengas contexto suficiente.
+**En conversaciones nuevas: llama a update_conversation_title como tu PRIMERA herramienta, antes de cualquier otra.** No esperes a terminar la tarea — con solo leer el mensaje del usuario ya tienes suficiente contexto para poner un título descriptivo.
+
+- Título: máximo 6 palabras, sin comillas, en el mismo idioma del usuario.
+- Si al avanzar la conversación el tema se vuelve más específico, actualiza el título con un nuevo llamado a update_conversation_title.
+- En conversaciones ya existentes (hay mensajes previos), actualiza el título solo si el tema cambia significativamente.
 
 ## Memoria persistente
 
@@ -159,7 +165,121 @@ Tienes acceso a una memoria que persiste entre conversaciones. Úsala activament
 - Cuando un dato guardado ya no aplica
 
 El contexto de la organización (scope=tenant) se comparte con todos los usuarios de la empresa.
-Las preferencias personales (scope=user) aplican solo al usuario actual.`;
+Las preferencias personales (scope=user) aplican solo al usuario actual.
+
+---
+
+# Uso de Skills especializados
+
+Cuando en el system prompt aparezca la sección "Skills disponibles", significa que el usuario ha instalado skills que amplían tus capacidades.
+
+**Regla obligatoria de progressive disclosure:**
+1. Los skills se listan solo con nombre y descripción para no saturar el contexto.
+2. Cuando detectes que un skill es relevante para la tarea del usuario, **llama PRIMERO a \`get_skill_reference(skill_name)\` sin file_path** para cargar sus instrucciones completas.
+3. Solo después de leer esas instrucciones, aplícalas en tu respuesta.
+4. Si el skill indica archivos en references/ o scripts/, cárgalos también con \`get_skill_reference(skill_name, file_path)\` cuando sean necesarios.
+
+Nunca inventes que conoces las instrucciones de un skill sin haberlas cargado con esa herramienta.
+
+---
+
+# Módulo: Marketing y Redes Sociales
+
+Además de la contabilidad, tienes capacidades completas para crear y gestionar contenido en redes sociales, comenzando con LinkedIn. Detecta automáticamente cuándo el usuario habla de posts, publicaciones, contenido o marketing — y usa las herramientas correspondientes.
+
+## Capacidades de social media
+
+- **Crear posts de LinkedIn**: Texto, con imágenes (generadas por Gemini o subidas por el usuario), o con artículos/URLs
+- **Programar publicaciones**: Una a la vez o calendarios completos de 30, 60, 90 días
+- **Generar imágenes con Gemini**: Usa model="flash" (Gemini 3.1 Flash, por defecto) o model="pro" (mayor calidad, si el usuario lo pide)
+- **Gestionar calendario**: Ver posts programados, cancelar, consultar historial
+- **Estrategia de contenido**: Definir pilares, frecuencia y mix de formatos
+
+## Flujo para crear posts de LinkedIn
+
+⚠️ **REGLA ABSOLUTA**: Al crear un post de LinkedIn, la única respuesta válida es ejecutar herramientas, NO hacer preguntas. El orden de tool calls es el único flujo permitido. Cualquier llamada a ask_user_question para un post de LinkedIn queda **terminantemente prohibida**.
+
+### Post inmediato — secuencia de tool calls (sin excepciones):
+**Paso 1 →** generate_image(prompt=..., model="flash") — SIEMPRE, salvo que el usuario haya adjuntado su propia imagen o haya dicho explícitamente "sin imagen".
+**Paso 2 →** create_linkedin_post(content=..., media_type="IMAGE", image_s3_key=..., media_url=...) — usando los datos del paso anterior.
+**FIN.** El sistema muestra automáticamente un PostPreviewCard con botones Publicar / Programar / Cancelar. El usuario decide desde ahí. **No hay paso 3. No llames a ask_user_question. No preguntes "¿Lo publico?". No muestres el borrador manualmente. Solo ejecuta las herramientas.**
+
+### Calendario de contenido:
+1. Consulta los pilares con get_content_pillars
+2. Define cadencia (ej: 3 posts/día = mañana, mediodía, noche)
+3. Genera posts distribuyendo pilares de forma equilibrada
+4. Para cada post del calendario, genera primero la imagen con generate_image antes de llamar a bulk_schedule_posts
+5. Usa bulk_schedule_posts para programar todos de una vez
+6. Confirma el número de posts y muestra resumen por pilar
+
+### Post con imagen generada:
+1. Usa generate_image con un prompt detallado y profesional en inglés para mejores resultados
+2. Muestra la URL de la imagen al usuario
+3. Crea el post con media_type=IMAGE y los datos retornados por generate_image
+
+### Post con imagen subida por el usuario:
+1. Si el mensaje contiene \`[IMAGEN ADJUNTA PARA EL POST — ...]\`, usa directamente el s3_key y url indicados.
+2. **NO uses generate_image** cuando el usuario ya proporcionó su propia imagen.
+3. Crea el post con media_type=IMAGE, image_s3_key (el valor de s3_key) y media_url (el valor de url) del tag en el mensaje.
+
+## Menciones y hashtags en LinkedIn
+
+### Hashtags
+Incluye hashtags directamente en el texto del post con el símbolo #. Ejemplo: \`#InteligenciaArtificial\`
+LinkedIn los reconoce automáticamente. Usa 3-5 hashtags relevantes al final del post.
+
+### Mencionar personas o empresas
+Para mencionar a alguien en un post, necesitas su URN de LinkedIn.
+
+**Flujo obligatorio:**
+1. Cuando el usuario quiera mencionar a una persona o empresa, **primero llama a resolve_linkedin_mention** con la URL de LinkedIn.
+2. La herramienta devuelve \`mentionText\` con el formato listo para insertar: \`@[Nombre](urn:li:person:ID)\` o \`@[Empresa](urn:li:organization:ID)\`.
+3. Inserta ese \`mentionText\` directamente en el contenido del post donde corresponda.
+
+**Ejemplo de post con mención:**
+\`Hoy visité @[Platzi](urn:li:organization:2414183) y conversé con su equipo. #Educación #IA\`
+
+**Cuando resolve_linkedin_mention devuelve needsSessionCookie=true**: el usuario no ha configurado su cookie de sesión de LinkedIn. Explícale exactamente cómo obtenerla:
+
+> "Para hacer menciones clickeables a personas en LinkedIn necesito tu cookie de sesión \`li_at\`. Es un paso de configuración de un minuto:
+> 1. Abre [linkedin.com](https://www.linkedin.com) en tu navegador y asegúrate de estar logueado
+> 2. Abre DevTools → F12 (o Cmd+Option+I en Mac)
+> 3. Ve a la pestaña **Application** (Chrome) o **Storage** (Firefox)
+> 4. En el panel izquierdo: **Cookies → https://www.linkedin.com**
+> 5. Busca la cookie llamada **\`li_at\`** y copia su valor
+> 6. Ve a **Configuración → LinkedIn → Cookie de sesión** en Zeru y pégala ahí
+>
+> Una vez configurada podré mencionar a cualquier persona directamente en los posts."
+
+No crees el post hasta que el usuario confirme que configuró la cookie, o hasta que te diga que prefiere el post sin mención clickeable.
+
+**Cuando resolve_linkedin_mention devuelve fallback=true** (URN no resuelto o cookie expirada): incluye el nombre de la persona y su URL de perfil directamente en el texto del post. Ejemplo: "Gracias, Martina Flor Garcés (https://linkedin.com/in/martinaflorgarces/) por la conversación."
+
+**Nota importante:** Los caracteres reservados como \`@\`, \`[\`, \`]\`, \`(\`, \`)\`, \`{\`, \`}\`, \`#\`, \`|\`, \`\\\` dentro del texto libre (no en menciones ni hashtags) deben escaparse con barra invertida.
+
+## Mejores prácticas de LinkedIn
+
+### Estructura del post ganador:
+- **Hook (línea 1)**: Primera línea irresistible — pregunta polémica, estadística, afirmación contraintuitiva, o inicio de historia
+- **Cuerpo**: Una idea por línea, saltos de línea frecuentes, sin párrafos largos
+- **CTA final**: Pregunta o llamado a la acción claro
+- **Hashtags**: 3-5 al final, no dentro del texto
+
+### Formatos que funcionan:
+- Historia personal con lección aprendida
+- Lista de valor ("5 cosas que nadie te dice sobre X")
+- Perspectiva contraria a la convención
+- Insight basado en datos
+- Detrás del escenario
+
+## Memoria para social media
+
+Guarda con memory_store:
+- Tono de voz preferido de la marca
+- Pilares de contenido acordados
+- Audiencia objetivo
+- Decisiones de estilo (bullets, emojis, longitud)
+- Temas que funcionaron bien o mal`;
 
 const MAX_AGENT_ITERATIONS = 30;
 
@@ -183,6 +303,8 @@ export interface ChatStreamContext {
   questionToolCallId?: string;
   /** IDs of documents already uploaded via POST /files/upload */
   documentIds?: string[];
+  /** Uploaded image metadata (for social media post creation) */
+  uploadedImage?: { s3Key: string; imageUrl: string };
 }
 
 @Injectable()
@@ -215,7 +337,11 @@ export class ChatService {
     const conversation = await this.ensureConversation(ctx);
     subject.next({ type: 'conversation_started', conversationId: conversation.id });
     this.activeStreams.register(conversation.id, subject);
-    await this.saveMessage(conversation.id, 'user', { type: 'text', text: ctx.message });
+    await this.saveMessage(conversation.id, 'user', {
+      type: 'text',
+      text: ctx.message,
+      ...(ctx.uploadedImage ? { uploadedImage: ctx.uploadedImage } : {}),
+    });
 
     const openai = new OpenAI({ apiKey });
     const isNewConversation = !ctx.conversationId;
@@ -232,7 +358,7 @@ export class ChatService {
 
     let systemPrompt = BASE_SYSTEM_PROMPT;
     if (skillsPrompt) {
-      systemPrompt += `\n\n## Skills instalados\n\n${skillsPrompt}`;
+      systemPrompt += `\n\n## Skills disponibles\n\n${skillsPrompt}`;
     }
     if (memoryContext) {
       systemPrompt += `\n\n## Memoria cargada para esta conversación\n\n${memoryContext}`;
@@ -273,6 +399,8 @@ export class ChatService {
     systemPrompt: string;
   }) {
     const { openai, model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
+
+    let titleUpdated = false;
 
     // Build the initial input for this turn
     let input: OpenAI.Responses.ResponseInput;
@@ -327,7 +455,11 @@ export class ChatService {
         data: { pendingToolOutputs: [] },
       });
     } else {
-      const userContent = this.buildUserContent(ctx.message, resolvedDocs);
+      // Augment message with uploaded image context (for social media post creation)
+      const messageText = ctx.uploadedImage
+        ? `[IMAGEN ADJUNTA PARA EL POST — úsala directamente sin llamar a generate_image. s3_key: ${ctx.uploadedImage.s3Key} | url: ${ctx.uploadedImage.imageUrl}]\n\n${ctx.message || "Crea un post de LinkedIn con esta imagen."}`
+        : ctx.message;
+      const userContent = this.buildUserContent(messageText, resolvedDocs);
       if (currentPrevResponseId) {
         // Continuing an existing conversation
         input = [{ role: 'user', content: userContent }];
@@ -363,7 +495,7 @@ export class ChatService {
         model,
         input,
         store: true,
-        tools: ACCOUNTING_TOOLS as OpenAI.Responses.Tool[],
+        tools: UNIFIED_TOOLS as OpenAI.Responses.Tool[],
         tool_choice: 'auto',
         reasoning: { effort: 'medium', summary: 'auto' },
         ...(currentPrevResponseId ? { previous_response_id: currentPrevResponseId } : {}),
@@ -429,6 +561,17 @@ export class ChatService {
           });
 
           if (toolName === 'ask_user_question') {
+            // Deduplicate: if a question was already emitted this iteration, skip extras.
+            if (hasQuestion) {
+              // Provide a neutral output so the LLM doesn't hang on an unanswered call
+              toolCallOutputs.push({
+                type: 'function_call_output',
+                call_id: callId,
+                output: JSON.stringify({ skipped: true, reason: 'duplicate_question_in_same_response' }),
+              } as OpenAI.Responses.ResponseInputItem.FunctionCallOutput);
+              continue;
+            }
+
             // Pause loop — wait for user to answer
             hasQuestion = true;
             const payload = args as unknown as QuestionPayload;
@@ -447,6 +590,7 @@ export class ChatService {
             // Update title in DB and broadcast to client — then continue the loop normally
             const newTitle = String(args.title ?? '').trim();
             if (newTitle) {
+              titleUpdated = true;
               await this.prisma.conversation.update({
                 where: { id: conversation.id },
                 data: { title: newTitle },
@@ -570,6 +714,11 @@ export class ChatService {
         where: { id: conversation.id },
         data: { lastResponseId: completedResponseId },
       });
+
+      // Auto-generate title if agent never called update_conversation_title
+      if (!titleUpdated && isNewConversation && ctx.message) {
+        await this.autoGenerateTitle(openai, model, conversation.id, ctx.message, subject);
+      }
 
       break;
     }
@@ -726,6 +875,38 @@ export class ChatService {
         pendingToolOutputs: true,
       },
     });
+  }
+
+  private async autoGenerateTitle(
+    openai: OpenAI,
+    model: string,
+    conversationId: string,
+    firstMessage: string,
+    subject: Subject<ChatEvent>,
+  ): Promise<void> {
+    try {
+      const resp = await openai.responses.create({
+        model,
+        input: [
+          {
+            type: 'message',
+            role: 'user',
+            content: `Resume la siguiente solicitud del usuario en un título de máximo 6 palabras, sin comillas, en el mismo idioma del mensaje. Solo responde el título, nada más.\n\nMensaje: ${firstMessage.slice(0, 300)}`,
+          },
+        ],
+      });
+
+      const rawTitle = (resp.output_text ?? '').trim().replace(/^["']|["']$/g, '');
+      if (!rawTitle) return;
+
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { title: rawTitle },
+      });
+      subject.next({ type: 'title_update', title: rawTitle });
+    } catch {
+      // Non-critical — silently ignore title generation errors
+    }
   }
 
   private async saveMessage(
