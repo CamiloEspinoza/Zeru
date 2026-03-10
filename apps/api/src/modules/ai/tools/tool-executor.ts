@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ChartOfAccountsService } from '../../accounting/services/chart-of-accounts.service';
 import { JournalEntriesService } from '../../accounting/services/journal-entries.service';
@@ -7,6 +7,10 @@ import { ReportsService } from '../../accounting/services/reports.service';
 import { FilesService } from '../../files/files.service';
 import { MemoryService } from '../services/memory.service';
 import { SkillsService } from '../services/skills.service';
+import { LinkedInPostsService } from '../../linkedin/services/linkedin-posts.service';
+import { LinkedInAuthService } from '../../linkedin/services/linkedin-auth.service';
+import { LinkedInApiService } from '../../linkedin/services/linkedin-api.service';
+import { GeminiImageService } from '../../linkedin/services/gemini-image.service';
 import { DocumentCategory, MemoryCategory } from '@prisma/client';
 
 export interface ToolExecutionResult {
@@ -26,6 +30,14 @@ export class ToolExecutor {
     private readonly files: FilesService,
     private readonly memory: MemoryService,
     private readonly skills: SkillsService,
+    @Inject(forwardRef(() => LinkedInPostsService))
+    private readonly linkedInPosts: LinkedInPostsService,
+    @Inject(forwardRef(() => LinkedInAuthService))
+    private readonly linkedInAuth: LinkedInAuthService,
+    @Inject(forwardRef(() => LinkedInApiService))
+    private readonly linkedInApi: LinkedInApiService,
+    @Inject(forwardRef(() => GeminiImageService))
+    private readonly geminiImage: GeminiImageService,
   ) {}
 
   async execute(
@@ -72,6 +84,40 @@ export class ToolExecutor {
 
         case 'get_document_journal_entries':
           return await this.getDocumentJournalEntries(args, tenantId);
+
+        // ─── Social Media tools ───────────────────────────────
+
+        case 'create_linkedin_post':
+          return await this.createLinkedInPost(args, tenantId, options?.conversationId);
+
+        case 'schedule_linkedin_post':
+          return await this.scheduleLinkedInPost(args, tenantId, options?.conversationId);
+
+        case 'bulk_schedule_posts':
+          return await this.bulkScheduleLinkedInPosts(args, tenantId, options?.conversationId);
+
+        case 'generate_image':
+          return await this.generateImage(args, tenantId);
+
+        case 'resolve_linkedin_mention':
+          return await this.resolveLinkedInMention(args, tenantId);
+
+        case 'get_linkedin_connection_status':
+          return await this.getLinkedInConnectionStatus(tenantId);
+
+        case 'get_post_history':
+          return await this.getLinkedInPostHistory(args, tenantId);
+
+        case 'get_scheduled_posts':
+          return await this.getLinkedInScheduledPosts(args, tenantId);
+
+        case 'cancel_scheduled_post':
+          return await this.cancelLinkedInPost(args, tenantId);
+
+        case 'get_content_pillars':
+          return await this.getLinkedInContentPillars(tenantId);
+
+        // ─── Shared tools ─────────────────────────────────────
 
         case 'ask_user_question':
           // This tool is handled by the chat service directly (sends question event to client)
@@ -598,19 +644,212 @@ export class ToolExecutor {
     args: Record<string, unknown>,
     tenantId: string,
   ): Promise<ToolExecutionResult> {
+    const skillName = String(args.skill_name);
+    const filePath = args.file_path ? String(args.file_path) : undefined;
+
     const content = await this.skills.getSkillReference(
       tenantId,
-      String(args.skill_name),
-      String(args.file_path),
+      skillName,
+      filePath,
     );
 
     const isError = content.startsWith('Error:');
+    const label = filePath
+      ? `Referencia cargada: ${filePath} (${content.length} chars)`
+      : `Skill cargado: ${skillName} (${content.length} chars)`;
+
     return {
       success: !isError,
       data: { content },
-      summary: isError
-        ? content
-        : `Referencia cargada: ${args.file_path} (${content.length} caracteres)`,
+      summary: isError ? content : label,
+    };
+  }
+
+  // ─── Social Media tool implementations ─────────────────────
+
+  private async createLinkedInPost(
+    args: Record<string, unknown>,
+    tenantId: string,
+    conversationId?: string,
+  ): Promise<ToolExecutionResult> {
+    const config = await this.linkedInPosts.getOrCreateConfig(tenantId);
+    const post = await this.linkedInPosts.create(tenantId, {
+      content: String(args.content ?? ''),
+      mediaType: String(args.media_type ?? 'NONE'),
+      mediaUrl: args.media_url ? String(args.media_url) : undefined,
+      imageS3Key: args.image_s3_key ? String(args.image_s3_key) : undefined,
+      status: config.autoPublish ? 'SCHEDULED' : 'PENDING_APPROVAL',
+      contentPillar: args.content_pillar ? String(args.content_pillar) : undefined,
+      visibility: String(args.visibility ?? 'PUBLIC'),
+      conversationId,
+    });
+
+    if (config.autoPublish) {
+      await this.linkedInPosts.publish(tenantId, post.id);
+      return { success: true, data: { ...post, status: 'PUBLISHED' }, summary: 'Post publicado directamente en LinkedIn' };
+    }
+
+    return { success: true, data: post, summary: `Post creado y pendiente de aprobación (id: ${post.id})` };
+  }
+
+  private async scheduleLinkedInPost(
+    args: Record<string, unknown>,
+    tenantId: string,
+    conversationId?: string,
+  ): Promise<ToolExecutionResult> {
+    const post = await this.linkedInPosts.create(tenantId, {
+      content: String(args.content ?? ''),
+      mediaType: String(args.media_type ?? 'NONE'),
+      mediaUrl: args.media_url ? String(args.media_url) : undefined,
+      imageS3Key: args.image_s3_key ? String(args.image_s3_key) : undefined,
+      status: 'SCHEDULED',
+      scheduledAt: new Date(String(args.scheduled_at)),
+      contentPillar: args.content_pillar ? String(args.content_pillar) : undefined,
+      visibility: String(args.visibility ?? 'PUBLIC'),
+      conversationId,
+    });
+    return { success: true, data: post, summary: `Post programado para ${new Date(String(args.scheduled_at)).toLocaleString('es-CL')}` };
+  }
+
+  private async bulkScheduleLinkedInPosts(
+    args: Record<string, unknown>,
+    tenantId: string,
+    conversationId?: string,
+  ): Promise<ToolExecutionResult> {
+    const postsInput = (args.posts as Array<{ content: string; scheduled_at: string; content_pillar?: string | null; visibility?: string }>) ?? [];
+    const created = await this.linkedInPosts.bulkSchedule(
+      tenantId,
+      postsInput.map((p) => ({
+        content: p.content,
+        scheduledAt: p.scheduled_at,
+        contentPillar: p.content_pillar ?? undefined,
+        visibility: p.visibility ?? 'PUBLIC',
+      })),
+      conversationId,
+    );
+    return {
+      success: true,
+      data: { count: created.length, posts: created.map((p) => ({ id: p.id, scheduledAt: p.scheduledAt, contentPillar: p.contentPillar })) },
+      summary: `${created.length} posts programados en el calendario de contenido`,
+    };
+  }
+
+  private async generateImage(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const model = (args.model === 'pro' ? 'pro' : 'flash') as 'flash' | 'pro';
+    const result = await this.geminiImage.generateImage(tenantId, String(args.prompt ?? ''), String(args.aspect_ratio ?? '1:1'), model);
+    return {
+      success: true,
+      data: { s3Key: result.s3Key, imageUrl: result.s3Url, mimeType: result.mimeType },
+      summary: `Imagen generada con Gemini ${model === 'pro' ? '3 Pro' : '3.1 Flash'} (${args.aspect_ratio})`,
+    };
+  }
+
+  private async resolveLinkedInMention(
+    args: Record<string, unknown>,
+    tenantId: string,
+  ): Promise<ToolExecutionResult> {
+    const rawUrl = String(args.url ?? '').trim();
+    const type = String(args.type ?? 'person') as 'person' | 'organization';
+
+    // Extract vanity name from URL or use as-is
+    let vanityName = rawUrl;
+    const personMatch = rawUrl.match(/linkedin\.com\/in\/([^/?#]+)/);
+    const orgMatch = rawUrl.match(/linkedin\.com\/company\/([^/?#]+)/);
+    if (personMatch) vanityName = personMatch[1];
+    else if (orgMatch) vanityName = orgMatch[1];
+    vanityName = vanityName.replace(/\/$/, '');
+
+    if (type === 'organization') {
+      try {
+        const result = await this.linkedInApi.resolveOrganizationUrn(tenantId, vanityName);
+        const mentionText = `@[${result.displayName}](${result.urn})`;
+        return {
+          success: true,
+          data: { ...result, mentionText, type: 'organization' },
+          summary: `Empresa encontrada: ${result.displayName} → ${result.urn}`,
+        };
+      } catch {
+        // Fallback: embed URL as plain text
+        return {
+          success: true,
+          data: { fallback: true, url: rawUrl, vanityName, type: 'organization', mentionText: null },
+          summary: `No se pudo resolver la mención de empresa. Usa el nombre y la URL en el texto del post.`,
+        };
+      }
+    }
+
+    // For persons: requires li_at session cookie stored by the user in settings
+    const profileUrl = rawUrl.startsWith('http') ? rawUrl : `https://www.linkedin.com/in/${vanityName}/`;
+    try {
+      const result = await this.linkedInApi.resolvePersonUrn(tenantId, vanityName);
+      const mentionText = `@[${result.displayName}](${result.urn})`;
+      return {
+        success: true,
+        data: { ...result, mentionText, type: 'person' },
+        summary: `Perfil encontrado: ${result.displayName} → ${result.urn}`,
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+
+      // Special case: no session cookie configured — tell the agent to guide the user
+      if (message === 'NO_SESSION_COOKIE') {
+        return {
+          success: true,
+          data: {
+            needsSessionCookie: true,
+            vanityName,
+            url: profileUrl,
+            type: 'person',
+            mentionText: null,
+          },
+          summary: `El usuario no ha configurado su cookie de sesión de LinkedIn (li_at). Necesaria para menciones a personas.`,
+        };
+      }
+
+      // Other errors (expired cookie, profile not found, etc.) — fallback to plain text
+      return {
+        success: true,
+        data: { fallback: true, url: profileUrl, vanityName, type: 'person', mentionText: null },
+        summary: `No se pudo resolver la mención: ${message}. Usa el nombre y URL en el texto del post.`,
+      };
+    }
+  }
+
+  private async getLinkedInConnectionStatus(tenantId: string): Promise<ToolExecutionResult> {
+    const connection = await this.linkedInAuth.getConnection(tenantId);
+    if (!connection) return { success: true, data: { connected: false }, summary: 'LinkedIn no conectado' };
+    return {
+      success: true,
+      data: { connected: true, profileName: connection.profileName, personUrn: connection.personUrn, isExpired: connection.isExpired, expiresAt: connection.expiresAt },
+      summary: connection.isExpired ? 'LinkedIn conectado pero token expirado' : `LinkedIn conectado como ${connection.profileName ?? 'usuario desconocido'}`,
+    };
+  }
+
+  private async getLinkedInPostHistory(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const status = args.status ? String(args.status) : undefined;
+    const limit = Math.min(Number(args.limit ?? 10), 50);
+    const result = await this.linkedInPosts.list(tenantId, { status, perPage: limit });
+    return { success: true, data: result, summary: `${result.total} posts encontrados` };
+  }
+
+  private async getLinkedInScheduledPosts(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const from = args.from ? String(args.from) : new Date().toISOString();
+    const to = args.to ? String(args.to) : undefined;
+    const result = await this.linkedInPosts.list(tenantId, { status: 'SCHEDULED', from, to, perPage: 50 });
+    return { success: true, data: result, summary: `${result.total} posts programados` };
+  }
+
+  private async cancelLinkedInPost(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const post = await this.linkedInPosts.cancel(tenantId, String(args.post_id ?? ''));
+    return { success: true, data: post, summary: `Post cancelado: "${String(post.content).slice(0, 50)}..."` };
+  }
+
+  private async getLinkedInContentPillars(tenantId: string): Promise<ToolExecutionResult> {
+    const config = await this.linkedInPosts.getOrCreateConfig(tenantId);
+    return {
+      success: true,
+      data: { contentPillars: config.contentPillars, autoPublish: config.autoPublish, defaultVisibility: config.defaultVisibility },
+      summary: 'Pilares de contenido y configuración de LinkedIn obtenidos',
     };
   }
 }

@@ -23,6 +23,7 @@ model Tenant {
 
   memberships          UserTenant[]
   aiConfig             AiProviderConfig?
+  geminiConfig         GeminiConfig?
   storageConfig        StorageConfig?
   emailConfig          EmailConfig?
   conversations        Conversation[]
@@ -31,9 +32,12 @@ model Tenant {
   fiscalPeriods        FiscalPeriod[]
   documents            Document[]
   accountingSteps      AccountingProcessStep[]
-  memories       Memory[]
-  agentSkills    AgentSkill[]
-  apiKeys        ApiKey[]
+  memories             Memory[]
+  agentSkills          AgentSkill[]
+  apiKeys              ApiKey[]
+  linkedInConnection   LinkedInConnection?
+  linkedInPosts        LinkedInPost[]
+  linkedInAgentConfig  LinkedInAgentConfig?
 
   @@map("tenants")
 }
@@ -111,6 +115,20 @@ model AiProviderConfig {
   @@map("ai_provider_configs")
 }
 
+/// API key de Google Gemini por tenant (para generación de imágenes)
+model GeminiConfig {
+  id              String   @id @default(uuid())
+  encryptedApiKey String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("gemini_configs")
+}
+
 /// Configuracion de almacenamiento S3 por tenant
 model StorageConfig {
   id                   String   @id @default(uuid())
@@ -149,6 +167,8 @@ model EmailConfig {
 model Conversation {
   id                  String  @id @default(uuid())
   title               String  @default("Nueva conversación")
+  /// GENERAL | LINKEDIN
+  agentType           String  @default("GENERAL")
   lastResponseId      String?
   /// The previous_response_id that was used when the last response was generated (used for manual context reconstruction)
   parentResponseId    String?
@@ -164,12 +184,14 @@ model Conversation {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  messages      Message[]
-  documents     Document[]
-  journalEntries JournalEntry[]
+  messages        Message[]
+  documents       Document[]
+  journalEntries  JournalEntry[]
+  linkedInPosts   LinkedInPost[]
 
   @@index([userId])
   @@index([tenantId])
+  @@index([tenantId, agentType])
   @@map("conversations")
 }
 
@@ -568,4 +590,90 @@ model WaitlistEntry {
   createdAt DateTime @default(now())
 
   @@map("waitlist_entries")
+}
+
+// ─── LinkedIn ─────────────────────────────────────────────
+
+/// Conexión OAuth de LinkedIn por tenant (1 por tenant)
+model LinkedInConnection {
+  id            String   @id @default(uuid())
+  /// Access token encriptado con ENCRYPTION_KEY
+  accessToken   String
+  /// Refresh token encriptado (LinkedIn emite refresh tokens de larga duración)
+  refreshToken  String?
+  expiresAt     DateTime
+  /// urn:li:person:xxx
+  personUrn     String
+  profileName   String?
+  profileImage  String?
+  /// Cookie li_at encriptada — necesaria para Voyager API (menciones a personas)
+  liAtCookie    String?
+  /// Token de la app Community Management (r_organization_followers) — encriptado
+  communityAccessToken  String?
+  communityRefreshToken String?
+  communityExpiresAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("linkedin_connections")
+}
+
+/// Post de LinkedIn creado o programado por el agente
+model LinkedInPost {
+  id             String    @id @default(uuid())
+  /// Texto del post (commentary)
+  content        String
+  /// NONE | ARTICLE | IMAGE
+  mediaType      String    @default("NONE")
+  /// URL de S3 para imágenes, URL externa para artículos
+  mediaUrl       String?
+  /// S3 key de la imagen generada por Gemini
+  imageS3Key     String?
+  /// DRAFT | PENDING_APPROVAL | SCHEDULED | PUBLISHED | FAILED | CANCELLED
+  status         String    @default("DRAFT")
+  /// Fecha/hora programada para auto-publicar
+  scheduledAt    DateTime?
+  /// URN retornado por LinkedIn al publicar (ej: urn:li:share:xxx)
+  linkedinPostId String?
+  publishedAt    DateTime?
+  errorMessage   String?
+  /// Pilar de contenido (ej: "thought-leadership", "tips", "case-study")
+  contentPillar  String?
+  /// PUBLIC | CONNECTIONS
+  visibility     String    @default("PUBLIC")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([status, scheduledAt])
+  @@map("linkedin_posts")
+}
+
+/// Configuración del agente de LinkedIn por tenant
+model LinkedInAgentConfig {
+  id                String   @id @default(uuid())
+  /// Si true, los posts se publican directamente sin aprobación
+  autoPublish       Boolean  @default(false)
+  defaultVisibility String   @default("PUBLIC")
+  /// Pilares de contenido configurados: ["thought-leadership", "tips", ...]
+  contentPillars    Json?
+  /// URN de la organización para People Typeahead API — urn:li:organization:xxx
+  organizationUrn   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("linkedin_agent_configs")
 }

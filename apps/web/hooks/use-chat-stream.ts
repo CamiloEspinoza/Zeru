@@ -7,6 +7,7 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
 const TOOL_LABELS: Record<string, string> = {
+  // Accounting tools
   update_conversation_title: "Actualizando título de conversación",
   list_accounts: "Consultando plan de cuentas",
   create_account: "Creando cuenta contable",
@@ -24,6 +25,18 @@ const TOOL_LABELS: Record<string, string> = {
   memory_store: "Guardando en memoria",
   memory_search: "Buscando en memoria",
   memory_delete: "Eliminando de memoria",
+  get_skill_reference: "Cargando referencia del skill",
+  // Social media tools
+  create_linkedin_post: "Creando post de LinkedIn",
+  schedule_linkedin_post: "Programando post de LinkedIn",
+  bulk_schedule_posts: "Programando calendario de contenido",
+  generate_image: "Generando imagen con Gemini",
+  resolve_linkedin_mention: "Buscando perfil en LinkedIn",
+  get_linkedin_connection_status: "Verificando conexión de LinkedIn",
+  get_post_history: "Consultando historial de posts",
+  get_scheduled_posts: "Consultando posts programados",
+  cancel_scheduled_post: "Cancelando post programado",
+  get_content_pillars: "Consultando pilares de contenido",
 };
 
 function getAuthHeaders(): Record<string, string> {
@@ -81,7 +94,7 @@ async function readSSEStream(
   }
 }
 
-// ─── File upload ─────────────────────────────────────────────────────────────
+// ─── File / image upload ──────────────────────────────────────────────────────
 
 export interface PendingFile {
   localId: string;
@@ -96,6 +109,11 @@ export interface AttachedDoc {
   id: string;
   name: string;
   mimeType: string;
+}
+
+export interface UploadedImage {
+  s3Key: string;
+  imageUrl: string;
 }
 
 export async function uploadFile(file: File): Promise<string> {
@@ -115,6 +133,24 @@ export async function uploadFile(file: File): Promise<string> {
 
   const data = (await res.json()) as { id: string };
   return data.id;
+}
+
+export async function uploadImage(file: File): Promise<UploadedImage> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/linkedin/upload-image`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error((error as { message?: string }).message ?? "Error al subir imagen");
+  }
+
+  return res.json() as Promise<UploadedImage>;
 }
 
 // ─── Content blocks (ordered, chronological) ─────────────────────────────────
@@ -144,7 +180,7 @@ export type ContentBlock =
 // ─── Message blocks ───────────────────────────────────────────────────────────
 
 export type MessageBlock =
-  | { id: string; type: "user"; text: string; docs?: AttachedDoc[] }
+  | { id: string; type: "user"; text: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
   | {
       id: string;
       type: "assistant";
@@ -200,7 +236,7 @@ export function useChatStream() {
   const sendMessage = useCallback(
     async (
       text: string,
-      opts?: { questionToolCallId?: string; docs?: AttachedDoc[] }
+      opts?: { questionToolCallId?: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
     ) => {
       if (streaming) return;
 
@@ -209,7 +245,7 @@ export function useChatStream() {
 
       setMessages((prev) => [
         ...prev,
-        { id: userMsgId, type: "user", text, docs: opts?.docs },
+        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImage: opts?.uploadedImage },
         {
           id: assistantMsgId,
           type: "assistant",
@@ -233,6 +269,7 @@ export function useChatStream() {
             conversationId,
             questionToolCallId: opts?.questionToolCallId,
             documentIds: opts?.docs?.map((d) => d.id),
+            uploadedImage: opts?.uploadedImage,
           }),
           signal: abortRef.current.signal,
         });
@@ -507,6 +544,7 @@ export function useChatStream() {
           payload?: QuestionPayload;
           /** OpenAI call_id for question messages; required when sending the answer back */
           callId?: string;
+          uploadedImage?: UploadedImage;
         } | null;
         toolName?: string | null;
         toolArgs?: Record<string, unknown> | null;
@@ -575,10 +613,12 @@ export function useChatStream() {
         if (msg.role === "user") {
           // Orphaned pending blocks (no thinking arrived) — attach to last assistant
           drainPending();
+          const uploadedImage = msg.content?.uploadedImage as UploadedImage | undefined;
           blocks.push({
             id: msg.id,
             type: "user",
             text: msg.content?.text ?? "",
+            ...(uploadedImage ? { uploadedImage } : {}),
           });
 
         } else if (msg.role === "assistant") {

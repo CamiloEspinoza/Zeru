@@ -15,6 +15,7 @@ import { EncryptionModule } from './common/services/encryption.module';
 import { StorageConfigModule } from './modules/storage-config/storage-config.module';
 import { EmailConfigModule } from './modules/email-config/email-config.module';
 import { EmailModule } from './modules/email/email.module';
+import { LinkedInModule } from './modules/linkedin/linkedin.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
@@ -35,6 +36,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     ApiKeysModule,
     PublicApiModule,
     ZeruMcpModule,
+    LinkedInModule,
   ],
 })
 export class AppModule implements NestModule {

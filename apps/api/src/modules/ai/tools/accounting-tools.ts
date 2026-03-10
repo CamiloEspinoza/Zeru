@@ -1,4 +1,5 @@
 import type { FunctionTool } from 'openai/resources/responses/responses';
+import { LINKEDIN_TOOLS, LINKEDIN_TOOL_LABELS } from '../../linkedin/tools/linkedin-tools';
 
 /**
  * Definiciones de herramientas contables para el agente de IA.
@@ -433,26 +434,43 @@ NO guardes: información transitoria, datos ya en el sistema contable, resultado
     type: 'function',
     name: 'get_skill_reference',
     description:
-      'Carga el contenido de un archivo de referencia o script de un skill instalado. Úsala cuando las instrucciones de un skill indiquen que debes consultar un archivo específico de references/ o scripts/ para obtener documentación detallada, esquemas, plantillas u otro material de referencia.',
+      'Carga las instrucciones completas de un skill o un archivo de referencia específico. ' +
+      'Úsala en dos casos: (1) Sin file_path: carga el SKILL.md completo con todas las instrucciones del skill — hazlo ANTES de usar cualquier skill para conocer cómo aplicarlo. ' +
+      '(2) Con file_path: carga un archivo de references/ o scripts/ que el skill indique consultar.',
     parameters: {
       type: 'object',
       properties: {
         skill_name: {
           type: 'string',
           description:
-            'Nombre del skill tal como aparece en la sección "Skills instalados" del system prompt.',
+            'Nombre exacto del skill tal como aparece en la sección de skills disponibles del system prompt.',
         },
         file_path: {
           type: 'string',
           description:
-            'Ruta relativa del archivo dentro del skill, por ejemplo "references/api_docs.md" o "scripts/helper.py".',
+            'Opcional. Ruta relativa de un archivo de referencia dentro del skill, por ejemplo "references/frameworks.md". Omite este campo para cargar las instrucciones principales del skill.',
         },
       },
-      required: ['skill_name', 'file_path'],
+      required: ['skill_name'],
       additionalProperties: false,
     },
-    strict: true,
+    strict: false,
   },
+];
+
+// Shared tool names that appear in both sets — keep only the accounting version
+const SHARED_TOOL_NAMES = new Set([
+  'ask_user_question',
+  'update_conversation_title',
+  'memory_store',
+  'memory_search',
+  'get_skill_reference',
+]);
+
+/** Unified tool list: accounting + social media (deduplicating shared tools) */
+export const UNIFIED_TOOLS: FunctionTool[] = [
+  ...ACCOUNTING_TOOLS,
+  ...LINKEDIN_TOOLS.filter((t) => !SHARED_TOOL_NAMES.has(t.name)),
 ];
 
 /** Human-readable labels para las herramientas */
@@ -475,4 +493,6 @@ export const TOOL_LABELS: Record<string, string> = {
   memory_search: 'Buscando en memoria',
   memory_delete: 'Eliminando de memoria',
   get_skill_reference: 'Cargando referencia del skill',
+  // Social media tools
+  ...LINKEDIN_TOOL_LABELS,
 };

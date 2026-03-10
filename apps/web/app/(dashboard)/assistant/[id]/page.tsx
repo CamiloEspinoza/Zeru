@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useChatStream, uploadFile, type AttachedDoc } from "@/hooks/use-chat-stream";
+import { useChatStream, uploadFile, uploadImage, type AttachedDoc, type UploadedImage } from "@/hooks/use-chat-stream";
 import { ThinkingBlock } from "@/components/ai/thinking-block";
 import { ToolExecution } from "@/components/ai/tool-execution";
 import { QuestionCard } from "@/components/ai/question-card";
 import { JournalEntryReviewCard } from "@/components/ai/journal-entry-review-card";
+import { PostPreviewCard } from "@/components/linkedin/post-preview-card";
+import { ImagePreviewCard } from "@/components/linkedin/image-preview-card";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { api } from "@/lib/api-client";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -59,6 +62,17 @@ interface PendingFile {
   status: "uploading" | "done" | "error";
   documentId?: string;
   errorMessage?: string;
+}
+
+// ─── Pending image for social media posts ─────────────────
+
+interface PendingImage {
+  localId: string;
+  file: File;
+  previewUrl: string;
+  status: "uploading" | "done" | "error";
+  result?: UploadedImage;
+  error?: string;
 }
 
 // ─── Attachment chip / thumbnail ──────────────────────────
@@ -264,7 +278,9 @@ export default function AssistantChatPage() {
 
   const [input, setInput] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -366,8 +382,9 @@ export default function AssistantChatPage() {
   // ── File upload ──────────────────────────────────────────
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
-    const arr = Array.from(files).filter((f) =>
-      ACCEPTED_TYPES.includes(f.type)
+    // Images are handled separately via addImage → /linkedin/upload-image
+    const arr = Array.from(files).filter(
+      (f) => ACCEPTED_TYPES.includes(f.type) && !f.type.startsWith("image/")
     );
     if (!arr.length) return;
 
@@ -417,6 +434,108 @@ export default function AssistantChatPage() {
     });
   }, []);
 
+  // ── Image upload for social media posts ──────────────────
+
+  const addImage = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    if (pendingImage?.previewUrl) URL.revokeObjectURL(pendingImage.previewUrl);
+
+    const pending: PendingImage = {
+      localId: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+      status: "uploading",
+    };
+    setPendingImage(pending);
+
+    try {
+      const result = await uploadImage(file);
+      setPendingImage((prev) =>
+        prev?.localId === pending.localId ? { ...prev, status: "done", result } : prev
+      );
+    } catch (err) {
+      setPendingImage((prev) =>
+        prev?.localId === pending.localId
+          ? { ...prev, status: "error", error: err instanceof Error ? err.message : "Error al subir" }
+          : prev
+      );
+    }
+  }, [pendingImage?.previewUrl]);
+
+  const removePendingImage = useCallback(() => {
+    setPendingImage((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+  }, []);
+
+  // ── Publish / cancel post actions ────────────────────────
+
+  const handlePublishPost = useCallback(async (postId: string) => {
+    try {
+      await api.post(`/linkedin/posts/${postId}/publish`);
+    } catch {
+      // Ignore, the post list will reflect real state on refresh
+    }
+  }, []);
+
+  const handleCancelPost = useCallback(async (postId: string) => {
+    try {
+      await api.post(`/linkedin/posts/${postId}/cancel`);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const handleSchedulePost = useCallback(async (postId: string, scheduledAt: Date) => {
+    await api.post(`/linkedin/posts/${postId}/reschedule`, { scheduledAt: scheduledAt.toISOString() });
+  }, []);
+
+  // Collect all PENDING_APPROVAL posts visible in the current conversation
+  const pendingPosts = useMemo(() => {
+    const result: { id: string }[] = [];
+    for (const msg of messages) {
+      if (msg.role !== "assistant") continue;
+      for (const block of msg.blocks) {
+        if (
+          block.kind === "tool" &&
+          (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") &&
+          block.state.status === "done" &&
+          block.state.result
+        ) {
+          const post = block.state.result as { id: string; status: string };
+          if (post.status === "PENDING_APPROVAL") {
+            result.push({ id: post.id });
+          }
+        }
+      }
+    }
+    return result;
+  }, [messages]);
+
+  const [isBulkPublishing, setIsBulkPublishing] = useState(false);
+  const [isBulkCancelling, setIsBulkCancelling] = useState(false);
+
+  const handlePublishAll = useCallback(async () => {
+    if (pendingPosts.length === 0 || isBulkPublishing) return;
+    setIsBulkPublishing(true);
+    try {
+      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/publish`)));
+    } finally {
+      setIsBulkPublishing(false);
+    }
+  }, [pendingPosts, isBulkPublishing]);
+
+  const handleCancelAll = useCallback(async () => {
+    if (pendingPosts.length === 0 || isBulkCancelling) return;
+    setIsBulkCancelling(true);
+    try {
+      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/cancel`)));
+    } finally {
+      setIsBulkCancelling(false);
+    }
+  }, [pendingPosts, isBulkCancelling]);
+
   // ── Drag & drop ─────────────────────────────────────────
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
@@ -440,9 +559,14 @@ export default function AssistantChatPage() {
       e.preventDefault();
       dragCounterRef.current = 0;
       setIsDragging(false);
-      if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+      const files = Array.from(e.dataTransfer.files);
+      if (!files.length) return;
+      const images = files.filter((f) => f.type.startsWith("image/"));
+      const docs = files.filter((f) => !f.type.startsWith("image/"));
+      if (images.length > 0) addImage(images[0]); // route images to LinkedIn image uploader
+      if (docs.length > 0) addFiles(docs);
     },
-    [addFiles]
+    [addFiles, addImage]
   );
 
   // ── Clipboard paste ──────────────────────────────────────
@@ -450,12 +574,14 @@ export default function AssistantChatPage() {
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const files = Array.from(e.clipboardData.files);
-      if (files.length) {
-        e.preventDefault();
-        addFiles(files);
-      }
+      if (!files.length) return;
+      e.preventDefault();
+      const images = files.filter((f) => f.type.startsWith("image/"));
+      const docs = files.filter((f) => !f.type.startsWith("image/"));
+      if (images.length > 0) addImage(images[0]); // route images to LinkedIn image uploader
+      if (docs.length > 0) addFiles(docs);
     },
-    [addFiles]
+    [addFiles, addImage]
   );
 
   // ── Send ────────────────────────────────────────────────
@@ -464,7 +590,9 @@ export default function AssistantChatPage() {
 
   const handleSend = async () => {
     const text = input.trim();
-    if ((!text && !pendingFiles.length) || streaming || anyUploading) return;
+    const hasImage = pendingImage?.status === "done" && pendingImage.result;
+    const imageUploading = pendingImage?.status === "uploading";
+    if ((!text && !pendingFiles.length && !hasImage) || streaming || anyUploading || imageUploading) return;
 
     // Al enviar, volver a seguir el scroll para ver la nueva respuesta
     setAutoScrollEnabled(true);
@@ -478,14 +606,16 @@ export default function AssistantChatPage() {
         mimeType: p.file.type,
       }));
 
+    const uploadedImageData = hasImage ? pendingImage!.result : undefined;
+
     setInput("");
-    // Keep preview so user sees them in the message bubble, but clear queue
     const cleared = [...pendingFiles];
     setPendingFiles([]);
-    // Revoke preview URLs after a brief delay
+    setPendingImage(null);
     setTimeout(() => cleared.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl)), 5000);
 
-    await sendMessage(text || "Analiza los archivos adjuntos", { docs });
+    const fallbackText = docs.length > 0 ? "Analiza los archivos adjuntos" : uploadedImageData ? "Crea un post con esta imagen" : "";
+    await sendMessage(text || fallbackText, { docs, uploadedImage: uploadedImageData });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -558,11 +688,10 @@ export default function AssistantChatPage() {
             </div>
             <div>
               <p className="font-medium text-foreground">
-                Asistente Contable Zeru
+                Asistente Zeru
               </p>
               <p className="text-sm mt-1">
-                Puedo crear cuentas contables, asientos de diario y procesar
-                documentos como estatutos de sociedades.
+                Puedo ayudarte con contabilidad, crear posts de LinkedIn, generar imágenes y gestionar tu calendario de contenido.
               </p>
               <p className="text-xs mt-1 text-muted-foreground/70">
                 Arrastra archivos o pega imágenes directamente en el chat.
@@ -572,7 +701,8 @@ export default function AssistantChatPage() {
               {[
                 "Crea los asientos de constitución de sociedad",
                 "¿Cuál es el balance de comprobación?",
-                "Lista el plan de cuentas",
+                "Crea un post de LinkedIn sobre liderazgo",
+                "Genera un calendario de contenido para 30 días",
               ].map((suggestion) => (
                 <button
                   key={suggestion}
@@ -595,6 +725,17 @@ export default function AssistantChatPage() {
             {msg.type === "user" ? (
               <div className="flex justify-end">
                 <div className="max-w-[75%] space-y-2">
+                  {/* Uploaded image in user bubble (for social media posts) */}
+                  {msg.uploadedImage && (
+                    <div className="flex justify-end">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={msg.uploadedImage.imageUrl}
+                        alt="Imagen adjunta"
+                        className="h-32 w-32 rounded-xl object-cover border border-border"
+                      />
+                    </div>
+                  )}
                   {/* Document chips in user bubble */}
                   {msg.docs && msg.docs.length > 0 && (
                     <div className="flex flex-wrap gap-2 justify-end">
@@ -680,6 +821,49 @@ export default function AssistantChatPage() {
                             />
                           </div>
                         );
+                      }
+
+                      // Render post preview card for LinkedIn post creation/scheduling
+                      if (
+                        (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") &&
+                        block.state.status === "done" &&
+                        block.state.result
+                      ) {
+                        const post = block.state.result as {
+                          id: string;
+                          content: string;
+                          mediaType: string;
+                          mediaUrl?: string | null;
+                          imageS3Key?: string | null;
+                          status: string;
+                          scheduledAt?: string | null;
+                          contentPillar?: string | null;
+                          visibility: string;
+                        };
+                        return (
+                          <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
+                            <div className="w-full max-w-[560px]">
+                              <PostPreviewCard
+                                post={post}
+                                onApprove={post.status === "PENDING_APPROVAL" ? handlePublishPost : undefined}
+                                onReject={post.status === "PENDING_APPROVAL" ? handleCancelPost : undefined}
+                                onSchedule={post.status === "PENDING_APPROVAL" ? handleSchedulePost : undefined}
+                              />
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Render image preview for Gemini-generated images
+                      if (
+                        block.state.name === "generate_image" &&
+                        block.state.status === "done" &&
+                        block.state.result
+                      ) {
+                        const img = block.state.result as { s3Key: string; imageUrl: string; mimeType: string };
+                        if (img.imageUrl) {
+                          return <ImagePreviewCard key={block.state.toolCallId} image={img} />;
+                        }
                       }
 
                       return (
@@ -800,6 +984,46 @@ export default function AssistantChatPage() {
         <div ref={bottomRef} />
       </div>
 
+      {/* Bulk post action bar — visible when 2+ pending posts in current conversation */}
+      {pendingPosts.length >= 2 && (
+        <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+              {pendingPosts.length}
+            </span>
+            <span className="text-amber-900 dark:text-amber-200 font-medium">
+              posts pendientes de aprobación
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePublishAll}
+              disabled={isBulkPublishing || isBulkCancelling}
+              className="flex items-center gap-1.5 rounded-lg bg-[#0A66C2] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#004182] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isBulkPublishing ? (
+                <>
+                  <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Publicando…
+                </>
+              ) : (
+                "Publicar todos"
+              )}
+            </button>
+            <button
+              onClick={handleCancelAll}
+              disabled={isBulkPublishing || isBulkCancelling}
+              className="rounded-lg border border-amber-300 dark:border-amber-700 px-4 py-1.5 text-sm text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {isBulkCancelling ? "Cancelando…" : "Cancelar todos"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input area */}
       <div className="border-t px-6 pt-4 pb-5 shrink-0">
         <div
@@ -808,9 +1032,9 @@ export default function AssistantChatPage() {
             isDragging && "border-primary ring-1 ring-primary"
           )}
         >
-          {/* File chips above textarea */}
-          {pendingFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 px-4 pt-3">
+          {/* File chips and image thumbnail above textarea */}
+          {(pendingFiles.length > 0 || pendingImage) && (
+            <div className="flex flex-wrap gap-2 px-4 pt-3 items-center">
               {pendingFiles.map((pf) => (
                 <FileChip
                   key={pf.localId}
@@ -818,6 +1042,38 @@ export default function AssistantChatPage() {
                   onRemove={() => removePendingFile(pf.localId)}
                 />
               ))}
+              {pendingImage && (
+                <div className="relative group flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={pendingImage.previewUrl}
+                    alt={pendingImage.file.name}
+                    className="h-16 w-16 rounded-lg object-cover border border-border"
+                  />
+                  {pendingImage.status === "uploading" && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                      <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    </span>
+                  )}
+                  {pendingImage.status === "error" && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-destructive/60">
+                      <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={removePendingImage}
+                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -826,7 +1082,7 @@ export default function AssistantChatPage() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              title="Adjuntar archivo"
+              title="Adjuntar documento"
               className="flex-shrink-0 mb-0.5 text-muted-foreground hover:text-foreground transition-colors"
             >
               <svg
@@ -852,6 +1108,29 @@ export default function AssistantChatPage() {
               onChange={(e) => e.target.files && addFiles(e.target.files)}
             />
 
+            {/* Attach image for social media post button */}
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              title="Adjuntar imagen para post"
+              className="flex-shrink-0 mb-0.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) addImage(file);
+                e.target.value = "";
+              }}
+            />
+
             <textarea
               ref={textareaRef}
               value={input}
@@ -859,7 +1138,9 @@ export default function AssistantChatPage() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                pendingFiles.length
+                pendingImage
+                  ? "Describe qué quieres hacer con la imagen…"
+                  : pendingFiles.length
                   ? "Agrega un mensaje o envía solo los archivos…"
                   : "Escribe un mensaje, arrastra archivos o pega imágenes…"
               }
@@ -883,12 +1164,13 @@ export default function AssistantChatPage() {
                 className="h-8 w-8 p-0 flex-shrink-0"
                 onClick={handleSend}
                 disabled={
-                  (!input.trim() && !pendingFiles.length) ||
-                  anyUploading
+                  (!input.trim() && !pendingFiles.length && !(pendingImage?.status === "done")) ||
+                  anyUploading ||
+                  pendingImage?.status === "uploading"
                 }
-                title={anyUploading ? "Esperando subida de archivos…" : undefined}
+                title={anyUploading || pendingImage?.status === "uploading" ? "Esperando subida…" : undefined}
               >
-                {anyUploading ? (
+                {(anyUploading || pendingImage?.status === "uploading") ? (
                   <svg
                     className="h-4 w-4 animate-spin"
                     fill="none"
@@ -928,8 +1210,7 @@ export default function AssistantChatPage() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          El asistente puede cometer errores. Verifica los asientos contables
-          antes de contabilizarlos.
+          El asistente puede cometer errores. Verifica la información antes de confirmar acciones.
         </p>
       </div>
 

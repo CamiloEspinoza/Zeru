@@ -16,6 +16,9 @@ import {
   CheckListIcon,
   Key01Icon,
   HardDriveIcon,
+  Linkedin01Icon,
+  Megaphone01Icon,
+  Calendar02Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -34,9 +37,16 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
+interface NavLeafItem {
+  title: string;
+  href: string;
+}
+
 interface NavSubItem {
   title: string;
   href: string;
+  icon?: IconSvgElement;
+  items?: NavLeafItem[];
 }
 
 interface NavItem {
@@ -61,6 +71,23 @@ const appNav: NavItem[] = [
       { title: "Reportes", href: "/accounting/reports" },
     ],
   },
+  { title: "Calendario", href: "/calendar", icon: Calendar02Icon },
+  {
+    title: "Marketing",
+    href: "/linkedin",
+    icon: Megaphone01Icon,
+    items: [
+      {
+        title: "LinkedIn",
+        href: "/linkedin/posts",
+        icon: Linkedin01Icon,
+        items: [
+          { title: "Posts", href: "/linkedin/posts" },
+          { title: "Configuración", href: "/settings/linkedin" },
+        ],
+      },
+    ],
+  },
 ];
 
 const settingsNav: NavItem[] = [
@@ -71,6 +98,8 @@ const settingsNav: NavItem[] = [
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
+  { title: "Google Gemini", href: "/settings/ai/gemini", icon: AiChat02Icon },
+  { title: "LinkedIn", href: "/settings/linkedin", icon: Linkedin01Icon },
   { title: "Almacenamiento y Email", href: "/settings/storage", icon: HardDriveIcon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
@@ -106,7 +135,10 @@ export function NavMain() {
             <Collapsible
               key={item.title}
               asChild
-              defaultOpen={pathname.startsWith(item.href)}
+              defaultOpen={
+                pathname.startsWith(item.href) ||
+                (item.items?.some((sub) => pathname.startsWith(sub.href)) ?? false)
+              }
               className="group/collapsible"
             >
               <SidebarMenuItem>
@@ -122,18 +154,73 @@ export function NavMain() {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items.map((sub) => {
-                      const isActive = pathname === sub.href;
-                      return (
+                    {item.items.map((sub) =>
+                      sub.items ? (
+                        <Collapsible
+                          key={sub.title}
+                          asChild
+                          defaultOpen={
+                            pathname.startsWith(sub.href) ||
+                            (sub.items?.some((leaf) =>
+                              pathname.startsWith(leaf.href)
+                            ) ?? false)
+                          }
+                          className="group/sub-collapsible"
+                        >
+                          <SidebarMenuSubItem>
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuSubButton className="cursor-pointer select-none">
+                                {sub.icon && (
+                                  <HugeiconsIcon
+                                    icon={sub.icon}
+                                    className="size-3.5 shrink-0"
+                                  />
+                                )}
+                                <span>{sub.title}</span>
+                                <HugeiconsIcon
+                                  icon={ArrowRight01Icon}
+                                  className="ml-auto size-3 transition-transform duration-200 group-data-[state=open]/sub-collapsible:rotate-90"
+                                />
+                              </SidebarMenuSubButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <ul className="border-sidebar-border mx-2 mt-0.5 flex flex-col gap-0.5 border-l pl-2.5">
+                                {sub.items.map((leaf) => (
+                                  <li key={leaf.title}>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={pathname === leaf.href || pathname.startsWith(leaf.href + "/")}
+                                      size="sm"
+                                    >
+                                      <Link href={leaf.href}>
+                                        <span>{leaf.title}</span>
+                                      </Link>
+                                    </SidebarMenuSubButton>
+                                  </li>
+                                ))}
+                              </ul>
+                            </CollapsibleContent>
+                          </SidebarMenuSubItem>
+                        </Collapsible>
+                      ) : (
                         <SidebarMenuSubItem key={sub.title}>
-                          <SidebarMenuSubButton asChild isActive={isActive}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === sub.href}
+                          >
                             <Link href={sub.href}>
+                              {sub.icon && (
+                                <HugeiconsIcon
+                                  icon={sub.icon}
+                                  className="size-3.5 shrink-0"
+                                />
+                              )}
                               <span>{sub.title}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
-                      );
-                    })}
+                      )
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
