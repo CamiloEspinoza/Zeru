@@ -11,7 +11,7 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const tenantId = req.headers[TENANT_HEADER] as string | undefined;
 
     if (tenantId) {
-      (req as any).tenantId = tenantId;
+      (req as Request & { tenantId: string }).tenantId = tenantId;
     }
 
     next();

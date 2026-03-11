@@ -290,11 +290,11 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: (this.config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
+      expiresIn: this.config.get<string>('JWT_EXPIRATION') ?? '7d',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: (this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d') as any,
+      expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d',
     });
 
     return { accessToken, refreshToken, tenantId: user.tenantId };
