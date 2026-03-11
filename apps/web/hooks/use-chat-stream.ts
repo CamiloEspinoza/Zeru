@@ -179,7 +179,7 @@ export type ContentBlock =
 // ─── Message blocks ───────────────────────────────────────────────────────────
 
 export type MessageBlock =
-  | { id: string; type: "user"; text: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
+  | { id: string; type: "user"; text: string; docs?: AttachedDoc[]; uploadedImages?: UploadedImage[] }
   | {
       id: string;
       type: "assistant";
@@ -244,7 +244,7 @@ export function useChatStream() {
   const sendMessage = useCallback(
     async (
       text: string,
-      opts?: { questionToolCallId?: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
+      opts?: { questionToolCallId?: string; docs?: AttachedDoc[]; uploadedImages?: UploadedImage[] }
     ) => {
       if (streaming) return;
 
@@ -253,7 +253,7 @@ export function useChatStream() {
 
       setMessages((prev) => [
         ...prev,
-        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImage: opts?.uploadedImage },
+        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImages: opts?.uploadedImages },
         {
           id: assistantMsgId,
           type: "assistant",
@@ -277,7 +277,7 @@ export function useChatStream() {
             conversationId,
             questionToolCallId: opts?.questionToolCallId,
             documentIds: opts?.docs?.map((d) => d.id),
-            uploadedImage: opts?.uploadedImage,
+            uploadedImages: opts?.uploadedImages,
           }),
           signal: abortRef.current.signal,
         });
@@ -563,6 +563,7 @@ export function useChatStream() {
           /** OpenAI call_id for question messages; required when sending the answer back */
           callId?: string;
           uploadedImage?: UploadedImage;
+          uploadedImages?: UploadedImage[];
         } | null;
         toolName?: string | null;
         toolArgs?: Record<string, unknown> | null;
@@ -631,12 +632,14 @@ export function useChatStream() {
         if (msg.role === "user") {
           // Orphaned pending blocks (no thinking arrived) — attach to last assistant
           drainPending();
-          const uploadedImage = msg.content?.uploadedImage as UploadedImage | undefined;
+          // Backward compat: support both old singular `uploadedImage` and new plural `uploadedImages`
+          const uploadedImages = (msg.content?.uploadedImages as UploadedImage[] | undefined)
+            ?? (msg.content?.uploadedImage ? [msg.content.uploadedImage as UploadedImage] : undefined);
           blocks.push({
             id: msg.id,
             type: "user",
             text: msg.content?.text ?? "",
-            ...(uploadedImage ? { uploadedImage } : {}),
+            ...(uploadedImages?.length ? { uploadedImages } : {}),
           });
 
         } else if (msg.role === "assistant") {

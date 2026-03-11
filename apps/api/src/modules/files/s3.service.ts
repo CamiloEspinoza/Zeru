@@ -91,6 +91,27 @@ export class S3Service {
     }
   }
 
+  /** Downloads an object from S3 as a Buffer with its content type. */
+  async download(tenantId: string, key: string): Promise<{ buffer: Buffer; contentType: string }> {
+    const { client, bucket } = await this.getContext(tenantId);
+    try {
+      const response = await client.send(
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
+      );
+      const chunks: Buffer[] = [];
+      for await (const chunk of response.Body as AsyncIterable<Buffer>) {
+        chunks.push(chunk);
+      }
+      return { buffer: Buffer.concat(chunks), contentType: response.ContentType ?? 'application/octet-stream' };
+    } catch (err) {
+      throw new InternalServerErrorException(
+        `Error downloading file from S3: ${(err as Error).message}`,
+      );
+    } finally {
+      client.destroy();
+    }
+  }
+
   /** Builds the S3 key for a document. */
   static buildKey(tenantId: string, docId: string, filename: string): string {
     return `tenants/${tenantId}/documents/${docId}/${filename}`;

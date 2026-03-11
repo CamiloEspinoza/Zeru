@@ -18,9 +18,9 @@ export const chatRequestSchema = z.object({
   questionToolCallId: z.string().optional(),
   /** IDs of documents already uploaded via POST /files/upload */
   documentIds: z.array(z.string().uuid()).optional(),
-  /** Uploaded image metadata (for social media post creation) */
-  uploadedImage: z
-    .object({ s3Key: z.string(), imageUrl: z.string() })
+  /** Uploaded images metadata (for social media post creation) */
+  uploadedImages: z
+    .array(z.object({ s3Key: z.string(), imageUrl: z.string() }))
     .optional(),
 });
 
