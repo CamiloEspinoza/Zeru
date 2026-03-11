@@ -189,12 +189,21 @@ export type MessageBlock =
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+/** Cumulative token usage for the conversation */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedTokens: number;
+}
+
 export function useChatStream() {
   const [messages, setMessages] = useState<MessageBlock[]>([]);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const conversationIdRef = useRef<string | undefined>(undefined);
   const [conversationTitle, setConversationTitle] = useState<string | undefined>();
   const [streaming, setStreaming] = useState(false);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsage>({ inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedTokens: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
   // Keep ref in sync so handleEvent callbacks can read the latest value
@@ -447,6 +456,15 @@ export function useChatStream() {
 
         case "done":
           setConversationId(event.conversationId);
+          // Accumulate token usage
+          if (event.usage) {
+            setTokenUsage((prev) => ({
+              inputTokens: prev.inputTokens + event.usage.inputTokens,
+              outputTokens: prev.outputTokens + event.usage.outputTokens,
+              totalTokens: prev.totalTokens + (event.usage.totalTokens ?? 0),
+              cachedTokens: prev.cachedTokens + (event.usage.cachedTokens ?? 0),
+            }));
+          }
           // Mark all open thinking blocks as done
           updateLastAssistantBlocks((blocks) =>
             blocks.map((b) =>
@@ -509,6 +527,7 @@ export function useChatStream() {
     setMessages([]);
     setConversationId(undefined);
     setConversationTitle(undefined);
+    setTokenUsage({ inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedTokens: 0 });
   }, [abort]);
 
   /**
@@ -732,6 +751,7 @@ export function useChatStream() {
     conversationId,
     conversationTitle,
     streaming,
+    tokenUsage,
     sendMessage,
     answerQuestion,
     abort,

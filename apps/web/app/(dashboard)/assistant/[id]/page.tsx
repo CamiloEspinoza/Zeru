@@ -9,6 +9,7 @@ import { QuestionCard } from "@/components/ai/question-card";
 import { JournalEntryReviewCard } from "@/components/ai/journal-entry-review-card";
 import { PostPreviewCard } from "@/components/linkedin/post-preview-card";
 import { ImagePreviewCard } from "@/components/linkedin/image-preview-card";
+import { TokenMeter } from "@/components/ai/token-meter";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -273,7 +274,7 @@ export default function AssistantChatPage() {
   const router = useRouter();
   const isNew = params.id === "new";
 
-  const { messages, conversationId, conversationTitle, streaming, sendMessage, answerQuestion, reset, loadHistory } =
+  const { messages, conversationId, conversationTitle, streaming, tokenUsage, sendMessage, answerQuestion, reset, loadHistory } =
     useChatStream();
 
   const [input, setInput] = useState("");
@@ -661,6 +662,9 @@ export default function AssistantChatPage() {
           title={conversationTitle ?? (isNew ? "Nueva conversación" : "Cargando...")}
           animate={!!conversationTitle}
         />
+        <div className="ml-auto">
+          <TokenMeter liveUsage={tokenUsage} conversationId={conversationId} />
+        </div>
       </div>
 
       {/* Message list */}
