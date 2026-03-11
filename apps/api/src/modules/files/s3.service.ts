@@ -6,7 +6,7 @@ import {
   GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { StorageConfigService, type DecryptedStorageConfig } from '../storage-config/storage-config.service';
+import { StorageConfigService } from '../storage-config/storage-config.service';
 
 @Injectable()
 export class S3Service {

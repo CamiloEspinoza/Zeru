@@ -189,7 +189,7 @@ export class ReportsService {
       return { periods: [], rows: [] };
     }
 
-    const periodIds = periods.map((p) => p.id);
+    const _periodIds = periods.map((p) => p.id);
     const rowsByPeriod: IncomeStatementRow[][] = [];
 
     for (const period of periods) {

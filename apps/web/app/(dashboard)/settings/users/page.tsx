@@ -33,7 +33,7 @@ export default function UsersSettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchUsers();
+    Promise.resolve().then(fetchUsers);
   }, [fetchUsers]);
 
   const getRoleBadgeVariant = (role: string) => {

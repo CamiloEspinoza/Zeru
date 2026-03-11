@@ -147,7 +147,7 @@ function GeneralLedgerPageContent() {
 
   // Reference data (loaded once)
   const [accountsTree, setAccountsTree] = useState<AccountWithChildren[]>([]);
-  const [periods, setPeriods] = useState<FiscalPeriod[]>([]);
+  const [, setPeriods] = useState<FiscalPeriod[]>([]);
   const [refDataReady, setRefDataReady] = useState(false);
 
   // Report results
@@ -204,7 +204,7 @@ function GeneralLedgerPageContent() {
         setRefDataReady(true);
       })
       .catch((err) => setError(err.message ?? "Error al cargar datos"));
-  }, [tenant?.id]);
+  }, [tenant?.id, searchParams, router, pathname]);
 
   // Auto-search when URL has all 3 filters and ref data is ready
   const lastFetchKeyRef = useRef<string | null>(null);
@@ -217,15 +217,17 @@ function GeneralLedgerPageContent() {
     if (lastFetchKeyRef.current === key) return;
     lastFetchKeyRef.current = key;
 
-    setLoading(true);
-    setError(null);
-    setHasSearched(true);
     const params = new URLSearchParams({ accountId, startDate, endDate });
-    api
-      .get<GeneralLedgerRow[]>(
-        `/accounting/reports/general-ledger?${params.toString()}`,
-        { tenantId }
-      )
+    Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        setHasSearched(true);
+        return api.get<GeneralLedgerRow[]>(
+          `/accounting/reports/general-ledger?${params.toString()}`,
+          { tenantId }
+        );
+      })
       .then(setData)
       .catch((err) => setError(err.message ?? "Error al cargar reporte"))
       .finally(() => setLoading(false));

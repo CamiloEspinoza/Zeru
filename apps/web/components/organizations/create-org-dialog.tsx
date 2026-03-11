@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api-client";
 import { useAuthContext } from "@/providers/auth-provider";
-import type { Tenant, AuthTokens } from "@zeru/shared";
-import { storeTokens } from "@/hooks/use-auth";
+import type { Tenant } from "@zeru/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

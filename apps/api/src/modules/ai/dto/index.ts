@@ -4,6 +4,7 @@ export const upsertAiConfigSchema = z.object({
   provider: z.enum(['OPENAI']),
   apiKey: z.string().min(1, 'API key requerida'),
   model: z.string().min(1, 'Modelo requerido'),
+  reasoningEffort: z.enum(['none', 'low', 'medium', 'high']).optional(),
 });
 
 export const validateKeySchema = z.object({

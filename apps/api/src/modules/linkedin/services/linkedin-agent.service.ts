@@ -215,7 +215,7 @@ export class LinkedInAgentService {
     isNewConversation: boolean;
     systemPrompt: string;
   }) {
-    const { openai, model, conversation, ctx, subject, isNewConversation, systemPrompt } = params;
+    const { openai, model, conversation, ctx, subject, systemPrompt } = params;
 
     let input: OpenAI.Responses.ResponseInput;
     let currentPrevResponseId = conversation.lastResponseId ?? undefined;
