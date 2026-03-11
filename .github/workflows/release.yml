@@ -189,8 +189,24 @@ jobs:
               ["AWS_SES_SECRET_ACCESS_KEY"]="${{ secrets.AWS_SES_SECRET_ACCESS_KEY }}"
               ["AWS_SES_FROM_EMAIL"]="${{ secrets.AWS_SES_FROM_EMAIL }}"
             )
+            declare -A LINKEDIN_VARS=(
+              ["LINKEDIN_CLIENT_ID"]="${{ secrets.LINKEDIN_CLIENT_ID }}"
+              ["LINKEDIN_CLIENT_SECRET"]="${{ secrets.LINKEDIN_CLIENT_SECRET }}"
+              ["LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_ID"]="${{ secrets.LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_ID }}"
+              ["LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_SECRET"]="${{ secrets.LINKEDIN_COMMUNITY_MANAGMENT_CLIENT_SECRET }}"
+            )
             for key in "${!SES_VARS[@]}"; do
               val="${SES_VARS[$key]}"
+              if [[ -n "$val" ]]; then
+                if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+                  sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
+                else
+                  echo "${key}=${val}" >> "$ENV_FILE"
+                fi
+              fi
+            done
+            for key in "${!LINKEDIN_VARS[@]}"; do
+              val="${LINKEDIN_VARS[$key]}"
               if [[ -n "$val" ]]; then
                 if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
                   sed -i "s|^${key}=.*|${key}=${val}|" "$ENV_FILE"
