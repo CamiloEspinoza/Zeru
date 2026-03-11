@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
+import { MemoryCategory } from '@prisma/client';
 import { MemoryService } from '../services/memory.service';
 import { updateMemorySchema, type UpdateMemoryDto } from '../dto';
 
@@ -57,7 +58,7 @@ export class MemoryController {
       memoryId,
       tenantId,
       content: body.content,
-      category: body.category as any,
+      category: body.category as MemoryCategory,
       importance: body.importance,
     });
 

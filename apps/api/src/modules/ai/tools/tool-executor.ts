@@ -13,6 +13,14 @@ import { LinkedInApiService } from '../../linkedin/services/linkedin-api.service
 import { GeminiImageService } from '../../linkedin/services/gemini-image.service';
 import { DocumentCategory, MemoryCategory } from '@prisma/client';
 
+interface AccountTreeNode {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  children?: AccountTreeNode[];
+}
+
 export interface ToolExecutionResult {
   success: boolean;
   data: unknown;
@@ -147,7 +155,7 @@ export class ToolExecutor {
 
   private async listAccounts(tenantId: string): Promise<ToolExecutionResult> {
     const accounts = await this.chartOfAccounts.findAll(tenantId);
-    const flat = this.flattenAccounts(accounts as any[]);
+    const flat = this.flattenAccounts(accounts as AccountTreeNode[]);
     return {
       success: true,
       data: flat,
@@ -156,13 +164,13 @@ export class ToolExecutor {
   }
 
   private flattenAccounts(
-    accounts: Array<{ id: string; code: string; name: string; type: string; children?: unknown[] }>,
+    accounts: AccountTreeNode[],
     result: Array<{ id: string; code: string; name: string; type: string }> = [],
   ) {
     for (const account of accounts) {
       result.push({ id: account.id, code: account.code, name: account.name, type: account.type });
       if (account.children && account.children.length > 0) {
-        this.flattenAccounts(account.children as any[], result);
+        this.flattenAccounts(account.children, result);
       }
     }
     return result;
@@ -344,7 +352,7 @@ export class ToolExecutor {
     tenantId: string,
   ): Promise<ToolExecutionResult> {
     const existing = await this.chartOfAccounts.findAll(tenantId);
-    const flat = this.flattenAccounts(existing as any[]);
+    const flat = this.flattenAccounts(existing as AccountTreeNode[]);
     if (flat.length > 0) {
       return {
         success: false,
@@ -551,7 +559,7 @@ export class ToolExecutor {
     return {
       success: true,
       data: entry,
-      summary: `Asiento #${(entry as any).number} contabilizado (POSTED)`,
+      summary: `Asiento #${(entry as Record<string, unknown>).number} contabilizado (POSTED)`,
     };
   }
 

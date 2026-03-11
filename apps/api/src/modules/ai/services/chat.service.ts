@@ -459,7 +459,7 @@ export class ChatService {
       console.log('[ChatService] Stream call:', {
         iteration,
         previousResponseId: currentPrevResponseId ?? null,
-        inputItemTypes: Array.isArray(input) ? input.map((i: any) => i['type'] ?? i['role'] ?? 'unknown') : 'non-array',
+        inputItemTypes: Array.isArray(input) ? input.map((i: Record<string, unknown>) => i['type'] ?? i['role'] ?? 'unknown') : 'non-array',
       });
 
       const reasoningConfig = reasoningEffort === 'none'

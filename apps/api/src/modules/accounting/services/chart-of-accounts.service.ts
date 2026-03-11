@@ -8,7 +8,7 @@ export class ChartOfAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(tenantId: string) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     const accounts = await client.account.findMany({
       orderBy: { code: 'asc' },
