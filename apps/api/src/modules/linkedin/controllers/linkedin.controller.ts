@@ -241,24 +241,6 @@ export class LinkedInController {
     return this.postsService.reschedule(tenantId, postId, new Date(body.scheduledAt));
   }
 
-  // ─── Session cookie (li_at) ───────────────────────────────
-
-  @Put('session-cookie')
-  async saveSessionCookie(
-    @Body() body: { liAtCookie: string },
-    @CurrentTenant() tenantId: string,
-  ) {
-    if (!body.liAtCookie?.trim()) throw new Error('liAtCookie is required');
-    await this.authService.saveSessionCookie(tenantId, body.liAtCookie);
-    return { saved: true };
-  }
-
-  @Get('session-cookie/status')
-  async getSessionCookieStatus(@CurrentTenant() tenantId: string) {
-    const has = await this.authService.hasSessionCookie(tenantId);
-    return { configured: has };
-  }
-
   // ─── Community Management OAuth ──────────────────────────
 
   @Post('community/setup-organization')
@@ -277,7 +259,7 @@ export class LinkedInController {
     if (!vanityMatch) throw new BadRequestException('URL de empresa inválida. Usa el formato: linkedin.com/company/nombre-empresa');
     const vanityName = vanityMatch[1];
 
-    const org = await this.apiService.resolveOrganizationUrnViaVoyager(tenantId, vanityName);
+    const org = await this.apiService.resolveOrganizationUrn(tenantId, vanityName);
     await this.postsService.updateConfig(tenantId, { organizationUrn: org.urn });
     return { organizationUrn: org.urn, displayName: org.displayName };
   }

@@ -157,32 +157,6 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
-    name: 'resolve_linkedin_mention',
-    description:
-      'Resuelve una URL de perfil o empresa de LinkedIn al URN necesario para mencionar en un post. ' +
-      'Para personas usa URLs como linkedin.com/in/nombre. Para empresas usa linkedin.com/company/nombre. ' +
-      'Devuelve el URN y el nombre para construir la mención con formato @[Nombre](urn:li:person:ID) u @[Empresa](urn:li:organization:ID).',
-    parameters: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          description:
-            'URL del perfil de LinkedIn. Ejemplos: "https://www.linkedin.com/in/juanpablo/", "https://www.linkedin.com/company/platzi/", o simplemente el vanity name "juanpablo" o "platzi".',
-        },
-        type: {
-          type: 'string',
-          enum: ['person', 'organization'],
-          description: '"person" para perfiles personales (/in/), "organization" para empresas (/company/).',
-        },
-      },
-      required: ['url', 'type'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: 'function',
     name: 'get_linkedin_connection_status',
     description: 'Verifica si LinkedIn está conectado para este tenant y obtiene info del perfil.',
     parameters: {
@@ -324,25 +298,6 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
-    name: 'search_linkedin_person',
-    description:
-      'Busca una persona de LinkedIn por URL de perfil para obtener su URN. Usa esto cuando necesites mencionar a alguien en un post. El usuario debe proporcionar la URL del perfil (ej: linkedin.com/in/nombre).',
-    parameters: {
-      type: 'object',
-      properties: {
-        profile_url: {
-          type: 'string',
-          description:
-            'URL del perfil de LinkedIn (ej: "linkedin.com/in/juan-perez" o "https://www.linkedin.com/in/juan-perez").',
-        },
-      },
-      required: ['profile_url'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: 'function',
     name: 'memory_store',
     description: 'Guarda información importante en memoria persistente (preferencias de contenido, audiencia, decisiones de estilo).',
     parameters: {
@@ -400,7 +355,6 @@ export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   schedule_linkedin_post: 'Programando post de LinkedIn',
   bulk_schedule_posts: 'Programando calendario de contenido',
   generate_image: 'Generando imagen con Gemini',
-  resolve_linkedin_mention: 'Buscando perfil en LinkedIn',
   get_linkedin_connection_status: 'Verificando conexión de LinkedIn',
   get_post_history: 'Consultando historial de posts',
   get_scheduled_posts: 'Consultando posts programados',
@@ -410,6 +364,5 @@ export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   update_conversation_title: 'Actualizando título',
   memory_store: 'Guardando en memoria',
   memory_search: 'Buscando en memoria',
-  search_linkedin_person: 'Buscando persona en LinkedIn',
   get_skill_reference: 'Cargando referencia del skill',
 };

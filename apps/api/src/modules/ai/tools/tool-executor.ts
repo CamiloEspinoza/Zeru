@@ -99,9 +99,6 @@ export class ToolExecutor {
         case 'generate_image':
           return await this.generateImage(args, tenantId);
 
-        case 'resolve_linkedin_mention':
-          return await this.resolveLinkedInMention(args, tenantId);
-
         case 'get_linkedin_connection_status':
           return await this.getLinkedInConnectionStatus(tenantId);
 
@@ -742,77 +739,6 @@ export class ToolExecutor {
       data: { s3Key: result.s3Key, imageUrl: result.s3Url, mimeType: result.mimeType },
       summary: `Imagen generada con Gemini ${model === 'pro' ? '3 Pro' : '3.1 Flash'} (${args.aspect_ratio})`,
     };
-  }
-
-  private async resolveLinkedInMention(
-    args: Record<string, unknown>,
-    tenantId: string,
-  ): Promise<ToolExecutionResult> {
-    const rawUrl = String(args.url ?? '').trim();
-    const type = String(args.type ?? 'person') as 'person' | 'organization';
-
-    // Extract vanity name from URL or use as-is
-    let vanityName = rawUrl;
-    const personMatch = rawUrl.match(/linkedin\.com\/in\/([^/?#]+)/);
-    const orgMatch = rawUrl.match(/linkedin\.com\/company\/([^/?#]+)/);
-    if (personMatch) vanityName = personMatch[1];
-    else if (orgMatch) vanityName = orgMatch[1];
-    vanityName = vanityName.replace(/\/$/, '');
-
-    if (type === 'organization') {
-      try {
-        const result = await this.linkedInApi.resolveOrganizationUrn(tenantId, vanityName);
-        const mentionText = `@[${result.displayName}](${result.urn})`;
-        return {
-          success: true,
-          data: { ...result, mentionText, type: 'organization' },
-          summary: `Empresa encontrada: ${result.displayName} → ${result.urn}`,
-        };
-      } catch {
-        // Fallback: embed URL as plain text
-        return {
-          success: true,
-          data: { fallback: true, url: rawUrl, vanityName, type: 'organization', mentionText: null },
-          summary: `No se pudo resolver la mención de empresa. Usa el nombre y la URL en el texto del post.`,
-        };
-      }
-    }
-
-    // For persons: requires li_at session cookie stored by the user in settings
-    const profileUrl = rawUrl.startsWith('http') ? rawUrl : `https://www.linkedin.com/in/${vanityName}/`;
-    try {
-      const result = await this.linkedInApi.resolvePersonUrn(tenantId, vanityName);
-      const mentionText = `@[${result.displayName}](${result.urn})`;
-      return {
-        success: true,
-        data: { ...result, mentionText, type: 'person' },
-        summary: `Perfil encontrado: ${result.displayName} → ${result.urn}`,
-      };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-
-      // Special case: no session cookie configured — tell the agent to guide the user
-      if (message === 'NO_SESSION_COOKIE') {
-        return {
-          success: true,
-          data: {
-            needsSessionCookie: true,
-            vanityName,
-            url: profileUrl,
-            type: 'person',
-            mentionText: null,
-          },
-          summary: `El usuario no ha configurado su cookie de sesión de LinkedIn (li_at). Necesaria para menciones a personas.`,
-        };
-      }
-
-      // Other errors (expired cookie, profile not found, etc.) — fallback to plain text
-      return {
-        success: true,
-        data: { fallback: true, url: profileUrl, vanityName, type: 'person', mentionText: null },
-        summary: `No se pudo resolver la mención: ${message}. Usa el nombre y URL en el texto del post.`,
-      };
-    }
   }
 
   private async getLinkedInConnectionStatus(tenantId: string): Promise<ToolExecutionResult> {

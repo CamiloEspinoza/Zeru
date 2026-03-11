@@ -31,7 +31,6 @@ const TOOL_LABELS: Record<string, string> = {
   schedule_linkedin_post: "Programando post de LinkedIn",
   bulk_schedule_posts: "Programando calendario de contenido",
   generate_image: "Generando imagen con Gemini",
-  resolve_linkedin_mention: "Buscando perfil en LinkedIn",
   get_linkedin_connection_status: "Verificando conexión de LinkedIn",
   get_post_history: "Consultando historial de posts",
   get_scheduled_posts: "Consultando posts programados",
