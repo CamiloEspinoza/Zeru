@@ -1,3 +1,16 @@
+# [0.6.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.5.0...v0.6.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* resolve react-hooks/set-state-in-effect lint error in TokenMeter ([157b0a6](https://github.com/CamiloEspinoza/Zeru/commit/157b0a67f8cb7d46cba37fb58c9b89092cfa0d52))
+
+
+### Features
+
+* add AI token tracking, cost control, and visual meter ([59dd4a7](https://github.com/CamiloEspinoza/Zeru/commit/59dd4a73a13b73762999eec58563bf775b41b418))
+* overhaul LinkedIn post creation flow with draft-first carousel UX ([523ffe0](https://github.com/CamiloEspinoza/Zeru/commit/523ffe07cf97143089cc94125e587c7b9b06f532))
+
 # [0.5.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.4.1...v0.5.0) (2026-03-11)
 
 
