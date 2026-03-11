@@ -55,7 +55,12 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("es-CL", { day: "numeric", month: "short" });
 }
 
-export function ConversationsSidebar() {
+interface ConversationsSidebarProps {
+  /** When provided, close the mobile sheet after navigating */
+  onNavigate?: () => void;
+}
+
+export function ConversationsSidebar({ onNavigate }: ConversationsSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -127,7 +132,7 @@ export function ConversationsSidebar() {
     : null;
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-background overflow-hidden">
+    <aside className="flex w-full md:w-60 shrink-0 flex-col border-r border-border bg-background overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-border">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -135,6 +140,7 @@ export function ConversationsSidebar() {
         </span>
         <Link
           href="/assistant/new"
+          onClick={onNavigate}
           className="flex items-center justify-center size-6 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           title="Nueva conversación"
         >
@@ -160,6 +166,7 @@ export function ConversationsSidebar() {
               <Link
                 key={conv.id}
                 href={`/assistant/${conv.id}`}
+                onClick={onNavigate}
                 className={cn(
                   "group relative flex items-start gap-2 px-3 py-2.5 mx-1 rounded-lg transition-colors",
                   isActive

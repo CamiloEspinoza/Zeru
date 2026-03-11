@@ -656,7 +656,7 @@ export default function AssistantChatPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b shrink-0">
+      <div className="flex items-center gap-3 px-3 md:px-6 py-3 border-b shrink-0">
         <ConversationTitle
           title={conversationTitle ?? (isNew ? "Nueva conversación" : "Cargando...")}
           animate={!!conversationTitle}
@@ -667,7 +667,7 @@ export default function AssistantChatPage() {
       <div
         ref={scrollContainerRef}
         onScroll={handleScrollContainerScroll}
-        className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-4"
+        className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 space-y-4"
       >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 text-muted-foreground">
@@ -697,7 +697,7 @@ export default function AssistantChatPage() {
                 Arrastra archivos o pega imágenes directamente en el chat.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2 justify-center max-w-md">
+            <div className="flex flex-wrap gap-2 justify-center max-w-md px-2">
               {[
                 "Crea los asientos de constitución de sociedad",
                 "¿Cuál es el balance de comprobación?",
@@ -724,7 +724,7 @@ export default function AssistantChatPage() {
           <div key={msg.id}>
             {msg.type === "user" ? (
               <div className="flex justify-end">
-                <div className="max-w-[75%] space-y-2">
+                <div className="max-w-[90%] md:max-w-[75%] space-y-2">
                   {/* Uploaded image in user bubble (for social media posts) */}
                   {msg.uploadedImage && (
                     <div className="flex justify-end">
@@ -986,7 +986,7 @@ export default function AssistantChatPage() {
 
       {/* Bulk post action bar — visible when 2+ pending posts in current conversation */}
       {pendingPosts.length >= 2 && (
-        <div className="mx-6 mb-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 px-4 py-3">
+        <div className="mx-3 md:mx-6 mb-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 md:gap-3 rounded-xl border border-amber-200/60 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-950/20 px-3 md:px-4 py-3">
           <div className="flex items-center gap-2 text-sm">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
               {pendingPosts.length}
@@ -1025,7 +1025,7 @@ export default function AssistantChatPage() {
       )}
 
       {/* Input area */}
-      <div className="border-t px-6 pt-4 pb-5 shrink-0">
+      <div className="border-t px-3 md:px-6 pt-3 md:pt-4 pb-4 md:pb-5 shrink-0">
         <div
           className={cn(
             "rounded-xl border bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring",
@@ -1216,7 +1216,7 @@ export default function AssistantChatPage() {
 
       {/* Botón flotante: asientos en borrador pendientes de contabilizar */}
       {!isNew && pendingDraftEntries.length > 0 && (
-        <div className="fixed bottom-24 right-6 z-40">
+        <div className="fixed bottom-24 right-3 md:right-6 z-40">
           {pendingDraftEntries.length === 1 ? (
             <Button
               size="sm"

@@ -460,7 +460,7 @@ export class ChatService {
       const messageText = ctx.uploadedImage
         ? `[IMAGEN ADJUNTA PARA EL POST — úsala directamente sin llamar a generate_image. s3_key: ${ctx.uploadedImage.s3Key} | url: ${ctx.uploadedImage.imageUrl}]\n\n${ctx.message || "Crea un post de LinkedIn con esta imagen."}`
         : ctx.message;
-      const userContent = this.buildUserContent(messageText, resolvedDocs);
+      const userContent = this.buildUserContent(messageText, resolvedDocs, ctx.uploadedImage);
       if (currentPrevResponseId) {
         // Continuing an existing conversation
         input = [{ role: 'user', content: userContent }];
@@ -814,8 +814,9 @@ export class ChatService {
   private buildUserContent(
     text: string,
     resolvedDocs: ResolvedDocument[],
+    uploadedImage?: { s3Key: string; imageUrl: string },
   ): string | OpenAI.Responses.ResponseInputContent[] {
-    if (!resolvedDocs.length) return text;
+    if (!resolvedDocs.length && !uploadedImage) return text;
 
     const docRefs = resolvedDocs
       .filter((d) => d.docId)
@@ -835,6 +836,15 @@ export class ChatService {
     const parts: OpenAI.Responses.ResponseInputContent[] = [
       { type: 'input_text', text: combinedText } as OpenAI.Responses.ResponseInputText,
     ];
+
+    // Include uploaded image so the model can visually interpret it
+    if (uploadedImage?.imageUrl) {
+      parts.push({
+        type: 'input_image',
+        image_url: uploadedImage.imageUrl,
+        detail: 'auto',
+      } as OpenAI.Responses.ResponseInputImage);
+    }
 
     for (const d of resolvedDocs) {
       if (d.mimeType.startsWith('image/') && d.presignedUrl) {
