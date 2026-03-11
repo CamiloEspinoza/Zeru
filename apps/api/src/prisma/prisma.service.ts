@@ -38,21 +38,21 @@ export class PrismaService
           if (writeOps.includes(operation)) {
             if ('data' in args) {
               if (Array.isArray(args.data)) {
-                args.data = args.data.map((d: any) => ({
+                args.data = args.data.map((d: Record<string, unknown>) => ({
                   ...d,
                   tenantId,
                 }));
               } else if (args.data && typeof args.data === 'object') {
-                (args.data as any).tenantId = tenantId;
+                (args.data as Record<string, unknown>).tenantId = tenantId;
               }
             }
           }
 
           if ([...readOps, ...mutateOps].includes(operation)) {
             if ('where' in args && args.where) {
-              (args.where as any).tenantId = tenantId;
+              (args.where as Record<string, unknown>).tenantId = tenantId;
             } else if ('where' in args || readOps.includes(operation)) {
-              (args as any).where = { tenantId };
+              (args as Record<string, unknown>).where = { tenantId };
             }
           }
 
