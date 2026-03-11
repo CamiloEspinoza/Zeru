@@ -1,3 +1,19 @@
+# [0.5.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.4.1...v0.5.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* **accounting:** remove explicit any casts in accounting services ([f404602](https://github.com/CamiloEspinoza/Zeru/commit/f404602b6c39073e4f9cf09ea002e4f26676f10b))
+* **ci:** ignore release commits in commitlint to prevent body-max-line-length failures ([49e9e3d](https://github.com/CamiloEspinoza/Zeru/commit/49e9e3d23ec23e7b0681afdaed16216f8350efa6))
+* remove all @typescript-eslint/no-explicit-any warnings ([3697d50](https://github.com/CamiloEspinoza/Zeru/commit/3697d50f863203a5208dc1163bba46f673da3904))
+* remove remaining @typescript-eslint/no-explicit-any warnings ([2e93cc9](https://github.com/CamiloEspinoza/Zeru/commit/2e93cc9ecea75b22012883d990af89b3e52b5fb4))
+
+
+### Features
+
+* **ai:** add GPT-5.4 model support with configurable reasoning effort ([a757571](https://github.com/CamiloEspinoza/Zeru/commit/a757571c44ffc086f8be3c3a9d07709bf16c7c06))
+* **assistant:** mobile-responsive chat UI and image vision support ([a2d02dc](https://github.com/CamiloEspinoza/Zeru/commit/a2d02dc365808d1a5e542ea36cd7a029bc0732e6))
+
 ## [0.4.1](https://github.com/CamiloEspinoza/Zeru/compare/v0.4.0...v0.4.1) (2026-03-11)
 
 
