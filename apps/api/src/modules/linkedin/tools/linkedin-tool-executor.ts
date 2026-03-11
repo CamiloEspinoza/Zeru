@@ -45,6 +45,12 @@ export class LinkedInToolExecutor {
         case 'bulk_schedule_posts':
           return await this.bulkSchedulePosts(args, tenantId, options?.conversationId);
 
+        case 'bulk_create_drafts':
+          return await this.bulkCreateDrafts(args, tenantId, options?.conversationId);
+
+        case 'suggest_image_prompt':
+          return await this.suggestImagePrompt(args, tenantId);
+
         case 'generate_image':
           return await this.generateImage(args, tenantId);
 
@@ -161,6 +167,57 @@ export class LinkedInToolExecutor {
       success: true,
       data: { count: created.length, posts: created.map((p) => ({ id: p.id, scheduledAt: p.scheduledAt, contentPillar: p.contentPillar })) },
       summary: `${created.length} posts programados en el calendario de contenido`,
+    };
+  }
+
+  private async bulkCreateDrafts(args: Record<string, unknown>, tenantId: string, conversationId?: string): Promise<ToolExecutionResult> {
+    const postsInput = (args.posts as Array<{
+      content: string;
+      scheduled_at: string;
+      content_pillar?: string | null;
+      visibility?: string;
+      image_prompt?: string | null;
+    }>) ?? [];
+
+    const created = await this.postsService.bulkCreateDrafts(
+      tenantId,
+      postsInput.map((p) => ({
+        content: p.content,
+        scheduledAt: p.scheduled_at,
+        contentPillar: p.content_pillar ?? undefined,
+        visibility: p.visibility ?? 'PUBLIC',
+        imagePrompt: p.image_prompt ?? undefined,
+      })),
+      conversationId,
+    );
+
+    return {
+      success: true,
+      data: {
+        count: created.length,
+        posts: created.map((p) => ({
+          id: p.id,
+          content: p.content,
+          scheduledAt: p.scheduledAt,
+          contentPillar: p.contentPillar,
+          imagePrompt: p.imagePrompt,
+          status: p.status,
+        })),
+      },
+      summary: `${created.length} borradores creados para revisión`,
+    };
+  }
+
+  private async suggestImagePrompt(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const postId = String(args.post_id ?? '');
+    const prompt = String(args.prompt ?? '');
+
+    const post = await this.postsService.updateImagePrompt(tenantId, postId, prompt);
+
+    return {
+      success: true,
+      data: { postId: post.id, imagePrompt: prompt },
+      summary: `Prompt de imagen sugerido para el post`,
     };
   }
 
