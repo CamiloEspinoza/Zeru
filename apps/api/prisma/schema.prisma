@@ -659,6 +659,8 @@ model LinkedInPost {
   mediaUrl       String?
   /// S3 key de la imagen generada por Gemini
   imageS3Key     String?
+  /// Prompt sugerido/usado para la generación de la imagen
+  imagePrompt    String?
   /// DRAFT | PENDING_APPROVAL | SCHEDULED | PUBLISHED | FAILED | CANCELLED
   status         String    @default("DRAFT")
   /// Fecha/hora programada para auto-publicar
@@ -680,10 +682,51 @@ model LinkedInPost {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
+  versions       LinkedInPostVersion[]
+  imageVersions  LinkedInImageVersion[]
+
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([status, scheduledAt])
   @@map("linkedin_posts")
+}
+
+/// Versión del contenido de texto de un post (para historial de regeneraciones)
+model LinkedInPostVersion {
+  id            String   @id @default(uuid())
+  postId        String
+  post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  /// Contenido del post en esta versión
+  content       String
+  /// Número de versión (1, 2, 3...)
+  versionNumber Int
+  /// Instrucciones de regeneración que produjeron esta versión (null para la versión original)
+  instructions  String?
+  createdAt     DateTime @default(now())
+
+  @@index([postId])
+  @@map("linkedin_post_versions")
+}
+
+/// Versión de imagen generada para un post
+model LinkedInImageVersion {
+  id            String   @id @default(uuid())
+  postId        String
+  post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  /// Prompt usado para generar la imagen
+  prompt        String
+  /// URL pública de la imagen en S3
+  imageUrl      String
+  /// S3 key de la imagen
+  imageS3Key    String
+  /// Número de versión (1, 2, 3...)
+  versionNumber Int
+  /// Si esta versión es la seleccionada actualmente
+  isSelected    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([postId])
+  @@map("linkedin_image_versions")
 }
 
 /// Configuración del agente de LinkedIn por tenant

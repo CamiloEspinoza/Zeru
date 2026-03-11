@@ -105,6 +105,7 @@ export interface CreatePostInput {
   mediaType?: string;
   mediaUrl?: string;
   imageS3Key?: string;
+  imagePrompt?: string;
   status?: string;
   scheduledAt?: Date | null;
   contentPillar?: string;
@@ -118,6 +119,14 @@ export interface BulkScheduleItem {
   contentPillar?: string;
   mediaType?: string;
   visibility?: string;
+}
+
+export interface BulkCreateDraftItem {
+  content: string;
+  scheduledAt: string;
+  contentPillar?: string;
+  visibility?: string;
+  imagePrompt?: string | null;
 }
 
 export interface ListPostsFilters {
@@ -148,6 +157,7 @@ export class LinkedInPostsService {
         mediaType: input.mediaType ?? 'NONE',
         mediaUrl: input.mediaUrl ?? null,
         imageS3Key: input.imageS3Key ?? null,
+        imagePrompt: input.imagePrompt ?? null,
         status: input.status ?? 'DRAFT',
         scheduledAt: input.scheduledAt ?? null,
         contentPillar: input.contentPillar ?? null,
@@ -358,6 +368,218 @@ export class LinkedInPostsService {
         ...(data.defaultVisibility ? { defaultVisibility: data.defaultVisibility } : {}),
         ...(data.contentPillars ? { contentPillars: data.contentPillars } : {}),
         ...(data.organizationUrn !== undefined ? { organizationUrn: data.organizationUrn } : {}),
+      },
+    });
+  }
+
+  // ─── Version history & regeneration ─────────────────────
+
+  async bulkCreateDrafts(tenantId: string, posts: BulkCreateDraftItem[], conversationId?: string) {
+    const created = await this.prisma.$transaction(
+      posts.map((p) =>
+        this.prisma.linkedInPost.create({
+          data: {
+            tenantId,
+            content: p.content,
+            mediaType: 'NONE',
+            status: 'DRAFT',
+            scheduledAt: new Date(p.scheduledAt),
+            contentPillar: p.contentPillar ?? null,
+            visibility: p.visibility ?? 'PUBLIC',
+            imagePrompt: p.imagePrompt ?? null,
+            conversationId: conversationId ?? null,
+          },
+        }),
+      ),
+    );
+    return created;
+  }
+
+  async updateImagePrompt(tenantId: string, postId: string, prompt: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: { imagePrompt: prompt },
+    });
+  }
+
+  async updateContent(tenantId: string, postId: string, content: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+
+    // Save current content as a version before updating
+    const lastVersion = await this.prisma.linkedInPostVersion.findFirst({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    const nextVersion = (lastVersion?.versionNumber ?? 0) + 1;
+
+    await this.prisma.linkedInPostVersion.create({
+      data: {
+        postId,
+        content: post.content,
+        versionNumber: nextVersion,
+      },
+    });
+
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: { content },
+    });
+  }
+
+  async regenerateContent(tenantId: string, postId: string, instructions: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+
+    // Save current content as a version
+    const lastVersion = await this.prisma.linkedInPostVersion.findFirst({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    const nextVersion = (lastVersion?.versionNumber ?? 0) + 1;
+
+    await this.prisma.linkedInPostVersion.create({
+      data: {
+        postId,
+        content: post.content,
+        versionNumber: nextVersion,
+        instructions,
+      },
+    });
+
+    // Return the post with the instructions — the actual AI regeneration
+    // is done by the caller (controller/tool executor) using OpenAI
+    return { post, versionNumber: nextVersion };
+  }
+
+  async getVersions(tenantId: string, postId: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    return this.prisma.linkedInPostVersion.findMany({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+  }
+
+  async selectVersion(tenantId: string, postId: string, versionId: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    const version = await this.prisma.linkedInPostVersion.findFirst({
+      where: { id: versionId, postId },
+    });
+    if (!version) throw new NotFoundException('Versión no encontrada');
+
+    // Save current content before restoring
+    const lastVersion = await this.prisma.linkedInPostVersion.findFirst({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    const nextVersion = (lastVersion?.versionNumber ?? 0) + 1;
+
+    await this.prisma.linkedInPostVersion.create({
+      data: { postId, content: post.content, versionNumber: nextVersion },
+    });
+
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: { content: version.content },
+    });
+  }
+
+  async generateAndAttachImage(tenantId: string, postId: string, prompt: string, model: 'flash' | 'pro' = 'flash') {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+
+    const result = await this.geminiService.generateImage(tenantId, prompt, '1:1', model);
+
+    // Count existing image versions
+    const lastImageVersion = await this.prisma.linkedInImageVersion.findFirst({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+    const nextVersion = (lastImageVersion?.versionNumber ?? 0) + 1;
+
+    // Deselect all previous versions
+    await this.prisma.linkedInImageVersion.updateMany({
+      where: { postId },
+      data: { isSelected: false },
+    });
+
+    // Create new image version
+    const imageVersion = await this.prisma.linkedInImageVersion.create({
+      data: {
+        postId,
+        prompt,
+        imageUrl: result.s3Url,
+        imageS3Key: result.s3Key,
+        versionNumber: nextVersion,
+        isSelected: true,
+      },
+    });
+
+    // Update post with the new image
+    await this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: {
+        mediaType: 'IMAGE',
+        mediaUrl: result.s3Url,
+        imageS3Key: result.s3Key,
+        imagePrompt: prompt,
+      },
+    });
+
+    return { imageVersion, s3Key: result.s3Key, imageUrl: result.s3Url, mimeType: result.mimeType };
+  }
+
+  async getImageVersions(tenantId: string, postId: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    return this.prisma.linkedInImageVersion.findMany({
+      where: { postId },
+      orderBy: { versionNumber: 'desc' },
+    });
+  }
+
+  async selectImageVersion(tenantId: string, postId: string, versionId: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+    const version = await this.prisma.linkedInImageVersion.findFirst({
+      where: { id: versionId, postId },
+    });
+    if (!version) throw new NotFoundException('Versión de imagen no encontrada');
+
+    // Deselect all, then select the chosen one
+    await this.prisma.linkedInImageVersion.updateMany({
+      where: { postId },
+      data: { isSelected: false },
+    });
+    await this.prisma.linkedInImageVersion.update({
+      where: { id: versionId },
+      data: { isSelected: true },
+    });
+
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: {
+        mediaUrl: version.imageUrl,
+        imageS3Key: version.imageS3Key,
+        imagePrompt: version.prompt,
+      },
+    });
+  }
+
+  async uploadAndAttachImage(tenantId: string, postId: string, s3Key: string, imageUrl: string) {
+    const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
+    if (!post) throw new NotFoundException('Post no encontrado');
+
+    return this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: {
+        mediaType: 'IMAGE',
+        mediaUrl: imageUrl,
+        imageS3Key: s3Key,
       },
     });
   }

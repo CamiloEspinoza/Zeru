@@ -241,6 +241,111 @@ export class LinkedInController {
     return this.postsService.reschedule(tenantId, postId, new Date(body.scheduledAt));
   }
 
+  @Get('posts/:id')
+  async getPost(
+    @Param('id') postId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.postsService.getById(tenantId, postId);
+  }
+
+  @Put('posts/:id/content')
+  async updatePostContent(
+    @Param('id') postId: string,
+    @Body() body: { content: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.content?.trim()) throw new BadRequestException('content es requerido');
+    return this.postsService.updateContent(tenantId, postId, body.content);
+  }
+
+  @Post('posts/:id/regenerate')
+  async regeneratePost(
+    @Param('id') postId: string,
+    @Body() body: { instructions: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.instructions?.trim()) throw new BadRequestException('instructions es requerido');
+    return this.postsService.regenerateContent(tenantId, postId, body.instructions);
+  }
+
+  @Get('posts/:id/versions')
+  async getPostVersions(
+    @Param('id') postId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.postsService.getVersions(tenantId, postId);
+  }
+
+  @Put('posts/:id/select-version')
+  async selectPostVersion(
+    @Param('id') postId: string,
+    @Body() body: { versionId: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.versionId) throw new BadRequestException('versionId es requerido');
+    return this.postsService.selectVersion(tenantId, postId, body.versionId);
+  }
+
+  @Put('posts/:id/image-prompt')
+  async updateImagePrompt(
+    @Param('id') postId: string,
+    @Body() body: { prompt: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.prompt?.trim()) throw new BadRequestException('prompt es requerido');
+    return this.postsService.updateImagePrompt(tenantId, postId, body.prompt);
+  }
+
+  @Post('posts/:id/generate-image')
+  async generatePostImage(
+    @Param('id') postId: string,
+    @Body() body: { prompt: string; model?: 'flash' | 'pro' },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.prompt?.trim()) throw new BadRequestException('prompt es requerido');
+    return this.postsService.generateAndAttachImage(tenantId, postId, body.prompt, body.model ?? 'flash');
+  }
+
+  @Get('posts/:id/image-versions')
+  async getImageVersions(
+    @Param('id') postId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.postsService.getImageVersions(tenantId, postId);
+  }
+
+  @Put('posts/:id/select-image-version')
+  async selectImageVersion(
+    @Param('id') postId: string,
+    @Body() body: { versionId: string },
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!body.versionId) throw new BadRequestException('versionId es requerido');
+    return this.postsService.selectImageVersion(tenantId, postId, body.versionId);
+  }
+
+  @Post('posts/:id/upload-image')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  async uploadPostImage(
+    @Param('id') postId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.mimetype)) {
+      throw new BadRequestException('Solo se permiten imágenes (JPEG, PNG, WEBP, GIF)');
+    }
+    const uploaded = await this.geminiImageService.uploadUserImage(
+      tenantId,
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+    );
+    return this.postsService.uploadAndAttachImage(tenantId, postId, uploaded.s3Key, uploaded.s3Url);
+  }
+
   // ─── Community Management OAuth ──────────────────────────
 
   @Post('community/setup-organization')

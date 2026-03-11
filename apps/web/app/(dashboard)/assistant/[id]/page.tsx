@@ -7,8 +7,9 @@ import { ThinkingBlock } from "@/components/ai/thinking-block";
 import { ToolExecution } from "@/components/ai/tool-execution";
 import { QuestionCard } from "@/components/ai/question-card";
 import { JournalEntryReviewCard } from "@/components/ai/journal-entry-review-card";
-import { PostPreviewCard } from "@/components/linkedin/post-preview-card";
 import { ImagePreviewCard } from "@/components/linkedin/image-preview-card";
+import { PostDraftCard, type PostDraftData } from "@/components/linkedin/post-draft-card";
+import { PostCarousel } from "@/components/linkedin/post-carousel";
 import { TokenMeter } from "@/components/ai/token-meter";
 import { Button } from "@/components/ui/button";
 import {
@@ -470,42 +471,24 @@ export default function AssistantChatPage() {
     });
   }, []);
 
-  // ── Publish / cancel post actions ────────────────────────
-
-  const handlePublishPost = useCallback(async (postId: string) => {
-    try {
-      await api.post(`/linkedin/posts/${postId}/publish`, {});
-    } catch {
-      // Ignore, the post list will reflect real state on refresh
-    }
-  }, []);
-
-  const handleCancelPost = useCallback(async (postId: string) => {
-    try {
-      await api.post(`/linkedin/posts/${postId}/cancel`, {});
-    } catch {
-      // Ignore
-    }
-  }, []);
-
-  const handleSchedulePost = useCallback(async (postId: string, scheduledAt: Date) => {
-    await api.post(`/linkedin/posts/${postId}/reschedule`, { scheduledAt: scheduledAt.toISOString() });
-  }, []);
-
-  // Collect all PENDING_APPROVAL posts visible in the current conversation
+  // Collect all PENDING_APPROVAL/DRAFT posts visible in the current conversation
   const pendingPosts = useMemo(() => {
     const result: { id: string }[] = [];
     for (const msg of messages) {
       if (msg.type !== "assistant") continue;
       for (const block of msg.blocks) {
-        if (
-          block.kind === "tool" &&
-          (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") &&
-          block.state.status === "done" &&
-          block.state.result
-        ) {
+        if (block.kind !== "tool" || block.state.status !== "done" || !block.state.result) continue;
+
+        if (block.state.name === "bulk_create_drafts") {
+          const res = block.state.result as { posts?: { id: string; status: string }[] };
+          if (res.posts) {
+            for (const p of res.posts) {
+              if (["PENDING_APPROVAL", "DRAFT"].includes(p.status)) result.push({ id: p.id });
+            }
+          }
+        } else if (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") {
           const post = block.state.result as { id: string; status: string };
-          if (post.status === "PENDING_APPROVAL") {
+          if (["PENDING_APPROVAL", "DRAFT"].includes(post.status)) {
             result.push({ id: post.id });
           }
         }
@@ -776,7 +759,36 @@ export default function AssistantChatPage() {
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                   {/* Render blocks in chronological order */}
-                  {msg.blocks.map((block, blockIdx) => {
+                  {(() => {
+                    // Pre-collect post drafts for carousel rendering
+                    const POST_TOOL_NAMES = ["create_linkedin_post", "schedule_linkedin_post", "bulk_create_drafts"];
+                    const postDrafts: PostDraftData[] = [];
+                    const skipToolCallIds = new Set<string>();
+
+                    for (const block of msg.blocks) {
+                      if (block.kind !== "tool" || block.state.status !== "done" || !block.state.result) continue;
+                      if (block.state.name === "bulk_create_drafts") {
+                        const result = block.state.result as { posts?: PostDraftData[] };
+                        if (result.posts) {
+                          for (const p of result.posts) postDrafts.push(p);
+                          skipToolCallIds.add(block.state.toolCallId);
+                        }
+                      } else if (POST_TOOL_NAMES.includes(block.state.name)) {
+                        const post = block.state.result as PostDraftData;
+                        if (post?.id && post?.content) {
+                          postDrafts.push(post);
+                          skipToolCallIds.add(block.state.toolCallId);
+                        }
+                      }
+                      // Skip suggest_image_prompt tool renders (handled inside PostDraftCard)
+                      if (block.state.name === "suggest_image_prompt") {
+                        skipToolCallIds.add(block.state.toolCallId);
+                      }
+                    }
+
+                    let carouselRendered = false;
+
+                    return msg.blocks.map((block, blockIdx) => {
                     if (block.kind === "thinking") {
                       return (
                         <ThinkingBlock
@@ -787,6 +799,30 @@ export default function AssistantChatPage() {
                       );
                     }
                     if (block.kind === "tool") {
+                      // Render carousel for collected post drafts
+                      if (skipToolCallIds.has(block.state.toolCallId) && postDrafts.length > 0 && !carouselRendered) {
+                        carouselRendered = true;
+                        if (postDrafts.length >= 2) {
+                          return (
+                            <div key={`carousel-${msg.blocks[0]?.kind === "tool" ? (msg.blocks[0] as { state: { toolCallId: string } }).state.toolCallId : blockIdx}`} className="w-full my-2">
+                              <PostCarousel posts={postDrafts} />
+                            </div>
+                          );
+                        }
+                        // Single post — render as standalone draft card
+                        return (
+                          <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
+                            <div className="w-full max-w-[560px]">
+                              <PostDraftCard post={postDrafts[0]} />
+                            </div>
+                          </div>
+                        );
+                      }
+                      // Skip tool blocks that are already rendered in the carousel
+                      if (skipToolCallIds.has(block.state.toolCallId)) {
+                        return null;
+                      }
+
                       // Render a rich review card for journal entry creation
                       if (
                         block.state.name === "create_journal_entry" &&
@@ -827,35 +863,22 @@ export default function AssistantChatPage() {
                         );
                       }
 
-                      // Render post preview card for LinkedIn post creation/scheduling
+                      // Render post draft card for LinkedIn post creation/scheduling (fallback for old messages)
                       if (
                         (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") &&
                         block.state.status === "done" &&
                         block.state.result
                       ) {
-                        const post = block.state.result as {
-                          id: string;
-                          content: string;
-                          mediaType: string;
-                          mediaUrl?: string | null;
-                          imageS3Key?: string | null;
-                          status: string;
-                          scheduledAt?: string | null;
-                          contentPillar?: string | null;
-                          visibility: string;
-                        };
-                        return (
-                          <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
-                            <div className="w-full max-w-[560px]">
-                              <PostPreviewCard
-                                post={post}
-                                onApprove={post.status === "PENDING_APPROVAL" ? handlePublishPost : undefined}
-                                onReject={post.status === "PENDING_APPROVAL" ? handleCancelPost : undefined}
-                                onSchedule={post.status === "PENDING_APPROVAL" ? handleSchedulePost : undefined}
-                              />
+                        const post = block.state.result as PostDraftData;
+                        if (post?.id && post?.content) {
+                          return (
+                            <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
+                              <div className="w-full max-w-[560px]">
+                                <PostDraftCard post={post} />
+                              </div>
                             </div>
-                          </div>
-                        );
+                          );
+                        }
                       }
 
                       // Render image preview for Gemini-generated images
@@ -919,7 +942,8 @@ export default function AssistantChatPage() {
                       );
                     }
                     return null;
-                  })}
+                  });
+                  })()}
                   {/* Loader inicial: aún no hay ningún bloque (conectando) */}
                   {msg.blocks.length === 0 && streaming && !msg.done && (
                     <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
