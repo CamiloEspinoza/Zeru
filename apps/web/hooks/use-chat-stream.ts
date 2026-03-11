@@ -205,6 +205,7 @@ export function useChatStream() {
   const [streaming, setStreaming] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage>({ inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedTokens: 0 });
   const abortRef = useRef<AbortController | null>(null);
+  const streamReconnectAbortRef = useRef<AbortController | null>(null);
 
   // Keep ref in sync so handleEvent callbacks can read the latest value
   useEffect(() => {
@@ -330,10 +331,12 @@ export function useChatStream() {
           break;
 
         case "thinking":
+          if (!event.delta) break;
           updateLastAssistantBlocks((blocks) => {
             const last = blocks[blocks.length - 1];
             if (last?.kind === "thinking") {
-              // Append to the existing thinking block
+              // Dedupe: skip if this delta was already appended (streaming/API duplication)
+              if (last.text.endsWith(event.delta)) return blocks;
               return [
                 ...blocks.slice(0, -1),
                 { ...last, text: last.text + event.delta },
@@ -351,9 +354,12 @@ export function useChatStream() {
           break;
 
         case "text_delta":
+          if (!event.delta) break;
           updateLastAssistantBlocks((blocks) => {
             const last = blocks[blocks.length - 1];
             if (last?.kind === "text") {
+              // Dedupe: skip if this delta was already appended (streaming/API duplication)
+              if (last.text.endsWith(event.delta)) return blocks;
               return [
                 ...blocks.slice(0, -1),
                 { ...last, text: last.text + event.delta },
@@ -716,6 +722,11 @@ export function useChatStream() {
 
       // If a stream is still active for this conversation, reconnect to it
       if (isStreaming) {
+        // Abort any previous reconnection (e.g. React Strict Mode double-mount)
+        streamReconnectAbortRef.current?.abort();
+        streamReconnectAbortRef.current = new AbortController();
+        const signal = streamReconnectAbortRef.current.signal;
+
         // Append an in-progress assistant block for the ongoing turn
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -730,6 +741,7 @@ export function useChatStream() {
         try {
           const streamRes = await fetch(`${API_BASE}/ai/conversations/${convId}/stream`, {
             headers: getAuthHeaders(),
+            signal,
           });
 
           if (streamRes.status === 200 && streamRes.body) {
@@ -737,9 +749,12 @@ export function useChatStream() {
             await readSSEStream(reader, handleEvent);
           }
           // 204 = stream already finished before we connected, nothing to do
-        } catch {
-          // Ignore reconnection errors — user can still interact
+        } catch (err) {
+          if ((err as Error)?.name !== "AbortError") {
+            // Ignore reconnection errors — user can still interact
+          }
         } finally {
+          streamReconnectAbortRef.current = null;
           setStreaming(false);
           updateLastAssistant(() => ({ done: true }));
         }

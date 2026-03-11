@@ -291,6 +291,7 @@ export class LinkedInAgentService {
           subject.next({ type: 'thinking', delta });
           continue;
         }
+        if (evType === 'response.reasoning_text.delta') continue;
 
         if (evType === 'response.output_text.delta') {
           const delta = String(ev['delta'] ?? '');

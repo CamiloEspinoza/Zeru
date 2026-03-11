@@ -494,12 +494,16 @@ export class ChatService {
         const evType = ev['type'] as string;
 
         // ── Thinking / Reasoning ─────────────────────────────
+        // Use ONLY reasoning_summary_text.delta. With summary:'auto', the API may also emit
+        // response.reasoning_text.delta — if we handled both, the UI would show duplicated text.
         if (evType === 'response.reasoning_summary_text.delta') {
           const delta = String(ev['delta'] ?? '');
           thinkingText += delta;
           subject.next({ type: 'thinking', delta });
           continue;
         }
+        // Explicitly skip reasoning_text.delta to avoid duplicate emissions
+        if (evType === 'response.reasoning_text.delta') continue;
 
         // ── Text output ──────────────────────────────────────
         if (evType === 'response.output_text.delta') {
@@ -1086,7 +1090,20 @@ export class ChatService {
     });
     if (!conversation) return null;
 
-    const logs = await this.prisma.aiUsageLog.findMany({
+    // Guard: aiUsageLog may be missing if Prisma client was generated before the migration
+    const aiUsageLog = this.prisma.aiUsageLog as { findMany: (args: unknown) => Promise<unknown[]> } | undefined;
+    if (!aiUsageLog?.findMany) {
+      return {
+        conversationId,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalTokens: 0,
+        totalCachedTokens: 0,
+        byModel: [],
+      };
+    }
+
+    const logs = (await aiUsageLog.findMany({
       where: { conversationId },
       select: {
         provider: true,
@@ -1096,7 +1113,14 @@ export class ChatService {
         totalTokens: true,
         cachedTokens: true,
       },
-    });
+    })) as Array<{
+      provider: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      cachedTokens: number;
+    }>;
 
     const byModel = new Map<string, { provider: string; model: string; inputTokens: number; outputTokens: number; totalTokens: number }>();
     let totalInputTokens = 0;
@@ -1139,6 +1163,10 @@ export class ChatService {
 
   /** Get detailed usage logs for the tenant (for cost analysis) */
   async getUsageLogs(tenantId: string, filters?: { from?: string; to?: string; conversationId?: string }) {
+    if (!this.prisma.aiUsageLog?.findMany) {
+      return { logs: [], totals: { totalInputTokens: 0, totalOutputTokens: 0, totalTokens: 0 } };
+    }
+
     const where: Record<string, unknown> = { tenantId };
     if (filters?.conversationId) where.conversationId = filters.conversationId;
     if (filters?.from || filters?.to) {

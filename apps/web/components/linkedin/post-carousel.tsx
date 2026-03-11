@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { api } from "@/lib/api-client";
 import { PostDraftCard, type PostDraftData } from "./post-draft-card";
 
 const STATUS_DOT_COLORS: Record<string, string> = {
@@ -19,6 +20,17 @@ export function PostCarousel({
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [currentPage, setCurrentPage] = useState(0);
+
+  // Refetch current status for all posts when IDs change — tool results from history are snapshots
+  const postIds = initialPosts.map((p) => p.id).join(",");
+  useEffect(() => {
+    if (initialPosts.length === 0) return;
+    Promise.all(
+      initialPosts.map((p) =>
+        api.get<PostDraftData>(`/linkedin/posts/${p.id}`).catch(() => p)
+      )
+    ).then(setPosts);
+  }, [postIds]);
 
   // Show 3 per page on large, 2 on medium, 1 on small (handled by grid CSS)
   const postsPerPage = 3;

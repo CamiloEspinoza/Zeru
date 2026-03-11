@@ -104,6 +104,12 @@ export class ToolExecutor {
         case 'bulk_schedule_posts':
           return await this.bulkScheduleLinkedInPosts(args, tenantId, options?.conversationId);
 
+        case 'bulk_create_drafts':
+          return await this.bulkCreateLinkedInDrafts(args, tenantId, options?.conversationId);
+
+        case 'suggest_image_prompt':
+          return await this.suggestLinkedInImagePrompt(args, tenantId);
+
         case 'generate_image':
           return await this.generateImage(args, tenantId);
 
@@ -736,6 +742,57 @@ export class ToolExecutor {
       success: true,
       data: { count: created.length, posts: created.map((p) => ({ id: p.id, scheduledAt: p.scheduledAt, contentPillar: p.contentPillar })) },
       summary: `${created.length} posts programados en el calendario de contenido`,
+    };
+  }
+
+  private async bulkCreateLinkedInDrafts(
+    args: Record<string, unknown>,
+    tenantId: string,
+    conversationId?: string,
+  ): Promise<ToolExecutionResult> {
+    const postsInput = (args.posts as Array<{
+      content: string;
+      scheduled_at: string;
+      content_pillar?: string | null;
+      visibility?: string;
+      image_prompt?: string | null;
+    }>) ?? [];
+    const created = await this.linkedInPosts.bulkCreateDrafts(
+      tenantId,
+      postsInput.map((p) => ({
+        content: p.content,
+        scheduledAt: p.scheduled_at,
+        contentPillar: p.content_pillar ?? undefined,
+        visibility: p.visibility ?? 'PUBLIC',
+        imagePrompt: p.image_prompt ?? undefined,
+      })),
+      conversationId,
+    );
+    return {
+      success: true,
+      data: {
+        count: created.length,
+        posts: created.map((p) => ({
+          id: p.id,
+          content: p.content,
+          scheduledAt: p.scheduledAt,
+          contentPillar: p.contentPillar,
+          imagePrompt: p.imagePrompt,
+          status: p.status,
+        })),
+      },
+      summary: `${created.length} borradores creados para revisión`,
+    };
+  }
+
+  private async suggestLinkedInImagePrompt(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
+    const postId = String(args.post_id ?? '');
+    const prompt = String(args.prompt ?? '');
+    const post = await this.linkedInPosts.updateImagePrompt(tenantId, postId, prompt);
+    return {
+      success: true,
+      data: { postId: post.id, imagePrompt: prompt },
+      summary: 'Prompt de imagen sugerido para el post',
     };
   }
 
