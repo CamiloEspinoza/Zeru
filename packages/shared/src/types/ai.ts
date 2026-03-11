@@ -4,6 +4,7 @@ export interface AiProviderConfig {
   id: string;
   provider: AiProvider;
   model: string;
+  reasoningEffort: ReasoningEffort;
   isActive: boolean;
   tenantId: string;
   createdAt: Date;
@@ -16,6 +17,7 @@ export interface UpsertAiConfigInput {
   provider: AiProvider;
   apiKey: string;
   model: string;
+  reasoningEffort?: ReasoningEffort;
 }
 
 // ─── Conversations & Messages ─────────────────────────────
@@ -218,8 +220,53 @@ export interface ChatRequest {
   documentIds?: string[];
 }
 
+// ─── Reasoning Effort ─────────────────────────────────────
+
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
+export const REASONING_EFFORT_OPTIONS: Array<{ id: ReasoningEffort; label: string; description: string }> = [
+  { id: 'none', label: 'Ninguno', description: 'Sin razonamiento interno — respuestas más rápidas y económicas' },
+  { id: 'low', label: 'Bajo', description: 'Razonamiento mínimo — buen balance velocidad/calidad' },
+  { id: 'medium', label: 'Medio', description: 'Razonamiento moderado — recomendado para uso general' },
+  { id: 'high', label: 'Alto', description: 'Razonamiento profundo — mejor calidad en tareas complejas' },
+];
+
 // ─── Available Models ─────────────────────────────────────
 
-export const AI_MODELS: Record<AiProvider, Array<{ id: string; label: string }>> = {
-  OPENAI: [{ id: 'gpt-5.2-2025-12-11', label: 'GPT-5.2 (2025-12-11)' }],
+export interface AiModelDef {
+  id: string;
+  label: string;
+  description: string;
+  contextWindow: string;
+  defaultReasoningEffort: ReasoningEffort;
+  supportedReasoningEfforts: ReasoningEffort[];
+}
+
+export const AI_MODELS: Record<AiProvider, AiModelDef[]> = {
+  OPENAI: [
+    {
+      id: 'gpt-5.4',
+      label: 'GPT-5.4',
+      description: 'Modelo más reciente de OpenAI — 1M de contexto, computer-use nativo',
+      contextWindow: '1.05M tokens',
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: ['none', 'low', 'medium', 'high'],
+    },
+    {
+      id: 'gpt-5.4-pro',
+      label: 'GPT-5.4 Pro',
+      description: 'Máximo rendimiento para tareas complejas y profesionales',
+      contextWindow: '1.05M tokens',
+      defaultReasoningEffort: 'high',
+      supportedReasoningEfforts: ['medium', 'high'],
+    },
+    {
+      id: 'gpt-5.2-2025-12-11',
+      label: 'GPT-5.2 (Legacy)',
+      description: 'Modelo anterior — disponible hasta junio 2026',
+      contextWindow: '200K tokens',
+      defaultReasoningEffort: 'medium',
+      supportedReasoningEfforts: ['low', 'medium', 'high'],
+    },
+  ],
 };

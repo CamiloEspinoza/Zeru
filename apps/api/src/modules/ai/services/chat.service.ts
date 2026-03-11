@@ -372,7 +372,7 @@ export class ChatService {
     }
 
     try {
-      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt });
+      await this.runAgentLoop({ openai, model: fullConfig.model, reasoningEffort: fullConfig.reasoningEffort ?? 'medium', conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error inesperado';
       subject.next({ type: 'error', message });
@@ -385,6 +385,7 @@ export class ChatService {
   private async runAgentLoop(params: {
     openai: OpenAI;
     model: string;
+    reasoningEffort: string;
     conversation: {
       id: string;
       lastResponseId: string | null;
@@ -398,7 +399,7 @@ export class ChatService {
     isNewConversation: boolean;
     systemPrompt: string;
   }) {
-    const { openai, model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
+    const { openai, model, reasoningEffort, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
 
     let titleUpdated = false;
 
@@ -491,13 +492,17 @@ export class ChatService {
         inputItemTypes: Array.isArray(input) ? input.map((i: any) => i['type'] ?? i['role'] ?? 'unknown') : 'non-array',
       });
 
+      const reasoningConfig = reasoningEffort === 'none'
+        ? undefined
+        : { effort: reasoningEffort as 'low' | 'medium' | 'high', summary: 'auto' as const };
+
       const stream = openai.responses.stream({
         model,
         input,
         store: true,
         tools: UNIFIED_TOOLS as OpenAI.Responses.Tool[],
         tool_choice: 'auto',
-        reasoning: { effort: 'medium', summary: 'auto' },
+        ...(reasoningConfig ? { reasoning: reasoningConfig } : {}),
         ...(currentPrevResponseId ? { previous_response_id: currentPrevResponseId } : {}),
       } as Parameters<typeof openai.responses.stream>[0]);
 

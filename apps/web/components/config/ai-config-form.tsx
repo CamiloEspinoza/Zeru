@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
-import { AI_MODELS, type AiProvider } from "@zeru/shared";
+import {
+  AI_MODELS,
+  REASONING_EFFORT_OPTIONS,
+  type AiProvider,
+  type ReasoningEffort,
+} from "@zeru/shared";
 import {
   Card,
   CardContent,
@@ -38,6 +43,7 @@ import { SaveIndicator, type SaveStatus } from "@/components/config/save-indicat
 interface AiConfig {
   provider?: AiProvider;
   model?: string;
+  reasoningEffort?: ReasoningEffort;
   isActive?: boolean;
   hasApiKey?: boolean;
 }
@@ -62,13 +68,15 @@ export function AiConfigForm({
   const [showApiKey, setShowApiKey] = useState(false);
 
   const [provider, setProvider] = useState<AiProvider>("OPENAI");
-  const [model, setModel] = useState("gpt-5.2-2025-12-11");
+  const [model, setModel] = useState("gpt-5.4");
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
   const [apiKey, setApiKey] = useState("");
   const [keyStatus, setKeyStatus] = useState<KeyStatus>("idle");
   const [keyError, setKeyError] = useState("");
 
   const [providerSave, setProviderSave] = useState<SaveStatus>("idle");
   const [modelSave, setModelSave] = useState<SaveStatus>("idle");
+  const [reasoningSave, setReasoningSave] = useState<SaveStatus>("idle");
   const [keySave, setKeySave] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -83,6 +91,7 @@ export function AiConfigForm({
         setConfig(data);
         if (data.provider) setProvider(data.provider);
         if (data.model) setModel(data.model);
+        if (data.reasoningEffort) setReasoningEffort(data.reasoningEffort);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -102,6 +111,7 @@ export function AiConfigForm({
       opts: {
         provider: AiProvider;
         model: string;
+        reasoningEffort: ReasoningEffort;
         apiKey: string;
         setStatus: (s: SaveStatus) => void;
         statusKey: string;
@@ -115,6 +125,7 @@ export function AiConfigForm({
           provider: opts.provider,
           apiKey: opts.apiKey || "KEEP_EXISTING",
           model: opts.model,
+          reasoningEffort: opts.reasoningEffort,
         });
         setConfig(updated);
         if (opts.apiKey) {
@@ -140,9 +151,12 @@ export function AiConfigForm({
 
   const handleProviderChange = (value: string) => {
     const newProvider = value as AiProvider;
-    const newModel = AI_MODELS[newProvider]?.[0]?.id ?? "";
+    const firstModel = AI_MODELS[newProvider]?.[0];
+    const newModel = firstModel?.id ?? "";
+    const newEffort = firstModel?.defaultReasoningEffort ?? "medium";
     setProvider(newProvider);
     setModel(newModel);
+    setReasoningEffort(newEffort);
     setApiKey("");
     setKeyStatus("idle");
     setKeyError("");
@@ -150,6 +164,7 @@ export function AiConfigForm({
       autoSave({
         provider: newProvider,
         model: newModel,
+        reasoningEffort: newEffort,
         apiKey: "",
         setStatus: setProviderSave,
         statusKey: "provider",
@@ -159,13 +174,32 @@ export function AiConfigForm({
 
   const handleModelChange = (value: string) => {
     setModel(value);
+    const modelDef = models.find((m) => m.id === value);
+    const newEffort = modelDef?.defaultReasoningEffort ?? "medium";
+    setReasoningEffort(newEffort);
     if (config.hasApiKey) {
       autoSave({
         provider,
         model: value,
+        reasoningEffort: newEffort,
         apiKey: "",
         setStatus: setModelSave,
         statusKey: "model",
+      });
+    }
+  };
+
+  const handleReasoningEffortChange = (value: string) => {
+    const newEffort = value as ReasoningEffort;
+    setReasoningEffort(newEffort);
+    if (config.hasApiKey) {
+      autoSave({
+        provider,
+        model,
+        reasoningEffort: newEffort,
+        apiKey: "",
+        setStatus: setReasoningSave,
+        statusKey: "reasoning",
       });
     }
   };
@@ -202,6 +236,7 @@ export function AiConfigForm({
           autoSave({
             provider,
             model,
+            reasoningEffort,
             apiKey: value.trim(),
             setStatus: setKeySave,
             statusKey: "key",
@@ -242,6 +277,10 @@ export function AiConfigForm({
   }
 
   const models = AI_MODELS[provider] ?? [];
+  const selectedModel = models.find((m) => m.id === model);
+  const availableEfforts = REASONING_EFFORT_OPTIONS.filter((opt) =>
+    selectedModel?.supportedReasoningEfforts.includes(opt.id),
+  );
   const isKeyBusy = keyStatus === "validating";
 
   return (
@@ -299,12 +338,48 @@ export function AiConfigForm({
               <SelectContent>
                 {models.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
-                    {m.label}
+                    <div className="flex items-center gap-2">
+                      <span>{m.label}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {m.contextWindow}
+                      </span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {selectedModel && (
+              <p className="text-xs text-muted-foreground">
+                {selectedModel.description}
+              </p>
+            )}
           </div>
+
+          {availableEfforts.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="reasoningEffort">Nivel de razonamiento</Label>
+                <SaveIndicator status={reasoningSave} error={saveError} />
+              </div>
+              <Select value={reasoningEffort} onValueChange={handleReasoningEffortChange}>
+                <SelectTrigger id="reasoningEffort">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEfforts.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {REASONING_EFFORT_OPTIONS.find((o) => o.id === reasoningEffort) && (
+                <p className="text-xs text-muted-foreground">
+                  {REASONING_EFFORT_OPTIONS.find((o) => o.id === reasoningEffort)!.description}
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
