@@ -21,6 +21,7 @@ export class AiConfigService {
       id: config.id,
       provider: config.provider,
       model: config.model,
+      reasoningEffort: config.reasoningEffort,
       isActive: config.isActive,
       tenantId: config.tenantId,
       hasApiKey: !!config.encryptedApiKey,
@@ -46,7 +47,9 @@ export class AiConfigService {
     return config;
   }
 
-  async upsert(tenantId: string, data: { provider: AiProvider; apiKey: string; model: string }) {
+  async upsert(tenantId: string, data: { provider: AiProvider; apiKey: string; model: string; reasoningEffort?: string }) {
+    const reasoningEffort = data.reasoningEffort ?? 'medium';
+
     // If KEEP_EXISTING sentinel, only update model/provider without changing the key
     if (data.apiKey === 'KEEP_EXISTING') {
       const existing = await this.prisma.aiProviderConfig.findUnique({ where: { tenantId } });
@@ -55,10 +58,11 @@ export class AiConfigService {
       }
       const config = await this.prisma.aiProviderConfig.update({
         where: { tenantId },
-        data: { provider: data.provider, model: data.model, isActive: true },
+        data: { provider: data.provider, model: data.model, reasoningEffort, isActive: true },
       });
       return {
         id: config.id, provider: config.provider, model: config.model,
+        reasoningEffort: config.reasoningEffort,
         isActive: config.isActive, tenantId: config.tenantId, hasApiKey: true,
         createdAt: config.createdAt, updatedAt: config.updatedAt,
       };
@@ -72,6 +76,7 @@ export class AiConfigService {
         provider: data.provider,
         encryptedApiKey,
         model: data.model,
+        reasoningEffort,
         isActive: true,
       },
       create: {
@@ -79,6 +84,7 @@ export class AiConfigService {
         provider: data.provider,
         encryptedApiKey,
         model: data.model,
+        reasoningEffort,
         isActive: true,
       },
     });
@@ -87,6 +93,7 @@ export class AiConfigService {
       id: config.id,
       provider: config.provider,
       model: config.model,
+      reasoningEffort: config.reasoningEffort,
       isActive: config.isActive,
       tenantId: config.tenantId,
       hasApiKey: true,

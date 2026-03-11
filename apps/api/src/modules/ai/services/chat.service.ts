@@ -222,40 +222,10 @@ Además de la contabilidad, tienes capacidades completas para crear y gestionar 
 2. **NO uses generate_image** cuando el usuario ya proporcionó su propia imagen.
 3. Crea el post con media_type=IMAGE, image_s3_key (el valor de s3_key) y media_url (el valor de url) del tag en el mensaje.
 
-## Menciones y hashtags en LinkedIn
+## Hashtags en LinkedIn
 
-### Hashtags
 Incluye hashtags directamente en el texto del post con el símbolo #. Ejemplo: \`#InteligenciaArtificial\`
 LinkedIn los reconoce automáticamente. Usa 3-5 hashtags relevantes al final del post.
-
-### Mencionar personas o empresas
-Para mencionar a alguien en un post, necesitas su URN de LinkedIn.
-
-**Flujo obligatorio:**
-1. Cuando el usuario quiera mencionar a una persona o empresa, **primero llama a resolve_linkedin_mention** con la URL de LinkedIn.
-2. La herramienta devuelve \`mentionText\` con el formato listo para insertar: \`@[Nombre](urn:li:person:ID)\` o \`@[Empresa](urn:li:organization:ID)\`.
-3. Inserta ese \`mentionText\` directamente en el contenido del post donde corresponda.
-
-**Ejemplo de post con mención:**
-\`Hoy visité @[Platzi](urn:li:organization:2414183) y conversé con su equipo. #Educación #IA\`
-
-**Cuando resolve_linkedin_mention devuelve needsSessionCookie=true**: el usuario no ha configurado su cookie de sesión de LinkedIn. Explícale exactamente cómo obtenerla:
-
-> "Para hacer menciones clickeables a personas en LinkedIn necesito tu cookie de sesión \`li_at\`. Es un paso de configuración de un minuto:
-> 1. Abre [linkedin.com](https://www.linkedin.com) en tu navegador y asegúrate de estar logueado
-> 2. Abre DevTools → F12 (o Cmd+Option+I en Mac)
-> 3. Ve a la pestaña **Application** (Chrome) o **Storage** (Firefox)
-> 4. En el panel izquierdo: **Cookies → https://www.linkedin.com**
-> 5. Busca la cookie llamada **\`li_at\`** y copia su valor
-> 6. Ve a **Configuración → LinkedIn → Cookie de sesión** en Zeru y pégala ahí
->
-> Una vez configurada podré mencionar a cualquier persona directamente en los posts."
-
-No crees el post hasta que el usuario confirme que configuró la cookie, o hasta que te diga que prefiere el post sin mención clickeable.
-
-**Cuando resolve_linkedin_mention devuelve fallback=true** (URN no resuelto o cookie expirada): incluye el nombre de la persona y su URL de perfil directamente en el texto del post. Ejemplo: "Gracias, Martina Flor Garcés (https://linkedin.com/in/martinaflorgarces/) por la conversación."
-
-**Nota importante:** Los caracteres reservados como \`@\`, \`[\`, \`]\`, \`(\`, \`)\`, \`{\`, \`}\`, \`#\`, \`|\`, \`\\\` dentro del texto libre (no en menciones ni hashtags) deben escaparse con barra invertida.
 
 ## Mejores prácticas de LinkedIn
 
@@ -372,7 +342,7 @@ export class ChatService {
     }
 
     try {
-      await this.runAgentLoop({ openai, model: fullConfig.model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt });
+      await this.runAgentLoop({ openai, model: fullConfig.model, reasoningEffort: fullConfig.reasoningEffort ?? 'medium', conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error inesperado';
       subject.next({ type: 'error', message });
@@ -385,6 +355,7 @@ export class ChatService {
   private async runAgentLoop(params: {
     openai: OpenAI;
     model: string;
+    reasoningEffort: string;
     conversation: {
       id: string;
       lastResponseId: string | null;
@@ -398,7 +369,7 @@ export class ChatService {
     isNewConversation: boolean;
     systemPrompt: string;
   }) {
-    const { openai, model, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
+    const { openai, model, reasoningEffort, conversation, ctx, resolvedDocs, subject, isNewConversation, systemPrompt } = params;
 
     let titleUpdated = false;
 
@@ -459,7 +430,7 @@ export class ChatService {
       const messageText = ctx.uploadedImage
         ? `[IMAGEN ADJUNTA PARA EL POST — úsala directamente sin llamar a generate_image. s3_key: ${ctx.uploadedImage.s3Key} | url: ${ctx.uploadedImage.imageUrl}]\n\n${ctx.message || "Crea un post de LinkedIn con esta imagen."}`
         : ctx.message;
-      const userContent = this.buildUserContent(messageText, resolvedDocs);
+      const userContent = this.buildUserContent(messageText, resolvedDocs, ctx.uploadedImage);
       if (currentPrevResponseId) {
         // Continuing an existing conversation
         input = [{ role: 'user', content: userContent }];
@@ -488,8 +459,12 @@ export class ChatService {
       console.log('[ChatService] Stream call:', {
         iteration,
         previousResponseId: currentPrevResponseId ?? null,
-        inputItemTypes: Array.isArray(input) ? input.map((i: any) => i['type'] ?? i['role'] ?? 'unknown') : 'non-array',
+        inputItemTypes: Array.isArray(input) ? input.map((i: Record<string, unknown>) => i['type'] ?? i['role'] ?? 'unknown') : 'non-array',
       });
+
+      const reasoningConfig = reasoningEffort === 'none'
+        ? undefined
+        : { effort: reasoningEffort as 'low' | 'medium' | 'high', summary: 'auto' as const };
 
       const stream = openai.responses.stream({
         model,
@@ -497,7 +472,7 @@ export class ChatService {
         store: true,
         tools: UNIFIED_TOOLS as OpenAI.Responses.Tool[],
         tool_choice: 'auto',
-        reasoning: { effort: 'medium', summary: 'auto' },
+        ...(reasoningConfig ? { reasoning: reasoningConfig } : {}),
         ...(currentPrevResponseId ? { previous_response_id: currentPrevResponseId } : {}),
       } as Parameters<typeof openai.responses.stream>[0]);
 
@@ -809,8 +784,9 @@ export class ChatService {
   private buildUserContent(
     text: string,
     resolvedDocs: ResolvedDocument[],
+    uploadedImage?: { s3Key: string; imageUrl: string },
   ): string | OpenAI.Responses.ResponseInputContent[] {
-    if (!resolvedDocs.length) return text;
+    if (!resolvedDocs.length && !uploadedImage) return text;
 
     const docRefs = resolvedDocs
       .filter((d) => d.docId)
@@ -830,6 +806,15 @@ export class ChatService {
     const parts: OpenAI.Responses.ResponseInputContent[] = [
       { type: 'input_text', text: combinedText } as OpenAI.Responses.ResponseInputText,
     ];
+
+    // Include uploaded image so the model can visually interpret it
+    if (uploadedImage?.imageUrl) {
+      parts.push({
+        type: 'input_image',
+        image_url: uploadedImage.imageUrl,
+        detail: 'auto',
+      } as OpenAI.Responses.ResponseInputImage);
+    }
 
     for (const d of resolvedDocs) {
       if (d.mimeType.startsWith('image/') && d.presignedUrl) {

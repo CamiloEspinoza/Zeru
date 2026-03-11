@@ -19,7 +19,7 @@ import { AiModule } from '../ai/ai.module';
       useFactory: (config: ConfigService): JwtModuleOptions => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
-          expiresIn: (config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
+          expiresIn: config.get<string>('JWT_EXPIRATION') ?? '7d',
         },
       }),
       inject: [ConfigService],

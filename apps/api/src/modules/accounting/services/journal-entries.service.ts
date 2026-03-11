@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type {
   BatchJournalEntryItemSchema,
@@ -51,7 +52,7 @@ export class JournalEntriesService {
     const where = query?.status ? { status: query.status, tenantId } : { tenantId };
 
     const [entries, total] = await Promise.all([
-      (this.prisma as any).journalEntry.findMany({
+      this.prisma.journalEntry.findMany({
         where,
         skip,
         take: perPage,
@@ -70,7 +71,7 @@ export class JournalEntriesService {
           },
         },
       }),
-      (this.prisma as any).journalEntry.count({ where }),
+      this.prisma.journalEntry.count({ where }),
     ]);
 
     return {
@@ -86,7 +87,7 @@ export class JournalEntriesService {
 
   async findById(id: string, tenantId: string) {
     // Use main prisma so include of documents (DocumentJournalEntry + Document) is not filtered by tenant extension
-    const entry = await (this.prisma as any).journalEntry.findFirst({
+    const entry = await this.prisma.journalEntry.findFirst({
       where: { id, tenantId },
       include: {
         lines: {
@@ -128,7 +129,7 @@ export class JournalEntriesService {
     meta?: CreateJournalEntryMeta,
   ) {
     // Validate fiscal period exists and is OPEN
-    const fiscalPeriod = await (this.prisma as any).fiscalPeriod.findFirst({
+    const fiscalPeriod = await this.prisma.fiscalPeriod.findFirst({
       where: { id: data.fiscalPeriodId, tenantId },
       select: { id: true, status: true },
     });
@@ -148,7 +149,7 @@ export class JournalEntriesService {
     const accountIds = Array.from(
       new Set(data.lines.map((line) => line.accountId)),
     );
-    const accounts = await (this.prisma as any).account.findMany({
+    const accounts = await this.prisma.account.findMany({
       where: { tenantId, id: { in: accountIds } },
       select: { id: true },
     });
@@ -164,14 +165,14 @@ export class JournalEntriesService {
 
     return this.prisma.$transaction(async (tx) => {
       // Get next number inside the transaction to avoid race conditions
-      const maxEntry = await (tx as any).journalEntry.findFirst({
+      const maxEntry = await tx.journalEntry.findFirst({
         where: { tenantId },
         orderBy: { number: 'desc' },
         select: { number: true },
       });
       const nextNumber = (maxEntry?.number ?? 0) + 1;
 
-      const entry = await (tx as any).journalEntry.create({
+      const entry = await tx.journalEntry.create({
         data: {
           tenantId,
           number: nextNumber,
@@ -228,11 +229,11 @@ export class JournalEntriesService {
     );
 
     const [accounts, periods] = await Promise.all([
-      (this.prisma as any).account.findMany({
+      this.prisma.account.findMany({
         where: { tenantId, id: { in: accountIds } },
         select: { id: true },
       }),
-      (this.prisma as any).fiscalPeriod.findMany({
+      this.prisma.fiscalPeriod.findMany({
         where: { tenantId, id: { in: fiscalPeriodIds } },
         select: { id: true, status: true },
       }),
@@ -321,14 +322,14 @@ export class JournalEntriesService {
 
       await this.prisma.$transaction(async (tx) => {
         // Get next number inside the transaction to avoid race conditions
-        const maxEntry = await (tx as any).journalEntry.findFirst({
+        const maxEntry = await tx.journalEntry.findFirst({
           where: { tenantId },
           orderBy: { number: 'desc' },
           select: { number: true },
         });
         let nextNumber = (maxEntry?.number ?? 0) + 1;
         for (const item of validEntries) {
-          const created = await (tx as any).journalEntry.create({
+          const created = await tx.journalEntry.create({
             data: {
               tenantId,
               number: nextNumber,
@@ -383,7 +384,7 @@ export class JournalEntriesService {
   }
 
   async post(id: string, tenantId: string) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     const entry = await client.journalEntry.findUnique({
       where: { id },
@@ -406,7 +407,7 @@ export class JournalEntriesService {
   }
 
   async void(id: string, tenantId: string) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     const entry = await client.journalEntry.findUnique({
       where: { id },

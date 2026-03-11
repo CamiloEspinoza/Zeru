@@ -177,55 +177,15 @@ export class LinkedInPostsService {
     return created;
   }
 
-  private async processCommentaryMentions(tenantId: string, commentary: string): Promise<string> {
-    const urlMentionPattern = /@\[(?:https?:\/\/)?(?:www\.)?linkedin\.com\/in\/([a-zA-Z0-9\-_%]+)\]/g;
-
-    let processed = commentary;
-    const matches = [...commentary.matchAll(urlMentionPattern)];
-
-    for (const match of matches) {
-      const fullMatch = match[0];
-      const vanityName = decodeURIComponent(match[1]);
-
-      const person = await this.apiService.resolvePersonByVanityUrl(tenantId, vanityName);
-      if (person) {
-        const displayName = `${person.firstName} ${person.lastName}`.trim();
-        processed = processed.replace(fullMatch, `@[${displayName}](${person.personUrn})`);
-      } else {
-        processed = processed.replace(fullMatch, vanityName);
-      }
-    }
-
-    return processed;
-  }
-
   /**
    * Escapes reserved characters for LinkedIn API (Little Text Format).
    * Parentheses () in plain text cause truncation — they must be escaped as \( and \).
-   * Parentheses inside mentions @[Name](urn:...) must NOT be escaped.
    */
   private escapeLinkedInCommentary(commentary: string): string {
-    const mentionPattern = /@\[[^\]]*\]\(urn:[^)]+\)/g;
-    const parts: string[] = [];
-    let lastIndex = 0;
-    let match;
-    while ((match = mentionPattern.exec(commentary)) !== null) {
-      const before = commentary
-        .slice(lastIndex, match.index)
-        .replace(/\\/g, '\\\\')
-        .replace(/\(/g, '\\(')
-        .replace(/\)/g, '\\)');
-      parts.push(before);
-      parts.push(match[0]);
-      lastIndex = match.index + match[0].length;
-    }
-    const after = commentary
-      .slice(lastIndex)
+    return commentary
       .replace(/\\/g, '\\\\')
       .replace(/\(/g, '\\(')
       .replace(/\)/g, '\\)');
-    parts.push(after);
-    return parts.join('');
   }
 
   async publish(tenantId: string, postId: string): Promise<void> {
@@ -236,8 +196,7 @@ export class LinkedInPostsService {
     if (post.status === 'PUBLISHED') return;
 
     try {
-      const withMentions = await this.processCommentaryMentions(tenantId, post.content);
-      const processedContent = this.escapeLinkedInCommentary(withMentions);
+      const processedContent = this.escapeLinkedInCommentary(post.content);
       let result: { postId: string | null };
 
       if (post.mediaType === 'IMAGE' && post.imageS3Key) {

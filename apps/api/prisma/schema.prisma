@@ -104,7 +104,8 @@ model AiProviderConfig {
   id              String      @id @default(uuid())
   provider        AiProvider  @default(OPENAI)
   encryptedApiKey String
-  model           String      @default("gpt-5.2-2025-12-11")
+  model           String      @default("gpt-5.4")
+  reasoningEffort String      @default("medium")
   isActive        Boolean     @default(true)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -606,8 +607,6 @@ model LinkedInConnection {
   personUrn     String
   profileName   String?
   profileImage  String?
-  /// Cookie li_at encriptada — necesaria para Voyager API (menciones a personas)
-  liAtCookie    String?
   /// Token de la app Community Management (r_organization_followers) — encriptado
   communityAccessToken  String?
   communityRefreshToken String?

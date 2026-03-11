@@ -38,7 +38,7 @@ export class FilesService {
 
     await this.s3.upload(tenantId, s3Key, input.buffer, input.mimeType);
 
-    const doc = await (this.prisma as any).document.create({
+    const doc = await this.prisma.document.create({
       data: {
         id: docId,
         name: input.name,
@@ -71,7 +71,7 @@ export class FilesService {
     }
 
     const [docs, total] = await Promise.all([
-      (this.prisma as any).document.findMany({
+      this.prisma.document.findMany({
         where,
         skip,
         take: perPage,
@@ -88,7 +88,7 @@ export class FilesService {
           },
         },
       }),
-      (this.prisma as any).document.count({ where }),
+      this.prisma.document.count({ where }),
     ]);
 
     return {
@@ -98,7 +98,7 @@ export class FilesService {
   }
 
   async findById(tenantId: string, docId: string) {
-    const doc = await (this.prisma as any).document.findFirst({
+    const doc = await this.prisma.document.findFirst({
       where: { id: docId, tenantId },
       include: {
         uploadedBy: { select: { id: true, firstName: true, lastName: true } },
@@ -125,12 +125,12 @@ export class FilesService {
     category: DocumentCategory,
     tags: string[],
   ) {
-    const doc = await (this.prisma as any).document.findFirst({
+    const doc = await this.prisma.document.findFirst({
       where: { id: docId, tenantId },
     });
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
-    return (this.prisma as any).document.update({
+    return this.prisma.document.update({
       where: { id: docId },
       data: { category, tags },
     });
@@ -143,15 +143,15 @@ export class FilesService {
   ) {
     // Verify both belong to tenant
     const [doc, entry] = await Promise.all([
-      (this.prisma as any).document.findFirst({ where: { id: docId, tenantId } }),
-      (this.prisma as any).journalEntry.findFirst({ where: { id: journalEntryId, tenantId } }),
+      this.prisma.document.findFirst({ where: { id: docId, tenantId } }),
+      this.prisma.journalEntry.findFirst({ where: { id: journalEntryId, tenantId } }),
     ]);
 
     if (!doc) throw new NotFoundException('Documento no encontrado');
     if (!entry) throw new NotFoundException('Asiento contable no encontrado');
 
     // Upsert to avoid duplicate
-    return (this.prisma as any).documentJournalEntry.upsert({
+    return this.prisma.documentJournalEntry.upsert({
       where: { documentId_journalEntryId: { documentId: docId, journalEntryId } },
       create: { documentId: docId, journalEntryId },
       update: {},
@@ -160,20 +160,20 @@ export class FilesService {
 
   /** Returns journal entries already linked to a document. Used to avoid duplicate entries. */
   async getJournalEntriesForDocument(tenantId: string, documentId: string) {
-    const doc = await (this.prisma as any).document.findFirst({
+    const doc = await this.prisma.document.findFirst({
       where: { id: documentId, tenantId },
       select: { id: true },
     });
     if (!doc) return { entries: [] };
 
-    const links = await (this.prisma as any).documentJournalEntry.findMany({
+    const links = await this.prisma.documentJournalEntry.findMany({
       where: { documentId },
       select: { journalEntryId: true },
     });
     const entryIds = links.map((l: { journalEntryId: string }) => l.journalEntryId);
     if (entryIds.length === 0) return { entries: [] };
 
-    const entries = await (this.prisma as any).journalEntry.findMany({
+    const entries = await this.prisma.journalEntry.findMany({
       where: { id: { in: entryIds }, tenantId },
       select: { id: true, number: true, description: true, date: true, status: true },
     });
@@ -182,7 +182,7 @@ export class FilesService {
 
   /** Associates uploaded documents to a conversation (called after conversation is created/confirmed). */
   async attachToConversation(tenantId: string, docIds: string[], conversationId: string) {
-    await (this.prisma as any).document.updateMany({
+    await this.prisma.document.updateMany({
       where: { id: { in: docIds }, tenantId, conversationId: null },
       data: { conversationId },
     });
@@ -190,20 +190,20 @@ export class FilesService {
 
   /** Returns lightweight doc info needed for LLM context (s3Key + mimeType). */
   async findManyByIds(tenantId: string, docIds: string[]) {
-    return (this.prisma as any).document.findMany({
+    return this.prisma.document.findMany({
       where: { id: { in: docIds }, tenantId },
       select: { id: true, name: true, mimeType: true, s3Key: true },
     }) as Promise<Array<{ id: string; name: string; mimeType: string; s3Key: string }>>;
   }
 
   async remove(tenantId: string, docId: string) {
-    const doc = await (this.prisma as any).document.findFirst({
+    const doc = await this.prisma.document.findFirst({
       where: { id: docId, tenantId },
     });
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
     await this.s3.delete(tenantId, doc.s3Key);
-    await (this.prisma as any).document.delete({ where: { id: docId } });
+    await this.prisma.document.delete({ where: { id: docId } });
     return { deleted: true };
   }
 }

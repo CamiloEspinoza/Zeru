@@ -34,6 +34,7 @@ export class AiConfigController {
       provider: body.provider as AiProvider,
       apiKey: body.apiKey,
       model: body.model,
+      reasoningEffort: body.reasoningEffort,
     });
   }
 
