@@ -54,17 +54,18 @@ export function TokenMeter({ liveUsage, conversationId }: TokenMeterProps) {
 
   // Fetch cumulative usage from server when conversation changes or live usage updates
   useEffect(() => {
-    if (!conversationId) {
-      setServerUsage(null);
-      return;
-    }
+    let cancelled = false;
 
     const fetchUsage = async () => {
+      if (!conversationId) {
+        if (!cancelled) setServerUsage(null);
+        return;
+      }
       try {
         const res = await fetch(`${API_BASE}/ai/conversations/${conversationId}/usage`, {
           headers: getAuthHeaders(),
         });
-        if (res.ok) {
+        if (res.ok && !cancelled) {
           setServerUsage(await res.json());
         }
       } catch {
@@ -73,6 +74,7 @@ export function TokenMeter({ liveUsage, conversationId }: TokenMeterProps) {
     };
 
     fetchUsage();
+    return () => { cancelled = true; };
   }, [conversationId, liveUsage.totalTokens]);
 
   // Combine server + live usage
