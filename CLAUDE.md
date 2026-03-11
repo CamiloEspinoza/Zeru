@@ -1,5 +1,9 @@
 # Zeru — Project Memory
 
+## Pre-commit checklist (mandatory)
+
+Before every `git commit`, you MUST run `pnpm lint` and fix any errors. Do NOT commit code that fails linting.
+
 ## AI Cost Tracking (mandatory requirement)
 
 Every AI model interaction MUST be tracked with a detailed usage log. This applies to ALL current and future AI features.
