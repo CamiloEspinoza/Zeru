@@ -58,17 +58,16 @@ services:
       - "traefik.http.routers.zeru.entrypoints=websecure"
       - "traefik.http.routers.zeru.tls.certresolver=myresolver"
       - "traefik.http.services.zeru.loadbalancer.server.port=80"
-      # Redirect www → naked domain
-      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.regex=^https?://www\\.(.*)"
-      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.replacement=https://$${1}"
-      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.permanent=true"
+      # Redirect www.zeruapp.com -> zeruapp.com
       - "traefik.http.routers.zeru-www.rule=Host(`www.zeruapp.com`)"
       - "traefik.http.routers.zeru-www.entrypoints=websecure"
       - "traefik.http.routers.zeru-www.tls.certresolver=myresolver"
       - "traefik.http.routers.zeru-www.middlewares=zeru-www-redirect"
-      - "traefik.http.routers.zeru-www.service=zeru"
-      # Route *.zeruapp.com (excluding www, handled above)
-      - "traefik.http.routers.zeru-wildcard.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.zeruapp.com`)"
+      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.regex=^https://www\\.zeruapp\\.com/(.*)"
+      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.replacement=https://zeruapp.com/$${1}"
+      - "traefik.http.middlewares.zeru-www-redirect.redirectregex.permanent=true"
+      # Route *.zeruapp.com (excluding www)
+      - "traefik.http.routers.zeru-wildcard.rule=HostRegexp(`^[a-z0-9-]+\\.zeruapp\\.com$$`) && !Host(`www.zeruapp.com`)"
       - "traefik.http.routers.zeru-wildcard.entrypoints=websecure"
       - "traefik.http.routers.zeru-wildcard.tls.certresolver=myresolver"
       - "traefik.http.routers.zeru-wildcard.service=zeru"
