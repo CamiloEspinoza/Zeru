@@ -280,7 +280,7 @@ export default function AssistantChatPage() {
 
   const [input, setInput] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
-  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -440,7 +440,8 @@ export default function AssistantChatPage() {
 
   const addImage = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    if (pendingImage?.previewUrl) URL.revokeObjectURL(pendingImage.previewUrl);
+    // Limit to 5 images
+    if (pendingImages.length >= 5) return;
 
     const pending: PendingImage = {
       localId: crypto.randomUUID(),
@@ -448,26 +449,29 @@ export default function AssistantChatPage() {
       previewUrl: URL.createObjectURL(file),
       status: "uploading",
     };
-    setPendingImage(pending);
+    setPendingImages((prev) => [...prev, pending]);
 
     try {
       const result = await uploadImage(file);
-      setPendingImage((prev) =>
-        prev?.localId === pending.localId ? { ...prev, status: "done", result } : prev
+      setPendingImages((prev) =>
+        prev.map((p) => p.localId === pending.localId ? { ...p, status: "done", result } : p)
       );
     } catch (err) {
-      setPendingImage((prev) =>
-        prev?.localId === pending.localId
-          ? { ...prev, status: "error", error: err instanceof Error ? err.message : "Error al subir" }
-          : prev
+      setPendingImages((prev) =>
+        prev.map((p) =>
+          p.localId === pending.localId
+            ? { ...p, status: "error", error: err instanceof Error ? err.message : "Error al subir" }
+            : p
+        )
       );
     }
-  }, [pendingImage?.previewUrl]);
+  }, [pendingImages.length]);
 
-  const removePendingImage = useCallback(() => {
-    setPendingImage((prev) => {
-      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-      return null;
+  const removePendingImage = useCallback((localId: string) => {
+    setPendingImages((prev) => {
+      const target = prev.find((p) => p.localId === localId);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.localId !== localId);
     });
   }, []);
 
@@ -547,7 +551,7 @@ export default function AssistantChatPage() {
       if (!files.length) return;
       const images = files.filter((f) => f.type.startsWith("image/"));
       const docs = files.filter((f) => !f.type.startsWith("image/"));
-      if (images.length > 0) addImage(images[0]); // route images to LinkedIn image uploader
+      images.forEach((img) => addImage(img)); // route images to LinkedIn image uploader
       if (docs.length > 0) addFiles(docs);
     },
     [addFiles, addImage]
@@ -562,7 +566,7 @@ export default function AssistantChatPage() {
       e.preventDefault();
       const images = files.filter((f) => f.type.startsWith("image/"));
       const docs = files.filter((f) => !f.type.startsWith("image/"));
-      if (images.length > 0) addImage(images[0]); // route images to LinkedIn image uploader
+      images.forEach((img) => addImage(img)); // route images to LinkedIn image uploader
       if (docs.length > 0) addFiles(docs);
     },
     [addFiles, addImage]
@@ -574,9 +578,9 @@ export default function AssistantChatPage() {
 
   const handleSend = async () => {
     const text = input.trim();
-    const hasImage = pendingImage?.status === "done" && pendingImage.result;
-    const imageUploading = pendingImage?.status === "uploading";
-    if ((!text && !pendingFiles.length && !hasImage) || streaming || anyUploading || imageUploading) return;
+    const doneImages = pendingImages.filter((p) => p.status === "done" && p.result);
+    const imageUploading = pendingImages.some((p) => p.status === "uploading");
+    if ((!text && !pendingFiles.length && !doneImages.length) || streaming || anyUploading || imageUploading) return;
 
     // Al enviar, volver a seguir el scroll para ver la nueva respuesta
     setAutoScrollEnabled(true);
@@ -590,16 +594,20 @@ export default function AssistantChatPage() {
         mimeType: p.file.type,
       }));
 
-    const uploadedImageData = hasImage ? pendingImage!.result : undefined;
+    const uploadedImagesData = doneImages.length > 0 ? doneImages.map((p) => p.result!) : undefined;
 
     setInput("");
     const cleared = [...pendingFiles];
     setPendingFiles([]);
-    setPendingImage(null);
-    setTimeout(() => cleared.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl)), 5000);
+    const clearedImages = [...pendingImages];
+    setPendingImages([]);
+    setTimeout(() => {
+      cleared.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+      clearedImages.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl));
+    }, 5000);
 
-    const fallbackText = docs.length > 0 ? "Analiza los archivos adjuntos" : uploadedImageData ? "Crea un post con esta imagen" : "";
-    await sendMessage(text || fallbackText, { docs, uploadedImage: uploadedImageData });
+    const fallbackText = docs.length > 0 ? "Analiza los archivos adjuntos" : uploadedImagesData ? "Crea post(s) con estas imágenes" : "";
+    await sendMessage(text || fallbackText, { docs, uploadedImages: uploadedImagesData });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -712,15 +720,18 @@ export default function AssistantChatPage() {
             {msg.type === "user" ? (
               <div className="flex justify-end">
                 <div className="max-w-[90%] md:max-w-[75%] space-y-2">
-                  {/* Uploaded image in user bubble (for social media posts) */}
-                  {msg.uploadedImage && (
-                    <div className="flex justify-end">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={msg.uploadedImage.imageUrl}
-                        alt="Imagen adjunta"
-                        className="h-32 w-32 rounded-xl object-cover border border-border"
-                      />
+                  {/* Uploaded images in user bubble (for social media posts) */}
+                  {msg.uploadedImages && msg.uploadedImages.length > 0 && (
+                    <div className="flex justify-end gap-2 flex-wrap">
+                      {msg.uploadedImages.map((img, idx) => (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          key={idx}
+                          src={img.imageUrl}
+                          alt={`Imagen adjunta ${idx + 1}`}
+                          className="h-32 w-32 rounded-xl object-cover border border-border"
+                        />
+                      ))}
                     </div>
                   )}
                   {/* Document chips in user bubble */}
@@ -1061,7 +1072,7 @@ export default function AssistantChatPage() {
           )}
         >
           {/* File chips and image thumbnail above textarea */}
-          {(pendingFiles.length > 0 || pendingImage) && (
+          {(pendingFiles.length > 0 || pendingImages.length > 0) && (
             <div className="flex flex-wrap gap-2 px-4 pt-3 items-center">
               {pendingFiles.map((pf) => (
                 <FileChip
@@ -1070,15 +1081,15 @@ export default function AssistantChatPage() {
                   onRemove={() => removePendingFile(pf.localId)}
                 />
               ))}
-              {pendingImage && (
-                <div className="relative group flex-shrink-0">
+              {pendingImages.map((pi) => (
+                <div key={pi.localId} className="relative group flex-shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={pendingImage.previewUrl}
-                    alt={pendingImage.file.name}
+                    src={pi.previewUrl}
+                    alt={pi.file.name}
                     className="h-16 w-16 rounded-lg object-cover border border-border"
                   />
-                  {pendingImage.status === "uploading" && (
+                  {pi.status === "uploading" && (
                     <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
                       <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1086,7 +1097,7 @@ export default function AssistantChatPage() {
                       </svg>
                     </span>
                   )}
-                  {pendingImage.status === "error" && (
+                  {pi.status === "error" && (
                     <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-destructive/60">
                       <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1095,13 +1106,13 @@ export default function AssistantChatPage() {
                   )}
                   <button
                     type="button"
-                    onClick={removePendingImage}
+                    onClick={() => removePendingImage(pi.localId)}
                     className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
                   >
                     ×
                   </button>
                 </div>
-              )}
+              ))}
             </div>
           )}
 
@@ -1151,10 +1162,11 @@ export default function AssistantChatPage() {
               ref={imageInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
               className="hidden"
               onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) addImage(file);
+                const files = Array.from(e.target.files ?? []);
+                files.forEach((f) => addImage(f));
                 e.target.value = "";
               }}
             />
@@ -1166,8 +1178,8 @@ export default function AssistantChatPage() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                pendingImage
-                  ? "Describe qué quieres hacer con la imagen…"
+                pendingImages.length > 0
+                  ? "Describe qué quieres hacer con las imágenes…"
                   : pendingFiles.length
                   ? "Agrega un mensaje o envía solo los archivos…"
                   : "Escribe un mensaje, arrastra archivos o pega imágenes…"
@@ -1192,13 +1204,13 @@ export default function AssistantChatPage() {
                 className="h-8 w-8 p-0 flex-shrink-0"
                 onClick={handleSend}
                 disabled={
-                  (!input.trim() && !pendingFiles.length && !(pendingImage?.status === "done")) ||
+                  (!input.trim() && !pendingFiles.length && !pendingImages.some((p) => p.status === "done")) ||
                   anyUploading ||
-                  pendingImage?.status === "uploading"
+                  pendingImages.some((p) => p.status === "uploading")
                 }
-                title={anyUploading || pendingImage?.status === "uploading" ? "Esperando subida…" : undefined}
+                title={anyUploading || pendingImages.some((p) => p.status === "uploading") ? "Esperando subida…" : undefined}
               >
-                {(anyUploading || pendingImage?.status === "uploading") ? (
+                {(anyUploading || pendingImages.some((p) => p.status === "uploading")) ? (
                   <svg
                     className="h-4 w-4 animate-spin"
                     fill="none"

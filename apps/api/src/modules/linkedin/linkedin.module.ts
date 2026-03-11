@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { EncryptionModule } from '../../common/services/encryption.module';
 import { AiModule } from '../ai/ai.module';
+import { FilesModule } from '../files/files.module';
 import { LinkedInAuthService } from './services/linkedin-auth.service';
 import { LinkedInApiService } from './services/linkedin-api.service';
 import { GeminiImageService } from './services/gemini-image.service';
@@ -17,6 +18,7 @@ import { LinkedInController } from './controllers/linkedin.controller';
     ScheduleModule.forRoot(),
     PrismaModule,
     EncryptionModule,
+    FilesModule,
     forwardRef(() => AiModule),
   ],
   controllers: [LinkedInController],

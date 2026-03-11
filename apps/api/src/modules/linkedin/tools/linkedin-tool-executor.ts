@@ -177,6 +177,9 @@ export class LinkedInToolExecutor {
       content_pillar?: string | null;
       visibility?: string;
       image_prompt?: string | null;
+      media_type?: string;
+      image_s3_key?: string | null;
+      media_url?: string | null;
     }>) ?? [];
 
     const created = await this.postsService.bulkCreateDrafts(
@@ -187,6 +190,9 @@ export class LinkedInToolExecutor {
         contentPillar: p.content_pillar ?? undefined,
         visibility: p.visibility ?? 'PUBLIC',
         imagePrompt: p.image_prompt ?? undefined,
+        mediaType: p.media_type ?? 'NONE',
+        imageS3Key: p.image_s3_key ?? undefined,
+        mediaUrl: p.media_url ?? undefined,
       })),
       conversationId,
     );
