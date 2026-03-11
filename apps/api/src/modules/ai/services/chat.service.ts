@@ -447,8 +447,9 @@ export class ChatService {
       let assistantText = '';
       let completedResponseId = '';
       let completedResponseOutput: Array<Record<string, unknown>> = [];
-      let completedUsage = { inputTokens: 0, outputTokens: 0 };
+      let completedUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedTokens: 0 };
       let hasQuestion = false;
+      let wasCompacted = false;
       let thinkingText = '';
       // The parentResponseId for the response we're about to create
       const parentResponseIdForThisCall = currentPrevResponseId;
@@ -472,6 +473,7 @@ export class ChatService {
         store: true,
         tools: UNIFIED_TOOLS as OpenAI.Responses.Tool[],
         tool_choice: 'auto',
+        max_output_tokens: 16384,
         ...(reasoningConfig ? { reasoning: reasoningConfig } : {}),
         ...(currentPrevResponseId ? { previous_response_id: currentPrevResponseId } : {}),
       } as Parameters<typeof openai.responses.stream>[0]);
@@ -617,12 +619,17 @@ export class ChatService {
           const response = ev['response'] as Record<string, unknown> | undefined;
           completedResponseId = String(response?.['id'] ?? '');
           const usageRaw = response?.['usage'] as Record<string, unknown> | undefined;
+          const inputDetails = usageRaw?.['input_tokens_details'] as Record<string, unknown> | undefined;
           completedUsage = {
             inputTokens: Number(usageRaw?.['input_tokens'] ?? 0),
             outputTokens: Number(usageRaw?.['output_tokens'] ?? 0),
+            totalTokens: Number(usageRaw?.['total_tokens'] ?? 0),
+            cachedTokens: Number(inputDetails?.['cached_tokens'] ?? 0),
           };
           // Capture the full output array for manual context reconstruction
           completedResponseOutput = (response?.['output'] as Array<Record<string, unknown>>) ?? [];
+          // Check if any output item is a compaction item
+          wasCompacted = completedResponseOutput.some((item) => item['type'] === 'compaction');
         }
       }
 
@@ -641,6 +648,24 @@ export class ChatService {
       }
 
       currentPrevResponseId = completedResponseId;
+
+      // Persist usage for every iteration (tool calls, questions, etc.)
+      if (completedUsage.inputTokens > 0 || completedUsage.outputTokens > 0) {
+        await this.prisma.aiUsageLog.create({
+          data: {
+            provider: 'OPENAI',
+            model,
+            feature: 'chat',
+            inputTokens: completedUsage.inputTokens,
+            outputTokens: completedUsage.outputTokens,
+            totalTokens: completedUsage.totalTokens,
+            cachedTokens: completedUsage.cachedTokens,
+            compacted: wasCompacted,
+            tenantId: ctx.tenantId,
+            conversationId: conversation.id,
+          },
+        });
+      }
 
       // Agent asked a question → stop loop, user will answer later.
       // Save lastResponseOutput + parentResponseId + any tool outputs that ran in the SAME response.
@@ -692,7 +717,7 @@ export class ChatService {
 
       // Auto-generate title if agent never called update_conversation_title
       if (!titleUpdated && isNewConversation && ctx.message) {
-        await this.autoGenerateTitle(openai, model, conversation.id, ctx.message, subject);
+        await this.autoGenerateTitle(openai, model, conversation.id, ctx.message, subject, ctx.tenantId);
       }
 
       break;
@@ -868,6 +893,7 @@ export class ChatService {
     conversationId: string,
     firstMessage: string,
     subject: Subject<ChatEvent>,
+    tenantId: string,
   ): Promise<void> {
     try {
       const resp = await openai.responses.create({
@@ -883,6 +909,26 @@ export class ChatService {
 
       const rawTitle = (resp.output_text ?? '').trim().replace(/^["']|["']$/g, '');
       if (!rawTitle) return;
+
+      // Log usage for title generation
+      const titleUsage = resp.usage;
+      if (titleUsage) {
+        await this.prisma.aiUsageLog.create({
+          data: {
+            provider: 'OPENAI',
+            model,
+            feature: 'title-generation',
+            inputTokens: titleUsage.input_tokens ?? 0,
+            outputTokens: titleUsage.output_tokens ?? 0,
+            totalTokens: titleUsage.total_tokens ?? 0,
+            cachedTokens: (titleUsage as Record<string, unknown>)?.['input_tokens_details']
+              ? Number(((titleUsage as Record<string, unknown>)['input_tokens_details'] as Record<string, unknown>)?.['cached_tokens'] ?? 0)
+              : 0,
+            tenantId,
+            conversationId,
+          },
+        });
+      }
 
       await this.prisma.conversation.update({
         where: { id: conversationId },
@@ -1018,5 +1064,106 @@ export class ChatService {
 
     await this.prisma.conversation.delete({ where: { id: conversationId } });
     return { deleted: true };
+  }
+
+  /** Get aggregated usage summary for a single conversation */
+  async getConversationUsage(conversationId: string, userId: string, tenantId: string) {
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, userId, tenantId },
+    });
+    if (!conversation) return null;
+
+    const logs = await this.prisma.aiUsageLog.findMany({
+      where: { conversationId },
+      select: {
+        provider: true,
+        model: true,
+        inputTokens: true,
+        outputTokens: true,
+        totalTokens: true,
+        cachedTokens: true,
+      },
+    });
+
+    const byModel = new Map<string, { provider: string; model: string; inputTokens: number; outputTokens: number; totalTokens: number }>();
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalTokens = 0;
+    let totalCachedTokens = 0;
+
+    for (const log of logs) {
+      totalInputTokens += log.inputTokens;
+      totalOutputTokens += log.outputTokens;
+      totalTokens += log.totalTokens;
+      totalCachedTokens += log.cachedTokens;
+
+      const key = `${log.provider}:${log.model}`;
+      const existing = byModel.get(key);
+      if (existing) {
+        existing.inputTokens += log.inputTokens;
+        existing.outputTokens += log.outputTokens;
+        existing.totalTokens += log.totalTokens;
+      } else {
+        byModel.set(key, {
+          provider: log.provider,
+          model: log.model,
+          inputTokens: log.inputTokens,
+          outputTokens: log.outputTokens,
+          totalTokens: log.totalTokens,
+        });
+      }
+    }
+
+    return {
+      conversationId,
+      totalInputTokens,
+      totalOutputTokens,
+      totalTokens,
+      totalCachedTokens,
+      byModel: Array.from(byModel.values()),
+    };
+  }
+
+  /** Get detailed usage logs for the tenant (for cost analysis) */
+  async getUsageLogs(tenantId: string, filters?: { from?: string; to?: string; conversationId?: string }) {
+    const where: Record<string, unknown> = { tenantId };
+    if (filters?.conversationId) where.conversationId = filters.conversationId;
+    if (filters?.from || filters?.to) {
+      const createdAt: Record<string, Date> = {};
+      if (filters.from) createdAt.gte = new Date(filters.from);
+      if (filters.to) createdAt.lte = new Date(filters.to);
+      where.createdAt = createdAt;
+    }
+
+    const logs = await this.prisma.aiUsageLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+      select: {
+        id: true,
+        provider: true,
+        model: true,
+        feature: true,
+        inputTokens: true,
+        outputTokens: true,
+        totalTokens: true,
+        cachedTokens: true,
+        compacted: true,
+        createdAt: true,
+        conversationId: true,
+      },
+    });
+
+    // Compute totals
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+    let totalTokens = 0;
+    for (const log of logs) {
+      totalInputTokens += log.inputTokens;
+      totalOutputTokens += log.outputTokens;
+      totalTokens += log.totalTokens;
+    }
+
+    return { logs, totals: { totalInputTokens, totalOutputTokens, totalTokens } };
   }
 }

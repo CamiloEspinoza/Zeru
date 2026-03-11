@@ -22,6 +22,7 @@ model Tenant {
   updatedAt             DateTime  @updatedAt
 
   memberships          UserTenant[]
+  aiUsageLogs          AiUsageLog[]
   aiConfig             AiProviderConfig?
   geminiConfig         GeminiConfig?
   storageConfig        StorageConfig?
@@ -97,6 +98,32 @@ enum AiProvider {
   OPENAI
 
   @@map("ai_provider")
+}
+
+/// Registro detallado de cada interacción con modelos de IA para análisis de costos
+model AiUsageLog {
+  id             String   @id @default(uuid())
+  provider       String   // OPENAI, GEMINI, etc.
+  model          String   // gpt-5.4, text-embedding-3-small, etc.
+  feature        String   // chat, embedding, title-generation, image-generation
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  totalTokens    Int      @default(0)
+  cachedTokens   Int      @default(0)
+  /// Whether compaction was triggered during this interaction
+  compacted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([conversationId])
+  @@map("ai_usage_logs")
 }
 
 /// Configuracion de proveedor de IA por tenant
@@ -189,6 +216,7 @@ model Conversation {
   documents       Document[]
   journalEntries  JournalEntry[]
   linkedInPosts   LinkedInPost[]
+  aiUsageLogs     AiUsageLog[]
 
   @@index([userId])
   @@index([tenantId])

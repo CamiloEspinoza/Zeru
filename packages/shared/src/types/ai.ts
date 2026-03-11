@@ -114,7 +114,26 @@ export interface DoneEvent {
   usage: {
     inputTokens: number;
     outputTokens: number;
+    totalTokens: number;
+    cachedTokens: number;
   };
+}
+
+/** Resumen acumulado de uso de tokens para la conversación */
+export interface ConversationUsageSummary {
+  conversationId: string;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  totalCachedTokens: number;
+  /** Breakdown by provider+model */
+  byModel: Array<{
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  }>;
 }
 
 /** El agente actualizó el título de la conversación */
