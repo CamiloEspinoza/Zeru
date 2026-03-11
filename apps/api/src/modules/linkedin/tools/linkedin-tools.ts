@@ -87,15 +87,15 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
-    name: 'bulk_schedule_posts',
+    name: 'bulk_create_drafts',
     description:
-      'Programa múltiples posts de LinkedIn de una vez. Ideal para crear un calendario de contenido completo (ej: 90 posts para 30 días). Todos quedan en estado SCHEDULED.',
+      'Crea múltiples borradores de posts de LinkedIn de una vez. Los posts quedan en estado DRAFT para que el usuario los revise, edite y apruebe individualmente desde el carrusel. Ideal para crear un calendario de contenido. NO programa los posts directamente — el usuario decide cuándo programar cada uno.',
     parameters: {
       type: 'object',
       properties: {
         posts: {
           type: 'array',
-          description: 'Lista de posts a programar.',
+          description: 'Lista de posts a crear como borradores.',
           items: {
             type: 'object',
             properties: {
@@ -105,7 +105,7 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
               },
               scheduled_at: {
                 type: 'string',
-                description: 'Fecha y hora de publicación en ISO 8601.',
+                description: 'Fecha y hora sugerida de publicación en ISO 8601. El usuario puede cambiarla.',
               },
               content_pillar: {
                 type: ['string', 'null'],
@@ -116,8 +116,12 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
                 enum: ['PUBLIC', 'CONNECTIONS'],
                 description: 'Visibilidad.',
               },
+              image_prompt: {
+                type: ['string', 'null'],
+                description: 'Prompt sugerido para generar una imagen para este post. null si no necesita imagen.',
+              },
             },
-            required: ['content', 'scheduled_at', 'content_pillar', 'visibility'],
+            required: ['content', 'scheduled_at', 'content_pillar', 'visibility', 'image_prompt'],
             additionalProperties: false,
           },
         },
@@ -151,6 +155,28 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
         },
       },
       required: ['prompt', 'aspect_ratio', 'model'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'suggest_image_prompt',
+    description:
+      'Sugiere un prompt de imagen para un post existente. NO genera la imagen — solo guarda el prompt sugerido en el post. El usuario podrá editar el prompt y generar la imagen cuando quiera desde la tarjeta del post.',
+    parameters: {
+      type: 'object',
+      properties: {
+        post_id: {
+          type: 'string',
+          description: 'ID del post al que se le sugiere la imagen.',
+        },
+        prompt: {
+          type: 'string',
+          description: 'Prompt detallado y profesional para generar la imagen. Sé específico sobre estilo, colores, composición y elementos visuales.',
+        },
+      },
+      required: ['post_id', 'prompt'],
       additionalProperties: false,
     },
     strict: true,
@@ -353,7 +379,9 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
 export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   create_linkedin_post: 'Creando post de LinkedIn',
   schedule_linkedin_post: 'Programando post de LinkedIn',
+  bulk_create_drafts: 'Creando borradores de contenido',
   bulk_schedule_posts: 'Programando calendario de contenido',
+  suggest_image_prompt: 'Sugiriendo imagen para el post',
   generate_image: 'Generando imagen con Gemini',
   get_linkedin_connection_status: 'Verificando conexión de LinkedIn',
   get_post_history: 'Consultando historial de posts',

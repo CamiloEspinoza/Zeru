@@ -34,6 +34,8 @@ const PILLAR_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
+  DRAFT: "bg-gray-400",
+  PENDING_APPROVAL: "bg-amber-500",
   SCHEDULED: "bg-blue-500",
   PUBLISHED: "bg-green-500",
 };
@@ -60,23 +62,33 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(today.getMonth());
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<"all" | "SCHEDULED" | "PUBLISHED">("all");
+  const [filter, setFilter] = useState<"all" | "DRAFT" | "PENDING_APPROVAL" | "SCHEDULED" | "PUBLISHED">("all");
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
-      const [scheduled, published] = await Promise.all([
-        api.get<ListResponse>("/linkedin/posts?status=SCHEDULED&perPage=200"),
-        api.get<ListResponse>("/linkedin/posts?status=PUBLISHED&perPage=200"),
+      const from = new Date(year, month, 1).toISOString();
+      const to = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+      const params = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&perPage=200`;
+      const [scheduled, published, drafts, pending] = await Promise.all([
+        api.get<ListResponse>(`/linkedin/posts?status=SCHEDULED&${params}`),
+        api.get<ListResponse>(`/linkedin/posts?status=PUBLISHED&${params}`),
+        api.get<ListResponse>(`/linkedin/posts?status=DRAFT&${params}`),
+        api.get<ListResponse>(`/linkedin/posts?status=PENDING_APPROVAL&${params}`),
       ]);
-      setPosts([...(scheduled.posts ?? []), ...(published.posts ?? [])]);
+      setPosts([
+        ...(scheduled.posts ?? []),
+        ...(published.posts ?? []),
+        ...(drafts.posts ?? []),
+        ...(pending.posts ?? []),
+      ]);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [year, month]);
 
   useEffect(() => {
     fetchPosts();
@@ -126,6 +138,8 @@ export default function CalendarPage() {
             className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="all">Todos</option>
+            <option value="DRAFT">Borradores</option>
+            <option value="PENDING_APPROVAL">Pendientes</option>
             <option value="SCHEDULED">Programados</option>
             <option value="PUBLISHED">Publicados</option>
           </select>

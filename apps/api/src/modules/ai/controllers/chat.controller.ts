@@ -5,6 +5,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
   Res,
@@ -163,5 +164,28 @@ export class ChatController {
     );
     if (!result) throw new NotFoundException('Conversacion no encontrada');
     return result;
+  }
+
+  /** Aggregated token usage for a conversation (by model breakdown) */
+  @Get('conversations/:id/usage')
+  async getConversationUsage(
+    @Param('id') conversationId: string,
+    @Request() req: { user: { userId: string } },
+    @CurrentTenant() tenantId: string,
+  ) {
+    const usage = await this.chatService.getConversationUsage(conversationId, req.user.userId, tenantId);
+    if (!usage) throw new NotFoundException('Conversacion no encontrada');
+    return usage;
+  }
+
+  /** Detailed usage logs for the tenant (cost analysis) */
+  @Get('usage-logs')
+  async getUsageLogs(
+    @CurrentTenant() tenantId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
+    return this.chatService.getUsageLogs(tenantId, { from, to, conversationId });
   }
 }
