@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { CreateAccountSchema, UpdateAccountSchema } from '@zeru/shared';
 
@@ -17,7 +18,7 @@ export class ChartOfAccountsService {
   }
 
   async findById(id: string, tenantId: string) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     const account = await client.account.findUnique({
       where: { id },
@@ -34,7 +35,7 @@ export class ChartOfAccountsService {
   }
 
   async create(tenantId: string, data: CreateAccountSchema) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     return client.account.create({
       data: {
@@ -47,7 +48,7 @@ export class ChartOfAccountsService {
   }
 
   async update(id: string, tenantId: string, data: UpdateAccountSchema) {
-    const client = this.prisma.forTenant(tenantId) as any;
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     const account = await client.account.findUnique({
       where: { id },
