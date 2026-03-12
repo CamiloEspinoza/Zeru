@@ -739,6 +739,8 @@ model LinkedInAgentConfig {
   contentPillars    Json?
   /// URN de la organización para People Typeahead API — urn:li:organization:xxx
   organizationUrn   String?
+  /// Idioma preferido para los prompts de generación de imágenes (ej: "es", "en", "pt")
+  preferredLanguage String   @default("es")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
