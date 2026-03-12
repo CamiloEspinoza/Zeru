@@ -15,8 +15,10 @@ const STATUS_DOT_COLORS: Record<string, string> = {
 
 export function PostCarousel({
   posts: initialPosts,
+  onStatusChange: onStatusChangeProp,
 }: {
   posts: PostDraftData[];
+  onStatusChange?: (postId: string, newStatus: string) => void;
 }) {
   const [posts, setPosts] = useState(initialPosts);
   const [currentPage, setCurrentPage] = useState(0);
@@ -42,7 +44,8 @@ export function PostCarousel({
 
   const handleStatusChange = useCallback((postId: string, newStatus: string) => {
     setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, status: newStatus } : p)));
-  }, []);
+    onStatusChangeProp?.(postId, newStatus);
+  }, [onStatusChangeProp]);
 
   const prevPage = () => setCurrentPage((p) => Math.max(0, p - 1));
   const nextPage = () => setCurrentPage((p) => Math.min(totalPages - 1, p + 1));

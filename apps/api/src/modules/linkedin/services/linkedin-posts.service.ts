@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import OpenAI from 'openai';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { LinkedInApiService } from './linkedin-api.service';
 import { GeminiImageService } from './gemini-image.service';
+import { AiConfigService } from '../../ai/services/ai-config.service';
 import { SkillsService } from '../../ai/services/skills.service';
 import { S3Service } from '../../files/s3.service';
 
@@ -150,6 +152,7 @@ export class LinkedInPostsService {
     private readonly prisma: PrismaService,
     private readonly apiService: LinkedInApiService,
     private readonly geminiService: GeminiImageService,
+    private readonly aiConfigService: AiConfigService,
     private readonly skillsService: SkillsService,
     private readonly s3Service: S3Service,
   ) {}
@@ -173,22 +176,22 @@ export class LinkedInPostsService {
   }
 
   async bulkSchedule(tenantId: string, posts: BulkScheduleItem[], conversationId?: string) {
-    const created = await this.prisma.$transaction(
-      posts.map((p) =>
-        this.prisma.linkedInPost.create({
-          data: {
-            tenantId,
-            content: p.content,
-            mediaType: p.mediaType ?? 'NONE',
-            status: 'SCHEDULED',
-            scheduledAt: new Date(p.scheduledAt),
-            contentPillar: p.contentPillar ?? null,
-            visibility: p.visibility ?? 'PUBLIC',
-            conversationId: conversationId ?? null,
-          },
-        }),
-      ),
-    );
+    const created = [];
+    for (const p of posts) {
+      const post = await this.prisma.linkedInPost.create({
+        data: {
+          tenantId,
+          content: p.content,
+          mediaType: p.mediaType ?? 'NONE',
+          status: 'SCHEDULED',
+          scheduledAt: new Date(p.scheduledAt),
+          contentPillar: p.contentPillar ?? null,
+          visibility: p.visibility ?? 'PUBLIC',
+          conversationId: conversationId ?? null,
+        },
+      });
+      created.push(post);
+    }
     return created;
   }
 
@@ -361,25 +364,25 @@ export class LinkedInPostsService {
   // ─── Version history & regeneration ─────────────────────
 
   async bulkCreateDrafts(tenantId: string, posts: BulkCreateDraftItem[], conversationId?: string) {
-    const created = await this.prisma.$transaction(
-      posts.map((p) =>
-        this.prisma.linkedInPost.create({
-          data: {
-            tenantId,
-            content: p.content,
-            mediaType: p.mediaType ?? 'NONE',
-            mediaUrl: p.mediaUrl ?? null,
-            imageS3Key: p.imageS3Key ?? null,
-            status: 'DRAFT',
-            scheduledAt: new Date(p.scheduledAt),
-            contentPillar: p.contentPillar ?? null,
-            visibility: p.visibility ?? 'PUBLIC',
-            imagePrompt: p.imagePrompt ?? null,
-            conversationId: conversationId ?? null,
-          },
-        }),
-      ),
-    );
+    const created = [];
+    for (const p of posts) {
+      const post = await this.prisma.linkedInPost.create({
+        data: {
+          tenantId,
+          content: p.content,
+          mediaType: p.mediaType ?? 'NONE',
+          mediaUrl: p.mediaUrl ?? null,
+          imageS3Key: p.imageS3Key ?? null,
+          status: 'DRAFT',
+          scheduledAt: new Date(p.scheduledAt),
+          contentPillar: p.contentPillar ?? null,
+          visibility: p.visibility ?? 'PUBLIC',
+          imagePrompt: p.imagePrompt ?? null,
+          conversationId: conversationId ?? null,
+        },
+      });
+      created.push(post);
+    }
     return created;
   }
 
@@ -421,7 +424,7 @@ export class LinkedInPostsService {
     const post = await this.prisma.linkedInPost.findFirst({ where: { id: postId, tenantId } });
     if (!post) throw new NotFoundException('Post no encontrado');
 
-    // Save current content as a version
+    // Save current content as a version before regenerating
     const lastVersion = await this.prisma.linkedInPostVersion.findFirst({
       where: { postId },
       orderBy: { versionNumber: 'desc' },
@@ -437,9 +440,59 @@ export class LinkedInPostsService {
       },
     });
 
-    // Return the post with the instructions — the actual AI regeneration
-    // is done by the caller (controller/tool executor) using OpenAI
-    return { post, versionNumber: nextVersion };
+    // Get AI config for this tenant
+    const [fullConfig, apiKey] = await Promise.all([
+      this.aiConfigService.getConfig(tenantId),
+      this.aiConfigService.getDecryptedApiKey(tenantId),
+    ]);
+
+    if (!apiKey) throw new BadRequestException('No hay API key configurada');
+
+    const model = fullConfig?.model ?? 'gpt-4.1-mini';
+    const openai = new OpenAI({ apiKey });
+
+    const response = await openai.responses.create({
+      model,
+      input: [
+        {
+          role: 'system',
+          content: `${LINKEDIN_COPYWRITING_SKILL_CONTENT}\n\nReescribe el siguiente post de LinkedIn siguiendo las instrucciones del usuario. Devuelve SOLO el texto del post reescrito, sin explicaciones ni comentarios adicionales. Mantén el formato de LinkedIn (saltos de línea, emojis si los hay, hashtags).`,
+        },
+        {
+          role: 'user',
+          content: `POST ACTUAL:\n${post.content}\n\nINSTRUCCIONES DE REESCRITURA:\n${instructions}`,
+        },
+      ],
+      max_output_tokens: 2048,
+    });
+
+    const newContent = (response.output_text ?? '').trim();
+    if (!newContent) throw new BadRequestException('El modelo no generó contenido');
+
+    // Update the post with the new content
+    const updated = await this.prisma.linkedInPost.update({
+      where: { id: postId },
+      data: { content: newContent },
+    });
+
+    // Log AI usage
+    const usage = response.usage;
+    if (usage) {
+      await this.prisma.aiUsageLog.create({
+        data: {
+          provider: 'OPENAI',
+          model,
+          feature: 'post-regeneration',
+          inputTokens: usage.input_tokens ?? 0,
+          outputTokens: usage.output_tokens ?? 0,
+          totalTokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
+          cachedTokens: 0,
+          tenantId,
+        },
+      });
+    }
+
+    return updated;
   }
 
   async getVersions(tenantId: string, postId: string) {

@@ -78,6 +78,7 @@ export function PostDraftCard({
   );
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isWriting, setIsWriting] = useState(false);
   const [typewriterText, setTypewriterText] = useState<string | null>(null);
   const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -133,13 +134,11 @@ export function PostDraftCard({
     setIsRegenerating(true);
     setIsWriting(true);
     try {
-      await api.post(`/linkedin/posts/${post.id}/regenerate`, {
+      const updated = await api.post<PostDraftData>(`/linkedin/posts/${post.id}/regenerate`, {
         instructions: regenInstructions.trim(),
       });
-      // Fetch updated post
-      const updated = await api.get<PostDraftData>(`/linkedin/posts/${post.id}`);
       setIsWriting(false);
-      // Start typewriter effect with the new content
+      // Start typewriter effect with the NEW content from the LLM
       startTypewriter(updated.content);
       setPost(updated);
       setShowRegenInput(false);
@@ -191,6 +190,20 @@ export function PostDraftCard({
       // silently fail
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handlePublishNow = async () => {
+    if (isPublishing) return;
+    setIsPublishing(true);
+    try {
+      await api.post(`/linkedin/posts/${post.id}/publish`, {});
+      setPost((prev) => ({ ...prev, status: "PUBLISHED" }));
+      onStatusChange?.(post.id, "PUBLISHED");
+    } catch {
+      // silently fail
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -362,18 +375,35 @@ export function PostDraftCard({
           {!showScheduler ? (
             <>
               <button
-                onClick={() => setShowScheduler(true)}
-                disabled={isScheduling || isCancelling}
+                onClick={handlePublishNow}
+                disabled={isPublishing || isScheduling || isCancelling}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#0A66C2] px-3 py-2 text-xs font-semibold text-white hover:bg-[#004182] transition-colors disabled:opacity-50"
               >
+                {isPublishing ? (
+                  <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+                Publicar ahora
+              </button>
+              <button
+                onClick={() => setShowScheduler(true)}
+                disabled={isPublishing || isScheduling || isCancelling}
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+              >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Aprobar y programar
+                Programar
               </button>
               <button
                 onClick={handleCancel}
-                disabled={isScheduling || isCancelling}
+                disabled={isPublishing || isScheduling || isCancelling}
                 className="rounded-lg border border-border px-3 py-2 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50"
               >
                 {isCancelling ? "…" : "Descartar"}
@@ -408,13 +438,30 @@ export function PostDraftCard({
 
       {/* Scheduled state */}
       {post.status === "SCHEDULED" && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 space-y-2">
           <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-[11px] font-medium">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             Programado para {new Date(post.scheduledAt!).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" })}
           </div>
+          <button
+            onClick={handlePublishNow}
+            disabled={isPublishing}
+            className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-[#0A66C2] px-3 py-2 text-xs font-semibold text-white hover:bg-[#004182] transition-colors disabled:opacity-50"
+          >
+            {isPublishing ? (
+              <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+            )}
+            Publicar ahora
+          </button>
         </div>
       )}
 

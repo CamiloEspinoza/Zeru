@@ -5,8 +5,6 @@ import { SkillsService } from '../../ai/services/skills.service';
 import { LinkedInAuthService } from '../services/linkedin-auth.service';
 import { LinkedInApiService } from '../services/linkedin-api.service';
 import { LinkedInPostsService } from '../services/linkedin-posts.service';
-import { GeminiImageService } from '../services/gemini-image.service';
-
 export interface ToolExecutionResult {
   success: boolean;
   data: unknown;
@@ -24,7 +22,6 @@ export class LinkedInToolExecutor {
     private readonly authService: LinkedInAuthService,
     private readonly apiService: LinkedInApiService,
     private readonly postsService: LinkedInPostsService,
-    private readonly geminiService: GeminiImageService,
   ) {}
 
   async execute(
@@ -50,9 +47,6 @@ export class LinkedInToolExecutor {
 
         case 'suggest_image_prompt':
           return await this.suggestImagePrompt(args, tenantId);
-
-        case 'generate_image':
-          return await this.generateImage(args, tenantId);
 
         case 'get_linkedin_connection_status':
           return await this.getConnectionStatus(tenantId);
@@ -224,20 +218,6 @@ export class LinkedInToolExecutor {
       success: true,
       data: { postId: post.id, imagePrompt: prompt },
       summary: `Prompt de imagen sugerido para el post`,
-    };
-  }
-
-  private async generateImage(args: Record<string, unknown>, tenantId: string): Promise<ToolExecutionResult> {
-    const prompt = String(args.prompt ?? '');
-    const aspectRatio = String(args.aspect_ratio ?? '1:1');
-    const model = (args.model === 'pro' ? 'pro' : 'flash') as 'flash' | 'pro';
-
-    const result = await this.geminiService.generateImage(tenantId, prompt, aspectRatio, model);
-
-    return {
-      success: true,
-      data: { s3Key: result.s3Key, imageUrl: result.s3Url, mimeType: result.mimeType },
-      summary: `Imagen generada con Gemini ${model === 'pro' ? '3 Pro' : '3.1 Flash'} y guardada en S3 (${aspectRatio})`,
     };
   }
 

@@ -2,25 +2,40 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { createSoftDeleteExtension } from './extensions/soft-delete.extension';
 
+type ExtendedClient = ReturnType<PrismaClient['$extends']>;
+
+/** Service that delegates to an extended Prisma client with soft delete. Uses Proxy to avoid Object.assign overwriting internal engine state. */
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  private readonly _base: PrismaClient;
-  private readonly _client: ReturnType<PrismaClient['$extends']>;
+  private readonly _client: ExtendedClient;
 
   constructor() {
-    this._base = new PrismaClient();
-    this._client = this._base.$extends(
-      createSoftDeleteExtension(this._base),
-    ) as ReturnType<PrismaClient['$extends']>;
-    Object.assign(this, this._client);
+    const base = new PrismaClient();
+    this._client = base.$extends(
+      createSoftDeleteExtension(base),
+    ) as ExtendedClient;
+
+    return new Proxy(this, {
+      get(target, prop: string | symbol) {
+        if (typeof prop === 'string' && (prop in target || ['forTenant', 'onModuleInit', 'onModuleDestroy', '_client'].includes(prop))) {
+          return (target as Record<string | symbol, unknown>)[prop];
+        }
+        const client = (target as PrismaService)._client;
+        if (prop === '$transaction') {
+          return (arg: unknown, opts?: unknown) =>
+            (base.$transaction as (arg: unknown, opts?: unknown) => unknown)(arg, opts);
+        }
+        return (client as Record<string | symbol, unknown>)[prop];
+      },
+    }) as PrismaService;
   }
 
   async onModuleInit() {
-    await this._base.$connect();
+    await this._client.$connect();
   }
 
   async onModuleDestroy() {
-    await this._base.$disconnect();
+    await this._client.$disconnect();
   }
 
   /**

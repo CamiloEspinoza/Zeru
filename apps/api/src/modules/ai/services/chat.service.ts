@@ -602,6 +602,11 @@ export class ChatService {
               call_id: callId,
               output: JSON.stringify({ success: true, title: newTitle }),
             } as OpenAI.Responses.ResponseInputItem.FunctionCallOutput);
+            await this.saveMessage(conversation.id, 'tool', null, {
+              toolName,
+              toolArgs: args,
+              toolResult: { success: true, title: newTitle },
+            });
           } else {
             // Execute tool and collect output for next iteration
             const result = await this.toolExecutor.execute(toolName, args, ctx.tenantId, ctx.userId, {

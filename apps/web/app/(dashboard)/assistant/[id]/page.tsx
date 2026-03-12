@@ -475,6 +475,15 @@ export default function AssistantChatPage() {
     });
   }, []);
 
+  // Track post IDs that have been individually or bulk dismissed (cancelled/published/scheduled)
+  const [dismissedPostIds, setDismissedPostIds] = useState<Set<string>>(new Set());
+
+  const handlePostStatusChange = useCallback((postId: string, newStatus: string) => {
+    if (!["PENDING_APPROVAL", "DRAFT"].includes(newStatus)) {
+      setDismissedPostIds((prev) => new Set(prev).add(postId));
+    }
+  }, []);
+
   // Collect all PENDING_APPROVAL/DRAFT posts visible in the current conversation
   const pendingPosts = useMemo(() => {
     const result: { id: string }[] = [];
@@ -487,19 +496,19 @@ export default function AssistantChatPage() {
           const res = block.state.result as { posts?: { id: string; status: string }[] };
           if (res.posts) {
             for (const p of res.posts) {
-              if (["PENDING_APPROVAL", "DRAFT"].includes(p.status)) result.push({ id: p.id });
+              if (["PENDING_APPROVAL", "DRAFT"].includes(p.status) && !dismissedPostIds.has(p.id)) result.push({ id: p.id });
             }
           }
         } else if (block.state.name === "create_linkedin_post" || block.state.name === "schedule_linkedin_post") {
           const post = block.state.result as { id: string; status: string };
-          if (["PENDING_APPROVAL", "DRAFT"].includes(post.status)) {
+          if (["PENDING_APPROVAL", "DRAFT"].includes(post.status) && !dismissedPostIds.has(post.id)) {
             result.push({ id: post.id });
           }
         }
       }
     }
     return result;
-  }, [messages]);
+  }, [messages, dismissedPostIds]);
 
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
   const [isBulkCancelling, setIsBulkCancelling] = useState(false);
@@ -508,7 +517,13 @@ export default function AssistantChatPage() {
     if (pendingPosts.length === 0 || isBulkPublishing) return;
     setIsBulkPublishing(true);
     try {
-      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/publish`, {})));
+      const ids = pendingPosts.map((p) => p.id);
+      await Promise.allSettled(ids.map((id) => api.post(`/linkedin/posts/${id}/publish`, {})));
+      setDismissedPostIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
     } finally {
       setIsBulkPublishing(false);
     }
@@ -518,7 +533,13 @@ export default function AssistantChatPage() {
     if (pendingPosts.length === 0 || isBulkCancelling) return;
     setIsBulkCancelling(true);
     try {
-      await Promise.allSettled(pendingPosts.map((p) => api.post(`/linkedin/posts/${p.id}/cancel`, {})));
+      const ids = pendingPosts.map((p) => p.id);
+      await Promise.allSettled(ids.map((id) => api.post(`/linkedin/posts/${id}/cancel`, {})));
+      setDismissedPostIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
     } finally {
       setIsBulkCancelling(false);
     }
@@ -608,6 +629,7 @@ export default function AssistantChatPage() {
 
     const fallbackText = docs.length > 0 ? "Analiza los archivos adjuntos" : uploadedImagesData ? "Crea post(s) con estas imágenes" : "";
     await sendMessage(text || fallbackText, { docs, uploadedImages: uploadedImagesData });
+    textareaRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -715,7 +737,7 @@ export default function AssistantChatPage() {
           </div>
         )}
 
-        {messages.map((msg) => (
+        {messages.map((msg, msgIdx) => (
           <div key={msg.id}>
             {msg.type === "user" ? (
               <div className="flex justify-end">
@@ -816,7 +838,7 @@ export default function AssistantChatPage() {
                         if (postDrafts.length >= 2) {
                           return (
                             <div key={`carousel-${msg.blocks[0]?.kind === "tool" ? (msg.blocks[0] as { state: { toolCallId: string } }).state.toolCallId : blockIdx}`} className="w-full my-2">
-                              <PostCarousel posts={postDrafts} />
+                              <PostCarousel posts={postDrafts} onStatusChange={handlePostStatusChange} />
                             </div>
                           );
                         }
@@ -824,7 +846,7 @@ export default function AssistantChatPage() {
                         return (
                           <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
                             <div className="w-full max-w-[560px]">
-                              <PostDraftCard post={postDrafts[0]} />
+                              <PostDraftCard post={postDrafts[0]} onStatusChange={handlePostStatusChange} />
                             </div>
                           </div>
                         );
@@ -885,7 +907,7 @@ export default function AssistantChatPage() {
                           return (
                             <div key={block.state.toolCallId} className="flex justify-center w-full my-2">
                               <div className="w-full max-w-[560px]">
-                                <PostDraftCard post={post} />
+                                <PostDraftCard post={post} onStatusChange={handlePostStatusChange} />
                               </div>
                             </div>
                           );
@@ -955,66 +977,32 @@ export default function AssistantChatPage() {
                     return null;
                   });
                   })()}
-                  {/* Loader inicial: aún no hay ningún bloque (conectando) */}
-                  {msg.blocks.length === 0 && streaming && !msg.done && (
-                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
-                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                          <svg
-                            className="h-3.5 w-3.5 animate-spin text-muted-foreground"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                            />
-                          </svg>
+                  {/* Loader: visible mientras no haya texto ni herramientas ejecutándose */}
+                  {streaming && !msg.done &&
+                    !msg.blocks.some((b) => b.kind === "text") &&
+                    !msg.blocks.some((b) => b.kind === "tool" && b.state.status === "running") && (() => {
+                    const prevMsg = messages[msgIdx - 1];
+                    const hasImages = prevMsg?.type === "user" && (
+                      (prevMsg.uploadedImages && prevMsg.uploadedImages.length > 0) ||
+                      (prevMsg.docs && prevMsg.docs.some((d) => d.mimeType.startsWith("image/")))
+                    );
+                    const hasDocs = prevMsg?.type === "user" && prevMsg.docs && prevMsg.docs.length > 0 && !hasImages;
+                    const label = hasImages
+                      ? "Analizando imagen…"
+                      : hasDocs
+                        ? "Analizando documento…"
+                        : "Pensando…";
+                    return (
+                      <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground animate-pulse">
+                        <span className="flex gap-0.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
                         </span>
-                        <span>Conectando con el asistente…</span>
+                        <span>{label}</span>
                       </div>
-                      <div className="px-3 pb-3 pt-0">
-                        <p className="text-xs text-muted-foreground/70 italic">
-                          Esperando respuesta del modelo…
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {/* Loader entre turnos: tools terminaron, esperando siguiente respuesta del LLM */}
-                  {msg.blocks.length > 0 &&
-                    streaming &&
-                    !msg.done &&
-                    (() => {
-                      const last = msg.blocks[msg.blocks.length - 1];
-                      const waitingAfterTools =
-                        last?.kind === "tool" && last.state.status === "done";
-                      return waitingAfterTools;
-                    })() && (
-                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
-                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <span className="flex gap-0.5">
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
-                          </span>
-                          Pensando...
-                        </span>
-                      </div>
-                      <p className="px-3 pb-3 pt-0 text-xs text-muted-foreground/70 italic">
-                        Esperando respuesta del modelo…
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             )}
@@ -1173,6 +1161,7 @@ export default function AssistantChatPage() {
 
             <textarea
               ref={textareaRef}
+              autoFocus
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

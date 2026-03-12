@@ -18,8 +18,6 @@ const SOFT_DELETABLE_MODELS = new Set([
   'fiscalPeriod',
   'accountingProcessStep',
   'document',
-  'agentSkill',
-  'agentSkillFile',
   'apiKey',
   'waitlistEntry',
   'linkedInConnection',

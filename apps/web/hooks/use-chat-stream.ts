@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { ChatEvent, QuestionPayload, ToolStartEvent, ToolDoneEvent, TitleUpdateEvent } from "@zeru/shared";
 
 const API_BASE =
@@ -30,7 +31,6 @@ const TOOL_LABELS: Record<string, string> = {
   create_linkedin_post: "Creando post de LinkedIn",
   schedule_linkedin_post: "Programando post de LinkedIn",
   bulk_schedule_posts: "Programando calendario de contenido",
-  generate_image: "Generando imagen con Gemini",
   get_linkedin_connection_status: "Verificando conexión de LinkedIn",
   get_post_history: "Consultando historial de posts",
   get_scheduled_posts: "Consultando posts programados",
@@ -252,18 +252,23 @@ export function useChatStream() {
       const userMsgId = crypto.randomUUID();
       const assistantMsgId = crypto.randomUUID();
 
-      setMessages((prev) => [
-        ...prev,
-        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImages: opts?.uploadedImages },
-        {
-          id: assistantMsgId,
-          type: "assistant",
-          blocks: [],
-          done: false,
-        },
-      ]);
-
-      setStreaming(true);
+      // flushSync ensures React commits the "loading" state to the DOM
+      // before we start the SSE stream. Without this, React 18 batching
+      // can merge these updates with the first SSE event, skipping the
+      // loader entirely.
+      flushSync(() => {
+        setMessages((prev) => [
+          ...prev,
+          { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImages: opts?.uploadedImages },
+          {
+            id: assistantMsgId,
+            type: "assistant",
+            blocks: [],
+            done: false,
+          },
+        ]);
+        setStreaming(true);
+      });
       abortRef.current = new AbortController();
 
       try {
@@ -579,8 +584,7 @@ export function useChatStream() {
       const raw: RawMessage[] = await res.json();
 
       // Tools that are internal/noisy and shouldn't be shown in history
-      const HIDDEN_TOOLS = new Set([
-        "update_conversation_title",
+      const HIDDEN_TOOLS = new Set<string>([
       ]);
 
       // Build MessageBlock[] by grouping DB rows into UI message blocks.

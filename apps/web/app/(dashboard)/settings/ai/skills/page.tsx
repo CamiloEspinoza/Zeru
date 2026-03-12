@@ -49,18 +49,7 @@ type SyncStatus = "idle" | "syncing";
 
 /**
  * Parses any supported skill input into a canonical GitHub URL.
- *
- * Supported formats:
- *   npx skills add owner/repo@skills/copywriting
- *   npx skills add https://github.com/owner/repo --skill copywriting
- *   owner/repo@skills/copywriting
- *   https://github.com/owner/repo/tree/main/skills/copywriting
- *
- * The `npx skills` CLI uses the convention that skills live under a `skills/`
- * subfolder inside the repo. When the `--skill` flag value doesn't already
- * contain a `/`, we prepend `skills/` to match that convention.
- * For the `@skill` shorthand, the path is used as-is (so users can write
- * `owner/repo@skills/copywriting` for explicitness, or rely on auto-prefix).
+ * Matches npx skills CLI behavior: --skill and @skill are filters for discovery from root.
  */
 function normalizeSkillInput(raw: string): string {
   let input = raw.trim();
@@ -73,26 +62,25 @@ function normalizeSkillInput(raw: string): string {
     }
   }
 
-  // Handle "URL --skill skillname" flag form
-  // Mirrors the `npx skills` CLI: --skill value → skills/<value> subfolder
+  // Handle "URL --skill X" or "owner/repo --skill X"
+  // Per npx skills: --skill is a filter, NOT a path. Use root for discovery.
   const skillFlagMatch = input.match(/^(.+?)\s+(?:--skill|-s)\s+(\S+)$/);
   if (skillFlagMatch) {
     const base = skillFlagMatch[1].trim().replace(/\/$/, "");
     const rawSkillName = skillFlagMatch[2].trim();
-    // If the value already contains a slash it's already a full path; otherwise
-    // assume the conventional `skills/<name>` subfolder layout
-    const skillPath = rawSkillName.includes("/") ? rawSkillName : `skills/${rawSkillName}`;
     const baseUrl = base.startsWith("http") ? base : `https://github.com/${base}`;
-    return `${baseUrl}/tree/main/${skillPath}`;
+    const skillPath = rawSkillName.includes("/") ? rawSkillName : "";
+    return `${baseUrl}/tree/main${skillPath ? `/${skillPath}` : ""}`;
   }
 
-  // Handle "owner/repo@skill-path" shorthand (path used as-is)
+  // Handle "owner/repo@X" - if X has no / it's a filter (use root); else it's a path
   const atMatch = input.match(/^([^@:/]+\/[^@:/]+)@(.+)$/);
   if (atMatch) {
-    return `https://github.com/${atMatch[1]}/tree/main/${atMatch[2]}`;
+    const suffix = atMatch[2].includes("/") ? `/${atMatch[2]}` : "";
+    return `https://github.com/${atMatch[1]}/tree/main${suffix}`;
   }
 
-  // Ensure full URL for bare "owner/repo"
+  // Bare "owner/repo" - root
   if (!input.startsWith("http") && /^[^/]+\/[^/]/.test(input)) {
     return `https://github.com/${input}`;
   }
@@ -326,7 +314,9 @@ export default function SkillsPage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [installStatus, setInstallStatus] = useState<InstallStatus>("idle");
   const [installError, setInstallError] = useState("");
+  const [installingRecommendedUrl, setInstallingRecommendedUrl] = useState<string | null>(null);
   const [wasCommand, setWasCommand] = useState(false);
+  const [recommendedCategory, setRecommendedCategory] = useState<"contabilidad" | "marketing">("contabilidad");
 
   useEffect(() => {
     api
@@ -348,7 +338,7 @@ export default function SkillsPage() {
 
     try {
       const skill = await api.post<Skill>("/ai/skills", {
-        repoUrl: parsedRepoUrl,
+        repoUrl: repoUrl.trim(),
       });
       setSkills((prev) => [skill, ...prev]);
       setRepoUrl("");
@@ -387,66 +377,135 @@ export default function SkillsPage() {
 
   const isInstalling = installStatus === "installing";
 
-  const recommendedSkills = [
-    {
-      name: "Social Content",
-      description: "Crear, programar y optimizar contenido para LinkedIn, Twitter/X, Instagram, TikTok y más. Incluye calendarios de contenido, hilos virales y estrategia de crecimiento.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/social-content",
-      command: "npx skills add coreyhaines31/marketingskills --skill social-content",
-      tags: ["linkedin", "redes sociales"],
-    },
-    {
-      name: "Copywriting",
-      description: "Redacción persuasiva para landing pages, homepages, páginas de precios y features. Headlines, CTAs, propuestas de valor y copy above-the-fold.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/copywriting",
-      command: "npx skills add coreyhaines31/marketingskills --skill copywriting",
-      tags: ["copy", "conversión"],
-    },
-    {
-      name: "Content Strategy",
-      description: "Planificación de contenido, clusters de temas, calendario editorial y pilares de contenido. Para decidir qué crear, no solo cómo escribirlo.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/content-strategy",
-      command: "npx skills add coreyhaines31/marketingskills --skill content-strategy",
-      tags: ["estrategia", "contenido"],
-    },
-    {
-      name: "Email Sequence",
-      description: "Secuencias de email automatizadas: bienvenida, nurture, reactivación y onboarding. Flujos de múltiples emails para cualquier etapa del funnel.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/email-sequence",
-      command: "npx skills add coreyhaines31/marketingskills --skill email-sequence",
-      tags: ["email", "automatización"],
-    },
-    {
-      name: "Marketing Psychology",
-      description: "Principios psicológicos aplicados al marketing: sesgos cognitivos, persuasión, prueba social, escasez, anclaje y ciencia del comportamiento.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/marketing-psychology",
-      command: "npx skills add coreyhaines31/marketingskills --skill marketing-psychology",
-      tags: ["psicología", "persuasión"],
-    },
-    {
-      name: "Ad Creative",
-      description: "Generar variaciones de copy para ads: headlines, descripciones, texto principal para Facebook, Google, LinkedIn y más. Escala y testeo de creativos.",
-      url: "https://github.com/coreyhaines31/marketingskills/tree/main/skills/ad-creative",
-      command: "npx skills add coreyhaines31/marketingskills --skill ad-creative",
-      tags: ["ads", "paid media"],
-    },
-  ];
+  type RecommendedCategory = "contabilidad" | "marketing";
+  const recommendedSkillsByCategory: Record<
+    RecommendedCategory,
+    Array<{
+      name: string;
+      description: string;
+      installPayload: string;
+      command: string;
+      tags: string[];
+      matchUrls: string[];
+    }>
+  > = {
+    contabilidad: [
+      {
+        name: "IFRS Accounting Standards Advisor",
+        description:
+          "Guía experta para normas contables NIIF/IFRS: análisis de transacciones, reconocimiento y medición, presentación y revelación, políticas contables y memorandos técnicos.",
+        installPayload:
+          "npx skills add https://github.com/camiloespinoza/ifrs-accounting-standards-advisor --skill ifrs-accounting-standards-advisor",
+        command:
+          "npx skills add https://github.com/camiloespinoza/ifrs-accounting-standards-advisor --skill ifrs-accounting-standards-advisor",
+        tags: ["NIIF", "IFRS", "normas internacionales"],
+        matchUrls: ["https://github.com/camiloespinoza/ifrs-accounting-standards-advisor"],
+      },
+      {
+        name: "Chilean Accounting & Tax Expert",
+        description:
+          "Sistema contable chileno: partida doble, DTE/IVA, cierre contable, reportes fiscales y financieros. Normativa SII, cuentas contables y lógica tributaria local.",
+        installPayload:
+          "npx skills add https://github.com/camiloespinoza/chilean-accounting-tax-expert --skill chilean-accounting-tax-expert",
+        command:
+          "npx skills add https://github.com/camiloespinoza/chilean-accounting-tax-expert --skill chilean-accounting-tax-expert",
+        tags: ["SII", "DTE", "impuestos Chile"],
+        matchUrls: ["https://github.com/camiloespinoza/chilean-accounting-tax-expert"],
+      },
+    ],
+    marketing: [
+      {
+        name: "Social Content",
+        description:
+          "Crear, programar y optimizar contenido para LinkedIn, Twitter/X, Instagram, TikTok y más. Incluye calendarios de contenido, hilos virales y estrategia de crecimiento.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/social-content",
+        command: "npx skills add coreyhaines31/marketingskills --skill social-content",
+        tags: ["linkedin", "redes sociales"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/social-content",
+        ],
+      },
+      {
+        name: "Copywriting",
+        description:
+          "Redacción persuasiva para landing pages, homepages, páginas de precios y features. Headlines, CTAs, propuestas de valor y copy above-the-fold.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/copywriting",
+        command: "npx skills add coreyhaines31/marketingskills --skill copywriting",
+        tags: ["copy", "conversión"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/copywriting",
+        ],
+      },
+      {
+        name: "Content Strategy",
+        description:
+          "Planificación de contenido, clusters de temas, calendario editorial y pilares de contenido. Para decidir qué crear, no solo cómo escribirlo.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/content-strategy",
+        command: "npx skills add coreyhaines31/marketingskills --skill content-strategy",
+        tags: ["estrategia", "contenido"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/content-strategy",
+        ],
+      },
+      {
+        name: "Email Sequence",
+        description:
+          "Secuencias de email automatizadas: bienvenida, nurture, reactivación y onboarding. Flujos de múltiples emails para cualquier etapa del funnel.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/email-sequence",
+        command: "npx skills add coreyhaines31/marketingskills --skill email-sequence",
+        tags: ["email", "automatización"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/email-sequence",
+        ],
+      },
+      {
+        name: "Marketing Psychology",
+        description:
+          "Principios psicológicos aplicados al marketing: sesgos cognitivos, persuasión, prueba social, escasez, anclaje y ciencia del comportamiento.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/marketing-psychology",
+        command: "npx skills add coreyhaines31/marketingskills --skill marketing-psychology",
+        tags: ["psicología", "persuasión"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/marketing-psychology",
+        ],
+      },
+      {
+        name: "Ad Creative",
+        description:
+          "Generar variaciones de copy para ads: headlines, descripciones, texto principal para Facebook, Google, LinkedIn y más. Escala y testeo de creativos.",
+        installPayload:
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/ad-creative",
+        command: "npx skills add coreyhaines31/marketingskills --skill ad-creative",
+        tags: ["ads", "paid media"],
+        matchUrls: [
+          "https://github.com/coreyhaines31/marketingskills/tree/main/skills/ad-creative",
+        ],
+      },
+    ],
+  };
 
-  const handleInstallRecommended = async (url: string) => {
-    setRepoUrl(url);
+  const recommendedSkills = recommendedSkillsByCategory[recommendedCategory];
+
+  const handleInstallRecommended = async (installPayload: string) => {
     setInstallStatus("installing");
+    setInstallingRecommendedUrl(installPayload);
     setInstallError("");
     try {
-      const skill = await api.post<Skill>("/ai/skills", { repoUrl: url });
+      const skill = await api.post<Skill>("/ai/skills", { repoUrl: installPayload });
       setSkills((prev) => [skill, ...prev]);
-      setRepoUrl("");
-      setWasCommand(false);
       setInstallStatus("success");
       setTimeout(() => setInstallStatus("idle"), 2500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error al instalar el skill";
       setInstallError(msg);
       setInstallStatus("error");
+    } finally {
+      setInstallingRecommendedUrl(null);
     }
   };
 
@@ -463,17 +522,40 @@ export default function SkillsPage() {
       {/* Recommended skills */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Skills recomendados para marketing</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Skills recomendados</CardTitle>
+            <div className="flex rounded-lg border border-border p-0.5 bg-muted/50">
+              {(["contabilidad", "marketing"] as const).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setRecommendedCategory(cat)}
+                  className={cn(
+                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors capitalize",
+                    recommendedCategory === cat
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
           <CardDescription>
-            Instala estos skills para potenciar las capacidades de copywriting y redes sociales del asistente.
+            {recommendedCategory === "contabilidad"
+              ? "Normas contables NIIF/IFRS y sistema tributario chileno."
+              : "Copywriting, contenido para redes sociales y estrategia de marketing."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {recommendedSkills.map((rec) => {
-            const alreadyInstalled = skills.some((s) => s.repoUrl === rec.url);
+            const alreadyInstalled = skills.some((s) =>
+              rec.matchUrls.some((u) => s.repoUrl === u || s.repoUrl.startsWith(u + "/"))
+            );
             return (
               <div
-                key={rec.url}
+                key={rec.installPayload}
                 className="flex items-start gap-3 rounded-lg border border-border p-3"
               >
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-purple-100 dark:bg-purple-900/30 text-base">
@@ -489,24 +571,22 @@ export default function SkillsPage() {
                       </span>
                     ))}
                   </div>
-                  {"command" in rec && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRepoUrl(rec.command as string);
-                        setWasCommand(true);
-                        document.getElementById("repoUrl")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                        document.getElementById("repoUrl")?.focus();
-                      }}
-                      className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
-                      title="Copiar comando al campo de instalación"
-                    >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepoUrl(rec.command);
+                      setWasCommand(true);
+                      document.getElementById("repoUrl")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      document.getElementById("repoUrl")?.focus();
+                    }}
+                    className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground/70 hover:text-muted-foreground transition-colors"
+                    title="Copiar comando al campo de instalación"
+                  >
                       <svg className="h-2.5 w-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      {rec.command as string}
+                      {rec.command}
                     </button>
-                  )}
                 </div>
                 {alreadyInstalled ? (
                   <span className="shrink-0 text-xs text-green-600 dark:text-green-400 flex items-center gap-1 mt-0.5">
@@ -521,9 +601,16 @@ export default function SkillsPage() {
                     size="sm"
                     className="shrink-0 h-7 text-xs"
                     disabled={isInstalling}
-                    onClick={() => handleInstallRecommended(rec.url)}
+                    onClick={() => handleInstallRecommended(rec.installPayload)}
                   >
-                    Instalar
+                    {installingRecommendedUrl === rec.installPayload ? (
+                      <>
+                        <div className="mr-1.5 h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                        Instalando...
+                      </>
+                    ) : (
+                      "Instalar"
+                    )}
                   </Button>
                 )}
               </div>
