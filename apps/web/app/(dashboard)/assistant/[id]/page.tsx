@@ -715,7 +715,7 @@ export default function AssistantChatPage() {
           </div>
         )}
 
-        {messages.map((msg) => (
+        {messages.map((msg, msgIdx) => (
           <div key={msg.id}>
             {msg.type === "user" ? (
               <div className="flex justify-end">
@@ -956,63 +956,44 @@ export default function AssistantChatPage() {
                   });
                   })()}
                   {/* Loader inicial: aún no hay ningún bloque (conectando) */}
-                  {msg.blocks.length === 0 && streaming && !msg.done && (
-                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
-                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                          <svg
-                            className="h-3.5 w-3.5 animate-spin text-muted-foreground"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                            />
-                          </svg>
+                  {msg.blocks.length === 0 && streaming && !msg.done && (() => {
+                    const prevMsg = messages[msgIdx - 1];
+                    const hasImages = prevMsg?.type === "user" && (
+                      (prevMsg.uploadedImages && prevMsg.uploadedImages.length > 0) ||
+                      (prevMsg.docs && prevMsg.docs.some((d) => d.mimeType.startsWith("image/")))
+                    );
+                    const hasDocs = prevMsg?.type === "user" && prevMsg.docs && prevMsg.docs.length > 0 && !hasImages;
+                    const label = hasImages
+                      ? "Analizando imagen…"
+                      : hasDocs
+                        ? "Analizando documento…"
+                        : "Pensando…";
+                    return (
+                      <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground animate-pulse">
+                        <span className="flex gap-0.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
                         </span>
-                        <span>Conectando con el asistente…</span>
+                        <span>{label}</span>
                       </div>
-                      <div className="px-3 pb-3 pt-0">
-                        <p className="text-xs text-muted-foreground/70 italic">
-                          Esperando respuesta del modelo…
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {/* Loader entre turnos: tools terminaron, esperando siguiente respuesta del LLM */}
                   {msg.blocks.length > 0 &&
                     streaming &&
                     !msg.done &&
                     (() => {
                       const last = msg.blocks[msg.blocks.length - 1];
-                      const waitingAfterTools =
-                        last?.kind === "tool" && last.state.status === "done";
-                      return waitingAfterTools;
+                      return last?.kind === "tool" && last.state.status === "done";
                     })() && (
-                    <div className="my-2 rounded-md border border-border/50 bg-muted/30 overflow-hidden">
-                      <div className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1.5">
-                          <span className="flex gap-0.5">
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-                            <span className="h-1 w-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
-                          </span>
-                          Pensando...
-                        </span>
-                      </div>
-                      <p className="px-3 pb-3 pt-0 text-xs text-muted-foreground/70 italic">
-                        Esperando respuesta del modelo…
-                      </p>
+                    <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground animate-pulse">
+                      <span className="flex gap-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                      </span>
+                      <span>Pensando…</span>
                     </div>
                   )}
                 </div>
