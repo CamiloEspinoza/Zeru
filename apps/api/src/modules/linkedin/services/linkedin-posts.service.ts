@@ -344,7 +344,7 @@ export class LinkedInPostsService {
     return config;
   }
 
-  async updateConfig(tenantId: string, data: { autoPublish?: boolean; defaultVisibility?: string; contentPillars?: string[]; organizationUrn?: string }) {
+  async updateConfig(tenantId: string, data: { autoPublish?: boolean; defaultVisibility?: string; contentPillars?: string[]; organizationUrn?: string; preferredLanguage?: string }) {
     await this.getOrCreateConfig(tenantId);
     return this.prisma.linkedInAgentConfig.update({
       where: { tenantId },
@@ -353,6 +353,7 @@ export class LinkedInPostsService {
         ...(data.defaultVisibility ? { defaultVisibility: data.defaultVisibility } : {}),
         ...(data.contentPillars ? { contentPillars: data.contentPillars } : {}),
         ...(data.organizationUrn !== undefined ? { organizationUrn: data.organizationUrn } : {}),
+        ...(data.preferredLanguage ? { preferredLanguage: data.preferredLanguage } : {}),
       },
     });
   }
