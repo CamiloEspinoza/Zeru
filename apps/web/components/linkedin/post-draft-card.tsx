@@ -133,13 +133,11 @@ export function PostDraftCard({
     setIsRegenerating(true);
     setIsWriting(true);
     try {
-      await api.post(`/linkedin/posts/${post.id}/regenerate`, {
+      const updated = await api.post<PostDraftData>(`/linkedin/posts/${post.id}/regenerate`, {
         instructions: regenInstructions.trim(),
       });
-      // Fetch updated post
-      const updated = await api.get<PostDraftData>(`/linkedin/posts/${post.id}`);
       setIsWriting(false);
-      // Start typewriter effect with the new content
+      // Start typewriter effect with the NEW content from the LLM
       startTypewriter(updated.content);
       setPost(updated);
       setShowRegenInput(false);
