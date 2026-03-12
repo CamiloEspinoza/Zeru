@@ -112,7 +112,11 @@ Usa memory_store para guardar:
 - Responde siempre en el idioma del usuario
 - Usa un tono profesional pero cercano
 - Al presentar posts, muéstralos con formato claro (usa bloques de código o separadores)
-- Sé proactivo: sugiere mejoras, anticipa preguntas`;
+- Sé proactivo: sugiere mejoras, anticipa preguntas
+
+## Idioma para prompts de imagen
+
+{{IMAGE_PROMPT_LANGUAGE_INSTRUCTION}}`;
 
 const MAX_AGENT_ITERATIONS = 30;
 
@@ -167,16 +171,29 @@ export class LinkedInAgentService {
     const openai = new OpenAI({ apiKey });
     const isNewConversation = !ctx.conversationId;
 
-    const [memoryContext, skillsPrompt] = await Promise.all([
+    const [memoryContext, skillsPrompt, linkedInConfig] = await Promise.all([
       this.memoryService.getContextForConversation({
         tenantId: ctx.tenantId,
         userId: ctx.userId,
         userMessage: ctx.message,
       }),
       this.skillsService.getActiveSkillsPrompt(ctx.tenantId),
+      this.prisma.linkedInAgentConfig.findUnique({ where: { tenantId: ctx.tenantId }, select: { preferredLanguage: true } }),
     ]);
 
-    let systemPrompt = LINKEDIN_SYSTEM_PROMPT;
+    const preferredLanguage = linkedInConfig?.preferredLanguage ?? 'es';
+    const languageNames: Record<string, string> = {
+      es: 'español',
+      en: 'English',
+      pt: 'português',
+      fr: 'français',
+      de: 'Deutsch',
+      it: 'italiano',
+    };
+    const langLabel = languageNames[preferredLanguage] ?? preferredLanguage;
+    const imageLangInstruction = `Los prompts de imagen que generes con suggest_image_prompt SIEMPRE deben estar escritos en ${langLabel} (código: "${preferredLanguage}"), independientemente del idioma en que el usuario escriba o del idioma del post.`;
+
+    let systemPrompt = LINKEDIN_SYSTEM_PROMPT.replace('{{IMAGE_PROMPT_LANGUAGE_INSTRUCTION}}', imageLangInstruction);
     if (skillsPrompt) {
       systemPrompt += `\n\n## Skills instalados\n\n${skillsPrompt}`;
     }

@@ -18,7 +18,17 @@ interface LinkedInConfig {
   autoPublish: boolean;
   defaultVisibility: string;
   contentPillars: string[] | null;
+  preferredLanguage: string;
 }
+
+const SUPPORTED_LANGUAGES = [
+  { code: "es", label: "Español" },
+  { code: "en", label: "English" },
+  { code: "pt", label: "Português" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "it", label: "Italiano" },
+];
 
 const DEFAULT_PILLARS = ["thought-leadership", "tips", "case-study", "industry-news", "behind-the-scenes"];
 
@@ -32,6 +42,7 @@ export default function LinkedInSettingsPage() {
 
   const [autoPublish, setAutoPublish] = useState(false);
   const [defaultVisibility, setDefaultVisibility] = useState("PUBLIC");
+  const [preferredLanguage, setPreferredLanguage] = useState("es");
   const [pillarsInput, setPillarsInput] = useState("");
   const [contentPillars, setContentPillars] = useState<string[]>(DEFAULT_PILLARS);
 
@@ -47,6 +58,7 @@ export default function LinkedInSettingsPage() {
         setConfig(cfg);
         setAutoPublish(cfg.autoPublish);
         setDefaultVisibility(cfg.defaultVisibility);
+        setPreferredLanguage(cfg.preferredLanguage ?? "es");
         setContentPillars(cfg.contentPillars ?? DEFAULT_PILLARS);
       }
     } catch {
@@ -86,6 +98,7 @@ export default function LinkedInSettingsPage() {
       const updated = await api.put<LinkedInConfig>("/linkedin/config", {
         autoPublish,
         defaultVisibility,
+        preferredLanguage,
         contentPillars,
       });
       setConfig(updated);
@@ -217,6 +230,23 @@ export default function LinkedInSettingsPage() {
           >
             <option value="PUBLIC">Público (todos en LinkedIn)</option>
             <option value="CONNECTIONS">Solo mis conexiones</option>
+          </select>
+        </div>
+
+        {/* Image prompt language */}
+        <div>
+          <label className="text-sm font-medium block mb-1.5">Idioma para prompts de imagen</label>
+          <p className="text-xs text-muted-foreground mb-2">
+            El agente escribirá los prompts de generación de imágenes en este idioma.
+          </p>
+          <select
+            value={preferredLanguage}
+            onChange={(e) => setPreferredLanguage(e.target.value)}
+            className="text-sm rounded-lg border border-border bg-background px-3 py-2 w-full outline-none focus:ring-1 focus:ring-ring"
+          >
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>{lang.label}</option>
+            ))}
           </select>
         </div>
 
