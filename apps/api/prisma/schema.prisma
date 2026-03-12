@@ -18,6 +18,7 @@ model Tenant {
   phone     String?
   isActive              Boolean   @default(true)
   onboardingCompletedAt DateTime?
+  deletedAt             DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -50,6 +51,7 @@ model User {
   firstName String
   lastName  String
   isActive  Boolean  @default(true)
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -69,6 +71,7 @@ model UserTenant {
   id        String     @id @default(uuid())
   role      UserRole   @default(OWNER)
   isActive  Boolean    @default(true)
+  deletedAt DateTime?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -134,6 +137,7 @@ model AiProviderConfig {
   model           String      @default("gpt-5.4")
   reasoningEffort String      @default("medium")
   isActive        Boolean     @default(true)
+  deletedAt       DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -148,6 +152,7 @@ model GeminiConfig {
   id              String   @id @default(uuid())
   encryptedApiKey String
   isActive        Boolean  @default(true)
+  deletedAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -165,6 +170,7 @@ model StorageConfig {
   encryptedSecretKey   String
   encryptedBucket      String
   isActive             Boolean  @default(true)
+  deletedAt            DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -182,6 +188,7 @@ model EmailConfig {
   encryptedSecretKey   String
   encryptedFromEmail   String
   isActive             Boolean  @default(true)
+  deletedAt            DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -203,6 +210,7 @@ model Conversation {
   /// Full response.output array from the last OpenAI response (needed for manual context on tool answer)
   lastResponseOutput  Json?
   pendingToolOutputs  Json?
+  deletedAt          DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -241,6 +249,7 @@ model Message {
   toolName    String?
   toolArgs    Json?
   toolResult  Json?
+  deletedAt   DateTime?
   createdAt   DateTime    @default(now())
 
   conversationId String
@@ -272,6 +281,7 @@ model Memory {
   /// Embedding pgvector(1536) para búsqueda semántica — gestionado via raw SQL
   embedding  Unsupported("vector(1536)")?
   isActive   Boolean        @default(true)
+  deletedAt  DateTime?
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -302,6 +312,7 @@ model Account {
   /// Sección IFRS IAS 1 (solo en cuentas REVENUE/EXPENSE). Se hereda del ancestro raíz.
   ifrsSection  AccountIFRSSection?
   isActive     Boolean              @default(true)
+  deletedAt   DateTime?
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
@@ -357,6 +368,7 @@ model JournalEntry {
   date        DateTime
   description String
   status      JournalEntryStatus @default(DRAFT)
+  deletedAt   DateTime?
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
@@ -397,6 +409,7 @@ model JournalEntryLine {
   debit       Decimal @default(0) @db.Decimal(18, 2)
   credit      Decimal @default(0) @db.Decimal(18, 2)
   description String?
+  deletedAt   DateTime?
 
   journalEntryId String
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
@@ -414,6 +427,7 @@ model FiscalPeriod {
   startDate DateTime
   endDate   DateTime
   status    FiscalPeriodStatus @default(OPEN)
+  deletedAt DateTime?
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 
@@ -438,6 +452,7 @@ model AccountingProcessStep {
   name        String
   description String?
   order       Int
+  deletedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -504,6 +519,7 @@ model Document {
   sizeBytes  Int
   category   DocumentCategory  @default(OTRO)
   tags       String[]
+  deletedAt  DateTime?
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
@@ -551,6 +567,7 @@ model AgentSkill {
   content     String
   version     String?
   isActive    Boolean  @default(true)
+  deletedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -570,6 +587,7 @@ model AgentSkillFile {
   /// Ruta relativa dentro del skill, ej: "references/api_docs.md"
   path    String
   content String
+  deletedAt DateTime?
 
   skillId String
   skill   AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
@@ -591,6 +609,7 @@ model ApiKey {
   createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
   lastUsedAt  DateTime?
   isActive    Boolean   @default(true)
+  deletedAt   DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -616,6 +635,7 @@ model LoginCode {
 model WaitlistEntry {
   id        String   @id @default(uuid())
   email     String   @unique
+  deletedAt DateTime?
   createdAt DateTime @default(now())
 
   @@map("waitlist_entries")
@@ -639,6 +659,7 @@ model LinkedInConnection {
   communityAccessToken  String?
   communityRefreshToken String?
   communityExpiresAt    DateTime?
+  deletedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -673,6 +694,7 @@ model LinkedInPost {
   contentPillar  String?
   /// PUBLIC | CONNECTIONS
   visibility     String    @default("PUBLIC")
+  deletedAt      DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -739,6 +761,7 @@ model LinkedInAgentConfig {
   contentPillars    Json?
   /// URN de la organización para People Typeahead API — urn:li:organization:xxx
   organizationUrn   String?
+  deletedAt         DateTime?
   /// Idioma preferido para los prompts de generación de imágenes (ej: "es", "en", "pt")
   preferredLanguage String   @default("es")
   createdAt         DateTime @default(now())

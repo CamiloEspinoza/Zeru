@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { LinkedInApiService } from './linkedin-api.service';
 import { GeminiImageService } from './gemini-image.service';
 import { SkillsService } from '../../ai/services/skills.service';
+import { S3Service } from '../../files/s3.service';
 
 const LINKEDIN_COPYWRITING_SKILL_CONTENT = `# LinkedIn Copywriting Expert Skill
 
@@ -127,6 +128,9 @@ export interface BulkCreateDraftItem {
   contentPillar?: string;
   visibility?: string;
   imagePrompt?: string | null;
+  mediaType?: string;
+  imageS3Key?: string;
+  mediaUrl?: string;
 }
 
 export interface ListPostsFilters {
@@ -147,6 +151,7 @@ export class LinkedInPostsService {
     private readonly apiService: LinkedInApiService,
     private readonly geminiService: GeminiImageService,
     private readonly skillsService: SkillsService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async create(tenantId: string, input: CreatePostInput) {
@@ -238,28 +243,8 @@ export class LinkedInPostsService {
   }
 
   private async uploadImageFromS3(tenantId: string, s3Key: string, _mediaUrl?: string | null): Promise<string> {
-    const { GetObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
-
-    // Re-download from S3 (we have credentials in env)
-    const client = new S3Client({
-      region: process.env.AWS_REGION ?? 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? '',
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? '',
-      },
-    });
-
-    const bucket = process.env.AWS_S3_BUCKET ?? 'zeru-dev';
-    const cmd = new GetObjectCommand({ Bucket: bucket, Key: s3Key });
-    const response = await client.send(cmd);
-    const chunks: Buffer[] = [];
-    for await (const chunk of response.Body as AsyncIterable<Buffer>) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    client.destroy();
-
-    return this.apiService.uploadImageToLinkedIn(tenantId, buffer, response.ContentType ?? 'image/png');
+    const { buffer, contentType } = await this.s3Service.download(tenantId, s3Key);
+    return this.apiService.uploadImageToLinkedIn(tenantId, buffer, contentType);
   }
 
   async cancel(tenantId: string, postId: string) {
@@ -382,7 +367,9 @@ export class LinkedInPostsService {
           data: {
             tenantId,
             content: p.content,
-            mediaType: 'NONE',
+            mediaType: p.mediaType ?? 'NONE',
+            mediaUrl: p.mediaUrl ?? null,
+            imageS3Key: p.imageS3Key ?? null,
             status: 'DRAFT',
             scheduledAt: new Date(p.scheduledAt),
             contentPillar: p.contentPillar ?? null,

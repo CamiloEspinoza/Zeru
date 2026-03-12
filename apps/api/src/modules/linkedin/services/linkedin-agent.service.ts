@@ -59,10 +59,17 @@ Puedes combinar varias preguntas en una sola llamada a ask_user_question si tien
 4. Los posts aparecerán en un carrusel donde el usuario puede revisar, editar, aprobar y programar cada uno individualmente
 5. **NO uses bulk_schedule_posts** — los posts deben crearse como DRAFT para revisión
 
-### Para posts con imagen subida por el usuario:
-1. Si el mensaje contiene \`[El usuario ha adjuntado una imagen...]\`, usa directamente el s3_key y url indicados
-2. NO uses generate_image cuando el usuario ya proporcionó una imagen
-3. Crea el post con media_type=IMAGE, image_s3_key={s3_key del mensaje}, media_url={url del mensaje}
+### Para posts con imágenes subidas por el usuario:
+1. Cuando el usuario adjunte imágenes, las verás visualmente Y recibirás sus s3_key/url en el mensaje.
+2. Analiza el contenido visual de cada imagen para incorporarlo en el texto del post.
+3. **NUNCA uses generate_image ni suggest_image_prompt** cuando el usuario proporcionó imágenes.
+4. Decide la estructura de posts basándote en las imágenes:
+   - Si hay una sola imagen → crea un solo post con create_linkedin_post (media_type=IMAGE, image_s3_key, media_url).
+   - Si hay varias imágenes del mismo tema/evento → crea posts individuales, cada uno con la imagen más relevante.
+   - Si hay varias imágenes de temas distintos → crea un post separado por cada imagen/tema.
+5. Para un solo post: usa create_linkedin_post con media_type=IMAGE, image_s3_key y media_url del mensaje.
+6. Para múltiples posts: usa bulk_create_drafts con media_type=IMAGE, image_s3_key y media_url en cada item que tenga imagen.
+7. Describe en el texto del post lo que ves en la imagen cuando sea relevante (insight, dato, contexto visual).
 
 ## Mejores prácticas de LinkedIn que debes aplicar
 
@@ -126,7 +133,7 @@ export interface LinkedInChatContext {
   message: string;
   conversationId?: string;
   questionToolCallId?: string;
-  uploadedImage?: { s3Key: string; imageUrl: string };
+  uploadedImages?: Array<{ s3Key: string; imageUrl: string }>;
 }
 
 @Injectable()
@@ -162,9 +169,13 @@ export class LinkedInAgentService {
     this.activeStreams.register(conversation.id, subject);
 
     // Augment message with uploaded image context
-    const effectiveMessage = ctx.uploadedImage
-      ? `${ctx.message}\n\n[El usuario ha adjuntado una imagen para usar en el post]\n- s3_key: ${ctx.uploadedImage.s3Key}\n- url: ${ctx.uploadedImage.imageUrl}`
-      : ctx.message;
+    let effectiveMessage = ctx.message;
+    if (ctx.uploadedImages?.length) {
+      const imageList = ctx.uploadedImages
+        .map((img, i) => `- Imagen ${i + 1}: s3_key: ${img.s3Key} | url: ${img.imageUrl}`)
+        .join('\n');
+      effectiveMessage = `${ctx.message}\n\n[IMÁGENES ADJUNTAS PARA EL POST — úsalas directamente sin llamar a generate_image ni suggest_image_prompt]\n${imageList}`;
+    }
 
     await this.saveMessage(conversation.id, 'user', { type: 'text', text: ctx.message });
 
@@ -255,12 +266,14 @@ export class LinkedInAgentService {
         data: { pendingToolOutputs: [] },
       });
     } else {
+      // Build multimodal content when images are present
+      const userContent = this.buildUserContent(ctx.message, ctx.uploadedImages);
       if (currentPrevResponseId) {
-        input = [{ role: 'user', content: ctx.message }];
+        input = [{ role: 'user', content: userContent }];
       } else {
         input = [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: ctx.message },
+          { role: 'user', content: userContent },
         ];
       }
     }
@@ -295,6 +308,7 @@ export class LinkedInAgentService {
           subject.next({ type: 'thinking', delta });
           continue;
         }
+        if (evType === 'response.reasoning_text.delta') continue;
 
         if (evType === 'response.output_text.delta') {
           const delta = String(ev['delta'] ?? '');
@@ -489,6 +503,29 @@ export class LinkedInAgentService {
         toolResult: (extras?.toolResult ?? null) as never,
       },
     });
+  }
+
+  private buildUserContent(
+    text: string,
+    uploadedImages?: Array<{ s3Key: string; imageUrl: string }>,
+  ): string | OpenAI.Responses.ResponseInputContent[] {
+    if (!uploadedImages?.length) return text;
+
+    const parts: OpenAI.Responses.ResponseInputContent[] = [
+      { type: 'input_text', text } as OpenAI.Responses.ResponseInputText,
+    ];
+
+    for (const img of uploadedImages) {
+      if (img.imageUrl) {
+        parts.push({
+          type: 'input_image',
+          image_url: img.imageUrl,
+          detail: 'auto',
+        } as OpenAI.Responses.ResponseInputImage);
+      }
+    }
+
+    return parts;
   }
 
   async getConversations(userId: string, tenantId: string) {

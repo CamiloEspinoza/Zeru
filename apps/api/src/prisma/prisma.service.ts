@@ -1,25 +1,36 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { createSoftDeleteExtension } from './extensions/soft-delete.extension';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  private readonly _base: PrismaClient;
+  private readonly _client: ReturnType<PrismaClient['$extends']>;
+
+  constructor() {
+    this._base = new PrismaClient();
+    this._client = this._base.$extends(
+      createSoftDeleteExtension(this._base),
+    ) as ReturnType<PrismaClient['$extends']>;
+    Object.assign(this, this._client);
+  }
+
   async onModuleInit() {
-    await this.$connect();
+    await this._base.$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await this._base.$disconnect();
   }
 
   /**
    * Returns a Prisma client that automatically filters by tenantId.
    * Uses Prisma client extensions for row-level multitenancy.
+   * Soft delete is applied via the base extended client.
    */
   forTenant(tenantId: string) {
-    return this.$extends({
+    return this._client.$extends({
+      name: 'tenantScope',
       query: {
         $allOperations({ args, query, operation }) {
           const writeOps = ['create', 'createMany', 'upsert'];

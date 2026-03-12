@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { api } from "@/lib/api-client";
 import { ImagePromptCard } from "./image-prompt-card";
 import { VersionHistoryPopover } from "./version-history-popover";
@@ -58,6 +58,14 @@ export function PostDraftCard({
 }) {
   const [post, setPost] = useState(initialPost);
   const [expanded, setExpanded] = useState(false);
+
+  // Refetch current post status on mount — tool results from history are snapshots; status may have changed (e.g. approved/scheduled)
+  useEffect(() => {
+    api
+      .get<PostDraftData>(`/linkedin/posts/${initialPost.id}`)
+      .then(setPost)
+      .catch(() => {});
+  }, [initialPost.id]);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showRegenInput, setShowRegenInput] = useState(false);
   const [regenInstructions, setRegenInstructions] = useState("");

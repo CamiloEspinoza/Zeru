@@ -179,7 +179,7 @@ export type ContentBlock =
 // ─── Message blocks ───────────────────────────────────────────────────────────
 
 export type MessageBlock =
-  | { id: string; type: "user"; text: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
+  | { id: string; type: "user"; text: string; docs?: AttachedDoc[]; uploadedImages?: UploadedImage[] }
   | {
       id: string;
       type: "assistant";
@@ -205,6 +205,7 @@ export function useChatStream() {
   const [streaming, setStreaming] = useState(false);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage>({ inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedTokens: 0 });
   const abortRef = useRef<AbortController | null>(null);
+  const streamReconnectAbortRef = useRef<AbortController | null>(null);
 
   // Keep ref in sync so handleEvent callbacks can read the latest value
   useEffect(() => {
@@ -244,7 +245,7 @@ export function useChatStream() {
   const sendMessage = useCallback(
     async (
       text: string,
-      opts?: { questionToolCallId?: string; docs?: AttachedDoc[]; uploadedImage?: UploadedImage }
+      opts?: { questionToolCallId?: string; docs?: AttachedDoc[]; uploadedImages?: UploadedImage[] }
     ) => {
       if (streaming) return;
 
@@ -253,7 +254,7 @@ export function useChatStream() {
 
       setMessages((prev) => [
         ...prev,
-        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImage: opts?.uploadedImage },
+        { id: userMsgId, type: "user", text, docs: opts?.docs, uploadedImages: opts?.uploadedImages },
         {
           id: assistantMsgId,
           type: "assistant",
@@ -277,7 +278,7 @@ export function useChatStream() {
             conversationId,
             questionToolCallId: opts?.questionToolCallId,
             documentIds: opts?.docs?.map((d) => d.id),
-            uploadedImage: opts?.uploadedImage,
+            uploadedImages: opts?.uploadedImages,
           }),
           signal: abortRef.current.signal,
         });
@@ -330,10 +331,12 @@ export function useChatStream() {
           break;
 
         case "thinking":
+          if (!event.delta) break;
           updateLastAssistantBlocks((blocks) => {
             const last = blocks[blocks.length - 1];
             if (last?.kind === "thinking") {
-              // Append to the existing thinking block
+              // Dedupe: skip if this delta was already appended (streaming/API duplication)
+              if (last.text.endsWith(event.delta)) return blocks;
               return [
                 ...blocks.slice(0, -1),
                 { ...last, text: last.text + event.delta },
@@ -351,9 +354,12 @@ export function useChatStream() {
           break;
 
         case "text_delta":
+          if (!event.delta) break;
           updateLastAssistantBlocks((blocks) => {
             const last = blocks[blocks.length - 1];
             if (last?.kind === "text") {
+              // Dedupe: skip if this delta was already appended (streaming/API duplication)
+              if (last.text.endsWith(event.delta)) return blocks;
               return [
                 ...blocks.slice(0, -1),
                 { ...last, text: last.text + event.delta },
@@ -563,6 +569,7 @@ export function useChatStream() {
           /** OpenAI call_id for question messages; required when sending the answer back */
           callId?: string;
           uploadedImage?: UploadedImage;
+          uploadedImages?: UploadedImage[];
         } | null;
         toolName?: string | null;
         toolArgs?: Record<string, unknown> | null;
@@ -631,12 +638,14 @@ export function useChatStream() {
         if (msg.role === "user") {
           // Orphaned pending blocks (no thinking arrived) — attach to last assistant
           drainPending();
-          const uploadedImage = msg.content?.uploadedImage as UploadedImage | undefined;
+          // Backward compat: support both old singular `uploadedImage` and new plural `uploadedImages`
+          const uploadedImages = (msg.content?.uploadedImages as UploadedImage[] | undefined)
+            ?? (msg.content?.uploadedImage ? [msg.content.uploadedImage as UploadedImage] : undefined);
           blocks.push({
             id: msg.id,
             type: "user",
             text: msg.content?.text ?? "",
-            ...(uploadedImage ? { uploadedImage } : {}),
+            ...(uploadedImages?.length ? { uploadedImages } : {}),
           });
 
         } else if (msg.role === "assistant") {
@@ -713,6 +722,11 @@ export function useChatStream() {
 
       // If a stream is still active for this conversation, reconnect to it
       if (isStreaming) {
+        // Abort any previous reconnection (e.g. React Strict Mode double-mount)
+        streamReconnectAbortRef.current?.abort();
+        streamReconnectAbortRef.current = new AbortController();
+        const signal = streamReconnectAbortRef.current.signal;
+
         // Append an in-progress assistant block for the ongoing turn
         setMessages((prev) => {
           const last = prev[prev.length - 1];
@@ -727,6 +741,7 @@ export function useChatStream() {
         try {
           const streamRes = await fetch(`${API_BASE}/ai/conversations/${convId}/stream`, {
             headers: getAuthHeaders(),
+            signal,
           });
 
           if (streamRes.status === 200 && streamRes.body) {
@@ -734,9 +749,12 @@ export function useChatStream() {
             await readSSEStream(reader, handleEvent);
           }
           // 204 = stream already finished before we connected, nothing to do
-        } catch {
-          // Ignore reconnection errors — user can still interact
+        } catch (err) {
+          if ((err as Error)?.name !== "AbortError") {
+            // Ignore reconnection errors — user can still interact
+          }
         } finally {
+          streamReconnectAbortRef.current = null;
           setStreaming(false);
           updateLastAssistant(() => ({ done: true }));
         }

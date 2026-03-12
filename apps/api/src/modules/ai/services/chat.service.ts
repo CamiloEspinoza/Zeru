@@ -217,10 +217,17 @@ Además de la contabilidad, tienes capacidades completas para crear y gestionar 
 2. Muestra la URL de la imagen al usuario
 3. Crea el post con media_type=IMAGE y los datos retornados por generate_image
 
-### Post con imagen subida por el usuario:
-1. Si el mensaje contiene \`[IMAGEN ADJUNTA PARA EL POST — ...]\`, usa directamente el s3_key y url indicados.
-2. **NO uses generate_image** cuando el usuario ya proporcionó su propia imagen.
-3. Crea el post con media_type=IMAGE, image_s3_key (el valor de s3_key) y media_url (el valor de url) del tag en el mensaje.
+### Post con imágenes subidas por el usuario:
+1. Cuando el usuario adjunte imágenes, las verás visualmente Y recibirás sus s3_key/url en el mensaje.
+2. Analiza el contenido visual de cada imagen para incorporarlo en el texto del post.
+3. **NUNCA uses generate_image** cuando el usuario proporcionó imágenes.
+4. Decide la estructura de posts basándote en las imágenes:
+   - Si hay una sola imagen → crea un solo post con create_linkedin_post (media_type=IMAGE, image_s3_key, media_url).
+   - Si hay varias imágenes del mismo tema/evento → crea posts individuales, cada uno con la imagen más relevante.
+   - Si hay varias imágenes de temas distintos → crea un post separado por cada imagen/tema.
+5. Para un solo post: usa create_linkedin_post con media_type=IMAGE, image_s3_key y media_url del mensaje.
+6. Para múltiples posts: usa bulk_create_drafts con media_type=IMAGE, image_s3_key y media_url en cada item que tenga imagen.
+7. Describe en el texto del post lo que ves en la imagen cuando sea relevante.
 
 ## Hashtags en LinkedIn
 
@@ -273,8 +280,8 @@ export interface ChatStreamContext {
   questionToolCallId?: string;
   /** IDs of documents already uploaded via POST /files/upload */
   documentIds?: string[];
-  /** Uploaded image metadata (for social media post creation) */
-  uploadedImage?: { s3Key: string; imageUrl: string };
+  /** Uploaded images metadata (for social media post creation) */
+  uploadedImages?: Array<{ s3Key: string; imageUrl: string }>;
 }
 
 @Injectable()
@@ -310,7 +317,7 @@ export class ChatService {
     await this.saveMessage(conversation.id, 'user', {
       type: 'text',
       text: ctx.message,
-      ...(ctx.uploadedImage ? { uploadedImage: ctx.uploadedImage } : {}),
+      ...(ctx.uploadedImages?.length ? { uploadedImages: ctx.uploadedImages } : {}),
     });
 
     const openai = new OpenAI({ apiKey });
@@ -427,10 +434,14 @@ export class ChatService {
       });
     } else {
       // Augment message with uploaded image context (for social media post creation)
-      const messageText = ctx.uploadedImage
-        ? `[IMAGEN ADJUNTA PARA EL POST — úsala directamente sin llamar a generate_image. s3_key: ${ctx.uploadedImage.s3Key} | url: ${ctx.uploadedImage.imageUrl}]\n\n${ctx.message || "Crea un post de LinkedIn con esta imagen."}`
-        : ctx.message;
-      const userContent = this.buildUserContent(messageText, resolvedDocs, ctx.uploadedImage);
+      let messageText = ctx.message;
+      if (ctx.uploadedImages?.length) {
+        const imageList = ctx.uploadedImages
+          .map((img, i) => `- Imagen ${i + 1}: s3_key: ${img.s3Key} | url: ${img.imageUrl}`)
+          .join('\n');
+        messageText = `[IMÁGENES ADJUNTAS PARA EL POST — úsalas directamente sin llamar a generate_image ni suggest_image_prompt]\n${imageList}\n\n${ctx.message || 'Crea post(s) de LinkedIn con estas imágenes.'}`;
+      }
+      const userContent = this.buildUserContent(messageText, resolvedDocs, ctx.uploadedImages);
       if (currentPrevResponseId) {
         // Continuing an existing conversation
         input = [{ role: 'user', content: userContent }];
@@ -483,12 +494,16 @@ export class ChatService {
         const evType = ev['type'] as string;
 
         // ── Thinking / Reasoning ─────────────────────────────
+        // Use ONLY reasoning_summary_text.delta. With summary:'auto', the API may also emit
+        // response.reasoning_text.delta — if we handled both, the UI would show duplicated text.
         if (evType === 'response.reasoning_summary_text.delta') {
           const delta = String(ev['delta'] ?? '');
           thinkingText += delta;
           subject.next({ type: 'thinking', delta });
           continue;
         }
+        // Explicitly skip reasoning_text.delta to avoid duplicate emissions
+        if (evType === 'response.reasoning_text.delta') continue;
 
         // ── Text output ──────────────────────────────────────
         if (evType === 'response.output_text.delta') {
@@ -809,9 +824,9 @@ export class ChatService {
   private buildUserContent(
     text: string,
     resolvedDocs: ResolvedDocument[],
-    uploadedImage?: { s3Key: string; imageUrl: string },
+    uploadedImages?: Array<{ s3Key: string; imageUrl: string }>,
   ): string | OpenAI.Responses.ResponseInputContent[] {
-    if (!resolvedDocs.length && !uploadedImage) return text;
+    if (!resolvedDocs.length && !uploadedImages?.length) return text;
 
     const docRefs = resolvedDocs
       .filter((d) => d.docId)
@@ -832,13 +847,15 @@ export class ChatService {
       { type: 'input_text', text: combinedText } as OpenAI.Responses.ResponseInputText,
     ];
 
-    // Include uploaded image so the model can visually interpret it
-    if (uploadedImage?.imageUrl) {
-      parts.push({
-        type: 'input_image',
-        image_url: uploadedImage.imageUrl,
-        detail: 'auto',
-      } as OpenAI.Responses.ResponseInputImage);
+    // Include uploaded images so the model can visually interpret them
+    for (const img of uploadedImages ?? []) {
+      if (img.imageUrl) {
+        parts.push({
+          type: 'input_image',
+          image_url: img.imageUrl,
+          detail: 'auto',
+        } as OpenAI.Responses.ResponseInputImage);
+      }
     }
 
     for (const d of resolvedDocs) {
@@ -1073,7 +1090,20 @@ export class ChatService {
     });
     if (!conversation) return null;
 
-    const logs = await this.prisma.aiUsageLog.findMany({
+    // Guard: aiUsageLog may be missing if Prisma client was generated before the migration
+    const aiUsageLog = this.prisma.aiUsageLog as { findMany: (args: unknown) => Promise<unknown[]> } | undefined;
+    if (!aiUsageLog?.findMany) {
+      return {
+        conversationId,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        totalTokens: 0,
+        totalCachedTokens: 0,
+        byModel: [],
+      };
+    }
+
+    const logs = (await aiUsageLog.findMany({
       where: { conversationId },
       select: {
         provider: true,
@@ -1083,7 +1113,14 @@ export class ChatService {
         totalTokens: true,
         cachedTokens: true,
       },
-    });
+    })) as Array<{
+      provider: string;
+      model: string;
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      cachedTokens: number;
+    }>;
 
     const byModel = new Map<string, { provider: string; model: string; inputTokens: number; outputTokens: number; totalTokens: number }>();
     let totalInputTokens = 0;
@@ -1126,6 +1163,10 @@ export class ChatService {
 
   /** Get detailed usage logs for the tenant (for cost analysis) */
   async getUsageLogs(tenantId: string, filters?: { from?: string; to?: string; conversationId?: string }) {
+    if (!this.prisma.aiUsageLog?.findMany) {
+      return { logs: [], totals: { totalInputTokens: 0, totalOutputTokens: 0, totalTokens: 0 } };
+    }
+
     const where: Record<string, unknown> = { tenantId };
     if (filters?.conversationId) where.conversationId = filters.conversationId;
     if (filters?.from || filters?.to) {

@@ -118,10 +118,23 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
               },
               image_prompt: {
                 type: ['string', 'null'],
-                description: 'Prompt sugerido para generar una imagen para este post. null si no necesita imagen.',
+                description: 'Prompt sugerido para generar una imagen para este post. null si no necesita imagen o si se usa imagen subida.',
+              },
+              media_type: {
+                type: 'string',
+                enum: ['NONE', 'IMAGE'],
+                description: 'NONE para solo texto, IMAGE si el post usa una imagen subida por el usuario.',
+              },
+              image_s3_key: {
+                type: ['string', 'null'],
+                description: 'S3 key de la imagen subida por el usuario. null si no aplica.',
+              },
+              media_url: {
+                type: ['string', 'null'],
+                description: 'URL de la imagen subida por el usuario. null si no aplica.',
               },
             },
-            required: ['content', 'scheduled_at', 'content_pillar', 'visibility', 'image_prompt'],
+            required: ['content', 'scheduled_at', 'content_pillar', 'visibility', 'image_prompt', 'media_type', 'image_s3_key', 'media_url'],
             additionalProperties: false,
           },
         },

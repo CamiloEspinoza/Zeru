@@ -9,10 +9,10 @@ export const linkedInChatSchema = z.object({
   message: z.string().min(1, 'Mensaje requerido'),
   conversationId: z.string().uuid().optional(),
   questionToolCallId: z.string().optional(),
-  uploadedImage: z.object({
+  uploadedImages: z.array(z.object({
     s3Key: z.string(),
     imageUrl: z.string(),
-  }).optional(),
+  })).optional(),
 });
 
 export const linkedInUpdateConfigSchema = z.object({
@@ -29,7 +29,7 @@ export const linkedInListPostsSchema = z.object({
   to: z.string().optional(),
   contentPillar: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
-  perPage: z.coerce.number().int().positive().max(100).optional(),
+  perPage: z.coerce.number().int().positive().max(500).optional(),
 });
 
 export type LinkedInCallbackDto = z.infer<typeof linkedInCallbackSchema>;

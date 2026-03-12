@@ -137,7 +137,7 @@ export class LinkedInController {
         message: body.message,
         conversationId: body.conversationId,
         questionToolCallId: body.questionToolCallId,
-        uploadedImage: body.uploadedImage,
+        uploadedImages: body.uploadedImages,
       },
       subject,
     );
