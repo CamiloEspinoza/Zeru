@@ -146,34 +146,6 @@ export const LINKEDIN_TOOLS: FunctionTool[] = [
   },
   {
     type: 'function',
-    name: 'generate_image',
-    description:
-      'Genera una imagen con Google Gemini para usarla en un post de LinkedIn. Usa "flash" (Gemini 3.1 Flash, más rápido y económico) para la mayoría de los casos, y "pro" (Gemini 3 Pro, mayor calidad) solo cuando el usuario pida explícitamente mejor calidad. Devuelve la URL de la imagen generada y su S3 key.',
-    parameters: {
-      type: 'object',
-      properties: {
-        prompt: {
-          type: 'string',
-          description: 'Descripción detallada de la imagen a generar. Sé específico sobre estilo, colores, composición y elementos visuales.',
-        },
-        aspect_ratio: {
-          type: 'string',
-          enum: ['1:1', '4:3', '3:4', '16:9', '9:16'],
-          description: 'Relación de aspecto de la imagen. 1:1 para posts cuadrados (recomendado para LinkedIn). 16:9 para banners.',
-        },
-        model: {
-          type: 'string',
-          enum: ['flash', 'pro'],
-          description: 'Modelo a usar: "flash" = Gemini 3.1 Flash (rápido, económico, recomendado por defecto). "pro" = Gemini 3 Pro (mayor calidad, más lento y costoso).',
-        },
-      },
-      required: ['prompt', 'aspect_ratio', 'model'],
-      additionalProperties: false,
-    },
-    strict: true,
-  },
-  {
-    type: 'function',
     name: 'suggest_image_prompt',
     description:
       'Sugiere un prompt de imagen para un post existente. NO genera la imagen — solo guarda el prompt sugerido en el post. El usuario podrá editar el prompt y generar la imagen cuando quiera desde la tarjeta del post.',
@@ -395,7 +367,6 @@ export const LINKEDIN_TOOL_LABELS: Record<string, string> = {
   bulk_create_drafts: 'Creando borradores de contenido',
   bulk_schedule_posts: 'Programando calendario de contenido',
   suggest_image_prompt: 'Sugiriendo imagen para el post',
-  generate_image: 'Generando imagen con Gemini',
   get_linkedin_connection_status: 'Verificando conexión de LinkedIn',
   get_post_history: 'Consultando historial de posts',
   get_scheduled_posts: 'Consultando posts programados',

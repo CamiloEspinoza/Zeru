@@ -176,22 +176,22 @@ export class LinkedInPostsService {
   }
 
   async bulkSchedule(tenantId: string, posts: BulkScheduleItem[], conversationId?: string) {
-    const created = await this.prisma.$transaction(
-      posts.map((p) =>
-        this.prisma.linkedInPost.create({
-          data: {
-            tenantId,
-            content: p.content,
-            mediaType: p.mediaType ?? 'NONE',
-            status: 'SCHEDULED',
-            scheduledAt: new Date(p.scheduledAt),
-            contentPillar: p.contentPillar ?? null,
-            visibility: p.visibility ?? 'PUBLIC',
-            conversationId: conversationId ?? null,
-          },
-        }),
-      ),
-    );
+    const created = [];
+    for (const p of posts) {
+      const post = await this.prisma.linkedInPost.create({
+        data: {
+          tenantId,
+          content: p.content,
+          mediaType: p.mediaType ?? 'NONE',
+          status: 'SCHEDULED',
+          scheduledAt: new Date(p.scheduledAt),
+          contentPillar: p.contentPillar ?? null,
+          visibility: p.visibility ?? 'PUBLIC',
+          conversationId: conversationId ?? null,
+        },
+      });
+      created.push(post);
+    }
     return created;
   }
 
@@ -364,25 +364,25 @@ export class LinkedInPostsService {
   // ─── Version history & regeneration ─────────────────────
 
   async bulkCreateDrafts(tenantId: string, posts: BulkCreateDraftItem[], conversationId?: string) {
-    const created = await this.prisma.$transaction(
-      posts.map((p) =>
-        this.prisma.linkedInPost.create({
-          data: {
-            tenantId,
-            content: p.content,
-            mediaType: p.mediaType ?? 'NONE',
-            mediaUrl: p.mediaUrl ?? null,
-            imageS3Key: p.imageS3Key ?? null,
-            status: 'DRAFT',
-            scheduledAt: new Date(p.scheduledAt),
-            contentPillar: p.contentPillar ?? null,
-            visibility: p.visibility ?? 'PUBLIC',
-            imagePrompt: p.imagePrompt ?? null,
-            conversationId: conversationId ?? null,
-          },
-        }),
-      ),
-    );
+    const created = [];
+    for (const p of posts) {
+      const post = await this.prisma.linkedInPost.create({
+        data: {
+          tenantId,
+          content: p.content,
+          mediaType: p.mediaType ?? 'NONE',
+          mediaUrl: p.mediaUrl ?? null,
+          imageS3Key: p.imageS3Key ?? null,
+          status: 'DRAFT',
+          scheduledAt: new Date(p.scheduledAt),
+          contentPillar: p.contentPillar ?? null,
+          visibility: p.visibility ?? 'PUBLIC',
+          imagePrompt: p.imagePrompt ?? null,
+          conversationId: conversationId ?? null,
+        },
+      });
+      created.push(post);
+    }
     return created;
   }
 

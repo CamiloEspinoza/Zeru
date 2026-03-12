@@ -39,7 +39,8 @@ interface ParsedGitHubUrl {
   owner: string;
   repo: string;
   branch: string;
-  skillPath: string; // path within repo to the skill folder (may be "")
+  skillPath: string; // path within repo to the skill folder ("" = discover from root)
+  skillFilter?: string; // from --skill or @skill, used to filter discovered skills by name
 }
 
 interface FetchedSkill {
@@ -48,6 +49,8 @@ interface FetchedSkill {
   version?: string;
   content: string; // SKILL.md body (without frontmatter)
   files: { path: string; content: string }[]; // references/ and scripts/
+  /** Canonical GitHub URL including resolved path (for storage and sync) */
+  resolvedRepoUrl?: string;
 }
 
 @Injectable()
@@ -82,25 +85,27 @@ export class SkillsService {
     }
 
     // Handle "URL --skill skillname" flag form
-    // Mirrors the `npx skills` CLI: --skill value → skills/<value> subfolder
+    // Per npx skills CLI: --skill is a filter, NOT a path. Discovery runs from repo root.
     const skillFlagMatch = input.match(/^(.+?)\s+(?:--skill|-s)\s+(\S+)$/);
     if (skillFlagMatch) {
       const base = skillFlagMatch[1].trim().replace(/\/$/, '');
       const rawSkillName = skillFlagMatch[2].trim();
-      // If value already has a slash it's a full path; otherwise use conventional skills/<name>
-      const skillPath = rawSkillName.includes('/')
-        ? rawSkillName
-        : `skills/${rawSkillName}`;
       const baseUrl = base.startsWith('http')
         ? base
         : `https://github.com/${base}`;
-      return `${baseUrl}/tree/main/${skillPath}`;
+      // If value contains / it's a path; otherwise empty = discover from root (like npx skills)
+      const skillPath = rawSkillName.includes('/') ? rawSkillName : '';
+      const pathPart = skillPath ? `/${skillPath}` : '';
+      return `${baseUrl}/tree/main${pathPart}`;
     }
 
-    // Handle "owner/repo@skill" shorthand (possibly without https://)
+    // Handle "owner/repo@skill" shorthand. Per npx skills: @value is skillFilter (by name) when
+    // no slash; otherwise it's a path. Use root when filter so discovery runs.
     const atMatch = input.match(/^([^@:/]+\/[^@:/]+)@(.+)$/);
     if (atMatch) {
-      return `https://github.com/${atMatch[1]}/tree/main/${atMatch[2]}`;
+      const afterAt = atMatch[2];
+      const pathPart = afterAt.includes('/') ? `/${afterAt}` : '';
+      return `https://github.com/${atMatch[1]}/tree/main${pathPart}`;
     }
 
     // Ensure full URL for bare "owner/repo" or "owner/repo/tree/…"
@@ -111,7 +116,32 @@ export class SkillsService {
     return input;
   }
 
+  /** Extracts --skill or @skill value from raw input (for discovery filtering) */
+  extractSkillFilter(raw: string): string | undefined {
+    const input = raw.trim();
+
+    // Strip CLI prefix if present, then fall through to flag matching
+    let rest = input;
+    for (const prefix of ['npx skills add ', 'skills add ']) {
+      if (input.startsWith(prefix)) {
+        rest = input.slice(prefix.length).trim();
+        break;
+      }
+    }
+
+    // --skill or -s flag anywhere in the string
+    const flagMatch = rest.match(/(?:--skill|-s)\s+(\S+)/);
+    if (flagMatch) return flagMatch[1].trim();
+
+    // owner/repo@skill or https://github.com/owner/repo@skill
+    const atMatch = rest.match(/[^@:]+\/[^@:]+\@([^/\s]+)/);
+    if (atMatch) return atMatch[1].trim();
+
+    return undefined;
+  }
+
   parseGitHubUrl(rawUrl: string): ParsedGitHubUrl {
+    const skillFilter = this.extractSkillFilter(rawUrl);
     const normalized = this.normalizeSkillInput(rawUrl);
 
     let url: URL;
@@ -145,7 +175,8 @@ export class SkillsService {
       owner,
       repo,
       branch: branch ?? 'main',
-      skillPath: rest.join('/'),
+      skillPath: rest.filter(Boolean).join('/'),
+      skillFilter,
     };
   }
 
@@ -203,8 +234,29 @@ export class SkillsService {
     return TEXT_EXTENSIONS.has(ext);
   }
 
+  /**
+   * Discovery order matches npx skills CLI: root first, then skills/, skills/.curated/, etc.
+   */
+  private skillPathPriority(path: string): number {
+    if (path === 'SKILL.md') return 0;
+    if (path.endsWith('/SKILL.md')) {
+      const dir = path.slice(0, -8);
+      if (dir === '') return 1;
+      if (dir === 'skills') return 10;
+      if (dir.startsWith('skills/')) {
+        const sub = dir.slice(7);
+        if (sub === '.curated') return 20;
+        if (sub === '.experimental') return 21;
+        if (sub === '.system') return 22;
+        return 15;
+      }
+      return 50;
+    }
+    return 100;
+  }
+
   async fetchSkillFromGitHub(parsed: ParsedGitHubUrl): Promise<FetchedSkill> {
-    const { owner, repo, branch, skillPath } = parsed;
+    const { owner, repo, branch, skillPath, skillFilter } = parsed;
 
     // 1. Fetch the tree
     const treeRef = branch;
@@ -232,19 +284,71 @@ export class SkillsService {
       truncated?: boolean;
     };
 
-    const prefix = skillPath ? `${skillPath}/` : '';
+    let prefix: string;
 
-    // 2. Find SKILL.md
-    const skillMdPath = `${prefix}SKILL.md`;
-    const skillMdItem = treeData.tree.find(
-      (item) => item.type === 'blob' && item.path === skillMdPath,
-    );
-
-    if (!skillMdItem) {
-      throw new BadRequestException(
-        `No se encontró SKILL.md en ${skillMdPath}. Verifica la URL del skill.`,
+    if (skillPath) {
+      // Explicit path: use direct lookup
+      prefix = `${skillPath}/`;
+      const skillMdPath = `${prefix}SKILL.md`;
+      const exists = treeData.tree.some(
+        (item) => item.type === 'blob' && item.path === skillMdPath,
       );
+      if (!exists) {
+        throw new BadRequestException(
+          `No se encontró SKILL.md en ${skillMdPath}. Verifica la URL del skill.`,
+        );
+      }
+    } else {
+      // Discovery mode (like npx skills add): find all SKILL.md, filter by name
+      const allSkillPaths = treeData.tree
+        .filter(
+          (item) =>
+            item.type === 'blob' &&
+            (item.path === 'SKILL.md' || item.path.endsWith('/SKILL.md')),
+        )
+        .map((item) => item.path)
+        .sort((a, b) => this.skillPathPriority(a) - this.skillPathPriority(b));
+
+      const candidates: { path: string; name: string }[] = [];
+      for (const p of allSkillPaths) {
+        try {
+          const raw = await this.fetchText(
+            this.rawUrl(owner, repo, branch, p),
+          );
+          const { name } = this.parseFrontmatter(raw);
+          if (name && raw) candidates.push({ path: p, name });
+        } catch {
+          /* skip */
+        }
+      }
+
+      const filterLower = skillFilter?.toLowerCase();
+      const match = filterLower
+        ? (candidates.find(
+            (c) =>
+              c.name.toLowerCase() === filterLower ||
+              c.name.toLowerCase().replace(/\s+/g, '-') === filterLower ||
+              c.path.replace(/\/?SKILL\.md$/, '').split('/').pop()?.toLowerCase() === filterLower,
+          ) ??
+          candidates.find((c) =>
+            c.name.toLowerCase().includes(filterLower),
+          ))
+        : candidates[0];
+
+      if (!match) {
+        const hint = skillFilter
+          ? `Ningún skill con nombre "${skillFilter}"`
+          : 'No se encontraron skills';
+        throw new BadRequestException(
+          `${hint}. Skills disponibles: ${candidates.map((c) => c.name).join(', ') || '(ninguno)'}`,
+        );
+      }
+
+      prefix = match.path.replace(/SKILL\.md$/, '');
+      if (prefix) prefix += '/';
     }
+
+    const skillMdPath = `${prefix}SKILL.md`;
 
     // 3. Fetch SKILL.md content
     const skillMdRaw = await this.fetchText(
@@ -292,39 +396,43 @@ export class SkillsService {
       }),
     );
 
+    const baseUrl = `https://github.com/${owner}/${repo}/tree/${branch}`;
+    const pathPart = prefix.replace(/\/$/, '');
+    const resolvedRepoUrl = pathPart ? `${baseUrl}/${pathPart}` : baseUrl;
+
     return {
       name,
       description,
       version,
       content: body,
       files: refFiles,
+      resolvedRepoUrl,
     };
   }
 
   // ─── CRUD ───────────────────────────────────────────────────────────────────
 
   async install(tenantId: string, repoUrl: string) {
-    // Normalise URL (parse CLI commands, shorthands, strip trailing slash)
-    const normalizedUrl = this.normalizeSkillInput(repoUrl).replace(/\/$/, '');
+    const parsed = this.parseGitHubUrl(repoUrl);
+    const fetched = await this.fetchSkillFromGitHub(parsed);
+
+    const urlToStore = fetched.resolvedRepoUrl ?? this.normalizeSkillInput(repoUrl).replace(/\/$/, '');
 
     // Check for duplicates
     const existing = await this.prisma.agentSkill.findUnique({
-      where: { tenantId_repoUrl: { tenantId, repoUrl: normalizedUrl } },
+      where: { tenantId_repoUrl: { tenantId, repoUrl: urlToStore } },
     });
     if (existing) {
       throw new BadRequestException(
-        `El skill de ${normalizedUrl} ya está instalado`,
+        `El skill de ${urlToStore} ya está instalado`,
       );
     }
-
-    const parsed = this.parseGitHubUrl(normalizedUrl);
-    const fetched = await this.fetchSkillFromGitHub(parsed);
 
     const skill = await this.prisma.$transaction(async (tx) => {
       const created = await tx.agentSkill.create({
         data: {
           tenantId,
-          repoUrl: normalizedUrl,
+          repoUrl: urlToStore,
           name: fetched.name,
           description: fetched.description,
           version: fetched.version,
