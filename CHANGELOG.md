@@ -1,3 +1,10 @@
+# [0.7.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.6.0...v0.7.0) (2026-03-12)
+
+
+### Features
+
+* **linkedin:** add preferred language for image prompts ([9ce699a](https://github.com/CamiloEspinoza/Zeru/commit/9ce699ab60255a051c7feb94a4e847e66e79e3a0))
+
 # [0.6.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.5.0...v0.6.0) (2026-03-11)
 
 
