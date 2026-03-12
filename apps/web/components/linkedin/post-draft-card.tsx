@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "@/lib/api-client";
 import { ImagePromptCard } from "./image-prompt-card";
 import { VersionHistoryPopover } from "./version-history-popover";
@@ -78,6 +78,33 @@ export function PostDraftCard({
   );
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isWriting, setIsWriting] = useState(false);
+  const [typewriterText, setTypewriterText] = useState<string | null>(null);
+  const typewriterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Typewriter effect
+  useEffect(() => {
+    return () => {
+      if (typewriterRef.current) clearInterval(typewriterRef.current);
+    };
+  }, []);
+
+  const startTypewriter = useCallback((fullText: string) => {
+    if (typewriterRef.current) clearInterval(typewriterRef.current);
+    let charIndex = 0;
+    setTypewriterText("");
+    const interval = setInterval(() => {
+      charIndex++;
+      setTypewriterText(fullText.slice(0, charIndex));
+      if (charIndex >= fullText.length) {
+        clearInterval(interval);
+        typewriterRef.current = null;
+        // Clear typewriter state after finishing
+        setTimeout(() => setTypewriterText(null), 100);
+      }
+    }, 15);
+    typewriterRef.current = interval;
+  }, []);
 
   const statusInfo = STATUS_LABELS[post.status] ?? { label: post.status, color: "bg-muted text-muted-foreground" };
   const isEditable = ["DRAFT", "PENDING_APPROVAL"].includes(post.status);
@@ -104,19 +131,23 @@ export function PostDraftCard({
   const handleRegenerate = async () => {
     if (!regenInstructions.trim() || isRegenerating) return;
     setIsRegenerating(true);
+    setIsWriting(true);
     try {
       await api.post(`/linkedin/posts/${post.id}/regenerate`, {
         instructions: regenInstructions.trim(),
       });
       // Fetch updated post
       const updated = await api.get<PostDraftData>(`/linkedin/posts/${post.id}`);
+      setIsWriting(false);
+      // Start typewriter effect with the new content
+      startTypewriter(updated.content);
       setPost(updated);
       setShowRegenInput(false);
       setRegenInstructions("");
       // Reload versions
       setVersionsLoaded(false);
     } catch {
-      // silently fail
+      setIsWriting(false);
     } finally {
       setIsRegenerating(false);
     }
@@ -264,16 +295,34 @@ export function PostDraftCard({
 
       {/* Post content */}
       <div className="px-3 pb-2 flex-1">
-        <p className="text-xs whitespace-pre-wrap leading-relaxed text-foreground">
-          {displayContent}
-        </p>
-        {needsTruncation && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-[11px] text-primary font-medium hover:underline mt-0.5"
-          >
-            {expanded ? "ver menos" : "...ver más"}
-          </button>
+        {isWriting ? (
+          <div className="flex items-center gap-2 py-3">
+            <div className="flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+            </div>
+            <span className="text-xs text-muted-foreground italic">Reescribiendo contenido…</span>
+          </div>
+        ) : (
+          <>
+            <p className="text-xs whitespace-pre-wrap leading-relaxed text-foreground">
+              {typewriterText !== null
+                ? typewriterText
+                : displayContent}
+              {typewriterText !== null && (
+                <span className="inline-block w-0.5 h-3.5 bg-primary ml-0.5 animate-pulse align-middle" />
+              )}
+            </p>
+            {typewriterText === null && needsTruncation && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="text-[11px] text-primary font-medium hover:underline mt-0.5"
+              >
+                {expanded ? "ver menos" : "...ver más"}
+              </button>
+            )}
+          </>
         )}
       </div>
 
