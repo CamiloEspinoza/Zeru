@@ -1,3 +1,12 @@
+## [0.9.1](https://github.com/CamiloEspinoza/Zeru/compare/v0.9.0...v0.9.1) (2026-03-12)
+
+
+### Bug Fixes
+
+* **chat:** add contextual loading indicators with shimmer animation ([6a255b8](https://github.com/CamiloEspinoza/Zeru/commit/6a255b80481f3a411314430e529d304c358b6835))
+* **linkedin:** regenerate post content with LLM instead of returning same text ([1bf78e4](https://github.com/CamiloEspinoza/Zeru/commit/1bf78e41e7e70dc5262dbf0ffb7dad8addf8ede7))
+* skills install, Prisma Proxy, hooks order, LinkedIn refinements ([087d622](https://github.com/CamiloEspinoza/Zeru/commit/087d622dd4c9efcd9f70ae93a7cb5b0c2587052a))
+
 # [0.9.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.8.0...v0.9.0) (2026-03-12)
 
 
