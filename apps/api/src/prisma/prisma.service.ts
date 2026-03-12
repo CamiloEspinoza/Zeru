@@ -4,22 +4,23 @@ import { createSoftDeleteExtension } from './extensions/soft-delete.extension';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  private readonly _base: PrismaClient;
   private readonly _client: ReturnType<PrismaClient['$extends']>;
 
   constructor() {
-    const base = new PrismaClient();
-    this._client = base.$extends(createSoftDeleteExtension(base)) as ReturnType<
-      PrismaClient['$extends']
-    >;
+    this._base = new PrismaClient();
+    this._client = this._base.$extends(
+      createSoftDeleteExtension(this._base),
+    ) as ReturnType<PrismaClient['$extends']>;
     Object.assign(this, this._client);
   }
 
   async onModuleInit() {
-    await this.$connect();
+    await this._base.$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await this._base.$disconnect();
   }
 
   /**

@@ -57,8 +57,9 @@ export function createSoftDeleteExtension(client: PrismaClient) {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const rawModel = model?.name ?? '';
-const modelName = rawModel ? rawModel[0].toLowerCase() + rawModel.slice(1) : '';
+          // model is the PascalCase model name (e.g. "LinkedInPost"). Convert to camelCase for set lookup.
+          const rawModel = model ?? '';
+          const modelName = rawModel ? rawModel[0].toLowerCase() + rawModel.slice(1) : '';
           const isSoftDeletable = SOFT_DELETABLE_MODELS.has(modelName);
 
           if (!isSoftDeletable) {

@@ -28,7 +28,7 @@ export const linkedInListPostsSchema = z.object({
   to: z.string().optional(),
   contentPillar: z.string().optional(),
   page: z.coerce.number().int().positive().optional(),
-  perPage: z.coerce.number().int().positive().max(100).optional(),
+  perPage: z.coerce.number().int().positive().max(500).optional(),
 });
 
 export type LinkedInCallbackDto = z.infer<typeof linkedInCallbackSchema>;
