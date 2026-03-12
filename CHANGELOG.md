@@ -1,3 +1,11 @@
+# [0.8.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.7.0...v0.8.0) (2026-03-12)
+
+
+### Features
+
+* analyze uploaded images with LLM + fix S3 credentials bug ([73b4b22](https://github.com/CamiloEspinoza/Zeru/commit/73b4b2248e5bf9259641c4c27b152e48c2ce809d))
+* soft delete, streaming dedup, LinkedIn post status refresh ([0604871](https://github.com/CamiloEspinoza/Zeru/commit/06048713dc580c2de01186d6c7e51b54e25a7f74))
+
 # [0.7.0](https://github.com/CamiloEspinoza/Zeru/compare/v0.6.0...v0.7.0) (2026-03-12)
 
 
