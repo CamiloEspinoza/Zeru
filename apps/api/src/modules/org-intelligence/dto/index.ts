@@ -62,6 +62,29 @@ export const listInterviewsSchema = z.object({
   perPage: z.coerce.number().int().positive().max(100).default(20),
 });
 
+// --- Improvement DTOs ---
+
+export const createImprovementSchema = z.object({
+  title: z.string().min(1, 'El titulo es requerido').max(200),
+  description: z.string().min(1, 'La descripcion es requerida').max(5000),
+  type: z.string().max(100).optional(),
+  effort: z.string().max(100).optional(),
+  impact: z.string().max(100).optional(),
+  priority: z.number().int().optional(),
+  projectId: z.string().uuid('ID de proyecto invalido'),
+  problemId: z.string().uuid('ID de problema invalido'),
+});
+
+export const updateImprovementSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().min(1).max(5000).optional(),
+  type: z.string().max(100).nullable().optional(),
+  effort: z.string().max(100).nullable().optional(),
+  impact: z.string().max(100).nullable().optional(),
+  priority: z.number().int().nullable().optional(),
+  status: z.string().max(50).optional(),
+});
+
 // --- Type inference ---
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
@@ -70,3 +93,5 @@ export type CreateInterviewDto = z.infer<typeof createInterviewSchema>;
 export type UpdateInterviewDto = z.infer<typeof updateInterviewSchema>;
 export type UpdateSpeakerDto = z.infer<typeof updateSpeakerSchema>;
 export type ListInterviewsDto = z.infer<typeof listInterviewsSchema>;
+export type CreateImprovementDto = z.infer<typeof createImprovementSchema>;
+export type UpdateImprovementDto = z.infer<typeof updateImprovementSchema>;

@@ -4,6 +4,10 @@ import { AiModule } from '../ai/ai.module';
 import { ProjectsController } from './controllers/projects.controller';
 import { InterviewsController } from './controllers/interviews.controller';
 import { SearchController } from './controllers/search.controller';
+import { EntitiesController } from './controllers/entities.controller';
+import { DiagnosisController } from './controllers/diagnosis.controller';
+import { ProblemsController } from './controllers/problems.controller';
+import { ImprovementsController } from './controllers/improvements.controller';
 import { ProjectsService } from './services/projects.service';
 import { InterviewsService } from './services/interviews.service';
 import { DeepgramConfigService } from './services/deepgram-config.service';
@@ -14,10 +18,21 @@ import { ChunkingService } from './services/chunking.service';
 import { OrgEmbeddingService } from './services/org-embedding.service';
 import { OrgSearchService } from './services/org-search.service';
 import { InterviewPipelineOrchestrator } from './services/interview-pipeline.orchestrator';
+import { OrgDiagramService } from './services/org-diagram.service';
+import { OrgDiagnosisService } from './services/org-diagnosis.service';
+import { OrgImprovementsService } from './services/org-improvements.service';
 
 @Module({
   imports: [FilesModule, forwardRef(() => AiModule)],
-  controllers: [ProjectsController, InterviewsController, SearchController],
+  controllers: [
+    ProjectsController,
+    InterviewsController,
+    SearchController,
+    EntitiesController,
+    DiagnosisController,
+    ProblemsController,
+    ImprovementsController,
+  ],
   providers: [
     ProjectsService,
     InterviewsService,
@@ -29,6 +44,9 @@ import { InterviewPipelineOrchestrator } from './services/interview-pipeline.orc
     OrgEmbeddingService,
     OrgSearchService,
     InterviewPipelineOrchestrator,
+    OrgDiagramService,
+    OrgDiagnosisService,
+    OrgImprovementsService,
   ],
   exports: [
     ProjectsService,
@@ -41,6 +59,9 @@ import { InterviewPipelineOrchestrator } from './services/interview-pipeline.orc
     OrgEmbeddingService,
     OrgSearchService,
     InterviewPipelineOrchestrator,
+    OrgDiagramService,
+    OrgDiagnosisService,
+    OrgImprovementsService,
   ],
 })
 export class OrgIntelligenceModule {}
