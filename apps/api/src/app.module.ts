@@ -16,6 +16,7 @@ import { StorageConfigModule } from './modules/storage-config/storage-config.mod
 import { EmailConfigModule } from './modules/email-config/email-config.module';
 import { EmailModule } from './modules/email/email.module';
 import { LinkedInModule } from './modules/linkedin/linkedin.module';
+import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligence.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
@@ -37,6 +38,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     PublicApiModule,
     ZeruMcpModule,
     LinkedInModule,
+    OrgIntelligenceModule,
   ],
 })
 export class AppModule implements NestModule {
