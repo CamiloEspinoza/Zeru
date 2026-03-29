@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import {
   ScatterChart,
   Scatter,
@@ -142,7 +143,10 @@ export function ProjectImprovementsTab({
       {/* Improvements table */}
       <Card>
         <CardHeader>
-          <CardTitle>Mejoras identificadas ({improvements.length})</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Mejoras identificadas ({improvements.length})
+            <HelpTooltip text="Propuestas de mejora generadas a partir de los problemas detectados. Cada mejora se evalua con el framework RICE para priorizacion objetiva." />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -196,7 +200,10 @@ export function ProjectImprovementsTab({
       {scatterData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Matriz Esfuerzo-Impacto</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Matriz Esfuerzo-Impacto
+              <HelpTooltip text="RICE = Reach (alcance) x Impact (impacto) x Confidence (confianza) / Effort (esfuerzo). Quick Wins = alto impacto, bajo esfuerzo." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative">

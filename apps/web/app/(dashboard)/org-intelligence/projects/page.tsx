@@ -25,6 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 
 interface Project {
   id: string;
@@ -83,7 +84,7 @@ export default function ProjectsPage() {
       await api.post("/org-intelligence/projects", {
         name: form.name,
         description: form.description || undefined,
-        startDate: form.startDate ? new Date(form.startDate).toISOString() : undefined,
+        startDate: form.startDate ? new Date(form.startDate + "T12:00:00").toISOString() : undefined,
       });
       setDialogOpen(false);
       setForm({ name: "", description: "", startDate: "" });
@@ -110,10 +111,13 @@ export default function ProjectsPage() {
         <div>
           <h1 className="text-2xl font-bold">Proyectos</h1>
           <p className="text-muted-foreground mt-1">
-            Gestiona proyectos de inteligencia organizacional
+            Cada proyecto agrupa las entrevistas y el análisis de una iniciativa de mejora continua. Crea un proyecto, agenda entrevistas, sube los audios y deja que la IA extraiga conocimiento organizacional.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>Nuevo Proyecto</Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setDialogOpen(true)}>Nuevo Proyecto</Button>
+          <HelpTooltip text="Crea un proyecto para iniciar un levantamiento organizacional. Después podrás agregar entrevistas y analizar los resultados." />
+        </div>
       </div>
 
       {loading ? (
@@ -137,7 +141,7 @@ export default function ProjectsPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground text-sm">
-              No hay proyectos todavia. Crea tu primer proyecto para comenzar.
+              No hay proyectos todavía. Crea tu primer proyecto para comenzar.
             </p>
             <Button className="mt-4" onClick={() => setDialogOpen(true)}>
               Crear Proyecto
@@ -225,7 +229,7 @@ export default function ProjectsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="description">Descripcion</Label>
+              <Label htmlFor="description">Descripción</Label>
               <Textarea
                 id="description"
                 placeholder="Describe el objetivo del proyecto"

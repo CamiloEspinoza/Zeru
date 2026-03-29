@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EntityTypeBadge } from "@/components/org-intelligence/entity-type-badge";
 import { ConfidenceBadge } from "@/components/org-intelligence/confidence-badge";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 
 interface Problem {
   id: string;
@@ -90,14 +91,16 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
       ]);
 
       if (problemsRes) {
-        setProblems(
-          Array.isArray(problemsRes) ? problemsRes : problemsRes.data,
-        );
+        const p = Array.isArray(problemsRes)
+          ? problemsRes
+          : (problemsRes as PaginatedResponse<Problem>).data ?? [];
+        setProblems(p);
       }
       if (entitiesRes) {
-        setEntities(
-          Array.isArray(entitiesRes) ? entitiesRes : entitiesRes.data,
-        );
+        const e = Array.isArray(entitiesRes)
+          ? entitiesRes
+          : (entitiesRes as PaginatedResponse<Entity>).data ?? [];
+        setEntities(e);
       }
       if (!problemsRes && !entitiesRes) {
         setError(true);
@@ -131,7 +134,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
     );
   }
 
-  if (error || (problems.length === 0 && entities.length === 0)) {
+  if (error || ((problems?.length ?? 0) === 0 && (entities?.length ?? 0) === 0)) {
     return (
       <Card>
         <CardContent className="py-10 text-center">
@@ -199,27 +202,39 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">Total entidades</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">Total entidades</p>
+              <HelpTooltip text="Personas, roles, departamentos, procesos, sistemas y otros elementos identificados en las entrevistas." />
+            </div>
             <p className="mt-1 text-2xl font-bold">{totalEntities}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">Total problemas</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">Total problemas</p>
+              <HelpTooltip text="Ineficiencias, cuellos de botella, riesgos y quejas detectados por la IA en las entrevistas." />
+            </div>
             <p className="mt-1 text-2xl font-bold">{totalProblems}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">Total procesos</p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">Total procesos</p>
+              <HelpTooltip text="Procesos de negocio identificados con sus actividades, responsables y flujos." />
+            </div>
             <p className="mt-1 text-2xl font-bold">{totalProcesses}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
-            <p className="text-xs text-muted-foreground">
-              Confianza promedio
-            </p>
+            <div className="flex items-center gap-1">
+              <p className="text-xs text-muted-foreground">
+                Confianza promedio
+              </p>
+              <HelpTooltip text="Promedio de certeza de la IA sobre la informacion extraida. Mayor a 80% es alta confianza." />
+            </div>
             <p className="mt-1 text-2xl font-bold">
               {Math.round(avgConfidence * 100)}%
             </p>
@@ -270,7 +285,10 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
       {topProblems.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Top 5 problemas</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Top 5 problemas
+              <HelpTooltip text="Los problemas se ordenan por severidad y confianza. Severidad: Critico (operacion detenida), Alto (impacto significativo), Medio (ineficiencia), Bajo (mejora menor)." />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

@@ -34,6 +34,7 @@ import {
 import { ProjectAnalysisTab } from "@/components/org-intelligence/project-analysis-tab";
 import { ProjectDiagnosisTab } from "@/components/org-intelligence/project-diagnosis-tab";
 import { ProjectImprovementsTab } from "@/components/org-intelligence/project-improvements-tab";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 
 interface Project {
   id: string;
@@ -143,7 +144,9 @@ export default function ProjectDetailPage({
       await api.post("/org-intelligence/interviews", {
         projectId: id,
         title: interviewForm.title || undefined,
-        date: interviewForm.date || undefined,
+        interviewDate: interviewForm.date
+          ? new Date(interviewForm.date + "T12:00:00").toISOString()
+          : undefined,
       });
       setDialogOpen(false);
       setInterviewForm({ title: "", date: "" });
@@ -161,8 +164,8 @@ export default function ProjectDetailPage({
       await api.patch(`/org-intelligence/projects/${id}`, {
         name: editForm.name,
         description: editForm.description || undefined,
-        startDate: editForm.startDate ? new Date(editForm.startDate).toISOString() : undefined,
-        endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : undefined,
+        startDate: editForm.startDate ? new Date(editForm.startDate + "T12:00:00").toISOString() : undefined,
+        endDate: editForm.endDate ? new Date(editForm.endDate + "T12:00:00").toISOString() : undefined,
       });
       await fetchProject();
     } catch {
@@ -246,11 +249,26 @@ export default function ProjectDetailPage({
       {/* Tabs */}
       <Tabs defaultValue="interviews">
         <TabsList>
-          <TabsTrigger value="interviews">Entrevistas</TabsTrigger>
-          <TabsTrigger value="analysis">Análisis</TabsTrigger>
-          <TabsTrigger value="diagnosis">Diagnóstico</TabsTrigger>
-          <TabsTrigger value="action-plan">Plan de Acción</TabsTrigger>
-          <TabsTrigger value="settings">Configuración</TabsTrigger>
+          <TabsTrigger value="interviews" className="gap-1">
+            Entrevistas
+            <HelpTooltip text="Gestiona las entrevistas del proyecto. Sube audio, configura participantes y lanza el procesamiento con IA." />
+          </TabsTrigger>
+          <TabsTrigger value="analysis" className="gap-1">
+            Análisis
+            <HelpTooltip text="Analisis cruzado de todas las entrevistas. Muestra entidades extraidas, problemas detectados y estadisticas generales." />
+          </TabsTrigger>
+          <TabsTrigger value="diagnosis" className="gap-1">
+            Diagnóstico
+            <HelpTooltip text="Diagnostico organizacional automatizado. Detecta cuellos de botella, puntos unicos de fallo (SPOF) y contradicciones entre entrevistados." />
+          </TabsTrigger>
+          <TabsTrigger value="action-plan" className="gap-1">
+            Plan de Acción
+            <HelpTooltip text="Propuestas de mejora priorizadas con framework RICE (Reach, Impact, Confidence, Effort). Incluye matriz esfuerzo-impacto." />
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-1">
+            Configuración
+            <HelpTooltip text="Edita los datos generales del proyecto: nombre, descripcion y fechas." />
+          </TabsTrigger>
         </TabsList>
 
         {/* Entrevistas Tab */}
@@ -259,9 +277,14 @@ export default function ProjectDetailPage({
             <h2 className="text-sm font-semibold">
               Entrevistas ({interviews.length})
             </h2>
-            <Button onClick={() => setDialogOpen(true)}>
-              Nueva Entrevista
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button onClick={() => setDialogOpen(true)}>
+                Nueva Entrevista
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Agrega una entrevista. Despues podras subir el audio para que sea procesado automaticamente.
+              </p>
+            </div>
           </div>
 
           {loadingInterviews ? (

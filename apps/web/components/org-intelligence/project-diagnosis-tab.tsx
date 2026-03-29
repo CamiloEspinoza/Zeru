@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { EntityTypeBadge } from "@/components/org-intelligence/entity-type-badge";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 
 interface DiagnosisSummary {
   executiveSummary?: string;
@@ -201,6 +202,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
             <CardTitle className="flex items-center gap-2">
               <span className="text-lg">&#9888;</span>
               Cuellos de botella
+              <HelpTooltip text="Entidades (roles, procesos, sistemas) de las que dependen muchas otras. Si fallan, afectan a multiples areas. Se detectan por el numero de dependencias entrantes en el grafo organizacional." />
             </CardTitle>
             <CardDescription>
               Entidades con alto numero de dependencias
@@ -238,6 +240,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
             <CardTitle className="flex items-center gap-2">
               <span className="text-lg">&#9888;</span>
               Puntos unicos de falla
+              <HelpTooltip text="Puntos Unicos de Fallo: roles que participan en muchos procesos y que solo ocupa una persona. Si esa persona se ausenta, los procesos se detienen." />
             </CardTitle>
             <CardDescription>
               Roles que participan en multiples procesos
@@ -273,7 +276,10 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
       {/* Contradictions */}
       <Card>
         <CardHeader>
-          <CardTitle>Contradicciones</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Contradicciones
+            <HelpTooltip text="Informacion contradictoria entre diferentes entrevistados. Factual = datos duros distintos, Perspectiva = opiniones diferentes, Alcance = uno ve mas/menos pasos que otro." />
+          </CardTitle>
           <CardDescription>
             Afirmaciones conflictivas detectadas entre entrevistas
           </CardDescription>

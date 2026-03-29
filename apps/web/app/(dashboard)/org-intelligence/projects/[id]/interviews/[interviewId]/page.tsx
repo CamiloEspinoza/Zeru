@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
+import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -58,6 +59,13 @@ const pipelineStepLabels: Record<string, string> = {
   TRANSCRIBING: "Transcribiendo",
   EXTRACTING: "Extrayendo",
   COMPLETED: "Completado",
+};
+
+const pipelineStepDescriptions: Record<string, string> = {
+  UPLOADED: "Audio recibido correctamente",
+  TRANSCRIBING: "Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3)",
+  EXTRACTING: "Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas de análisis)",
+  COMPLETED: "Procesamiento finalizado. Los resultados están disponibles en las pestañas de Análisis y Diagnóstico del proyecto.",
 };
 
 const speakerColors = [
@@ -304,7 +312,7 @@ export default function InterviewDetailPage({
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">
-              {interview.title ?? "Entrevista sin titulo"}
+              {interview.title ?? "Entrevista sin título"}
             </h1>
             <StatusBadge type="processing" value={currentStatus} />
           </div>
@@ -326,8 +334,7 @@ export default function InterviewDetailPage({
           <CardHeader>
             <CardTitle>Subir Audio</CardTitle>
             <CardDescription>
-              Arrastra un archivo de audio o haz clic para seleccionar.
-              Formatos: MP3, WAV, M4A, OGG, WebM
+              Sube el audio de la entrevista (MP3, WAV, M4A, OGG o WebM, máximo 500 MB). La grabación será transcrita automáticamente con identificación de hablantes.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -360,7 +367,7 @@ export default function InterviewDetailPage({
               ) : (
                 <div className="space-y-1 text-center">
                   <p className="text-sm font-medium">
-                    Arrastra tu archivo de audio aqui
+                    Arrastra tu archivo de audio aquí
                   </p>
                   <p className="text-xs text-muted-foreground">
                     o haz clic para seleccionar
@@ -390,9 +397,12 @@ export default function InterviewDetailPage({
             <CardDescription>{interview.audioFilename}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleProcess} disabled={processing}>
-              {processing ? "Iniciando..." : "Procesar"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleProcess} disabled={processing}>
+                {processing ? "Iniciando..." : "Procesar"}
+              </Button>
+              <HelpTooltip text="Al procesar, la IA transcribirá el audio, identificará quién habla, extraerá roles, procesos, problemas y dependencias, y generará un mapa de conocimiento organizacional. Este proceso toma entre 3 y 5 minutos." />
+            </div>
           </CardContent>
         </Card>
       )}
@@ -441,15 +451,18 @@ export default function InterviewDetailPage({
                             ? "\u2713"
                             : i + 1}
                       </div>
-                      <span
-                        className={`text-[10px] ${
-                          isCurrent || isCompleted
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {pipelineStepLabels[step]}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className={`text-[10px] ${
+                            isCurrent || isCompleted
+                              ? "font-medium text-foreground"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {pipelineStepLabels[step]}
+                        </span>
+                        <HelpTooltip text={pipelineStepDescriptions[step]} />
+                      </div>
                     </div>
                   </React.Fragment>
                 );
@@ -471,9 +484,9 @@ export default function InterviewDetailPage({
       {showTranscription && interview.transcriptionJson && (
         <Card>
           <CardHeader>
-            <CardTitle>Transcripcion</CardTitle>
+            <CardTitle>Transcripción</CardTitle>
             <CardDescription>
-              {interview.transcriptionJson.length} segmentos
+              Transcripción con identificación de hablantes. Cada color representa un participante diferente de la entrevista. {interview.transcriptionJson.length} segmentos.
             </CardDescription>
           </CardHeader>
           <CardContent>
