@@ -18,6 +18,7 @@ import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { InterviewsService } from '../services/interviews.service';
+import { InterviewPipelineOrchestrator } from '../services/interview-pipeline.orchestrator';
 import {
   createInterviewSchema,
   updateInterviewSchema,
@@ -32,7 +33,10 @@ import {
 @Controller('org-intelligence/interviews')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class InterviewsController {
-  constructor(private readonly interviewsService: InterviewsService) {}
+  constructor(
+    private readonly interviewsService: InterviewsService,
+    private readonly pipeline: InterviewPipelineOrchestrator,
+  ) {}
 
   @Post()
   async create(
@@ -84,6 +88,14 @@ export class InterviewsController {
   ) {
     if (!file) throw new BadRequestException('No se recibio ningun archivo de audio');
     return this.interviewsService.uploadAudio(tenantId, id, file);
+  }
+
+  @Post(':id/process')
+  async process(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.pipeline.launch(tenantId, id);
   }
 
   @Patch(':id/speakers')
