@@ -13,9 +13,20 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -23,34 +34,50 @@ const API_BASE =
 interface Interview {
   id: string;
   title: string | null;
-  date: string | null;
-  status: string;
-  audioUrl: string | null;
-  audioFilename: string | null;
-  transcriptionJson: TranscriptionSegment[] | null;
-  speakers: Speaker[] | null;
+  interviewDate: string | null;
+  processingStatus: string;
+  processingError: string | null;
+  audioS3Key: string | null;
+  audioMimeType: string | null;
+  transcriptionText: string | null;
+  transcriptionJson: Record<string, unknown> | null;
+  transcriptionStatus: string;
+  speakers: Speaker[];
   projectId: string;
   createdAt: string;
-  errorMessage: string | null;
 }
 
 interface Speaker {
   id: string;
+  speakerLabel: string;
+  name: string | null;
+  role: string | null;
+  department: string | null;
+  isInterviewer: boolean;
+}
+
+interface SpeakerFormData {
+  speakerLabel: string;
   name: string;
-  role?: string;
+  role: string;
+  department: string;
+  isInterviewer: boolean;
 }
 
 interface TranscriptionSegment {
   speaker: string;
   text: string;
-  start?: number;
-  end?: number;
+  startMs: number;
+  endMs: number;
+  confidence: number;
+  speakerConfidence?: number;
 }
 
 interface ProcessingStatus {
-  status: string;
-  step?: string;
-  errorMessage?: string;
+  id: string;
+  processingStatus: string;
+  processingError: string | null;
+  transcriptionStatus: string;
 }
 
 const pipelineSteps = ["UPLOADED", "TRANSCRIBING", "EXTRACTING", "COMPLETED"];
@@ -94,6 +121,14 @@ function formatTimestamp(seconds: number | undefined) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+const emptySpeakerForm: SpeakerFormData = {
+  speakerLabel: "",
+  name: "",
+  role: "",
+  department: "",
+  isInterviewer: false,
+};
+
 export default function InterviewDetailPage({
   params,
 }: {
@@ -113,6 +148,12 @@ export default function InterviewDetailPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Speaker management state
+  const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
+  const [speakerForm, setSpeakerForm] = useState<SpeakerFormData>(emptySpeakerForm);
+  const [editingSpeakerIndex, setEditingSpeakerIndex] = useState<number | null>(null);
+  const [savingSpeakers, setSavingSpeakers] = useState(false);
+
   const fetchInterview = useCallback(async () => {
     try {
       setLoading(true);
@@ -121,8 +162,8 @@ export default function InterviewDetailPage({
       );
       setInterview(res);
       if (
-        res.status === "TRANSCRIBING" ||
-        res.status === "EXTRACTING"
+        res.processingStatus === "TRANSCRIBING" ||
+        res.processingStatus === "EXTRACTING"
       ) {
         startPolling();
       }
@@ -143,8 +184,8 @@ export default function InterviewDetailPage({
         );
         setProcessingStatus(status);
         if (
-          status.status === "COMPLETED" ||
-          status.status === "FAILED"
+          status.processingStatus === "COMPLETED" ||
+          status.processingStatus === "FAILED"
         ) {
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
@@ -239,13 +280,119 @@ export default function InterviewDetailPage({
         `/org-intelligence/interviews/${interviewId}/process`,
         {},
       );
-      setProcessingStatus({ status: "TRANSCRIBING", step: "TRANSCRIBING" });
+      setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
       startPolling();
       await fetchInterview();
     } catch {
       // silently fail
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // --- Speaker management handlers ---
+
+  const openAddSpeakerDialog = () => {
+    const nextIndex = interview?.speakers?.length ?? 0;
+    setSpeakerForm({
+      ...emptySpeakerForm,
+      speakerLabel: `Speaker_${nextIndex}`,
+    });
+    setEditingSpeakerIndex(null);
+    setSpeakerDialogOpen(true);
+  };
+
+  const openEditSpeakerDialog = (index: number) => {
+    if (!interview) return;
+    const speaker = interview.speakers[index];
+    setSpeakerForm({
+      speakerLabel: speaker.speakerLabel,
+      name: speaker.name ?? "",
+      role: speaker.role ?? "",
+      department: speaker.department ?? "",
+      isInterviewer: speaker.isInterviewer,
+    });
+    setEditingSpeakerIndex(index);
+    setSpeakerDialogOpen(true);
+  };
+
+  const handleSaveSpeaker = async () => {
+    if (!interview || !speakerForm.speakerLabel.trim()) return;
+    setSavingSpeakers(true);
+    try {
+      const currentSpeakers = interview.speakers.map((s) => ({
+        speakerLabel: s.speakerLabel,
+        name: s.name ?? undefined,
+        role: s.role ?? undefined,
+        department: s.department ?? undefined,
+        isInterviewer: s.isInterviewer,
+      }));
+
+      let updatedSpeakers;
+      if (editingSpeakerIndex !== null) {
+        // Edit existing
+        updatedSpeakers = [...currentSpeakers];
+        updatedSpeakers[editingSpeakerIndex] = {
+          speakerLabel: speakerForm.speakerLabel,
+          name: speakerForm.name || undefined,
+          role: speakerForm.role || undefined,
+          department: speakerForm.department || undefined,
+          isInterviewer: speakerForm.isInterviewer,
+        };
+      } else {
+        // Add new
+        updatedSpeakers = [
+          ...currentSpeakers,
+          {
+            speakerLabel: speakerForm.speakerLabel,
+            name: speakerForm.name || undefined,
+            role: speakerForm.role || undefined,
+            department: speakerForm.department || undefined,
+            isInterviewer: speakerForm.isInterviewer,
+          },
+        ];
+      }
+
+      await api.patch(
+        `/org-intelligence/interviews/${interviewId}/speakers`,
+        { speakers: updatedSpeakers },
+      );
+
+      await fetchInterview();
+      setSpeakerDialogOpen(false);
+      setSpeakerForm(emptySpeakerForm);
+      setEditingSpeakerIndex(null);
+    } catch {
+      // silently fail
+    } finally {
+      setSavingSpeakers(false);
+    }
+  };
+
+  const handleDeleteSpeaker = async (index: number) => {
+    if (!interview) return;
+    setSavingSpeakers(true);
+    try {
+      const updatedSpeakers = interview.speakers
+        .filter((_, i) => i !== index)
+        .map((s) => ({
+          speakerLabel: s.speakerLabel,
+          name: s.name ?? undefined,
+          role: s.role ?? undefined,
+          department: s.department ?? undefined,
+          isInterviewer: s.isInterviewer,
+        }));
+
+      await api.patch(
+        `/org-intelligence/interviews/${interviewId}/speakers`,
+        { speakers: updatedSpeakers },
+      );
+
+      await fetchInterview();
+    } catch {
+      // silently fail
+    } finally {
+      setSavingSpeakers(false);
     }
   };
 
@@ -284,13 +431,13 @@ export default function InterviewDetailPage({
     );
   }
 
-  const currentStatus = processingStatus?.status ?? interview.status;
+  const currentStatus = processingStatus?.processingStatus ?? interview.processingStatus;
   const currentStepIndex = pipelineSteps.indexOf(currentStatus);
   const showUpload =
-    interview.status === "PENDING" && !interview.audioUrl;
+    interview.processingStatus === "PENDING" && !interview.audioS3Key;
   const showProcess =
-    (interview.status === "UPLOADED" ||
-      (interview.audioUrl && interview.status === "PENDING")) &&
+    (interview.processingStatus === "UPLOADED" ||
+      (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
     currentStatus !== "TRANSCRIBING" &&
     currentStatus !== "EXTRACTING";
   const showPipeline =
@@ -303,6 +450,7 @@ export default function InterviewDetailPage({
     (currentStatus === "COMPLETED" || currentStatus === "EXTRACTING") &&
     interview.transcriptionJson;
 
+  const hasSpeakers = interview.speakers.length > 0;
   const speakerMap = new Map<string, number>();
 
   return (
@@ -317,7 +465,7 @@ export default function InterviewDetailPage({
             <StatusBadge type="processing" value={currentStatus} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {formatDate(interview.date ?? interview.createdAt)}
+            {formatDate(interview.interviewDate ?? interview.createdAt)}
           </p>
         </div>
         <Button
@@ -328,7 +476,101 @@ export default function InterviewDetailPage({
         </Button>
       </div>
 
-      {/* Section 1: Audio Upload */}
+      {/* Section 1: Participants Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle>Participantes de la Entrevista</CardTitle>
+              <HelpTooltip text="Configurar los participantes antes de procesar el audio permite que la IA identifique mejor a cada hablante y asocie correctamente roles, departamentos y perspectivas en el análisis organizacional." />
+            </div>
+            <Button
+              size="sm"
+              onClick={openAddSpeakerDialog}
+              disabled={savingSpeakers}
+            >
+              Agregar participante
+            </Button>
+          </div>
+          <CardDescription>
+            Define quiénes participaron en la entrevista, sus cargos y áreas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {hasSpeakers ? (
+            <div className="space-y-3">
+              {interview.speakers.map((speaker, index) => (
+                <div
+                  key={speaker.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                      {(speaker.name ?? speaker.speakerLabel).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {speaker.name ?? speaker.speakerLabel}
+                        </span>
+                        <Badge
+                          variant={speaker.isInterviewer ? "default" : "secondary"}
+                          className="text-[10px]"
+                        >
+                          {speaker.isInterviewer ? "Entrevistador" : "Entrevistado"}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-2 text-xs text-muted-foreground">
+                        {speaker.role && <span>{speaker.role}</span>}
+                        {speaker.role && speaker.department && <span>-</span>}
+                        {speaker.department && <span>{speaker.department}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openEditSpeakerDialog(index)}
+                      disabled={savingSpeakers}
+                    >
+                      Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteSpeaker(index)}
+                      disabled={savingSpeakers}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                No hay participantes configurados.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Agregar participantes mejora la precisión del análisis con IA.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={openAddSpeakerDialog}
+              >
+                Agregar primer participante
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 2: Audio Upload */}
       {showUpload && (
         <Card>
           <CardHeader>
@@ -338,6 +580,11 @@ export default function InterviewDetailPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {!hasSpeakers && (
+              <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
+                Se recomienda configurar los participantes antes de subir el audio para obtener mejores resultados en el análisis.
+              </div>
+            )}
             <div
               className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                 dragOver
@@ -390,11 +637,11 @@ export default function InterviewDetailPage({
       )}
 
       {/* Audio uploaded - show filename and process button */}
-      {showProcess && interview.audioFilename && (
+      {showProcess && interview.audioS3Key?.split("/").pop() && (
         <Card>
           <CardHeader>
             <CardTitle>Audio Subido</CardTitle>
-            <CardDescription>{interview.audioFilename}</CardDescription>
+            <CardDescription>{interview.audioS3Key?.split("/").pop()}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -407,7 +654,7 @@ export default function InterviewDetailPage({
         </Card>
       )}
 
-      {/* Section 2: Processing Status */}
+      {/* Section 3: Processing Status */}
       {showPipeline && (
         <Card>
           <CardHeader>
@@ -471,8 +718,8 @@ export default function InterviewDetailPage({
             {currentStatus === "FAILED" && (
               <p className="mt-4 text-xs text-red-600">
                 Error:{" "}
-                {processingStatus?.errorMessage ??
-                  interview.errorMessage ??
+                {processingStatus?.processingError ??
+                  interview.processingError ??
                   "Error desconocido"}
               </p>
             )}
@@ -480,18 +727,18 @@ export default function InterviewDetailPage({
         </Card>
       )}
 
-      {/* Section 3: Transcription */}
+      {/* Section 4: Transcription */}
       {showTranscription && interview.transcriptionJson && (
         <Card>
           <CardHeader>
             <CardTitle>Transcripción</CardTitle>
             <CardDescription>
-              Transcripción con identificación de hablantes. Cada color representa un participante diferente de la entrevista. {interview.transcriptionJson.length} segmentos.
+              Transcripción con identificación de hablantes. Cada color representa un participante diferente de la entrevista. {((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[] | undefined)?.length ?? 0} segmentos.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-h-[600px] space-y-3 overflow-y-auto pr-2">
-              {interview.transcriptionJson.map(
+              {(((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[]) ?? []).map(
                 (segment: TranscriptionSegment, i: number) => (
                   <div key={i} className="flex gap-3">
                     <div className="shrink-0 pt-0.5">
@@ -509,11 +756,11 @@ export default function InterviewDetailPage({
                       <p className="text-sm leading-relaxed">
                         {segment.text}
                       </p>
-                      {segment.start != null && (
+                      {segment.startMs != null && (
                         <span className="text-[10px] text-muted-foreground">
-                          {formatTimestamp(segment.start)}
-                          {segment.end != null &&
-                            ` - ${formatTimestamp(segment.end)}`}
+                          {formatTimestamp(segment.startMs / 1000)}
+                          {segment.endMs != null &&
+                            ` - ${formatTimestamp(segment.endMs / 1000)}`}
                         </span>
                       )}
                     </div>
@@ -524,6 +771,123 @@ export default function InterviewDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Speaker Add/Edit Dialog */}
+      <Dialog open={speakerDialogOpen} onOpenChange={setSpeakerDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingSpeakerIndex !== null
+                ? "Editar Participante"
+                : "Agregar Participante"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingSpeakerIndex !== null
+                ? "Modifica los datos del participante."
+                : "Ingresa los datos del participante de la entrevista."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="speaker-name">Nombre</Label>
+              <Input
+                id="speaker-name"
+                placeholder="Nombre del participante"
+                value={speakerForm.name}
+                onChange={(e) =>
+                  setSpeakerForm({ ...speakerForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="speaker-role">Cargo / Rol</Label>
+              <Input
+                id="speaker-role"
+                placeholder="Ej: Gerente de Operaciones"
+                value={speakerForm.role}
+                onChange={(e) =>
+                  setSpeakerForm({ ...speakerForm, role: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="speaker-department">Departamento / Área</Label>
+              <Input
+                id="speaker-department"
+                placeholder="Ej: Operaciones"
+                value={speakerForm.department}
+                onChange={(e) =>
+                  setSpeakerForm({
+                    ...speakerForm,
+                    department: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="speaker-interviewer"
+                checked={speakerForm.isInterviewer}
+                onCheckedChange={(checked) =>
+                  setSpeakerForm({
+                    ...speakerForm,
+                    isInterviewer: checked === true,
+                  })
+                }
+              />
+              <Label
+                htmlFor="speaker-interviewer"
+                className="text-sm font-normal"
+              >
+                Es entrevistador (quien realiza las preguntas)
+              </Label>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="speaker-label">
+                Etiqueta de hablante
+                <HelpTooltip
+                  text="Identificador único del hablante en la transcripción. Se asigna automáticamente, pero puedes cambiarlo si lo necesitas."
+                  className="ml-1"
+                />
+              </Label>
+              <Input
+                id="speaker-label"
+                placeholder="Ej: Speaker_0"
+                value={speakerForm.speakerLabel}
+                onChange={(e) =>
+                  setSpeakerForm({
+                    ...speakerForm,
+                    speakerLabel: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSpeakerDialogOpen(false);
+                setSpeakerForm(emptySpeakerForm);
+                setEditingSpeakerIndex(null);
+              }}
+              disabled={savingSpeakers}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveSpeaker}
+              disabled={savingSpeakers || !speakerForm.speakerLabel.trim()}
+            >
+              {savingSpeakers
+                ? "Guardando..."
+                : editingSpeakerIndex !== null
+                  ? "Guardar"
+                  : "Agregar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

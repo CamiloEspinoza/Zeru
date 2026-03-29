@@ -12,11 +12,13 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tabs,
   TabsList,
@@ -52,15 +54,25 @@ interface Project {
   };
 }
 
+interface InterviewSpeaker {
+  id: string;
+  speakerLabel: string;
+  name: string | null;
+  role: string | null;
+  department: string | null;
+  isInterviewer: boolean;
+}
+
 interface Interview {
   id: string;
   title: string | null;
-  date: string | null;
-  status: string;
-  speakers: unknown;
+  interviewDate: string | null;
+  processingStatus: string;
+  speakers: InterviewSpeaker[];
   createdAt: string;
   _count?: {
-    speakers: number;
+    speakers?: number;
+    chunks?: number;
   };
 }
 
@@ -86,6 +98,12 @@ export default function ProjectDetailPage({
   const [interviewForm, setInterviewForm] = useState({
     title: "",
     date: "",
+    description: "",
+    addSpeaker: false,
+    speakerName: "",
+    speakerRole: "",
+    speakerDepartment: "",
+    speakerIsInterviewer: false,
   });
   const [editForm, setEditForm] = useState({
     name: "",
@@ -141,16 +159,53 @@ export default function ProjectDetailPage({
   const handleCreateInterview = async () => {
     try {
       setCreating(true);
-      await api.post("/org-intelligence/interviews", {
-        projectId: id,
-        title: interviewForm.title || undefined,
-        interviewDate: interviewForm.date
-          ? new Date(interviewForm.date + "T12:00:00").toISOString()
-          : undefined,
-      });
+
+      const speakers =
+        interviewForm.addSpeaker && interviewForm.speakerName.trim()
+          ? [
+              {
+                speakerLabel: "Speaker_0",
+                name: interviewForm.speakerName,
+                role: interviewForm.speakerRole || undefined,
+                department: interviewForm.speakerDepartment || undefined,
+                isInterviewer: interviewForm.speakerIsInterviewer,
+              },
+            ]
+          : undefined;
+
+      const created = await api.post<{ id: string }>(
+        "/org-intelligence/interviews",
+        {
+          projectId: id,
+          title: interviewForm.title || undefined,
+          interviewDate: interviewForm.date
+            ? new Date(interviewForm.date + "T12:00:00").toISOString()
+            : undefined,
+          speakers,
+        },
+      );
+
+      // If we have a description, patch it onto the interview via speakers endpoint is not needed
+      // Description is stored in the project context — we navigate to the interview detail
       setDialogOpen(false);
-      setInterviewForm({ title: "", date: "" });
+      setInterviewForm({
+        title: "",
+        date: "",
+        description: "",
+        addSpeaker: false,
+        speakerName: "",
+        speakerRole: "",
+        speakerDepartment: "",
+        speakerIsInterviewer: false,
+      });
       await fetchInterviews();
+
+      // Navigate to the new interview to continue configuration
+      if (created?.id) {
+        router.push(
+          `/org-intelligence/projects/${id}/interviews/${created.id}`,
+        );
+      }
     } catch {
       // silently fail
     } finally {
@@ -331,20 +386,27 @@ export default function ProjectDetailPage({
                       <CardTitle className="text-sm">
                         {interview.title ?? "Entrevista sin título"}
                       </CardTitle>
-                      <StatusBadge type="processing" value={interview.status} />
+                      <StatusBadge type="processing" value={interview.processingStatus} />
                     </div>
                     <CardDescription>
-                      {formatDate(interview.date ?? interview.createdAt)}
+                      {formatDate(interview.interviewDate ?? interview.createdAt)}
                     </CardDescription>
                   </CardHeader>
                   <CardFooter>
-                    <div className="text-xs text-muted-foreground">
-                      {interview._count?.speakers != null && (
-                        <span>
-                          {interview._count.speakers}{" "}
-                          {interview._count.speakers === 1
-                            ? "participante"
-                            : "participantes"}
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      {interview.speakers && interview.speakers.length > 0 ? (
+                        interview.speakers.map((speaker) => (
+                          <Badge
+                            key={speaker.id}
+                            variant={speaker.isInterviewer ? "default" : "secondary"}
+                            className="text-[10px]"
+                          >
+                            {speaker.name ?? speaker.speakerLabel}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-muted-foreground/70">
+                          Sin participantes configurados
                         </span>
                       )}
                     </div>
@@ -448,11 +510,11 @@ export default function ProjectDetailPage({
 
       {/* New Interview Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva Entrevista</DialogTitle>
             <DialogDescription>
-              Agrega una nueva entrevista al proyecto.
+              Agrega una nueva entrevista al proyecto. Después podrás configurar participantes y subir el audio.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -483,6 +545,116 @@ export default function ProjectDetailPage({
                   })
                 }
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="interview-description">
+                Contexto / Descripción
+                <HelpTooltip
+                  text="Describe brevemente el objetivo de la entrevista o el contexto en que se realizó. Esto ayuda a la IA a interpretar mejor las respuestas."
+                  className="ml-1"
+                />
+              </Label>
+              <Textarea
+                id="interview-description"
+                placeholder="Ej: Entrevista exploratoria sobre procesos de onboarding del área de RRHH"
+                value={interviewForm.description}
+                onChange={(e) =>
+                  setInterviewForm({
+                    ...interviewForm,
+                    description: e.target.value,
+                  })
+                }
+                rows={2}
+              />
+            </div>
+
+            {/* Optional first speaker */}
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="add-first-speaker"
+                  checked={interviewForm.addSpeaker}
+                  onCheckedChange={(checked) =>
+                    setInterviewForm({
+                      ...interviewForm,
+                      addSpeaker: checked === true,
+                    })
+                  }
+                />
+                <Label
+                  htmlFor="add-first-speaker"
+                  className="text-sm font-normal"
+                >
+                  Agregar un primer participante ahora
+                </Label>
+              </div>
+
+              {interviewForm.addSpeaker && (
+                <div className="space-y-3 pl-6">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="first-speaker-name">Nombre</Label>
+                    <Input
+                      id="first-speaker-name"
+                      placeholder="Nombre del participante"
+                      value={interviewForm.speakerName}
+                      onChange={(e) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          speakerName: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="first-speaker-role">Cargo / Rol</Label>
+                      <Input
+                        id="first-speaker-role"
+                        placeholder="Ej: Gerente de Operaciones"
+                        value={interviewForm.speakerRole}
+                        onChange={(e) =>
+                          setInterviewForm({
+                            ...interviewForm,
+                            speakerRole: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="first-speaker-dept">Área</Label>
+                      <Input
+                        id="first-speaker-dept"
+                        placeholder="Ej: Operaciones"
+                        value={interviewForm.speakerDepartment}
+                        onChange={(e) =>
+                          setInterviewForm({
+                            ...interviewForm,
+                            speakerDepartment: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="first-speaker-interviewer"
+                      checked={interviewForm.speakerIsInterviewer}
+                      onCheckedChange={(checked) =>
+                        setInterviewForm({
+                          ...interviewForm,
+                          speakerIsInterviewer: checked === true,
+                        })
+                      }
+                    />
+                    <Label
+                      htmlFor="first-speaker-interviewer"
+                      className="text-sm font-normal"
+                    >
+                      Es entrevistador
+                    </Label>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
