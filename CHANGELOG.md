@@ -1,3 +1,10 @@
+## [0.9.2](https://github.com/CamiloEspinoza/Zeru/compare/v0.9.1...v0.9.2) (2026-03-29)
+
+
+### Bug Fixes
+
+* accept npx commands in skill install endpoint ([568b1db](https://github.com/CamiloEspinoza/Zeru/commit/568b1db0339cb178a244a44c70bed595d71a187b))
+
 ## [0.9.1](https://github.com/CamiloEspinoza/Zeru/compare/v0.9.0...v0.9.1) (2026-03-12)
 
 
