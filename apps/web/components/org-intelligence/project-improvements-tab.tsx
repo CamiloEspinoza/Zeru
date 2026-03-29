@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import {
   ScatterChart,
   Scatter,
@@ -40,34 +41,12 @@ interface PaginatedResponse<T> {
   meta: { total: number; page: number; perPage: number };
 }
 
-const statusConfig: Record<
-  string,
-  { label: string; color: string; bgColor: string; dotColor: string }
-> = {
-  PROPOSED: {
-    label: "Propuesto",
-    color: "text-gray-700",
-    bgColor: "bg-gray-100",
-    dotColor: "#9ca3af",
-  },
-  VALIDATED: {
-    label: "Validado",
-    color: "text-blue-700",
-    bgColor: "bg-blue-100",
-    dotColor: "#3b82f6",
-  },
-  IN_PROGRESS: {
-    label: "En progreso",
-    color: "text-amber-700",
-    bgColor: "bg-amber-100",
-    dotColor: "#f59e0b",
-  },
-  COMPLETED: {
-    label: "Completado",
-    color: "text-green-700",
-    bgColor: "bg-green-100",
-    dotColor: "#22c55e",
-  },
+/** Dot colors for the scatter chart — labels/badge colors live in the shared StatusBadge. */
+const chartDotColors: Record<string, { label: string; dotColor: string }> = {
+  PROPOSED: { label: "Propuesta", dotColor: "#9ca3af" },
+  VALIDATED: { label: "Validada", dotColor: "#3b82f6" },
+  IN_PROGRESS: { label: "En progreso", dotColor: "#f59e0b" },
+  COMPLETED: { label: "Completada", dotColor: "#22c55e" },
 };
 
 const typeLabels: Record<string, string> = {
@@ -76,21 +55,6 @@ const typeLabels: Record<string, string> = {
   PEOPLE: "Personas",
   ORGANIZATION: "Organizacion",
 };
-
-function StatusBadge({ status }: { status: string }) {
-  const config = statusConfig[status] || {
-    label: status,
-    color: "text-gray-700",
-    bgColor: "bg-gray-100",
-  };
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.bgColor} ${config.color}`}
-    >
-      {config.label}
-    </span>
-  );
-}
 
 interface CustomTooltipProps {
   active?: boolean;
@@ -106,7 +70,7 @@ function ChartTooltip({ active, payload }: CustomTooltipProps) {
       <p className="text-xs text-muted-foreground">
         Esfuerzo: {item.effort} | Impacto: {item.impact}
       </p>
-      <StatusBadge status={item.status} />
+      <StatusBadge type="improvement" value={item.status} />
     </div>
   );
 }
@@ -221,7 +185,7 @@ export function ProjectImprovementsTab({
                 <span className="text-center">
                   {improvement.impact ?? "-"}
                 </span>
-                <StatusBadge status={improvement.status} />
+                <StatusBadge type="improvement" value={improvement.status} />
               </div>
             ))}
           </div>
@@ -303,7 +267,7 @@ export function ProjectImprovementsTab({
                       <Cell
                         key={item.id}
                         fill={
-                          statusConfig[item.status]?.dotColor ?? "#6366f1"
+                          chartDotColors[item.status]?.dotColor ?? "#6366f1"
                         }
                       />
                     ))}
@@ -314,7 +278,7 @@ export function ProjectImprovementsTab({
 
             {/* Legend */}
             <div className="mt-4 flex flex-wrap justify-center gap-4">
-              {Object.entries(statusConfig).map(([key, config]) => (
+              {Object.entries(chartDotColors).map(([key, config]) => (
                 <div key={key} className="flex items-center gap-1.5 text-xs">
                   <div
                     className="h-2.5 w-2.5 rounded-full"

@@ -12,8 +12,8 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -67,38 +67,6 @@ interface InterviewsResponse {
   data: Interview[];
   meta: { total: number; page: number; perPage: number };
 }
-
-const projectStatusColors: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-800",
-  ACTIVE: "bg-blue-100 text-blue-800",
-  COMPLETED: "bg-green-100 text-green-800",
-  ARCHIVED: "bg-slate-100 text-slate-800",
-};
-
-const projectStatusLabels: Record<string, string> = {
-  DRAFT: "Borrador",
-  ACTIVE: "Activo",
-  COMPLETED: "Completado",
-  ARCHIVED: "Archivado",
-};
-
-const interviewStatusColors: Record<string, string> = {
-  PENDING: "bg-gray-100 text-gray-800",
-  UPLOADED: "bg-yellow-100 text-yellow-800",
-  TRANSCRIBING: "bg-blue-100 text-blue-800",
-  EXTRACTING: "bg-purple-100 text-purple-800",
-  COMPLETED: "bg-green-100 text-green-800",
-  FAILED: "bg-red-100 text-red-800",
-};
-
-const interviewStatusLabels: Record<string, string> = {
-  PENDING: "Pendiente",
-  UPLOADED: "Subido",
-  TRANSCRIBING: "Transcribiendo",
-  EXTRACTING: "Extrayendo",
-  COMPLETED: "Completado",
-  FAILED: "Fallido",
-};
 
 export default function ProjectDetailPage({
   params,
@@ -193,8 +161,8 @@ export default function ProjectDetailPage({
       await api.patch(`/org-intelligence/projects/${id}`, {
         name: editForm.name,
         description: editForm.description || undefined,
-        startDate: editForm.startDate || undefined,
-        endDate: editForm.endDate || undefined,
+        startDate: editForm.startDate ? new Date(editForm.startDate).toISOString() : undefined,
+        endDate: editForm.endDate ? new Date(editForm.endDate).toISOString() : undefined,
       });
       await fetchProject();
     } catch {
@@ -250,12 +218,7 @@ export default function ProjectDetailPage({
         <div className="space-y-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{project.name}</h1>
-            <Badge
-              variant="outline"
-              className={projectStatusColors[project.status] ?? ""}
-            >
-              {projectStatusLabels[project.status] ?? project.status}
-            </Badge>
+            <StatusBadge type="project" value={project.status} />
           </div>
           {project.description && (
             <p className="text-sm text-muted-foreground">
@@ -284,10 +247,10 @@ export default function ProjectDetailPage({
       <Tabs defaultValue="interviews">
         <TabsList>
           <TabsTrigger value="interviews">Entrevistas</TabsTrigger>
-          <TabsTrigger value="analysis">Analisis</TabsTrigger>
-          <TabsTrigger value="diagnosis">Diagnostico</TabsTrigger>
-          <TabsTrigger value="action-plan">Plan de Accion</TabsTrigger>
-          <TabsTrigger value="settings">Configuracion</TabsTrigger>
+          <TabsTrigger value="analysis">Análisis</TabsTrigger>
+          <TabsTrigger value="diagnosis">Diagnóstico</TabsTrigger>
+          <TabsTrigger value="action-plan">Plan de Acción</TabsTrigger>
+          <TabsTrigger value="settings">Configuración</TabsTrigger>
         </TabsList>
 
         {/* Entrevistas Tab */}
@@ -345,15 +308,7 @@ export default function ProjectDetailPage({
                       <CardTitle className="text-sm">
                         {interview.title ?? "Entrevista sin titulo"}
                       </CardTitle>
-                      <Badge
-                        variant="outline"
-                        className={
-                          interviewStatusColors[interview.status] ?? ""
-                        }
-                      >
-                        {interviewStatusLabels[interview.status] ??
-                          interview.status}
-                      </Badge>
+                      <StatusBadge type="processing" value={interview.status} />
                     </div>
                     <CardDescription>
                       {formatDate(interview.date ?? interview.createdAt)}

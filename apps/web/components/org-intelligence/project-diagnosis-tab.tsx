@@ -12,6 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { EntityTypeBadge } from "@/components/org-intelligence/entity-type-badge";
+import { StatusBadge } from "@/components/org-intelligence/status-badge";
 
 interface DiagnosisSummary {
   executiveSummary?: string;
@@ -59,18 +60,6 @@ interface PaginatedResponse<T> {
   data: T[];
   meta: { total: number; page: number; perPage: number };
 }
-
-const contradictionTypeLabels: Record<string, string> = {
-  FACTUAL: "Factual",
-  PERSPECTIVE: "Perspectiva",
-  SCOPE: "Alcance",
-};
-
-const contradictionTypeColors: Record<string, string> = {
-  FACTUAL: "bg-red-100 text-red-700",
-  PERSPECTIVE: "bg-amber-100 text-amber-700",
-  SCOPE: "bg-blue-100 text-blue-700",
-};
 
 export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
   const [diagnosis, setDiagnosis] = useState<DiagnosisSummary | null>(null);
@@ -295,15 +284,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
               {contradictions.map((c) => (
                 <div key={c.id} className="rounded-md border p-3">
                   <div className="mb-2 flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={
-                        contradictionTypeColors[c.type] ??
-                        "bg-gray-100 text-gray-700"
-                      }
-                    >
-                      {contradictionTypeLabels[c.type] ?? c.type}
-                    </Badge>
+                    <StatusBadge type="conflict" value={c.type} />
                     <Badge variant="outline" className="text-xs">
                       {c.status}
                     </Badge>
