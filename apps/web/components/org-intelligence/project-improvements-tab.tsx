@@ -52,9 +52,9 @@ const chartDotColors: Record<string, { label: string; dotColor: string }> = {
 
 const typeLabels: Record<string, string> = {
   PROCESS: "Proceso",
-  TECHNOLOGY: "Tecnologia",
+  TECHNOLOGY: "Tecnología",
   PEOPLE: "Personas",
-  ORGANIZATION: "Organizacion",
+  ORGANIZATION: "Organización",
 };
 
 interface CustomTooltipProps {
@@ -125,7 +125,7 @@ export function ProjectImprovementsTab({
       <Card>
         <CardContent className="py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Las mejoras se generaran automaticamente tras el analisis. Tambien
+            Las mejoras se generarán automáticamente tras el análisis. También
             puedes crear mejoras manualmente.
           </p>
         </CardContent>
@@ -145,14 +145,14 @@ export function ProjectImprovementsTab({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Mejoras identificadas ({improvements.length})
-            <HelpTooltip text="Propuestas de mejora generadas a partir de los problemas detectados. Cada mejora se evalua con el framework RICE para priorizacion objetiva." />
+            <HelpTooltip text="Propuestas de mejora generadas a partir de los problemas detectados. Cada mejora se evalúa con el framework RICE para priorización objetiva." />
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {/* Table header */}
             <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-3 border-b pb-2 text-xs font-medium text-muted-foreground">
-              <span>Titulo</span>
+              <span>Título</span>
               <span>Tipo</span>
               <span>Prioridad</span>
               <span>Esfuerzo</span>
@@ -224,7 +224,7 @@ export function ProjectImprovementsTab({
                 <div className="flex w-1/2 flex-col">
                   <div className="flex flex-1 items-start justify-end p-4">
                     <span className="rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-blue-600">
-                      Estrategico
+                      Estratégico
                     </span>
                   </div>
                   <div className="flex flex-1 items-end justify-end p-4">

@@ -129,10 +129,10 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
       <Card>
         <CardContent className="py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            El diagnostico estara disponible una vez procesadas las entrevistas.
+            El diagnóstico estará disponible una vez procesadas las entrevistas.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Aqui se mostraran cuellos de botella, puntos unicos de falla y
+            Aquí se mostrarán cuellos de botella, puntos únicos de falla y
             contradicciones detectadas entre entrevistas.
           </p>
         </CardContent>
@@ -202,10 +202,10 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
             <CardTitle className="flex items-center gap-2">
               <span className="text-lg">&#9888;</span>
               Cuellos de botella
-              <HelpTooltip text="Entidades (roles, procesos, sistemas) de las que dependen muchas otras. Si fallan, afectan a multiples areas. Se detectan por el numero de dependencias entrantes en el grafo organizacional." />
+              <HelpTooltip text="Entidades (roles, procesos, sistemas) de las que dependen muchas otras. Si fallan, afectan a múltiples áreas. Se detectan por el número de dependencias entrantes en el grafo organizacional." />
             </CardTitle>
             <CardDescription>
-              Entidades con alto numero de dependencias
+              Entidades con alto número de dependencias
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -239,11 +239,11 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="text-lg">&#9888;</span>
-              Puntos unicos de falla
-              <HelpTooltip text="Puntos Unicos de Fallo: roles que participan en muchos procesos y que solo ocupa una persona. Si esa persona se ausenta, los procesos se detienen." />
+              Puntos únicos de falla
+              <HelpTooltip text="Puntos Únicos de Fallo: roles que participan en muchos procesos y que solo ocupa una persona. Si esa persona se ausenta, los procesos se detienen." />
             </CardTitle>
             <CardDescription>
-              Roles que participan en multiples procesos
+              Roles que participan en múltiples procesos
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -266,7 +266,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No se detectaron puntos unicos de falla.
+                No se detectaron puntos únicos de falla.
               </p>
             )}
           </CardContent>
@@ -278,7 +278,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Contradicciones
-            <HelpTooltip text="Informacion contradictoria entre diferentes entrevistados. Factual = datos duros distintos, Perspectiva = opiniones diferentes, Alcance = uno ve mas/menos pasos que otro." />
+            <HelpTooltip text="Información contradictoria entre diferentes entrevistados. Factual = datos duros distintos, Perspectiva = opiniones diferentes, Alcance = uno ve más/menos pasos que otro." />
           </CardTitle>
           <CardDescription>
             Afirmaciones conflictivas detectadas entre entrevistas

@@ -559,7 +559,7 @@ function SearchTab({ projectId }: { projectId: string }) {
       <div className="space-y-2">
         <div className="flex gap-2">
           <Input
-            placeholder="Ej: 'problemas en logistica', 'quien maneja las compras', 'sistemas que usa produccion'"
+            placeholder="Ej: 'problemas en logística', 'quién maneja las compras', 'sistemas que usa producción'"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {

@@ -255,11 +255,11 @@ export default function ProjectDetailPage({
           </TabsTrigger>
           <TabsTrigger value="analysis" className="gap-1">
             Análisis
-            <HelpTooltip text="Analisis cruzado de todas las entrevistas. Muestra entidades extraidas, problemas detectados y estadisticas generales." />
+            <HelpTooltip text="Análisis cruzado de todas las entrevistas. Muestra entidades extraídas, problemas detectados y estadísticas generales." />
           </TabsTrigger>
           <TabsTrigger value="diagnosis" className="gap-1">
             Diagnóstico
-            <HelpTooltip text="Diagnostico organizacional automatizado. Detecta cuellos de botella, puntos unicos de fallo (SPOF) y contradicciones entre entrevistados." />
+            <HelpTooltip text="Diagnóstico organizacional automatizado. Detecta cuellos de botella, puntos únicos de fallo (SPOF) y contradicciones entre entrevistados." />
           </TabsTrigger>
           <TabsTrigger value="action-plan" className="gap-1">
             Plan de Acción
@@ -267,7 +267,7 @@ export default function ProjectDetailPage({
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-1">
             Configuración
-            <HelpTooltip text="Edita los datos generales del proyecto: nombre, descripcion y fechas." />
+            <HelpTooltip text="Edita los datos generales del proyecto: nombre, descripción y fechas." />
           </TabsTrigger>
         </TabsList>
 
@@ -282,7 +282,7 @@ export default function ProjectDetailPage({
                 Nueva Entrevista
               </Button>
               <p className="text-xs text-muted-foreground">
-                Agrega una entrevista. Despues podras subir el audio para que sea procesado automaticamente.
+                Agrega una entrevista. Después podrás subir el audio para que sea procesado automáticamente.
               </p>
             </div>
           </div>
@@ -304,7 +304,7 @@ export default function ProjectDetailPage({
             <Card>
               <CardContent className="py-10 text-center">
                 <p className="text-sm text-muted-foreground">
-                  No hay entrevistas todavia. Agrega tu primera entrevista.
+                  No hay entrevistas todavía. Agrega tu primera entrevista.
                 </p>
                 <Button
                   className="mt-4"
@@ -329,7 +329,7 @@ export default function ProjectDetailPage({
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-sm">
-                        {interview.title ?? "Entrevista sin titulo"}
+                        {interview.title ?? "Entrevista sin título"}
                       </CardTitle>
                       <StatusBadge type="processing" value={interview.status} />
                     </div>
@@ -355,26 +355,26 @@ export default function ProjectDetailPage({
           )}
         </TabsContent>
 
-        {/* Analisis Tab */}
+        {/* Análisis Tab */}
         <TabsContent value="analysis" className="pt-4">
           <ProjectAnalysisTab projectId={id} />
         </TabsContent>
 
-        {/* Diagnostico Tab */}
+        {/* Diagnóstico Tab */}
         <TabsContent value="diagnosis" className="pt-4">
           <ProjectDiagnosisTab projectId={id} />
         </TabsContent>
 
-        {/* Plan de Accion Tab */}
+        {/* Plan de Acción Tab */}
         <TabsContent value="action-plan" className="pt-4">
           <ProjectImprovementsTab projectId={id} />
         </TabsContent>
 
-        {/* Configuracion Tab */}
+        {/* Configuración Tab */}
         <TabsContent value="settings" className="pt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Configuracion del Proyecto</CardTitle>
+              <CardTitle>Configuración del Proyecto</CardTitle>
               <CardDescription>
                 Modifica los datos del proyecto.
               </CardDescription>
@@ -391,7 +391,7 @@ export default function ProjectDetailPage({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit-description">Descripcion</Label>
+                <Label htmlFor="edit-description">Descripción</Label>
                 <Textarea
                   id="edit-description"
                   value={editForm.description}
@@ -457,10 +457,10 @@ export default function ProjectDetailPage({
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="interview-title">Titulo</Label>
+              <Label htmlFor="interview-title">Título</Label>
               <Input
                 id="interview-title"
-                placeholder="Titulo de la entrevista"
+                placeholder="Título de la entrevista"
                 value={interviewForm.title}
                 onChange={(e) =>
                   setInterviewForm({

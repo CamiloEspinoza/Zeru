@@ -42,7 +42,7 @@ const severityConfig: Record<
   string,
   { label: string; color: string; bgColor: string }
 > = {
-  CRITICAL: { label: "Critico", color: "text-red-700", bgColor: "bg-red-500" },
+  CRITICAL: { label: "Crítico", color: "text-red-700", bgColor: "bg-red-500" },
   HIGH: { label: "Alto", color: "text-orange-700", bgColor: "bg-orange-500" },
   MEDIUM: {
     label: "Medio",
@@ -139,7 +139,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
       <Card>
         <CardContent className="py-10 text-center">
           <p className="text-sm text-muted-foreground">
-            Los datos de analisis estaran disponibles una vez procesadas las
+            Los datos de análisis estarán disponibles una vez procesadas las
             entrevistas.
           </p>
         </CardContent>
@@ -233,7 +233,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
               <p className="text-xs text-muted-foreground">
                 Confianza promedio
               </p>
-              <HelpTooltip text="Promedio de certeza de la IA sobre la informacion extraida. Mayor a 80% es alta confianza." />
+              <HelpTooltip text="Promedio de certeza de la IA sobre la información extraída. Mayor a 80% es alta confianza." />
             </div>
             <p className="mt-1 text-2xl font-bold">
               {Math.round(avgConfidence * 100)}%
@@ -287,7 +287,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Top 5 problemas
-              <HelpTooltip text="Los problemas se ordenan por severidad y confianza. Severidad: Critico (operacion detenida), Alto (impacto significativo), Medio (ineficiencia), Bajo (mejora menor)." />
+              <HelpTooltip text="Los problemas se ordenan por severidad y confianza. Severidad: Crítico (operación detenida), Alto (impacto significativo), Medio (ineficiencia), Bajo (mejora menor)." />
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -295,7 +295,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
               {/* Table header */}
               <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b pb-2 text-xs font-medium text-muted-foreground">
                 <span>Severidad</span>
-                <span>Descripcion</span>
+                <span>Descripción</span>
                 <span>Entidades</span>
                 <span>Confianza</span>
               </div>
@@ -329,7 +329,7 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
       {entityTypeEntries.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Distribucion por tipo de entidad</CardTitle>
+            <CardTitle>Distribución por tipo de entidad</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
