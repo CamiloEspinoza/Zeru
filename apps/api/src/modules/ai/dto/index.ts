@@ -25,7 +25,7 @@ export const chatRequestSchema = z.object({
 });
 
 export const installSkillSchema = z.object({
-  repoUrl: z.string().url('URL inválida').min(1, 'La URL es requerida'),
+  repoUrl: z.string().min(1, 'La URL o comando de instalación es requerido'),
 });
 
 export const toggleSkillSchema = z.object({
