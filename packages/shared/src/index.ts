@@ -15,3 +15,5 @@ export * from './constants';
 
 export * from './utils/format-rut';
 export * from './utils/currency';
+
+export * from './org-intelligence';
