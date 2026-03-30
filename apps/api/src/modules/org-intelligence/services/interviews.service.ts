@@ -174,15 +174,41 @@ export class InterviewsService {
         where: { interviewId: id },
       });
 
+      // For each speaker, try to match to an existing PersonProfile
+      const speakersData = await Promise.all(
+        dto.speakers.map(async (s) => {
+          let personEntityId: string | null = null;
+
+          if (s.name) {
+            try {
+              const person = await tx.personProfile.findFirst({
+                where: {
+                  tenantId,
+                  deletedAt: null,
+                  name: { contains: s.name, mode: 'insensitive' },
+                },
+                select: { id: true },
+              });
+              personEntityId = person?.id ?? null;
+            } catch {
+              // Ignore matching errors — speaker will be created without link
+            }
+          }
+
+          return {
+            interviewId: id,
+            speakerLabel: s.speakerLabel,
+            name: s.name,
+            role: s.role,
+            department: s.department,
+            isInterviewer: s.isInterviewer,
+            personEntityId,
+          };
+        }),
+      );
+
       await tx.interviewSpeaker.createMany({
-        data: dto.speakers.map((s) => ({
-          interviewId: id,
-          speakerLabel: s.speakerLabel,
-          name: s.name,
-          role: s.role,
-          department: s.department,
-          isInterviewer: s.isInterviewer,
-        })),
+        data: speakersData,
       });
 
       return tx.interview.findFirst({

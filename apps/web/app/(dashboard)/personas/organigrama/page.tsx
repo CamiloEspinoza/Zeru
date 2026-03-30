@@ -37,7 +37,7 @@ interface OrgChartPerson {
   name: string;
   role?: string;
   position?: string;
-  department?: string;
+  department?: { id: string; name: string; color: string | null } | null;
   avatarUrl?: string | null;
   status?: string;
   source?: string;
@@ -77,7 +77,7 @@ function treeToNodesAndEdges(
       data: {
         name: person.name,
         role: person.role || person.position,
-        department: person.department,
+        department: person.department?.name,
         avatarUrl: person.avatarUrl ?? null,
         directReportsCount: person.directReports?.length ?? person.directReportsCount ?? 0,
         status: person.status || "ACTIVE",
@@ -187,7 +187,7 @@ export default function OrganigramaPage() {
             data: {
               name: person.name,
               role: person.role || person.position,
-              department: person.department,
+              department: person.department?.name,
               avatarUrl: person.avatarUrl ?? null,
               directReportsCount: 0,
               status: person.status || "ACTIVE",

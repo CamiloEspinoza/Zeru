@@ -102,10 +102,21 @@ export class ExtractionPipelineService {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
+    // 2.5. Load known persons and departments for context injection
+    const knownContext = await this.buildKnownEntitiesContext(
+      tenantId,
+      client,
+    );
+
     // 3. Run 5 passes sequentially
     // Pass 1: Entities (roles, departments, systems)
     let pass1: ExtractionP1 | null = null;
     try {
+      // Augment Pass 1 system prompt with known persons/departments context
+      const systemP1WithContext = knownContext
+        ? `${SYSTEM_P1}\n\n${knownContext}`
+        : SYSTEM_P1;
+
       const p1 = await this.runPass(
         openai,
         transcription,
@@ -113,7 +124,7 @@ export class ExtractionPipelineService {
         ExtractionP1Schema,
         'extraction_p1',
         MODEL_MINI,
-        SYSTEM_P1,
+        systemP1WithContext,
       );
       pass1 = p1.result;
       totalInputTokens += p1.usage.inputTokens;
@@ -440,5 +451,74 @@ export class ExtractionPipelineService {
     }
 
     return parts.join('\n\n');
+  }
+
+  // -------------------------------------------------------------------------
+  // Known entities context — inject PersonProfile & Department info into prompts
+  // -------------------------------------------------------------------------
+
+  /**
+   * Build a context block with known persons and departments for the tenant.
+   * This context is injected into the extraction prompts so the LLM can
+   * match extracted roles/departments to existing records.
+   */
+  private async buildKnownEntitiesContext(
+    tenantId: string,
+    client: PrismaClient,
+  ): Promise<string> {
+    try {
+      const [knownPersons, knownDepartments] = await Promise.all([
+        client.personProfile.findMany({
+          where: { tenantId, deletedAt: null },
+          select: {
+            name: true,
+            role: true,
+            department: { select: { name: true } },
+          },
+          take: 100,
+          orderBy: { name: 'asc' },
+        }),
+        client.department.findMany({
+          where: { tenantId, deletedAt: null },
+          select: { name: true },
+          orderBy: { name: 'asc' },
+        }),
+      ]);
+
+      if (knownPersons.length === 0 && knownDepartments.length === 0) {
+        return '';
+      }
+
+      const lines: string[] = [];
+
+      if (knownPersons.length > 0) {
+        lines.push('Personas conocidas en la organización:');
+        for (const p of knownPersons) {
+          const role = p.role ?? 'sin cargo';
+          const dept = p.department?.name ?? 'sin departamento';
+          lines.push(`- ${p.name} — ${role} — ${dept}`);
+        }
+      }
+
+      if (knownDepartments.length > 0) {
+        lines.push('');
+        lines.push('Departamentos existentes:');
+        for (const d of knownDepartments) {
+          lines.push(`- ${d.name}`);
+        }
+      }
+
+      lines.push('');
+      lines.push(
+        'Cuando identifiques roles o personas, intenta vincularlos con las personas conocidas usando los mismos nombres. Cuando identifiques departamentos, usa los nombres exactos de los departamentos existentes si coinciden.',
+      );
+
+      return lines.join('\n');
+    } catch (err) {
+      this.logger.warn(
+        `Failed to build known entities context: ${(err as Error).message}`,
+      );
+      return '';
+    }
   }
 }

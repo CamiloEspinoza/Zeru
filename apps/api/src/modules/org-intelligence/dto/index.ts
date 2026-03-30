@@ -85,12 +85,32 @@ export const updateImprovementSchema = z.object({
   status: z.string().max(50).optional(),
 });
 
+// --- Department DTOs ---
+
+export const createDepartmentSchema = z.object({
+  name: z.string().min(1, 'El nombre es requerido').max(100),
+  description: z.string().max(500).optional(),
+  color: z.string().max(20).optional(),
+  parentId: z.string().uuid().nullable().optional(),
+});
+
+export const updateDepartmentSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).nullable().optional(),
+  color: z.string().max(20).nullable().optional(),
+  parentId: z.string().uuid().nullable().optional(),
+});
+
+export const listDepartmentsSchema = z.object({
+  search: z.string().optional(),
+});
+
 // --- PersonProfile DTOs ---
 
 export const createPersonProfileSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(200),
   role: z.string().max(200).optional(),
-  department: z.string().max(200).optional(),
+  departmentId: z.string().uuid().nullable().optional(),
   email: z.string().email('Email inválido').optional(),
   phone: z.string().max(50).optional(),
   notes: z.string().max(5000).optional(),
@@ -104,7 +124,7 @@ export const createPersonProfileSchema = z.object({
 export const updatePersonProfileSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   role: z.string().max(200).nullable().optional(),
-  department: z.string().max(200).nullable().optional(),
+  departmentId: z.string().uuid().nullable().optional(),
   email: z.string().email('Email inválido').nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
@@ -117,7 +137,7 @@ export const updatePersonProfileSchema = z.object({
 
 export const listPersonProfilesSchema = z.object({
   search: z.string().optional(),
-  department: z.string().optional(),
+  departmentId: z.string().uuid().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'VACANT']).optional(),
   reportsToId: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().default(1),
@@ -134,6 +154,9 @@ export const orgchartQuerySchema = z.object({
 });
 
 // --- Type inference ---
+export type CreateDepartmentDto = z.infer<typeof createDepartmentSchema>;
+export type UpdateDepartmentDto = z.infer<typeof updateDepartmentSchema>;
+export type ListDepartmentsDto = z.infer<typeof listDepartmentsSchema>;
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
 export type ListProjectsDto = z.infer<typeof listProjectsSchema>;

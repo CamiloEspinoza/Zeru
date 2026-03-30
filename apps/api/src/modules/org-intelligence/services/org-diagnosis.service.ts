@@ -7,6 +7,9 @@ interface SpofResult {
   name: string;
   description: string | null;
   process_count: bigint;
+  personProfileId?: string | null;
+  personName?: string | null;
+  isRealPerson?: boolean;
 }
 
 interface BottleneckResult {
@@ -41,7 +44,7 @@ export class OrgDiagnosisService {
    * A SPOF is a role that executes activities across multiple processes.
    */
   async detectSPOFs(tenantId: string, projectId: string): Promise<SpofResult[]> {
-    return this.prisma.$queryRawUnsafe<SpofResult[]>(
+    const rawSpofs = await this.prisma.$queryRawUnsafe<SpofResult[]>(
       `
       SELECT e.id, e.name, e.description,
         COUNT(DISTINCT r2."fromEntityId") as process_count
@@ -62,6 +65,43 @@ export class OrgDiagnosisService {
       tenantId,
       projectId,
     );
+
+    // Enrich SPOFs with PersonProfile data
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+    for (const spof of rawSpofs) {
+      try {
+        // Check if the SPOF role entity has a linked PersonProfile
+        const entity = await client.orgEntity.findFirst({
+          where: { id: spof.id, deletedAt: null },
+          select: { metadata: true },
+        });
+        const meta = entity?.metadata as Record<string, unknown> | null;
+
+        if (meta?.personProfileId) {
+          const person = await client.personProfile.findFirst({
+            where: {
+              id: meta.personProfileId as string,
+              deletedAt: null,
+            },
+            select: { id: true, name: true },
+          });
+          if (person) {
+            spof.personProfileId = person.id;
+            spof.personName = person.name;
+            spof.isRealPerson = true;
+          }
+        }
+      } catch {
+        // Ignore enrichment errors
+      }
+    }
+
+    // Sort: real persons first (higher risk), then by process_count
+    return rawSpofs.sort((a, b) => {
+      if (a.isRealPerson && !b.isRealPerson) return -1;
+      if (!a.isRealPerson && b.isRealPerson) return 1;
+      return Number(b.process_count) - Number(a.process_count);
+    });
   }
 
   /**

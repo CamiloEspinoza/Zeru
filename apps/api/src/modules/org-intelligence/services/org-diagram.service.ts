@@ -64,9 +64,31 @@ export class OrgDiagramService {
       include: { fromEntity: true },
     });
 
+    // 4b. Enrich executor names with PersonProfile real names
     const executorMap = new Map<string, string>();
     for (const rel of executesRelations) {
-      executorMap.set(rel.toEntityId, rel.fromEntity.name);
+      let displayName = rel.fromEntity.name;
+
+      // Check if the role OrgEntity has a linked PersonProfile
+      const roleMeta = rel.fromEntity.metadata as Record<string, unknown> | null;
+      if (roleMeta?.personProfileId) {
+        try {
+          const person = await client.personProfile.findFirst({
+            where: {
+              id: roleMeta.personProfileId as string,
+              deletedAt: null,
+            },
+            select: { name: true },
+          });
+          if (person) {
+            displayName = `${person.name} (${rel.fromEntity.name})`;
+          }
+        } catch {
+          // Ignore — use original entity name
+        }
+      }
+
+      executorMap.set(rel.toEntityId, displayName);
     }
 
     // 5. Build Mermaid flowchart
@@ -170,10 +192,35 @@ export class OrgDiagramService {
       lines.push(`  ${nodeId}["${this.escapeMermaid(dept.name)}"]`);
     });
 
+    // Enrich role names with linked PersonProfile names
+    const roleDisplayNames = new Map<string, string>();
+    for (const role of roles) {
+      let displayName = role.name;
+      const roleMeta = role.metadata as Record<string, unknown> | null;
+      if (roleMeta?.personProfileId) {
+        try {
+          const person = await client.personProfile.findFirst({
+            where: {
+              id: roleMeta.personProfileId as string,
+              deletedAt: null,
+            },
+            select: { name: true },
+          });
+          if (person) {
+            displayName = `${person.name}<br/>${role.name}`;
+          }
+        } catch {
+          // Ignore — use original entity name
+        }
+      }
+      roleDisplayNames.set(role.id, displayName);
+    }
+
     roles.forEach((role, idx) => {
       const nodeId = `R${idx}`;
       nodeIdMap.set(role.id, nodeId);
-      lines.push(`  ${nodeId}("${this.escapeMermaid(role.name)}")`);
+      const display = roleDisplayNames.get(role.id) ?? role.name;
+      lines.push(`  ${nodeId}("${this.escapeMermaid(display)}")`);
     });
 
     // Department hierarchy (child BELONGS_TO parent => parent --> child)

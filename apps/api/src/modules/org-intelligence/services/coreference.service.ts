@@ -1,5 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaClient, OrgEntityType, OrgRelationType, ProblemSeverity } from '@prisma/client';
+import {
+  PrismaClient,
+  OrgEntityType,
+  OrgRelationType,
+  ProblemSeverity,
+  OrgSuggestionType,
+} from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type {
   ExtractionResult,
@@ -122,8 +128,19 @@ export class CoreferenceService {
       }
     });
 
+    // 3. Post-transaction: link extraction results to PersonProfile & Department
+    await this.linkToPersonProfiles(client, extraction, tenantId, interviewId);
+    await this.linkToDepartments(client, extraction, tenantId);
+    await this.createReportsToSuggestions(
+      client,
+      extraction,
+      tenantId,
+      interviewId,
+    );
+    await this.linkSpeakersToPersonProfiles(client, tenantId, interviewId);
+
     this.logger.log(
-      `[${interviewId}] Coreference processing complete — entities created/mapped`,
+      `[${interviewId}] Coreference processing complete — entities created/mapped, PersonProfile/Department linked`,
     );
   }
 
@@ -581,5 +598,295 @@ export class CoreferenceService {
       COORDINATION: OrgRelationType.DEPENDS_ON,
     };
     return mapping[depType] ?? OrgRelationType.DEPENDS_ON;
+  }
+
+  // -------------------------------------------------------------------------
+  // PersonProfile & Department integration
+  // -------------------------------------------------------------------------
+
+  /**
+   * For each role extracted in Pass 1, try to find a matching PersonProfile.
+   * If found: link the OrgEntity to the PersonProfile via metadata.
+   * If not found: create an OrgSuggestion of type CREATE_PERSON.
+   */
+  private async linkToPersonProfiles(
+    client: PrismaClient,
+    extraction: ExtractionResult,
+    tenantId: string,
+    interviewId: string,
+  ): Promise<void> {
+    if (!extraction.pass1?.roles?.length) return;
+
+    for (const role of extraction.pass1.roles) {
+      try {
+        // Fuzzy match by name (case-insensitive, contains)
+        const existingPerson = await client.personProfile.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            name: { contains: role.canonicalName, mode: 'insensitive' },
+          },
+        });
+
+        // Find the OrgEntity we created for this role
+        const roleEntity = await client.orgEntity.findFirst({
+          where: {
+            tenantId,
+            sourceInterviewId: interviewId,
+            type: OrgEntityType.ROLE,
+            name: role.canonicalName,
+            deletedAt: null,
+          },
+        });
+
+        if (!roleEntity) continue;
+
+        if (existingPerson) {
+          // Link OrgEntity to PersonProfile via metadata
+          const currentMeta =
+            (roleEntity.metadata as Record<string, unknown>) ?? {};
+          await client.orgEntity.update({
+            where: { id: roleEntity.id },
+            data: {
+              metadata: {
+                ...currentMeta,
+                personProfileId: existingPerson.id,
+              },
+            },
+          });
+          this.logger.debug(
+            `[${interviewId}] Linked role "${role.canonicalName}" to PersonProfile ${existingPerson.id}`,
+          );
+        } else {
+          // Create suggestion to create a new person
+          await client.orgSuggestion.create({
+            data: {
+              type: OrgSuggestionType.CREATE_PERSON,
+              confidence: role.confidence,
+              data: {
+                name: role.canonicalName,
+                role: role.responsibilities?.[0] ?? null,
+                departmentName: role.department,
+              },
+              evidence: `Mencionado en entrevista como rol: ${role.canonicalName}`,
+              interviewId,
+              tenantId,
+            },
+          });
+          this.logger.debug(
+            `[${interviewId}] Created CREATE_PERSON suggestion for "${role.canonicalName}"`,
+          );
+        }
+      } catch (err) {
+        this.logger.warn(
+          `[${interviewId}] Failed to link role "${role.canonicalName}" to PersonProfile: ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * For each department extracted in Pass 1, find or create a real Department record.
+   * Then link the OrgEntity metadata to the Department id.
+   */
+  private async linkToDepartments(
+    client: PrismaClient,
+    extraction: ExtractionResult,
+    tenantId: string,
+  ): Promise<void> {
+    if (!extraction.pass1?.departments?.length) return;
+
+    for (const dept of extraction.pass1.departments) {
+      try {
+        // Try to find existing department (case-insensitive)
+        let department = await client.department.findFirst({
+          where: {
+            tenantId,
+            name: { equals: dept.name, mode: 'insensitive' },
+            deletedAt: null,
+          },
+        });
+
+        if (!department) {
+          // Find parent department if specified
+          let parentId: string | null = null;
+          if (dept.parentDepartment) {
+            const parent = await client.department.findFirst({
+              where: {
+                tenantId,
+                name: { equals: dept.parentDepartment, mode: 'insensitive' },
+                deletedAt: null,
+              },
+            });
+            parentId = parent?.id ?? null;
+          }
+
+          // Create the department
+          department = await client.department.create({
+            data: {
+              name: dept.name,
+              parentId,
+              tenantId,
+            },
+          });
+          this.logger.debug(
+            `Created Department "${dept.name}" from extraction`,
+          );
+        }
+
+        // Link OrgEntity metadata to the real Department id
+        const deptEntity = await client.orgEntity.findFirst({
+          where: {
+            tenantId,
+            type: OrgEntityType.DEPARTMENT,
+            name: dept.name,
+            deletedAt: null,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (deptEntity) {
+          const currentMeta =
+            (deptEntity.metadata as Record<string, unknown>) ?? {};
+          await client.orgEntity.update({
+            where: { id: deptEntity.id },
+            data: {
+              metadata: {
+                ...currentMeta,
+                departmentId: department.id,
+              },
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Failed to link/create Department "${dept.name}": ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * For dependencies that suggest reporting relationships (APPROVAL type or
+   * description containing "reporta"), create SET_REPORTS_TO suggestions
+   * if both parties are known PersonProfiles.
+   */
+  private async createReportsToSuggestions(
+    client: PrismaClient,
+    extraction: ExtractionResult,
+    tenantId: string,
+    interviewId: string,
+  ): Promise<void> {
+    if (!extraction.pass4?.dependencies?.length) return;
+
+    for (const dep of extraction.pass4.dependencies) {
+      const isReportRelation =
+        dep.type === 'APPROVAL' ||
+        (dep.description?.toLowerCase().includes('reporta') ?? false);
+
+      if (!isReportRelation) continue;
+
+      try {
+        const personA = await this.findPersonByName(client, tenantId, dep.from);
+        const personB = await this.findPersonByName(client, tenantId, dep.to);
+
+        if (personA && personB && !personA.reportsToId) {
+          // Check if a similar suggestion already exists
+          const existing = await client.orgSuggestion.findFirst({
+            where: {
+              tenantId,
+              type: OrgSuggestionType.SET_REPORTS_TO,
+              personId: personA.id,
+              status: 'PENDING',
+            },
+          });
+
+          if (!existing) {
+            await client.orgSuggestion.create({
+              data: {
+                type: OrgSuggestionType.SET_REPORTS_TO,
+                confidence: dep.confidence,
+                personId: personA.id,
+                data: {
+                  reportsToId: personB.id,
+                  reportsToName: personB.name,
+                  fromName: personA.name,
+                },
+                evidence: `Relación de dependencia tipo "${dep.type}" detectada en entrevista: ${dep.description ?? `${dep.from} → ${dep.to}`}`,
+                interviewId,
+                tenantId,
+              },
+            });
+            this.logger.debug(
+              `[${interviewId}] Created SET_REPORTS_TO suggestion: ${personA.name} → ${personB.name}`,
+            );
+          }
+        }
+      } catch (err) {
+        this.logger.warn(
+          `[${interviewId}] Failed to create reports-to suggestion for ${dep.from} → ${dep.to}: ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
+  /**
+   * After processing extraction, try to link InterviewSpeakers to PersonProfiles.
+   * Matches by name (case-insensitive, fuzzy).
+   */
+  private async linkSpeakersToPersonProfiles(
+    client: PrismaClient,
+    tenantId: string,
+    interviewId: string,
+  ): Promise<void> {
+    try {
+      const speakers = await client.interviewSpeaker.findMany({
+        where: { interviewId },
+      });
+
+      for (const speaker of speakers) {
+        if (!speaker.name || speaker.personEntityId) continue;
+
+        const person = await client.personProfile.findFirst({
+          where: {
+            tenantId,
+            deletedAt: null,
+            name: { contains: speaker.name, mode: 'insensitive' },
+          },
+        });
+
+        if (person) {
+          await client.interviewSpeaker.update({
+            where: { id: speaker.id },
+            data: { personEntityId: person.id },
+          });
+          this.logger.debug(
+            `[${interviewId}] Linked speaker "${speaker.name}" to PersonProfile ${person.id}`,
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `[${interviewId}] Failed to link speakers to PersonProfiles: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Fuzzy find a PersonProfile by name (case-insensitive contains).
+   */
+  private async findPersonByName(
+    client: PrismaClient,
+    tenantId: string,
+    name: string,
+  ): Promise<{ id: string; name: string; reportsToId: string | null } | null> {
+    return client.personProfile.findFirst({
+      where: {
+        tenantId,
+        deletedAt: null,
+        name: { contains: name, mode: 'insensitive' },
+      },
+      select: { id: true, name: true, reportsToId: true },
+    });
   }
 }

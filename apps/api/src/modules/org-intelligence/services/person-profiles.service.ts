@@ -34,7 +34,7 @@ export class PersonProfilesService {
       data: {
         name: dto.name,
         role: dto.role,
-        department: dto.department,
+        departmentId: dto.departmentId ?? undefined,
         email: dto.email,
         phone: dto.phone,
         notes: dto.notes,
@@ -43,6 +43,9 @@ export class PersonProfilesService {
         startDate: dto.startDate ? new Date(dto.startDate) : undefined,
         status: dto.status,
         source: dto.source,
+      },
+      include: {
+        department: { select: { id: true, name: true, color: true } },
       },
     });
   }
@@ -58,13 +61,13 @@ export class PersonProfilesService {
       where.OR = [
         { name: { contains: dto.search, mode: 'insensitive' } },
         { role: { contains: dto.search, mode: 'insensitive' } },
-        { department: { contains: dto.search, mode: 'insensitive' } },
+        { department: { name: { contains: dto.search, mode: 'insensitive' } } },
         { email: { contains: dto.search, mode: 'insensitive' } },
       ];
     }
 
-    if (dto.department) {
-      where.department = dto.department;
+    if (dto.departmentId) {
+      where.departmentId = dto.departmentId;
     }
 
     if (dto.status) {
@@ -80,6 +83,7 @@ export class PersonProfilesService {
         where,
         include: {
           reportsTo: { select: { id: true, name: true, role: true } },
+          department: { select: { id: true, name: true, color: true } },
         },
         orderBy: { name: 'asc' },
         skip: (dto.page - 1) * dto.perPage,
@@ -106,9 +110,16 @@ export class PersonProfilesService {
       where: { id, deletedAt: null },
       include: {
         reportsTo: { select: { id: true, name: true, role: true } },
+        department: { select: { id: true, name: true, color: true } },
         directReports: {
           where: { deletedAt: null },
-          select: { id: true, name: true, role: true, department: true, status: true },
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            department: { select: { id: true, name: true, color: true } },
+            status: true,
+          },
           orderBy: { name: 'asc' },
         },
       },
@@ -139,7 +150,7 @@ export class PersonProfilesService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.role !== undefined && { role: dto.role }),
-        ...(dto.department !== undefined && { department: dto.department }),
+        ...(dto.departmentId !== undefined && { departmentId: dto.departmentId }),
         ...(dto.email !== undefined && { email: dto.email }),
         ...(dto.phone !== undefined && { phone: dto.phone }),
         ...(dto.notes !== undefined && { notes: dto.notes }),
@@ -150,6 +161,9 @@ export class PersonProfilesService {
         }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.source !== undefined && { source: dto.source }),
+      },
+      include: {
+        department: { select: { id: true, name: true, color: true } },
       },
     });
   }
@@ -203,6 +217,9 @@ export class PersonProfilesService {
     // Load all non-deleted persons for this tenant
     const persons = await client.personProfile.findMany({
       where: { deletedAt: null },
+      include: {
+        department: { select: { id: true, name: true, color: true } },
+      },
       orderBy: { name: 'asc' },
     });
 
@@ -278,14 +295,14 @@ export class PersonProfilesService {
   }
 
   private buildOrgchartStats(
-    persons: { status: string; department: string | null; reportsToId: string | null }[],
+    persons: { status: string; department: { id: string; name: string; color: string | null } | null; reportsToId: string | null }[],
     personMap: Map<string, { directReports: unknown[] }>,
   ) {
     const departments = [
       ...new Set(
         persons
-          .map((p) => p.department)
-          .filter((d): d is string => d !== null && d !== ''),
+          .map((p) => p.department?.name)
+          .filter((d): d is string => d !== null && d !== undefined && d !== ''),
       ),
     ].sort();
 
@@ -391,15 +408,10 @@ export class PersonProfilesService {
   async getDepartments(tenantId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    const results = await client.personProfile.findMany({
-      where: { deletedAt: null, department: { not: null } },
-      select: { department: true },
-      distinct: ['department'],
-      orderBy: { department: 'asc' },
+    return client.department.findMany({
+      where: { tenantId, deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, color: true },
     });
-
-    return results
-      .map((r) => r.department)
-      .filter((d): d is string => d !== null && d !== '');
   }
 }

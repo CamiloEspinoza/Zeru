@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
+import { DepartmentSelector } from "@/components/org-intelligence/department-selector";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -41,11 +42,18 @@ import {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
+interface DepartmentRef {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 interface PersonProfile {
   id: string;
   name: string;
   role: string | null;
-  department: string | null;
+  departmentId: string | null;
+  department: DepartmentRef | null;
   email: string | null;
   phone: string | null;
   avatarS3Key: string | null;
@@ -61,7 +69,8 @@ interface PersonsResponse {
 interface PersonForm {
   name: string;
   role: string;
-  department: string;
+  departmentId: string | null;
+  departmentName: string;
   email: string;
   phone: string;
   notes: string;
@@ -70,7 +79,8 @@ interface PersonForm {
 const emptyForm: PersonForm = {
   name: "",
   role: "",
-  department: "",
+  departmentId: null,
+  departmentName: "",
   email: "",
   phone: "",
   notes: "",
@@ -157,7 +167,8 @@ export default function DirectorioPage() {
     setForm({
       name: person.name,
       role: person.role ?? "",
-      department: person.department ?? "",
+      departmentId: person.departmentId ?? null,
+      departmentName: person.department?.name ?? "",
       email: person.email ?? "",
       phone: person.phone ?? "",
       notes: person.notes ?? "",
@@ -172,7 +183,7 @@ export default function DirectorioPage() {
       const payload = {
         name: form.name,
         role: form.role || undefined,
-        department: form.department || undefined,
+        departmentId: form.departmentId || null,
         email: form.email || undefined,
         phone: form.phone || undefined,
         notes: form.notes || undefined,
@@ -368,9 +379,9 @@ export default function DirectorioPage() {
                           {person.role}
                         </p>
                       )}
-                      {person.department && (
+                      {person.department?.name && (
                         <p className="truncate text-xs text-muted-foreground">
-                          {person.department}
+                          {person.department.name}
                         </p>
                       )}
                       {person.email && (
@@ -477,12 +488,14 @@ export default function DirectorioPage() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="person-department">Departamento</Label>
-                <Input
-                  id="person-department"
-                  placeholder="Ej: Operaciones"
-                  value={form.department}
-                  onChange={(e) =>
-                    setForm({ ...form, department: e.target.value })
+                <DepartmentSelector
+                  value={form.departmentId}
+                  onChange={(id, name) =>
+                    setForm({
+                      ...form,
+                      departmentId: id,
+                      departmentName: name ?? "",
+                    })
                   }
                 />
               </div>
