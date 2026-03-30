@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../prisma/prisma.module';
+import { PrismaModule } from '../../prisma/prisma.module';
 import { AccountingModule } from '../accounting/accounting.module';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { V1AccountsController } from './v1-accounts.controller';

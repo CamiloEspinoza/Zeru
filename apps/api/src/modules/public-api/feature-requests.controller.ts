@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Req, HttpCode } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { Request } from 'express';
 
 @Controller('public/feature-requests')
