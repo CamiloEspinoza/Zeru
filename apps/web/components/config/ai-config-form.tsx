@@ -507,7 +507,6 @@ export function AiConfigForm({
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
                     className="text-xs text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
                   >
                     {showApiKey ? "Ocultar" : "Mostrar"}
                   </button>

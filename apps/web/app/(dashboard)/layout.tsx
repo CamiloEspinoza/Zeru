@@ -33,9 +33,9 @@ export default function DashboardLayout({
                   <Breadcrumbs />
                 </div>
               </header>
-              <div className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-y-auto">
+              <main className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-y-auto">
                 {children}
-              </div>
+              </main>
             </SidebarInset>
           </SidebarProvider>
           <Toaster />

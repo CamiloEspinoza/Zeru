@@ -202,6 +202,7 @@ export function PostPreviewCard({
                 onChange={(e) => setScheduleValue(e.target.value)}
                 className="flex-1 bg-transparent text-sm outline-none"
                 min={toLocalDatetimeValue()}
+                aria-label="Fecha y hora de publicación"
               />
               <button
                 onClick={handleScheduleConfirm}
@@ -220,6 +221,7 @@ export function PostPreviewCard({
               <button
                 onClick={() => setShowScheduler(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors text-base leading-none px-1"
+                aria-label="Cerrar"
               >
                 ×
               </button>

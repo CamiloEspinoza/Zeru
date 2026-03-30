@@ -112,7 +112,7 @@ export function MarketingNav() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-[#0a0a0a]/90 backdrop-blur-md border-b border-white/5"
+          ? "bg-neutral-950/90 backdrop-blur-md border-b border-white/5"
           : "bg-transparent"
       }`}
     >
@@ -131,7 +131,9 @@ export function MarketingNav() {
           <li className="relative group">
             <button
               type="button"
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-white/60 hover:text-white rounded-md hover:bg-white/5 transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-white/85 hover:text-white rounded-md hover:bg-white/5 transition-colors"
+              aria-haspopup="menu"
+              aria-expanded={productoOpen}
             >
               Producto
               <HugeiconsIcon
@@ -142,11 +144,11 @@ export function MarketingNav() {
 
             {/* Mega menu dropdown */}
             <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 absolute -left-64 top-full pt-3 transition-all duration-200 ease-out">
-              <div className="w-[700px] rounded-xl border border-white/10 bg-[#0f0f0f]/98 backdrop-blur-xl p-6 shadow-2xl shadow-black/40">
+              <div className="max-w-[min(100vw-2rem,700px)] rounded-xl border border-white/10 bg-[#0f0f0f]/98 backdrop-blur-xl p-6 shadow-2xl shadow-black/40">
                 <div className="grid grid-cols-2 gap-8">
                   {/* Columna Plataforma */}
                   <div>
-                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/90">
                       Plataforma
                     </p>
                     <div className="space-y-0.5">
@@ -163,7 +165,7 @@ export function MarketingNav() {
                             <p className="text-sm font-medium text-white/80 group-hover/item:text-white transition-colors">
                               {item.name}
                             </p>
-                            <p className="text-xs text-white/50 leading-relaxed">
+                            <p className="text-xs text-white/90 leading-relaxed">
                               {item.description}
                             </p>
                           </div>
@@ -174,7 +176,7 @@ export function MarketingNav() {
 
                   {/* Columna Próximamente */}
                   <div>
-                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/90">
                       Próximamente
                     </p>
                     <div className="space-y-0.5">
@@ -184,19 +186,19 @@ export function MarketingNav() {
                           href={item.href}
                           className="flex gap-3 rounded-lg p-2.5 hover:bg-white/5 transition-colors group/item opacity-60 hover:opacity-80"
                         >
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/50 group-hover/item:bg-white/8 transition-colors">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/90 group-hover/item:bg-white/8 transition-colors">
                             <HugeiconsIcon icon={item.icon} size={18} />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-white/60 group-hover/item:text-white/80 transition-colors">
+                              <p className="text-sm font-medium text-white/85 group-hover/item:text-white/80 transition-colors">
                                 {item.name}
                               </p>
-                              <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/5 border border-white/10 text-white/50">
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/5 border border-white/10 text-white/90">
                                 Pronto
                               </span>
                             </div>
-                            <p className="text-xs text-white/50 leading-relaxed">
+                            <p className="text-xs text-white/90 leading-relaxed">
                               {item.description}
                             </p>
                           </div>
@@ -212,7 +214,7 @@ export function MarketingNav() {
           <li>
             <Link
               href="/#pricing"
-              className="px-3 py-1.5 text-sm text-white/60 hover:text-white rounded-md hover:bg-white/5 transition-colors"
+              className="px-3 py-1.5 text-sm text-white/85 hover:text-white rounded-md hover:bg-white/5 transition-colors"
             >
               Precios
             </Link>
@@ -232,7 +234,7 @@ export function MarketingNav() {
             <>
               <Link
                 href="/login"
-                className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
+                className="px-4 py-1.5 text-sm text-white/85 hover:text-white transition-colors"
               >
                 Iniciar sesión
               </Link>
@@ -254,7 +256,8 @@ export function MarketingNav() {
             setMobileOpen((v) => !v);
             if (mobileOpen) setProductoOpen(false);
           }}
-          aria-label="Menu"
+          aria-label="Menú de navegación"
+          aria-expanded={mobileOpen}
         >
           <span
             className={`block h-0.5 w-5 bg-white/70 transition-all origin-center ${mobileOpen ? "rotate-45 translate-y-2" : ""}`}
@@ -274,7 +277,7 @@ export function MarketingNav() {
           {/* Producto accordion */}
           <button
             type="button"
-            className="flex items-center justify-between py-2.5 text-sm text-white/70 hover:text-white border-b border-white/5 transition-colors"
+            className="flex items-center justify-between py-2.5 text-sm text-white/85 hover:text-white border-b border-white/5 transition-colors"
             onClick={() => setProductoOpen((v) => !v)}
           >
             <span>Producto</span>
@@ -287,7 +290,7 @@ export function MarketingNav() {
           {productoOpen && (
             <div className="pl-2 pb-2 border-b border-white/5">
               {/* Plataforma */}
-              <p className="px-2 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              <p className="px-2 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/90">
                 Plataforma
               </p>
               {platformItems.map((item) => (
@@ -300,12 +303,12 @@ export function MarketingNav() {
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-400">
                     <HugeiconsIcon icon={item.icon} size={16} />
                   </div>
-                  <span className="text-sm text-white/60">{item.name}</span>
+                  <span className="text-sm text-white/85">{item.name}</span>
                 </Link>
               ))}
 
               {/* Próximamente */}
-              <p className="px-2 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              <p className="px-2 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/90">
                 Próximamente
               </p>
               {upcomingItems.map((item) => (
@@ -315,11 +318,11 @@ export function MarketingNav() {
                   className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors opacity-50"
                   onClick={() => setMobileOpen(false)}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/5 text-white/50">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/5 text-white/90">
                     <HugeiconsIcon icon={item.icon} size={16} />
                   </div>
-                  <span className="text-sm text-white/50">{item.name}</span>
-                  <span className="ml-auto text-[9px] font-medium text-white/50 bg-white/5 rounded px-1.5 py-0.5">
+                  <span className="text-sm text-white/90">{item.name}</span>
+                  <span className="ml-auto text-[9px] font-medium text-white/90 bg-white/5 rounded px-1.5 py-0.5">
                     Pronto
                   </span>
                 </Link>
@@ -329,7 +332,7 @@ export function MarketingNav() {
 
           <Link
             href="/#pricing"
-            className="py-2.5 text-sm text-white/70 hover:text-white border-b border-white/5"
+            className="py-2.5 text-sm text-white/85 hover:text-white border-b border-white/5"
             onClick={() => setMobileOpen(false)}
           >
             Precios
@@ -348,7 +351,7 @@ export function MarketingNav() {
               <>
                 <Link
                   href="/login"
-                  className="py-2.5 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
+                  className="py-2.5 text-sm text-center text-white/85 hover:text-white border border-white/10 rounded-lg"
                 >
                   Iniciar sesión
                 </Link>
