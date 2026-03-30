@@ -5,6 +5,7 @@ import { api } from "@/lib/api-client";
 import { useAudioSync } from "./use-audio-sync";
 import { PlayerControls } from "./player-controls";
 import { SyncedTranscription } from "./synced-transcription";
+import type { SegmentEntity } from "./use-segment-entities";
 
 interface Segment {
   speaker: string;
@@ -18,6 +19,7 @@ interface TranscriptionPlayerProps {
   segments: Segment[];
   speakerNameMap: Map<string, string>;
   durationMs: number;
+  segmentEntityMap?: Map<number, SegmentEntity[]>;
 }
 
 export function TranscriptionPlayer({
@@ -25,6 +27,7 @@ export function TranscriptionPlayer({
   segments,
   speakerNameMap,
   durationMs,
+  segmentEntityMap,
 }: TranscriptionPlayerProps) {
   const { audioRef, state, toggle, seekTo, setPlaybackRate, play } =
     useAudioSync();
@@ -104,6 +107,7 @@ export function TranscriptionPlayer({
         segments={segments}
         currentTimeMs={state.currentTimeMs}
         speakerNameMap={speakerNameMap}
+        segmentEntityMap={segmentEntityMap}
         onSeekTo={(ms) => {
           seekTo(ms);
           if (!audioUrlRef.current) {

@@ -143,6 +143,14 @@ export class InterviewsController {
     return { url };
   }
 
+  @Get(':id/segment-entities')
+  async getSegmentEntities(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.interviewsService.getSegmentEntities(tenantId, id);
+  }
+
   /**
    * SSE endpoint for real-time pipeline progress.
    * Uses @Res() to manage the HTTP response lifecycle manually so it

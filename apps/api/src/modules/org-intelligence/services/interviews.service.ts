@@ -313,4 +313,77 @@ export class InterviewsService {
       processingLog: interview.processingLog ?? [],
     };
   }
+
+  async getSegmentEntities(tenantId: string, interviewId: string) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const interview = await client.interview.findFirst({
+      where: { id: interviewId, deletedAt: null },
+      select: { transcriptionJson: true },
+    });
+
+    if (!interview) {
+      throw new NotFoundException(`Entrevista con id ${interviewId} no encontrada`);
+    }
+
+    const entities = await client.orgEntity.findMany({
+      where: { sourceInterviewId: interviewId, deletedAt: null },
+      select: { id: true, name: true, type: true, confidence: true, aliases: true },
+    });
+
+    const transcriptionJson = interview.transcriptionJson as Record<string, unknown> | null;
+    const segments: Array<{ text: string }> =
+      (transcriptionJson?.segments as Array<{ text: string }>) ?? [];
+
+    type EntityRow = { id: string; name: string; type: string; confidence: number; aliases: string[] };
+    type MappedEntity = { id: string; name: string; type: string; confidence: number; matchType: 'text_match' };
+
+    const mappings: Array<{ segmentIndex: number; entities: MappedEntity[] }> = [];
+    const linkedEntityIds = new Set<string>();
+
+    segments.forEach((seg, segmentIndex) => {
+      const lowerText = seg.text.toLowerCase();
+      const matched: MappedEntity[] = [];
+
+      for (const entity of entities as EntityRow[]) {
+        if (entity.name.length < 3) continue;
+        const terms = [entity.name, ...(entity.aliases ?? [])];
+        const hits = terms.some((t) => t.length >= 3 && lowerText.includes(t.toLowerCase()));
+        if (hits) {
+          matched.push({
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            confidence: entity.confidence,
+            matchType: 'text_match',
+          });
+          linkedEntityIds.add(entity.id);
+        }
+      }
+
+      if (matched.length > 0) {
+        mappings.push({ segmentIndex, entities: matched });
+      }
+    });
+
+    const unlinked = (entities as EntityRow[])
+      .filter((e) => !linkedEntityIds.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        confidence: e.confidence,
+        matchType: 'text_match' as const,
+      }));
+
+    return {
+      mappings,
+      unlinked,
+      meta: {
+        totalEntities: entities.length,
+        linkedEntities: linkedEntityIds.size,
+        matchStrategy: 'text_match',
+      },
+    };
+  }
 }

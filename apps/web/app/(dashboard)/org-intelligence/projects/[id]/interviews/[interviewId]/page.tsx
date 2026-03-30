@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import { TranscriptionPlayer } from "@/components/org-intelligence/transcription-player";
+import { useSegmentEntities } from "@/components/org-intelligence/use-segment-entities";
+import { SegmentEntityBadges } from "@/components/org-intelligence/segment-entity-badges";
 import {
   Dialog,
   DialogContent,
@@ -203,6 +205,10 @@ export default function InterviewDetailPage({
   const [selectedPerson, setSelectedPerson] = useState<DirectoryPerson | null>(null);
   const [personAvatarUrls, setPersonAvatarUrls] = useState<Record<string, string>>({});
   const [speakerAvatarUrls, setSpeakerAvatarUrls] = useState<Record<string, string>>({});
+
+  // Segment entities (only fetch when processing is complete)
+  const isCompleted = (currentProcessingStatus ?? interview?.processingStatus) === "COMPLETED";
+  const { segmentEntityMap } = useSegmentEntities(isCompleted ? interviewId : null);
 
   // Edit interview state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -783,11 +789,15 @@ export default function InterviewDetailPage({
 
   const hasSpeakers = interview.speakers.length > 0;
   const speakerMap = new Map<string, number>();
-  // Map Deepgram labels (Speaker_0) to real names for transcription display
+  // Map Deepgram labels (Speaker_0, Speaker_1) to real names for transcription display.
+  // Index by speakerLabel AND by positional Speaker_N (fallback when speakerLabel
+  // was updated to the real name and no longer matches the Deepgram label).
   const speakerNameMap = new Map<string, string>();
-  for (const s of interview.speakers) {
+  for (let idx = 0; idx < interview.speakers.length; idx++) {
+    const s = interview.speakers[idx];
     if (s.name) {
       speakerNameMap.set(s.speakerLabel, s.name);
+      speakerNameMap.set(`Speaker_${idx}`, s.name);
     }
   }
 
@@ -1198,6 +1208,7 @@ export default function InterviewDetailPage({
                   segments={segments}
                   speakerNameMap={speakerNameMap}
                   durationMs={interview.audioDurationMs ?? 0}
+                  segmentEntityMap={segmentEntityMap}
                 />
               ) : (
                 <div className="max-h-[600px] space-y-3 overflow-y-auto pr-2">
@@ -1218,6 +1229,11 @@ export default function InterviewDetailPage({
                             {formatTimestamp(segment.startMs / 1000)}
                             {segment.endMs != null && ` - ${formatTimestamp(segment.endMs / 1000)}`}
                           </span>
+                        )}
+                        {segmentEntityMap.get(i) && (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <SegmentEntityBadges entities={segmentEntityMap.get(i)!} />
+                          </div>
                         )}
                       </div>
                     </div>

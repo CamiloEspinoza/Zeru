@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import { SegmentEntityBadges } from "./segment-entity-badges";
+import type { SegmentEntity } from "./use-segment-entities";
 
 interface SyncedSegmentProps {
   speaker: string;
@@ -10,6 +12,7 @@ interface SyncedSegmentProps {
   endMs: number;
   isActive: boolean;
   onClick: () => void;
+  entities?: SegmentEntity[];
 }
 
 function formatMs(ms: number): string {
@@ -27,6 +30,7 @@ export const SyncedSegment = React.memo(function SyncedSegment({
   endMs,
   isActive,
   onClick,
+  entities,
 }: SyncedSegmentProps) {
   return (
     <button
@@ -50,6 +54,11 @@ export const SyncedSegment = React.memo(function SyncedSegment({
       <p className={`text-sm leading-relaxed ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
         {text}
       </p>
+      {entities && entities.length > 0 && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <SegmentEntityBadges entities={entities} />
+        </div>
+      )}
     </button>
   );
 });

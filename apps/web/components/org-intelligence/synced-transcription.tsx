@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useCallback, useMemo } from "react";
 import { SyncedSegment } from "./synced-segment";
+import type { SegmentEntity } from "./use-segment-entities";
 
 interface Segment {
   speaker: string;
@@ -15,6 +16,7 @@ interface SyncedTranscriptionProps {
   currentTimeMs: number;
   speakerNameMap: Map<string, string>;
   onSeekTo: (ms: number) => void;
+  segmentEntityMap?: Map<number, SegmentEntity[]>;
 }
 
 function findActiveIndex(segments: Segment[], currentTimeMs: number): number {
@@ -39,6 +41,7 @@ export function SyncedTranscription({
   currentTimeMs,
   speakerNameMap,
   onSeekTo,
+  segmentEntityMap,
 }: SyncedTranscriptionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const segmentRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -81,6 +84,7 @@ export function SyncedTranscription({
             endMs={seg.endMs}
             isActive={i === activeIndex}
             onClick={() => onSeekTo(seg.startMs)}
+            entities={segmentEntityMap?.get(i)}
           />
         </div>
       ))}
