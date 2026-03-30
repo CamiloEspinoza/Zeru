@@ -99,8 +99,9 @@ export class InterviewsController {
   async process(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
+    @Query('fromStep') fromStep?: string,
   ) {
-    return this.pipeline.launch(tenantId, id);
+    return this.pipeline.launch(tenantId, id, fromStep);
   }
 
   @Patch(':id/speakers')

@@ -39,9 +39,19 @@ export class InterviewPipelineOrchestrator {
    * Launch the full processing pipeline for an interview.
    * Runs asynchronously via BackgroundQueueService.
    */
+  /** Ordered pipeline steps — used to resolve fromStep parameter */
+  private static readonly PIPELINE_STEPS = [
+    'TRANSCRIBING',
+    'EXTRACTING',
+    'RESOLVING_COREFERENCES',
+    'CHUNKING',
+    'EMBEDDING',
+  ] as const;
+
   async launch(
     tenantId: string,
     interviewId: string,
+    fromStep?: string,
   ): Promise<{ message: string; interviewId: string }> {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
@@ -70,16 +80,35 @@ export class InterviewPipelineOrchestrator {
       );
     }
 
+    // Resolve starting step index
+    let startStep = 0;
+    if (fromStep) {
+      const upper = fromStep.toUpperCase();
+      const idx = InterviewPipelineOrchestrator.PIPELINE_STEPS.indexOf(
+        upper as (typeof InterviewPipelineOrchestrator.PIPELINE_STEPS)[number],
+      );
+      if (idx === -1) {
+        throw new BadRequestException(
+          `Paso inválido "${fromStep}". Pasos válidos: ${InterviewPipelineOrchestrator.PIPELINE_STEPS.join(', ')}`,
+        );
+      }
+      startStep = idx;
+    }
+
     // 2. Initialise the SSE subject so clients can connect immediately
     this.pipelineEvents.getOrCreate(interviewId);
 
-    // 3. Mark as processing and reset log
-    await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
+    // 3. Mark as processing
+    await this.updateStatus(
+      interviewId,
+      tenantId,
+      InterviewPipelineOrchestrator.PIPELINE_STEPS[startStep] as ProcessingStatus,
+    );
 
     // 4. Enqueue async pipeline
     this.backgroundQueue.enqueue({
       name: `interview-pipeline-${interviewId}`,
-      fn: () => this.runPipeline(tenantId, interviewId),
+      fn: () => this.runPipeline(tenantId, interviewId, startStep),
       maxRetries: 1,
     });
 
@@ -89,62 +118,82 @@ export class InterviewPipelineOrchestrator {
   private async runPipeline(
     tenantId: string,
     interviewId: string,
+    startStep = 0,
   ): Promise<void> {
     try {
-      // Step 1: Transcribe
-      this.logger.log(`[${interviewId}] Starting transcription...`);
-      await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
-      await this.transcription.transcribe(tenantId, interviewId);
-      this.logger.log(`[${interviewId}] Transcription complete`);
-
-      // Step 2: Extract entities (5 passes)
-      this.logger.log(`[${interviewId}] Starting extraction...`);
-      await this.updateStatus(interviewId, tenantId, 'EXTRACTING');
-      const extractionResult = await this.extraction.extract(
-        tenantId,
-        interviewId,
-      );
-      if (extractionResult.metadata.completedPasses.length === 0) {
-        throw new Error(
-          'La extracción de conocimiento falló en todas las pasadas. Verifica la configuración de OpenAI.',
+      const steps = InterviewPipelineOrchestrator.PIPELINE_STEPS;
+      if (startStep > 0) {
+        this.logger.log(
+          `[${interviewId}] Resuming pipeline from step ${steps[startStep]}`,
         );
       }
-      this.logger.log(
-        `[${interviewId}] Extraction complete (${extractionResult.metadata.completedPasses.length}/5 passes)`,
-      );
 
-      // Step 3: Process extraction into knowledge graph
-      this.logger.log(`[${interviewId}] Starting coreference resolution...`);
-      await this.updateStatus(interviewId, tenantId, 'RESOLVING_COREFERENCES');
+      // Step 0: Transcribe
+      if (startStep <= 0) {
+        this.logger.log(`[${interviewId}] Starting transcription...`);
+        await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
+        await this.transcription.transcribe(tenantId, interviewId);
+        this.logger.log(`[${interviewId}] Transcription complete`);
+      }
+
+      // Step 1: Extract entities (5 passes)
+      if (startStep <= 1) {
+        this.logger.log(`[${interviewId}] Starting extraction...`);
+        await this.updateStatus(interviewId, tenantId, 'EXTRACTING');
+        const extractionResult = await this.extraction.extract(
+          tenantId,
+          interviewId,
+        );
+        if (extractionResult.metadata.completedPasses.length === 0) {
+          throw new Error(
+            'La extracción de conocimiento falló en todas las pasadas. Verifica la configuración de OpenAI.',
+          );
+        }
+        this.logger.log(
+          `[${interviewId}] Extraction complete (${extractionResult.metadata.completedPasses.length}/5 passes)`,
+        );
+      }
+
+      // Fetch project for steps that need it
       const interview = await (
         this.prisma.forTenant(tenantId) as unknown as PrismaClient
       ).interview.findFirst({
         where: { id: interviewId, deletedAt: null },
         select: { projectId: true },
       });
-      if (interview) {
-        await this.coreference.processExtraction(
-          tenantId,
-          interviewId,
-          interview.projectId,
-        );
-      }
-      this.logger.log(`[${interviewId}] Coreference resolution complete`);
 
-      // Step 4: Chunk transcription for RAG
-      this.logger.log(`[${interviewId}] Starting chunking...`);
-      await this.updateStatus(interviewId, tenantId, 'CHUNKING');
-      await this.chunking.chunkInterview(tenantId, interviewId);
-      this.logger.log(`[${interviewId}] Chunking complete`);
-
-      // Step 5: Generate embeddings for chunks and entities
-      this.logger.log(`[${interviewId}] Starting embedding generation...`);
-      await this.updateStatus(interviewId, tenantId, 'EMBEDDING');
-      await this.embedding.embedInterviewChunks(tenantId, interviewId);
-      if (interview) {
-        await this.embedding.embedEntities(tenantId, interview.projectId);
+      // Step 2: Process extraction into knowledge graph
+      if (startStep <= 2) {
+        this.logger.log(`[${interviewId}] Starting coreference resolution...`);
+        await this.updateStatus(interviewId, tenantId, 'RESOLVING_COREFERENCES');
+        if (interview) {
+          await this.coreference.processExtraction(
+            tenantId,
+            interviewId,
+            interview.projectId,
+          );
+        }
+        this.logger.log(`[${interviewId}] Coreference resolution complete`);
       }
-      this.logger.log(`[${interviewId}] Embedding generation complete`);
+
+      // Step 3: Chunk transcription for RAG
+      if (startStep <= 3) {
+        this.logger.log(`[${interviewId}] Starting chunking...`);
+        await this.updateStatus(interviewId, tenantId, 'CHUNKING');
+        await this.chunking.chunkInterview(tenantId, interviewId);
+        this.logger.log(`[${interviewId}] Chunking complete`);
+      }
+
+      // Step 4: Generate embeddings for chunks and entities
+      if (startStep <= 4) {
+        this.logger.log(`[${interviewId}] Starting embedding generation...`);
+        await this.updateStatus(interviewId, tenantId, 'EMBEDDING');
+        await this.embedding.embedInterviewChunks(tenantId, interviewId);
+        if (interview) {
+          await this.embedding.embedEntities(tenantId, interview.projectId);
+        }
+        this.logger.log(`[${interviewId}] Embedding generation complete`);
+      }
 
       // Mark complete
       await this.updateStatus(interviewId, tenantId, 'COMPLETED');
