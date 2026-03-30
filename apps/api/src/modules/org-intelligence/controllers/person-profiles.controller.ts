@@ -22,9 +22,13 @@ import {
   createPersonProfileSchema,
   updatePersonProfileSchema,
   listPersonProfilesSchema,
+  updatePersonReportsToSchema,
+  orgchartQuerySchema,
   type CreatePersonProfileDto,
   type UpdatePersonProfileDto,
   type ListPersonProfilesDto,
+  type UpdatePersonReportsToDto,
+  type OrgchartQueryDto,
 } from '../dto';
 
 @Controller('org-intelligence/persons')
@@ -50,6 +54,19 @@ export class PersonProfilesController {
     return this.personProfilesService.findAll(tenantId, query);
   }
 
+  @Get('orgchart')
+  async getOrgchart(
+    @CurrentTenant() tenantId: string,
+    @Query(new ZodValidationPipe(orgchartQuerySchema)) query: OrgchartQueryDto,
+  ) {
+    return this.personProfilesService.getOrgchart(tenantId, query.rootId, query.depth);
+  }
+
+  @Get('departments')
+  async getDepartments(@CurrentTenant() tenantId: string) {
+    return this.personProfilesService.getDepartments(tenantId);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,
@@ -65,6 +82,20 @@ export class PersonProfilesController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.personProfilesService.update(tenantId, id, dto);
+  }
+
+  @Patch(':id/reports-to')
+  async updateReportsTo(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updatePersonReportsToSchema))
+    dto: UpdatePersonReportsToDto,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.personProfilesService.updateReportsTo(
+      tenantId,
+      id,
+      dto.reportsToId,
+    );
   }
 
   @Delete(':id')

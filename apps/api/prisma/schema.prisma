@@ -42,6 +42,7 @@ model Tenant {
   linkedInAgentConfig  LinkedInAgentConfig?
   orgProjects          OrgProject[]
   personProfiles       PersonProfile[]
+  orgSuggestions       OrgSuggestion[]
 
   @@map("tenants")
 }
@@ -778,6 +779,23 @@ model LinkedInAgentConfig {
 
 // ─── Person Profiles ─────────────────────────────────────
 
+enum PersonStatus {
+  ACTIVE
+  INACTIVE
+  VACANT
+
+  @@map("person_status")
+}
+
+enum PersonSource {
+  MANUAL
+  AI_INFERRED
+  AI_CONFIRMED
+  CSV_IMPORT
+
+  @@map("person_source")
+}
+
 /// Perfil de persona para inteligencia organizacional (participantes de entrevistas)
 model PersonProfile {
   id          String  @id @default(uuid())
@@ -789,6 +807,17 @@ model PersonProfile {
   avatarS3Key String?
   notes       String?
 
+  // ─── Jerarquia organizacional ───
+  reportsToId   String?
+  reportsTo     PersonProfile?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  directReports PersonProfile[] @relation("ReportsTo")
+
+  // ─── Metadata organizacional ───
+  employeeCode String?
+  startDate    DateTime?
+  status       PersonStatus @default(ACTIVE)
+  source       PersonSource @default(MANUAL)
+
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -796,9 +825,61 @@ model PersonProfile {
   tenantId  String
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  orgSuggestions OrgSuggestion[]
+
   @@index([tenantId])
   @@index([tenantId, name])
+  @@index([tenantId, reportsToId])
+  @@index([tenantId, department])
   @@map("person_profiles")
+}
+
+// ─── Org Suggestions ─────────────────────────────────────
+
+enum OrgSuggestionType {
+  CREATE_PERSON
+  UPDATE_PERSON
+  SET_REPORTS_TO
+  DELETE_PERSON
+
+  @@map("org_suggestion_type")
+}
+
+enum OrgSuggestionStatus {
+  PENDING
+  APPROVED
+  APPROVED_MODIFIED
+  REJECTED
+
+  @@map("org_suggestion_status")
+}
+
+model OrgSuggestion {
+  id              String              @id @default(uuid())
+  type            OrgSuggestionType
+  status          OrgSuggestionStatus @default(PENDING)
+  confidence      Float
+  data            Json
+  evidence        String?
+  evidenceTimeSec Int?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  rejectReason    String?
+
+  personId    String?
+  person      PersonProfile? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  interviewId String?
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, personId])
+  @@map("org_suggestions")
 }
 
 // ─── Org Intelligence ────────────────────────────────────

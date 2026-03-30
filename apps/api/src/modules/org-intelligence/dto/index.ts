@@ -94,6 +94,11 @@ export const createPersonProfileSchema = z.object({
   email: z.string().email('Email inválido').optional(),
   phone: z.string().max(50).optional(),
   notes: z.string().max(5000).optional(),
+  reportsToId: z.string().uuid().nullable().optional(),
+  employeeCode: z.string().max(100).optional(),
+  startDate: z.string().datetime().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'VACANT']).optional(),
+  source: z.enum(['MANUAL', 'AI_INFERRED', 'AI_CONFIRMED', 'CSV_IMPORT']).optional(),
 });
 
 export const updatePersonProfileSchema = z.object({
@@ -103,12 +108,29 @@ export const updatePersonProfileSchema = z.object({
   email: z.string().email('Email inválido').nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),
+  reportsToId: z.string().uuid().nullable().optional(),
+  employeeCode: z.string().max(100).nullable().optional(),
+  startDate: z.string().datetime().nullable().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'VACANT']).optional(),
+  source: z.enum(['MANUAL', 'AI_INFERRED', 'AI_CONFIRMED', 'CSV_IMPORT']).optional(),
 });
 
 export const listPersonProfilesSchema = z.object({
   search: z.string().optional(),
+  department: z.string().optional(),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'VACANT']).optional(),
+  reportsToId: z.string().uuid().optional(),
   page: z.coerce.number().int().positive().default(1),
   perPage: z.coerce.number().int().positive().max(100).default(50),
+});
+
+export const updatePersonReportsToSchema = z.object({
+  reportsToId: z.string().uuid().nullable(),
+});
+
+export const orgchartQuerySchema = z.object({
+  rootId: z.string().uuid().optional(),
+  depth: z.coerce.number().int().min(1).max(20).default(10),
 });
 
 // --- Type inference ---
@@ -124,3 +146,5 @@ export type UpdateImprovementDto = z.infer<typeof updateImprovementSchema>;
 export type CreatePersonProfileDto = z.infer<typeof createPersonProfileSchema>;
 export type UpdatePersonProfileDto = z.infer<typeof updatePersonProfileSchema>;
 export type ListPersonProfilesDto = z.infer<typeof listPersonProfilesSchema>;
+export type UpdatePersonReportsToDto = z.infer<typeof updatePersonReportsToSchema>;
+export type OrgchartQueryDto = z.infer<typeof orgchartQuerySchema>;

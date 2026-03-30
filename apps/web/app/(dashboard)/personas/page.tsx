@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function OldPersonsPage() {
+export default function PersonasPage() {
   redirect("/personas/directorio");
 }

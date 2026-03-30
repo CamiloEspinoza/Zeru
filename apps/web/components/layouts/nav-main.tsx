@@ -20,6 +20,7 @@ import {
   Megaphone01Icon,
   Calendar02Icon,
   AnalysisTextLinkIcon,
+  UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -74,12 +75,20 @@ const appNav: NavItem[] = [
   },
   { title: "Calendario", href: "/calendar", icon: Calendar02Icon },
   {
+    title: "Personas",
+    href: "/personas",
+    icon: UserGroupIcon,
+    items: [
+      { title: "Directorio", href: "/personas/directorio" },
+      { title: "Organigrama", href: "/personas/organigrama" },
+    ],
+  },
+  {
     title: "Inteligencia Org.",
     href: "/org-intelligence",
     icon: AnalysisTextLinkIcon,
     items: [
       { title: "Proyectos", href: "/org-intelligence/projects" },
-      { title: "Personas", href: "/org-intelligence/persons" },
       { title: "Knowledge Base", href: "/org-intelligence/knowledge-base" },
     ],
   },
