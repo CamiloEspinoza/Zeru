@@ -75,7 +75,7 @@ export function ProblemSection() {
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Las empresas toman decisiones críticas{" "}
-            <span className="text-white/40">
+            <span className="text-white/60">
               sin entender cómo funcionan por dentro
             </span>
           </h2>
@@ -103,7 +103,7 @@ export function ProblemSection() {
               <h3 className="font-semibold text-white text-lg mb-3">
                 {problem.title}
               </h3>
-              <p className="text-sm text-white/45 leading-relaxed">
+              <p className="text-sm text-white/60 leading-relaxed">
                 {problem.description}
               </p>
             </div>

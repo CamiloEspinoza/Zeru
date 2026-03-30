@@ -230,7 +230,7 @@ export function FeaturesSection() {
                   {/* Progress bar */}
                   <div className="pt-3">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] text-white/30">
+                      <span className="text-[10px] text-white/50">
                         Análisis completado
                       </span>
                       <span className="text-[10px] text-teal-400">100%</span>

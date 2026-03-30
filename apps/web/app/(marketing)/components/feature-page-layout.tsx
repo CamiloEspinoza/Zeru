@@ -123,7 +123,7 @@ export function FeaturePageLayout({
                       <h3 className="font-semibold text-white text-lg mb-2">
                         {step.title}
                       </h3>
-                      <p className="text-sm text-white/45 leading-relaxed">
+                      <p className="text-sm text-white/60 leading-relaxed">
                         {step.description}
                       </p>
                     </div>
@@ -157,7 +157,7 @@ export function FeaturePageLayout({
                 <input
                   type="email"
                   placeholder="tu@email.com"
-                  className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 text-sm focus:outline-none focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 transition-colors"
+                  className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/50 text-sm focus:outline-none focus:border-teal-500/40 focus:ring-1 focus:ring-teal-500/20 transition-colors"
                 />
                 <button
                   type="button"
@@ -166,7 +166,7 @@ export function FeaturePageLayout({
                   Avisame
                 </button>
               </div>
-              <p className="text-xs text-white/25 mt-4">
+              <p className="text-xs text-white/50 mt-4">
                 Sin spam. Solo un aviso cuando este listo.
               </p>
             </>
@@ -204,7 +204,7 @@ export function FeaturePageLayout({
                   </svg>
                 </Link>
               </div>
-              <p className="text-xs text-white/30 mt-6">
+              <p className="text-xs text-white/50 mt-6">
                 Sin tarjeta de credito. Configura en 5 minutos.
               </p>
             </>

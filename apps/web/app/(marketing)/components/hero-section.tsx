@@ -104,14 +104,13 @@ export function HeroSection() {
           {/* Social proof tags */}
           <div className="flex flex-wrap gap-x-5 gap-y-3 pt-2">
             {[
-              "~$0.65 USD por entrevista procesada",
-              "Diagn\u00f3stico autom\u00e1tico en minutos",
-              "5 an\u00e1lisis con GPT-5.4 por entrevista",
+              "Diagnóstico automático en minutos",
+              "5 análisis con GPT-5.4 por entrevista",
               "Knowledge Graph organizacional",
             ].map((tag) => (
               <span
                 key={tag}
-                className="flex items-center gap-1.5 text-xs text-white/40"
+                className="flex items-center gap-1.5 text-xs text-white/60"
               >
                 <svg
                   className="w-3.5 h-3.5 text-teal-500 shrink-0"
@@ -142,7 +141,7 @@ export function HeroSection() {
                   <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
                 </div>
                 <div className="flex-1 mx-8 h-5 rounded bg-white/5 flex items-center justify-center">
-                  <span className="text-[10px] text-white/20">
+                  <span className="text-[10px] text-white/40">
                     zeruapp.com/org-intelligence
                   </span>
                 </div>
@@ -219,24 +218,24 @@ export function HeroSection() {
                       strokeWidth="1"
                     />
                   </svg>
-                  <div className="absolute bottom-2 right-3 text-[9px] text-white/20">
+                  <div className="absolute bottom-2 right-3 text-[9px] text-white/40">
                     Knowledge Graph Organizacional
                   </div>
                 </div>
                 {/* Analysis results cards */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 space-y-1">
-                    <div className="text-[10px] text-white/30">
+                    <div className="text-[10px] text-white/50">
                       Cuellos de botella
                     </div>
                     <div className="text-sm font-semibold text-amber-400">3</div>
                   </div>
                   <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 space-y-1">
-                    <div className="text-[10px] text-white/30">SPOFs</div>
+                    <div className="text-[10px] text-white/50">SPOFs</div>
                     <div className="text-sm font-semibold text-red-400">2</div>
                   </div>
                   <div className="rounded-lg bg-white/[0.03] border border-white/5 p-3 space-y-1">
-                    <div className="text-[10px] text-white/30">Mejoras</div>
+                    <div className="text-[10px] text-white/50">Mejoras</div>
                     <div className="text-sm font-semibold text-teal-400">7</div>
                   </div>
                 </div>

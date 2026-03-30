@@ -110,7 +110,7 @@ export function DeveloperSection() {
                 <p className="text-sm text-teal-400 font-medium">
                   Gerente General @ Citolab · CEO @ Ulern · Cofounder @ Frest
                 </p>
-                <p className="text-xs text-white/40 mt-0.5">
+                <p className="text-xs text-white/55 mt-0.5">
                   Santiago, Chile · Padre desde 2011
                 </p>
               </div>
@@ -180,7 +180,7 @@ export function DeveloperSection() {
 
             {/* Timeline */}
             <div className="rounded-2xl border border-white/6 bg-white/[0.02] p-6 space-y-5 fade-in-up" style={{ animationDelay: "150ms" }}>
-              <h4 className="text-xs font-semibold text-white/30 uppercase tracking-widest">
+              <h4 className="text-xs font-semibold text-white/50 uppercase tracking-widest">
                 Trayectoria
               </h4>
               {timeline.map((t, i) => (
@@ -197,8 +197,8 @@ export function DeveloperSection() {
                         {t.role} @ {t.company}
                       </span>
                     </div>
-                    <p className="text-[10px] text-white/30 mb-1">{t.period}</p>
-                    <p className="text-xs text-white/40 leading-relaxed">
+                    <p className="text-[10px] text-white/50 mb-1">{t.period}</p>
+                    <p className="text-xs text-white/55 leading-relaxed">
                       {t.description}
                     </p>
                     {t.highlight && (
@@ -245,26 +245,26 @@ export function DeveloperSection() {
                   {p.name}
                 </h3>
                 {!p.isCurrentProject && (
-                  <svg className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-white/60 transition-colors mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 )}
               </div>
-              <p className="text-xs text-white/40 mb-2">{p.tagline}</p>
-              <p className="text-xs text-white/35 leading-relaxed mb-4">
+              <p className="text-xs text-white/55 mb-2">{p.tagline}</p>
+              <p className="text-xs text-white/50 leading-relaxed mb-4">
                 {p.description}
               </p>
               <div className="flex items-center justify-between">
                 <span className={`text-xs font-semibold ${p.isCurrentProject ? "text-teal-400" : "text-white/50"}`}>
                   {p.stat}
                 </span>
-                <span className="text-[10px] text-white/25">{p.years}</span>
+                <span className="text-[10px] text-white/50">{p.years}</span>
               </div>
               <div className="flex flex-wrap gap-1 mt-3">
                 {p.tags.map((t) => (
                   <span
                     key={t}
-                    className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/30 border border-white/6"
+                    className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 border border-white/6"
                   >
                     {t}
                   </span>

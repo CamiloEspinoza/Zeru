@@ -103,13 +103,26 @@ export function SolutionSection() {
               <h3 className="font-semibold text-white text-lg mb-3">
                 {pillar.title}
               </h3>
-              <p className="text-sm text-white/45 leading-relaxed">
+              <p className="text-sm text-white/60 leading-relaxed">
                 {pillar.description}
               </p>
               {/* Hover glow */}
               <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-teal-500/0 to-teal-500/0 group-hover:from-teal-500/5 group-hover:to-transparent transition-all duration-500 pointer-events-none" />
             </div>
           ))}
+        </div>
+
+        {/* Differentiator callout */}
+        <div className="mt-16 rounded-2xl border border-teal-500/15 bg-teal-500/[0.04] p-8 md:p-10 text-center fade-in-up">
+          <p className="text-teal-400 font-semibold text-lg md:text-xl leading-relaxed max-w-3xl mx-auto">
+            La única plataforma que construye inteligencia organizacional a
+            partir de entrevistas reales — no desde formularios ni encuestas.
+          </p>
+          <p className="text-white/60 text-sm mt-3 max-w-2xl mx-auto leading-relaxed">
+            Lo que un consultor tarda semanas en producir, Zeru lo genera
+            automáticamente: transcripción, análisis, diagnóstico y plan de
+            mejoras priorizado. Por una fracción del costo.
+          </p>
         </div>
       </div>
     </section>

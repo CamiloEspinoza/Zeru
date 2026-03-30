@@ -8,17 +8,17 @@ import {
 import { FeaturePageLayout } from "../../components/feature-page-layout";
 
 export const metadata: Metadata = {
-  title: "Gestion Documental — Zeru",
+  title: "Gestión Documental — Zeru",
   description:
-    "Flujos de aprobacion, firma electronica y versionado de documentos. Gestiona todo el ciclo de vida de tus documentos. Proximamente en Zeru.",
+    "Flujos de aprobación, firma electrónica y versionado de documentos. Gestiona todo el ciclo de vida de tus documentos. Próximamente en Zeru.",
 };
 
 const features = [
   {
     icon: <HugeiconsIcon icon={Flowchart01Icon} size={20} />,
-    title: "Flujos de aprobacion",
+    title: "Flujos de aprobación",
     description:
-      "Disena flujos de aprobacion personalizados con multiples niveles. Notificaciones automaticas y escalamiento cuando se vencen los plazos.",
+      "Diseña flujos de aprobación personalizados con múltiples niveles. Notificaciones automáticas y escalamiento cuando se vencen los plazos.",
   },
   {
     icon: (
@@ -26,31 +26,31 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
       </svg>
     ),
-    title: "Firma electronica",
+    title: "Firma electrónica",
     description:
-      "Firma documentos de forma electronica con validez legal. Multiples firmantes, orden de firma y certificados digitales.",
+      "Firma documentos de forma electrónica con validez legal. Múltiples firmantes, orden de firma y certificados digitales.",
   },
   {
     icon: <HugeiconsIcon icon={FileAttachmentIcon} size={20} />,
     title: "Versionado de documentos",
     description:
-      "Historial completo de versiones para cada documento. Compara versiones, restaura anteriores y mantiene un registro de auditoria.",
+      "Historial completo de versiones para cada documento. Compara versiones, restaura anteriores y mantiene un registro de auditoría.",
   },
   {
     icon: <HugeiconsIcon icon={DocumentValidationIcon} size={20} />,
     title: "Ciclo de vida completo",
     description:
-      "Desde la creacion hasta el archivado. Gestiona todo el ciclo de vida de tus documentos con politicas de retencion y clasificacion automatica.",
+      "Desde la creación hasta el archivado. Gestiona todo el ciclo de vida de tus documentos con políticas de retención y clasificación automática.",
   },
 ];
 
 export default function GestionDocumentalPage() {
   return (
     <FeaturePageLayout
-      badge="Proximamente"
+      badge="Próximamente"
       badgeColor="gray"
-      title="Gestion Documental"
-      subtitle="Flujos de aprobacion, firma electronica y versionado. Gestiona todo el ciclo de vida de tus documentos empresariales en un solo lugar."
+      title="Gestión Documental"
+      subtitle="Flujos de aprobación, firma electrónica y versionado. Gestiona todo el ciclo de vida de tus documentos empresariales en un solo lugar."
       features={features}
       isUpcoming
     />

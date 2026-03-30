@@ -8,9 +8,9 @@ import {
 import { FeaturePageLayout } from "../../components/feature-page-layout";
 
 export const metadata: Metadata = {
-  title: "API Publica — Zeru",
+  title: "API Pública — Zeru",
   description:
-    "Endpoints RESTful, webhooks y SDK para desarrolladores. Integra Zeru con tus sistemas existentes. Proximamente.",
+    "Endpoints RESTful, webhooks y SDK para desarrolladores. Integra Zeru con tus sistemas existentes. Próximamente.",
 };
 
 const features = [
@@ -18,7 +18,7 @@ const features = [
     icon: <HugeiconsIcon icon={ApiIcon} size={20} />,
     title: "Endpoints RESTful",
     description:
-      "API REST completa y bien documentada para acceder a todos los recursos de Zeru. Autenticacion via API keys y OAuth 2.0.",
+      "API REST completa y bien documentada para acceder a todos los recursos de Zeru. Autenticación vía API keys y OAuth 2.0.",
   },
   {
     icon: <HugeiconsIcon icon={ConnectIcon} size={20} />,
@@ -30,7 +30,7 @@ const features = [
     icon: <HugeiconsIcon icon={DocumentCodeIcon} size={20} />,
     title: "SDK para desarrolladores",
     description:
-      "SDKs oficiales en TypeScript, Python y mas. Documentacion interactiva, ejemplos de codigo y sandbox para pruebas.",
+      "SDKs oficiales en TypeScript, Python y más. Documentación interactiva, ejemplos de código y sandbox para pruebas.",
   },
   {
     icon: (
@@ -47,9 +47,9 @@ const features = [
 export default function ApiPublicaPage() {
   return (
     <FeaturePageLayout
-      badge="Proximamente"
+      badge="Próximamente"
       badgeColor="gray"
-      title="API Publica"
+      title="API Pública"
       subtitle="Endpoints RESTful, webhooks y SDKs para desarrolladores. Integra Zeru con tus sistemas existentes y construye soluciones personalizadas sobre la plataforma."
       features={features}
       isUpcoming

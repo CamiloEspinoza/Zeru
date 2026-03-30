@@ -53,20 +53,20 @@ const platformItems = [
 
 const upcomingItems = [
   {
-    name: "Gestion de RRHH",
+    name: "Gestión de RRHH",
     description: "Contratos, vacaciones, asistencia y evaluaciones",
     href: "/features/gestion-rrhh",
     icon: Calendar01Icon,
   },
   {
-    name: "Gestion Documental",
-    description: "Flujos de aprobacion, firma electronica y versionado",
+    name: "Gestión Documental",
+    description: "Flujos de aprobación, firma electrónica y versionado",
     href: "/features/gestion-documental",
     icon: DocumentValidationIcon,
   },
   {
     name: "Integraciones",
-    description: "SAP, Google Workspace, Microsoft 365 y mas",
+    description: "SAP, Google Workspace, Microsoft 365 y más",
     href: "/features/integraciones",
     icon: PuzzleIcon,
   },
@@ -77,7 +77,7 @@ const upcomingItems = [
     icon: DashboardBrowsingIcon,
   },
   {
-    name: "API Publica",
+    name: "API Pública",
     description: "Endpoints, webhooks y SDK para desarrolladores",
     href: "/features/api-publica",
     icon: ApiIcon,
@@ -146,7 +146,7 @@ export function MarketingNav() {
                 <div className="grid grid-cols-2 gap-8">
                   {/* Columna Plataforma */}
                   <div>
-                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/30">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/50">
                       Plataforma
                     </p>
                     <div className="space-y-0.5">
@@ -163,7 +163,7 @@ export function MarketingNav() {
                             <p className="text-sm font-medium text-white/80 group-hover/item:text-white transition-colors">
                               {item.name}
                             </p>
-                            <p className="text-xs text-white/35 leading-relaxed">
+                            <p className="text-xs text-white/50 leading-relaxed">
                               {item.description}
                             </p>
                           </div>
@@ -172,10 +172,10 @@ export function MarketingNav() {
                     </div>
                   </div>
 
-                  {/* Columna Proximamente */}
+                  {/* Columna Próximamente */}
                   <div>
-                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/30">
-                      Proximamente
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                      Próximamente
                     </p>
                     <div className="space-y-0.5">
                       {upcomingItems.map((item) => (
@@ -184,7 +184,7 @@ export function MarketingNav() {
                           href={item.href}
                           className="flex gap-3 rounded-lg p-2.5 hover:bg-white/5 transition-colors group/item opacity-60 hover:opacity-80"
                         >
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/40 group-hover/item:bg-white/8 transition-colors">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/10 text-white/50 group-hover/item:bg-white/8 transition-colors">
                             <HugeiconsIcon icon={item.icon} size={18} />
                           </div>
                           <div className="min-w-0">
@@ -192,11 +192,11 @@ export function MarketingNav() {
                               <p className="text-sm font-medium text-white/60 group-hover/item:text-white/80 transition-colors">
                                 {item.name}
                               </p>
-                              <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/5 border border-white/10 text-white/35">
+                              <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-medium bg-white/5 border border-white/10 text-white/50">
                                 Pronto
                               </span>
                             </div>
-                            <p className="text-xs text-white/25 leading-relaxed">
+                            <p className="text-xs text-white/50 leading-relaxed">
                               {item.description}
                             </p>
                           </div>
@@ -234,7 +234,7 @@ export function MarketingNav() {
                 href="/login"
                 className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
               >
-                Iniciar sesion
+                Iniciar sesión
               </Link>
               <Link
                 href="/register"
@@ -287,7 +287,7 @@ export function MarketingNav() {
           {productoOpen && (
             <div className="pl-2 pb-2 border-b border-white/5">
               {/* Plataforma */}
-              <p className="px-2 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/25">
+              <p className="px-2 pt-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
                 Plataforma
               </p>
               {platformItems.map((item) => (
@@ -304,9 +304,9 @@ export function MarketingNav() {
                 </Link>
               ))}
 
-              {/* Proximamente */}
-              <p className="px-2 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/25">
-                Proximamente
+              {/* Próximamente */}
+              <p className="px-2 pt-4 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                Próximamente
               </p>
               {upcomingItems.map((item) => (
                 <Link
@@ -315,11 +315,11 @@ export function MarketingNav() {
                   className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors opacity-50"
                   onClick={() => setMobileOpen(false)}
                 >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/5 text-white/40">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white/5 text-white/50">
                     <HugeiconsIcon icon={item.icon} size={16} />
                   </div>
                   <span className="text-sm text-white/50">{item.name}</span>
-                  <span className="ml-auto text-[9px] font-medium text-white/25 bg-white/5 rounded px-1.5 py-0.5">
+                  <span className="ml-auto text-[9px] font-medium text-white/50 bg-white/5 rounded px-1.5 py-0.5">
                     Pronto
                   </span>
                 </Link>
@@ -350,7 +350,7 @@ export function MarketingNav() {
                   href="/login"
                   className="py-2.5 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
                 >
-                  Iniciar sesion
+                  Iniciar sesión
                 </Link>
                 <Link
                   href="/register"

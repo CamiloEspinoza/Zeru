@@ -11,7 +11,7 @@ import { FeaturePageLayout } from "../../components/feature-page-layout";
 export const metadata: Metadata = {
   title: "Contabilidad Inteligente — Zeru",
   description:
-    "Plan de cuentas SII, libro diario, balance general, periodos fiscales y estructura contable lista para operar con normativa chilena.",
+    "Plan de cuentas SII, libro diario, balance general, períodos fiscales y estructura contable lista para operar con normativa chilena.",
 };
 
 const features = [
@@ -19,7 +19,7 @@ const features = [
     icon: <HugeiconsIcon icon={Calculator01Icon} size={20} />,
     title: "Plan de cuentas",
     description:
-      "Plan de cuentas preconfigurado segun normativa SII chilena. Personalizable para tu empresa con cuentas auxiliares y centros de costo.",
+      "Plan de cuentas preconfigurado según normativa SII chilena. Personalizable para tu empresa con cuentas auxiliares y centros de costo.",
   },
   {
     icon: (
@@ -29,19 +29,19 @@ const features = [
     ),
     title: "Libro diario",
     description:
-      "Registro de asientos contables con partida doble. Busqueda, filtros por fecha y cuenta, y validacion automatica de cuadraturas.",
+      "Registro de asientos contables con partida doble. Búsqueda, filtros por fecha y cuenta, y validación automática de cuadraturas.",
   },
   {
     icon: <HugeiconsIcon icon={Chart02Icon} size={20} />,
     title: "Balance general y libro mayor",
     description:
-      "Genera el balance general y libro mayor en tiempo real. Visualiza la situacion financiera de tu empresa en cualquier momento.",
+      "Genera el balance general y libro mayor en tiempo real. Visualiza la situación financiera de tu empresa en cualquier momento.",
   },
   {
     icon: <HugeiconsIcon icon={Calendar01Icon} size={20} />,
-    title: "Periodos fiscales",
+    title: "Períodos fiscales",
     description:
-      "Gestion de periodos fiscales con apertura y cierre controlado. Bloquea periodos cerrados para proteger la integridad de los datos.",
+      "Gestión de períodos fiscales con apertura y cierre controlado. Bloquea períodos cerrados para proteger la integridad de los datos.",
   },
   {
     icon: <HugeiconsIcon icon={AnalyticsUpIcon} size={20} />,
@@ -57,7 +57,7 @@ export default function ContabilidadPage() {
       badge="Activo"
       badgeColor="teal"
       title="Contabilidad Inteligente"
-      subtitle="Plan de cuentas SII, libro diario, balance general y periodos fiscales. Toda la contabilidad de tu empresa en un solo lugar, lista para operar desde el dia uno."
+      subtitle="Plan de cuentas SII, libro diario, balance general y períodos fiscales. Toda la contabilidad de tu empresa en un solo lugar, lista para operar desde el día uno."
       features={features}
     />
   );

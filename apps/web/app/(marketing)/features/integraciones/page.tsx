@@ -10,7 +10,7 @@ import { FeaturePageLayout } from "../../components/feature-page-layout";
 export const metadata: Metadata = {
   title: "Integraciones — Zeru",
   description:
-    "Conecta Zeru con SAP, Google Workspace, Microsoft 365 y mas. Integraciones nativas para centralizar la informacion de tu empresa.",
+    "Conecta Zeru con SAP, Google Workspace, Microsoft 365 y más. Integraciones nativas para centralizar la información de tu empresa.",
 };
 
 const features = [
@@ -18,13 +18,13 @@ const features = [
     icon: <HugeiconsIcon icon={PuzzleIcon} size={20} />,
     title: "SAP y ERPs",
     description:
-      "Conecta con SAP Business One, SAP S/4HANA y otros ERPs para sincronizar datos contables, inventario y ordenes de compra automaticamente.",
+      "Conecta con SAP Business One, SAP S/4HANA y otros ERPs para sincronizar datos contables, inventario y órdenes de compra automáticamente.",
   },
   {
     icon: <HugeiconsIcon icon={ConnectIcon} size={20} />,
     title: "Google Workspace",
     description:
-      "Integracion con Gmail, Google Drive, Calendar y Docs. Importa documentos, sincroniza calendarios y centraliza la comunicacion.",
+      "Integración con Gmail, Google Drive, Calendar y Docs. Importa documentos, sincroniza calendarios y centraliza la comunicación.",
   },
   {
     icon: <HugeiconsIcon icon={Share01Icon} size={20} />,
@@ -38,19 +38,19 @@ const features = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16m-7 6h7" />
       </svg>
     ),
-    title: "Y muchas mas",
+    title: "Y muchas más",
     description:
-      "Slack, Notion, Jira, HubSpot y mas. El ecosistema de integraciones crece constantemente para conectar todas tus herramientas favoritas.",
+      "Slack, Notion, Jira, HubSpot y más. El ecosistema de integraciones crece constantemente para conectar todas tus herramientas favoritas.",
   },
 ];
 
 export default function IntegracionesPage() {
   return (
     <FeaturePageLayout
-      badge="Proximamente"
+      badge="Próximamente"
       badgeColor="gray"
       title="Integraciones"
-      subtitle="Conecta Zeru con las herramientas que ya usas. SAP, Google Workspace, Microsoft 365 y mas. Centraliza la informacion de tu empresa sin cambiar tu flujo de trabajo."
+      subtitle="Conecta Zeru con las herramientas que ya usas. SAP, Google Workspace, Microsoft 365 y más. Centraliza la información de tu empresa sin cambiar tu flujo de trabajo."
       features={features}
       isUpcoming
     />

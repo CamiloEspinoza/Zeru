@@ -111,8 +111,8 @@ export function OpenSourceSection() {
                   key={p}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/6 bg-white/[0.02]"
                 >
-                  <span className="text-sm text-white/40">{p}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/25 font-medium">Próximo</span>
+                  <span className="text-sm text-white/60">{p}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-white/50 font-medium">Próximo</span>
                 </div>
               ))}
             </div>

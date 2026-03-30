@@ -95,7 +95,7 @@ export function DifferentiatorsSection() {
             </div>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-white leading-tight mb-10">
               Lo que ninguna otra plataforma{" "}
-              <span className="text-white/40">hace</span>
+              <span className="text-white/60">hace</span>
             </h2>
 
             <div className="space-y-8">
@@ -112,7 +112,7 @@ export function DifferentiatorsSection() {
                     <h3 className="font-semibold text-white mb-1.5">
                       {diff.title}
                     </h3>
-                    <p className="text-sm text-white/45 leading-relaxed">
+                    <p className="text-sm text-white/60 leading-relaxed">
                       {diff.description}
                     </p>
                   </div>
@@ -154,7 +154,7 @@ export function DifferentiatorsSection() {
                           d="M6 18L18 6M6 6l12 12"
                         />
                       </svg>
-                      <span className="text-sm text-white/40">{item}</span>
+                      <span className="text-sm text-white/60">{item}</span>
                     </div>
                   ))}
                 </div>

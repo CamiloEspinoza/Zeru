@@ -46,7 +46,7 @@ export function CtaSection() {
           </Link>
         </div>
 
-        <p className="text-xs text-white/30 mt-6">
+        <p className="text-xs text-white/50 mt-6">
           Sin tarjeta de crédito. Configura en 5 minutos. Primera entrevista
           procesada en menos de 3 minutos.
         </p>

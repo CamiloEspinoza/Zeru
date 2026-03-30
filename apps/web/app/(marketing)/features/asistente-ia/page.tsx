@@ -25,13 +25,13 @@ const features = [
     icon: <HugeiconsIcon icon={FileAttachmentIcon} size={20} />,
     title: "Soporte de archivos",
     description:
-      "Sube PDFs, imagenes, Excel y otros documentos. La IA los procesa y puede responder preguntas sobre su contenido o extraer informacion relevante.",
+      "Sube PDFs, imágenes, Excel y otros documentos. La IA los procesa y puede responder preguntas sobre su contenido o extraer información relevante.",
   },
   {
     icon: <HugeiconsIcon icon={AiBrain01Icon} size={20} />,
     title: "Memoria contextual",
     description:
-      "El asistente recuerda conversaciones anteriores y mantiene el contexto entre sesiones. Comprension de contexto automatica para optimizar costos.",
+      "El asistente recuerda conversaciones anteriores y mantiene el contexto entre sesiones. Compresión de contexto automática para optimizar costos.",
   },
   {
     icon: <HugeiconsIcon icon={PuzzleIcon} size={20} />,

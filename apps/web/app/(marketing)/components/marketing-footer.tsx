@@ -21,7 +21,7 @@ export function MarketingFooter() {
               Plataforma de inteligencia organizacional con IA. Diagnostica tu
               empresa a partir de entrevistas con tu equipo.
             </p>
-            <div className="flex items-center gap-1.5 text-xs text-white/25">
+            <div className="flex items-center gap-1.5 text-xs text-white/50">
               <span>Hecho con</span>
               <span className="text-red-400">♥</span>
               <span>en Chile por</span>
@@ -38,7 +38,7 @@ export function MarketingFooter() {
 
           {/* Product */}
           <div>
-            <h4 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-4">
+            <h4 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-4">
               Producto
             </h4>
             <ul className="space-y-2.5">
@@ -63,7 +63,7 @@ export function MarketingFooter() {
 
           {/* Resources */}
           <div>
-            <h4 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-4">
+            <h4 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-4">
               Recursos
             </h4>
             <ul className="space-y-2.5">
@@ -113,7 +113,7 @@ export function MarketingFooter() {
 
           {/* Acceso */}
           <div>
-            <h4 className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-4">
+            <h4 className="text-xs font-semibold text-white/50 uppercase tracking-widest mb-4">
               Acceso
             </h4>
             <ul className="space-y-2.5">
@@ -165,11 +165,11 @@ export function MarketingFooter() {
 
         {/* Bottom bar */}
         <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-white/20">
+          <p className="text-xs text-white/50">
             © {currentYear} Zeru. Software libre.
           </p>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-white/15">
+            <span className="text-xs text-white/40">
               NestJS | Next.js | OpenAI | Deepgram | Prisma
             </span>
           </div>

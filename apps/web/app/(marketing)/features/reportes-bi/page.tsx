@@ -11,7 +11,7 @@ import { FeaturePageLayout } from "../../components/feature-page-layout";
 export const metadata: Metadata = {
   title: "Reportes y Business Intelligence — Zeru",
   description:
-    "Dashboards customizables, KPIs en tiempo real y analisis de datos para tomar mejores decisiones. Proximamente en Zeru.",
+    "Dashboards customizables, KPIs en tiempo real y análisis de datos para tomar mejores decisiones. Próximamente en Zeru.",
 };
 
 const features = [
@@ -25,29 +25,29 @@ const features = [
     icon: <HugeiconsIcon icon={AnalyticsUpIcon} size={20} />,
     title: "KPIs en tiempo real",
     description:
-      "Define y monitorea indicadores clave de rendimiento en tiempo real. Alertas automaticas cuando un KPI se desvie de su meta.",
+      "Define y monitorea indicadores clave de rendimiento en tiempo real. Alertas automáticas cuando un KPI se desvíe de su meta.",
   },
   {
     icon: <HugeiconsIcon icon={Chart01Icon} size={20} />,
-    title: "Analisis de tendencias",
+    title: "Análisis de tendencias",
     description:
-      "Visualiza tendencias historicas, comparativas entre periodos y proyecciones. La IA detecta patrones y anomalias automaticamente.",
+      "Visualiza tendencias históricas, comparativas entre períodos y proyecciones. La IA detecta patrones y anomalías automáticamente.",
   },
   {
     icon: <HugeiconsIcon icon={BarChartIcon} size={20} />,
     title: "Reportes exportables",
     description:
-      "Exporta reportes en PDF, Excel y otros formatos. Programa envios automaticos por email a stakeholders clave.",
+      "Exporta reportes en PDF, Excel y otros formatos. Programa envíos automáticos por email a stakeholders clave.",
   },
 ];
 
 export default function ReportesBiPage() {
   return (
     <FeaturePageLayout
-      badge="Proximamente"
+      badge="Próximamente"
       badgeColor="gray"
       title="Reportes y Business Intelligence"
-      subtitle="Dashboards customizables, KPIs en tiempo real y analisis de datos avanzado. Toma mejores decisiones con la informacion de toda tu organizacion en un solo lugar."
+      subtitle="Dashboards customizables, KPIs en tiempo real y análisis de datos avanzado. Toma mejores decisiones con la información de toda tu organización en un solo lugar."
       features={features}
       isUpcoming
     />

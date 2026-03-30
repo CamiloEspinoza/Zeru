@@ -456,23 +456,33 @@ export default function ProjectDetailPage({
 
       {/* Tabs */}
       <Tabs defaultValue={initialTab}>
+        <div className="flex items-center gap-2">
         <TabsList>
           <TabsTrigger value="interviews">
             Entrevistas{interviews.length > 0 ? ` (${interviews.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="analysis">
-            Análisis{(project._count?.entities ?? 0) > 0 ? ` (${project._count?.entities ?? 0})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
+            Análisis{(project._count?.entities ?? 0) > 0 ? ` (${project._count?.entities ?? 0})` : <span className="ml-1 opacity-60">(pendiente)</span>}
           </TabsTrigger>
           <TabsTrigger value="diagnosis">
-            Diagnóstico{(project._count?.problems ?? 0) > 0 ? ` (${project._count?.problems ?? 0})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
+            Diagnóstico{(project._count?.problems ?? 0) > 0 ? ` (${project._count?.problems ?? 0})` : <span className="ml-1 opacity-60">(pendiente)</span>}
           </TabsTrigger>
           <TabsTrigger value="action-plan">Plan de Acción</TabsTrigger>
           <TabsTrigger value="settings">Configuración</TabsTrigger>
-          <HelpTooltip
-            iconSize="md"
-            text="Entrevistas: gestiona entrevistas, sube audio y lanza el procesamiento con IA. Análisis: análisis cruzado con entidades extraídas, problemas y estadísticas. Diagnóstico: detecta cuellos de botella, puntos únicos de fallo (SPOF) y contradicciones. Plan de Acción: mejoras priorizadas con framework RICE y matriz esfuerzo-impacto. Configuración: edita nombre, descripción y fechas del proyecto."
-          />
         </TabsList>
+        <HelpTooltip
+          iconSize="md"
+          text={
+            <div className="space-y-2 py-1">
+              <p><strong>Entrevistas:</strong> Gestiona entrevistas, sube audio y lanza el procesamiento con IA.</p>
+              <p><strong>Análisis:</strong> Análisis cruzado con entidades extraídas, problemas detectados y estadísticas generales.</p>
+              <p><strong>Diagnóstico:</strong> Detecta cuellos de botella, puntos únicos de fallo y contradicciones entre entrevistados.</p>
+              <p><strong>Plan de Acción:</strong> Mejoras priorizadas con framework RICE y matriz esfuerzo-impacto.</p>
+              <p><strong>Configuración:</strong> Edita nombre, descripción y fechas del proyecto.</p>
+            </div>
+          }
+        />
+        </div>
 
         {/* Entrevistas Tab */}
         <TabsContent value="interviews" className="space-y-4 pt-4">

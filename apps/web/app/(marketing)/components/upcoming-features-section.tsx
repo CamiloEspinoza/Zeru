@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -164,15 +164,10 @@ function getUserVotes(): string[] {
 }
 
 export function UpcomingFeaturesSection() {
-  const [votes, setVotes] = useState<Record<string, number>>({});
-  const [userVotes, setUserVotes] = useState<string[]>([]);
+  const [votes, setVotes] = useState<Record<string, number>>(getVotes);
+  const [userVotes, setUserVotes] = useState<string[]>(getUserVotes);
   const [suggestion, setSuggestion] = useState("");
   const [suggestionSent, setSuggestionSent] = useState(false);
-
-  useEffect(() => {
-    setVotes(getVotes());
-    setUserVotes(getUserVotes());
-  }, []);
 
   const handleVote = useCallback(
     (featureId: string) => {
@@ -238,7 +233,7 @@ export function UpcomingFeaturesSection() {
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Tú decides{" "}
-            <span className="text-white/40">qué construimos primero</span>
+            <span className="text-white/60">qué construimos primero</span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
             Vota por las funcionalidades que más necesitas. Las más votadas
@@ -266,7 +261,7 @@ export function UpcomingFeaturesSection() {
                 )}
 
                 {/* Icon */}
-                <div className="mb-4 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 group-hover:text-white/60 group-hover:bg-white/8 transition-colors">
+                <div className="mb-4 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/50 group-hover:text-white/70 group-hover:bg-white/8 transition-colors">
                   <HugeiconsIcon icon={feature.icon} size={20} />
                 </div>
 
@@ -274,7 +269,7 @@ export function UpcomingFeaturesSection() {
                 <h3 className="font-semibold text-white/70 group-hover:text-white mb-2 transition-colors">
                   {feature.name}
                 </h3>
-                <p className="text-sm text-white/35 leading-relaxed mb-4 flex-1">
+                <p className="text-sm text-white/55 leading-relaxed mb-4 flex-1">
                   {feature.description}
                 </p>
 
@@ -285,7 +280,7 @@ export function UpcomingFeaturesSection() {
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                       hasVoted
                         ? "bg-teal-500/20 text-teal-400 border border-teal-500/30 hover:bg-teal-500/30"
-                        : "bg-white/5 text-white/40 border border-white/10 hover:bg-white/10 hover:text-white/70"
+                        : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/70"
                     }`}
                   >
                     <HugeiconsIcon icon={ThumbsUpIcon} size={14} />
@@ -295,7 +290,7 @@ export function UpcomingFeaturesSection() {
                   {feature.href !== "#" && (
                     <Link
                       href={feature.href}
-                      className="text-xs text-white/30 hover:text-teal-400 transition-colors inline-flex items-center gap-1"
+                      className="text-xs text-white/50 hover:text-teal-400 transition-colors inline-flex items-center gap-1"
                     >
                       Ver más
                       <svg
@@ -323,13 +318,13 @@ export function UpcomingFeaturesSection() {
 
           {/* Suggest feature card */}
           <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.01] p-6 flex flex-col items-center justify-center text-center fade-in-up">
-            <div className="mb-4 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/30">
+            <div className="mb-4 w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/50">
               <HugeiconsIcon icon={Idea01Icon} size={20} />
             </div>
             <h3 className="font-semibold text-white/50 mb-2">
               ¿Echas algo en falta?
             </h3>
-            <p className="text-xs text-white/30 mb-4 leading-relaxed">
+            <p className="text-xs text-white/50 mb-4 leading-relaxed">
               Propón una funcionalidad y la evaluaremos para el roadmap.
             </p>
             <form onSubmit={handleSuggestion} className="w-full space-y-2">

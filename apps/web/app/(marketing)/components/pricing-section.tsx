@@ -36,7 +36,7 @@ export function PricingSection() {
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Sabes exactamente cuánto pagas{" "}
-            <span className="text-white/40">antes de empezar</span>
+            <span className="text-white/60">antes de empezar</span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
             Zeru es gratuito. Solo pagas el costo real de la IA que usas,
@@ -49,10 +49,10 @@ export function PricingSection() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden fade-in-up">
           {/* Table header */}
           <div className="grid grid-cols-2 gap-4 px-6 py-4 border-b border-white/5 bg-white/[0.02]">
-            <span className="text-xs font-semibold text-white/30 uppercase tracking-widest">
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-widest">
               Concepto
             </span>
-            <span className="text-xs font-semibold text-white/30 uppercase tracking-widest text-right">
+            <span className="text-xs font-semibold text-white/50 uppercase tracking-widest text-right">
               Costo
             </span>
           </div>
@@ -77,7 +77,7 @@ export function PricingSection() {
         </div>
 
         {/* Footnote */}
-        <p className="text-xs text-white/30 mt-4 text-center leading-relaxed">
+        <p className="text-xs text-white/50 mt-4 text-center leading-relaxed">
           Los costos de IA dependen del proveedor (OpenAI) y varían según la
           longitud de las entrevistas y el uso del asistente. Usas tu propia API
           key — pagas directamente, sin intermediarios.
