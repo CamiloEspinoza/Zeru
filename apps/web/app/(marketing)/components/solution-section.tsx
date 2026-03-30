@@ -70,7 +70,7 @@ export function SolutionSection() {
         {/* Header */}
         <div className="max-w-3xl mx-auto text-center mb-16 fade-in-up">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-teal-500/20 bg-teal-500/8 text-teal-400 text-xs font-medium mb-6">
-            La soluci&oacute;n
+            La solución
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Zeru convierte entrevistas{" "}
@@ -79,10 +79,10 @@ export function SolutionSection() {
             </span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
-            Graba una conversaci&oacute;n con alguien de tu equipo. Zeru hace el
+            Graba una conversación con alguien de tu equipo. Zeru hace el
             resto: transcribe, identifica hablantes, extrae conocimiento, detecta
-            patrones y entrega un diagn&oacute;stico con plan de mejoras priorizado. Lo
-            que antes tomaba semanas de consultor&iacute;a, ahora toma minutos de
+            patrones y entrega un diagnóstico con plan de mejoras priorizado. Lo
+            que antes tomaba semanas de consultoría, ahora toma minutos de
             procesamiento.
           </p>
         </div>

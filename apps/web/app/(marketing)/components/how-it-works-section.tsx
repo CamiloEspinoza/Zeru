@@ -98,7 +98,7 @@ export function HowItWorksSection() {
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
             De una entrevista a un{" "}
-            <span className="text-white/40">diagn&oacute;stico completo</span>
+            <span className="text-white/40">diagnóstico completo</span>
           </h2>
         </div>
 
@@ -148,7 +148,7 @@ export function HowItWorksSection() {
               <span className="text-teal-400 font-semibold">
                 Costo promedio por entrevista procesada: ~$0.65 USD.
               </span>{" "}
-              Un diagn&oacute;stico completo de una empresa de 50 personas con 12
+              Un diagnóstico completo de una empresa de 50 personas con 12
               entrevistas cuesta menos de $8 USD en procesamiento IA.
             </p>
           </div>

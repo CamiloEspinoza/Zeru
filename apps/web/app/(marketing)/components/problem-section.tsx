@@ -74,16 +74,16 @@ export function ProblemSection() {
             El problema real
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
-            Las empresas toman decisiones cr&iacute;ticas{" "}
+            Las empresas toman decisiones críticas{" "}
             <span className="text-white/40">
-              sin entender c&oacute;mo funcionan por dentro
+              sin entender cómo funcionan por dentro
             </span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
-            Los consultores cobran miles de d&oacute;lares por un diagn&oacute;stico que toma
-            semanas. Las encuestas de clima miden percepci&oacute;n, no realidad
+            Los consultores cobran miles de dólares por un diagnóstico que toma
+            semanas. Las encuestas de clima miden percepción, no realidad
             operativa. Y los gerentes generales toman decisiones basadas en
-            intuici&oacute;n, no en datos.
+            intuición, no en datos.
           </p>
         </div>
 
@@ -113,9 +113,9 @@ export function ProblemSection() {
         {/* Closing question */}
         <div className="text-center fade-in-up">
           <p className="text-xl sm:text-2xl font-display font-semibold text-white/70 max-w-3xl mx-auto leading-relaxed">
-            &iquest;Y si pudieras convertir las conversaciones con tu equipo en un
-            diagn&oacute;stico completo, autom&aacute;tico,{" "}
-            <span className="text-teal-400">en d&iacute;as y no en meses?</span>
+            ¿Y si pudieras convertir las conversaciones con tu equipo en un
+            diagnóstico completo, automático,{" "}
+            <span className="text-teal-400">en días y no en meses?</span>
           </p>
         </div>
       </div>

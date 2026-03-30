@@ -141,12 +141,12 @@ export function FeaturesSection() {
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Una plataforma completa{" "}
             <span className="text-white/40">
-              para entender y gestionar tu organizaci&oacute;n
+              para entender y gestionar tu organización
             </span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
-            Zeru no es solo diagn&oacute;stico. Es una plataforma integral que conecta
-            la inteligencia organizacional con la gesti&oacute;n diaria de tu empresa.
+            Zeru no es solo diagnóstico. Es una plataforma integral que conecta
+            la inteligencia organizacional con la gestión diaria de tu empresa.
           </p>
         </div>
 
@@ -157,15 +157,15 @@ export function FeaturesSection() {
               <div>
                 <div className="inline-flex items-center gap-1.5 text-[10px] text-teal-400 font-semibold uppercase tracking-widest mb-4">
                   <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                  M&oacute;dulo principal
+                  Módulo principal
                 </div>
                 <h3 className="font-display text-2xl sm:text-3xl font-bold text-white mb-4">
                   Inteligencia Organizacional
                 </h3>
                 <p className="text-white/50 leading-relaxed mb-6">
                   Transforma entrevistas en conocimiento accionable.
-                  Transcripci&oacute;n autom&aacute;tica, extracci&oacute;n con IA, Knowledge Graph,
-                  diagn&oacute;stico de cuellos de botella y plan de mejoras priorizado.
+                  Transcripción automática, extracción con IA, Knowledge Graph,
+                  diagnóstico de cuellos de botella y plan de mejoras priorizado.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {[
@@ -231,7 +231,7 @@ export function FeaturesSection() {
                   <div className="pt-3">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[10px] text-white/30">
-                        An&aacute;lisis completado
+                        Análisis completado
                       </span>
                       <span className="text-[10px] text-teal-400">100%</span>
                     </div>

@@ -35,7 +35,7 @@ export function PricingSection() {
             Transparencia total
           </div>
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
-            Sabes exactamente cu&aacute;nto pagas{" "}
+            Sabes exactamente cuánto pagas{" "}
             <span className="text-white/40">antes de empezar</span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
@@ -78,9 +78,9 @@ export function PricingSection() {
 
         {/* Footnote */}
         <p className="text-xs text-white/30 mt-4 text-center leading-relaxed">
-          Los costos de IA dependen del proveedor (OpenAI) y var&iacute;an seg&uacute;n la
+          Los costos de IA dependen del proveedor (OpenAI) y varían según la
           longitud de las entrevistas y el uso del asistente. Usas tu propia API
-          key &mdash; pagas directamente, sin intermediarios.
+          key — pagas directamente, sin intermediarios.
         </p>
 
         {/* CTA */}
@@ -89,7 +89,7 @@ export function PricingSection() {
             href="/register"
             className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl font-semibold text-sm transition-all shadow-xl shadow-teal-500/20 hover:shadow-teal-500/30 hover:-translate-y-0.5"
           >
-            Comenzar gratis &mdash; sin tarjeta de cr&eacute;dito
+            Comenzar gratis — sin tarjeta de crédito
           </Link>
         </div>
       </div>

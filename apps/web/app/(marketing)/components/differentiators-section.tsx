@@ -91,7 +91,7 @@ export function DifferentiatorsSection() {
           {/* Left: text */}
           <div className="fade-in-up">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-teal-500/20 bg-teal-500/8 text-teal-400 text-xs font-medium mb-6">
-              Por qu&eacute; Zeru
+              Por qué Zeru
             </div>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-white leading-tight mb-10">
               Lo que ninguna otra plataforma{" "}

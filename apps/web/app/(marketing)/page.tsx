@@ -1,18 +1,24 @@
 import { HeroSection } from "./components/hero-section";
+import { ProblemSection } from "./components/problem-section";
+import { SolutionSection } from "./components/solution-section";
+import { HowItWorksSection } from "./components/how-it-works-section";
 import { FeaturesSection } from "./components/features-section";
-import { RoadmapSection } from "./components/roadmap-section";
-import { OpenSourceSection } from "./components/opensource-section";
-import { DeveloperSection } from "./components/developer-section";
+import { DifferentiatorsSection } from "./components/differentiators-section";
+import { PricingSection } from "./components/pricing-section";
+import { CtaSection } from "./components/cta-section";
 import { MarketingFooter } from "./components/marketing-footer";
 
 export default function LandingPage() {
   return (
     <>
       <HeroSection />
+      <ProblemSection />
+      <SolutionSection />
+      <HowItWorksSection />
       <FeaturesSection />
-      <RoadmapSection />
-      <OpenSourceSection />
-      <DeveloperSection />
+      <DifferentiatorsSection />
+      <PricingSection />
+      <CtaSection />
       <MarketingFooter />
     </>
   );

@@ -37,14 +37,14 @@ export function HeroSection() {
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.1] tracking-tight text-white">
               Entiende tu empresa{" "}
               <span className="bg-gradient-to-r from-teal-400 to-teal-300 bg-clip-text text-transparent">
-                en d&iacute;as,
+                en días,
               </span>{" "}
               no en meses
             </h1>
             <p className="text-lg text-white/50 font-normal leading-relaxed max-w-lg">
               Sube entrevistas con tu equipo y Zeru las transcribe, extrae el
               conocimiento clave y diagnostica cuellos de botella, dependencias
-              cr&iacute;ticas y oportunidades de mejora. Todo autom&aacute;tico, todo con IA.
+              críticas y oportunidades de mejora. Todo automático, todo con IA.
             </p>
           </div>
 
@@ -95,7 +95,7 @@ export function HeroSection() {
                   href="#como-funciona"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 border border-white/10 hover:border-white/20 text-white/70 hover:text-white rounded-xl font-medium text-sm transition-all hover:bg-white/5"
                 >
-                  Ver c&oacute;mo funciona
+                  Ver cómo funciona
                 </a>
               </>
             )}

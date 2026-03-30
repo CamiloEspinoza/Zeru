@@ -19,9 +19,9 @@ export function CtaSection() {
         </h2>
         <p className="text-white/50 text-lg leading-relaxed mb-10 max-w-2xl mx-auto">
           Cada persona en tu equipo tiene una pieza del rompecabezas. Zeru las
-          junta autom&aacute;ticamente y te muestra la imagen completa: d&oacute;nde est&aacute;n los
-          cuellos de botella, qui&eacute;n es irremplazable, qu&eacute; procesos se pueden
-          mejorar y por d&oacute;nde empezar.
+          junta automáticamente y te muestra la imagen completa: dónde están los
+          cuellos de botella, quién es irremplazable, qué procesos se pueden
+          mejorar y por dónde empezar.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -47,7 +47,7 @@ export function CtaSection() {
         </div>
 
         <p className="text-xs text-white/30 mt-6">
-          Sin tarjeta de cr&eacute;dito. Configura en 5 minutos. Primera entrevista
+          Sin tarjeta de crédito. Configura en 5 minutos. Primera entrevista
           procesada en menos de 3 minutos.
         </p>
       </div>

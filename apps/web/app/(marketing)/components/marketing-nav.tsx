@@ -64,7 +64,7 @@ export function MarketingNav() {
                 href="/login"
                 className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
               >
-                Iniciar sesi&oacute;n
+                Iniciar sesión
               </Link>
               <Link
                 href="/register"
@@ -122,7 +122,7 @@ export function MarketingNav() {
                   href="/login"
                   className="py-2 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
                 >
-                  Iniciar sesi&oacute;n
+                  Iniciar sesión
                 </Link>
                 <Link
                   href="/register"
