@@ -110,9 +110,41 @@ export class ProjectsService {
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.orgProject.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    await client.$transaction(async (tx) => {
+      // Get all interviews in this project
+      const interviews = await tx.interview.findMany({
+        where: { projectId: id },
+        select: { id: true },
+      });
+      const interviewIds = interviews.map((i) => i.id);
+
+      // Delete interview-specific data
+      if (interviewIds.length > 0) {
+        await tx.interviewChunk.deleteMany({
+          where: { interviewId: { in: interviewIds } },
+        });
+        await tx.interviewSpeaker.deleteMany({
+          where: { interviewId: { in: interviewIds } },
+        });
+        await tx.interview.deleteMany({ where: { projectId: id } });
+      }
+
+      // Delete knowledge graph data
+      await tx.factualClaim.deleteMany({ where: { projectId: id } });
+      await tx.problemLink.deleteMany({
+        where: { problem: { projectId: id } },
+      });
+      await tx.problem.deleteMany({ where: { projectId: id } });
+      await tx.orgRelation.deleteMany({ where: { projectId: id } });
+      await tx.orgEntity.deleteMany({ where: { projectId: id } });
+
+      // Soft-delete the project
+      await tx.orgProject.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
     });
+
+    return { message: 'Proyecto y todos sus datos eliminados' };
   }
 }
