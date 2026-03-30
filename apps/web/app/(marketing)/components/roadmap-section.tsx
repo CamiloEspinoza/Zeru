@@ -2,12 +2,12 @@ type Status = "proximas-semanas" | "proximo-mes" | "planificado";
 
 const statusConfig: Record<Status, { label: string; color: string; dot: string }> = {
   "proximas-semanas": {
-    label: "Próximas semanas",
+    label: "Proximas semanas",
     color: "bg-teal-500/15 text-teal-400 border-teal-500/25",
     dot: "bg-teal-400",
   },
   "proximo-mes": {
-    label: "Próximo mes",
+    label: "Proximo mes",
     color: "bg-blue-500/15 text-blue-400 border-blue-500/25",
     dot: "bg-blue-400",
   },
@@ -25,61 +25,61 @@ const roadmap: Array<{
   icon: string;
 }> = [
   {
-    title: "Inventario",
-    description: "Control de stock, productos, movimientos y valorización en tiempo real.",
+    title: "Gestion de RRHH",
+    description: "Contratos, vacaciones, asistencia y evaluaciones de desempeno.",
     status: "proximas-semanas",
-    icon: "📦",
+    icon: "📋",
   },
   {
-    title: "Órdenes de compra",
-    description: "Flujo completo de compras: cotización, OC, recepción y contabilización automática.",
+    title: "Gestion Documental",
+    description: "Flujos de aprobacion, firma electronica y versionado de documentos.",
     status: "proximas-semanas",
-    icon: "🛒",
+    icon: "📄",
   },
   {
-    title: "Documentos electrónicos (DTE)",
-    description: "Emisión y recepción de facturas, boletas y notas de crédito via SII.",
+    title: "Reportes y BI",
+    description: "Dashboards customizables y KPIs en tiempo real.",
     status: "proximas-semanas",
-    icon: "🧾",
-  },
-  {
-    title: "Conciliación bancaria automática",
-    description: "Importa cartolas y la IA concilia movimientos contra asientos contables.",
-    status: "proximo-mes",
-    icon: "🏦",
-  },
-  {
-    title: "Medios de pago",
-    description: "Recibe pagos online con Khipu, Transbank y otros. Conciliación automática.",
-    status: "proximo-mes",
-    icon: "💳",
-  },
-  {
-    title: "Automatización de cobranza",
-    description: "Emails, WhatsApp y llamadas automáticas para recordar deudas pendientes.",
-    status: "proximo-mes",
-    icon: "📞",
-  },
-  {
-    title: "Presupuestos y proyecciones",
-    description: "Crea presupuestos anuales, compara con la ejecución real y proyecta flujos.",
-    status: "planificado",
     icon: "📊",
   },
   {
-    title: "Alertas de presupuesto",
-    description: "Notificaciones cuando un centro de costo supera un % del presupuesto.",
-    status: "planificado",
-    icon: "🔔",
+    title: "Integraciones",
+    description: "Conexion con SAP, Google Workspace, Microsoft 365 y mas.",
+    status: "proximo-mes",
+    icon: "🔗",
   },
   {
-    title: "Productos y catálogo",
-    description: "Ficha de producto con precios, costos, impuestos y variantes.",
-    status: "planificado",
-    icon: "🏷️",
+    title: "API Publica",
+    description: "Endpoints, webhooks y SDK para desarrolladores.",
+    status: "proximo-mes",
+    icon: "🔌",
   },
   {
-    title: "CRM básico",
+    title: "Inventario",
+    description: "Control de stock, productos, movimientos y valorizacion en tiempo real.",
+    status: "proximo-mes",
+    icon: "📦",
+  },
+  {
+    title: "Ordenes de compra",
+    description: "Cotizacion, OC, recepcion y contabilizacion automatica.",
+    status: "planificado",
+    icon: "🛒",
+  },
+  {
+    title: "Documentos electronicos (DTE)",
+    description: "Emision y recepcion de facturas, boletas y notas de credito via SII.",
+    status: "planificado",
+    icon: "🧾",
+  },
+  {
+    title: "Conciliacion bancaria",
+    description: "Importa cartolas y la IA concilia movimientos contra asientos contables.",
+    status: "planificado",
+    icon: "🏦",
+  },
+  {
+    title: "CRM",
     description: "Auxiliar de clientes y proveedores con historial de operaciones.",
     status: "planificado",
     icon: "👥",
@@ -91,28 +91,10 @@ const roadmap: Array<{
     icon: "🛍️",
   },
   {
-    title: "Atención al cliente",
-    description: "Bandeja unificada: WhatsApp, email e IA para respuestas automáticas.",
-    status: "planificado",
-    icon: "💬",
-  },
-  {
-    title: "Marketing outbound",
-    description: "Campañas de email y WhatsApp segmentadas desde los datos de tu CRM.",
-    status: "planificado",
-    icon: "📣",
-  },
-  {
-    title: "Control de gestión",
-    description: "Dashboard de KPIs, márgenes por línea de negocio y análisis de rentabilidad.",
+    title: "Control de gestion",
+    description: "Dashboard de KPIs, margenes por linea de negocio y analisis de rentabilidad.",
     status: "planificado",
     icon: "🎯",
-  },
-  {
-    title: "Nuevos modelos de IA",
-    description: "Soporte para Claude, Gemini, Llama y más proveedores según el usuario elija.",
-    status: "planificado",
-    icon: "🤖",
   },
 ];
 
@@ -134,14 +116,14 @@ export function RoadmapSection() {
         {/* Header */}
         <div className="max-w-2xl mb-16 fade-in-up">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-white/50 text-xs font-medium mb-4">
-            Roadmap público
+            Roadmap publico
           </div>
           <h2 className="font-display text-4xl lg:text-5xl font-bold text-white leading-tight mb-4">
             Lo que viene
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
-            Zeru está creciendo rápido. Aquí puedes ver qué se viene y cuándo.
-            El roadmap es público y evoluciona con el feedback de los usuarios.
+            Zeru esta creciendo rapido. Aqui puedes ver que se viene y cuando.
+            El roadmap es publico y evoluciona con el feedback de los usuarios.
           </p>
         </div>
 

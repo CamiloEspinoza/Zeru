@@ -37,9 +37,9 @@ const projects = [
     name: "Zeru",
     url: "#",
     logo: null,
-    tagline: "Gestión empresarial con agentes de IA",
+    tagline: "Inteligencia organizacional con IA",
     description:
-      "Plataforma de gestión open source construida sobre agentes de IA desde el día uno. Nace de 9 años operando contabilidad real en Frest.",
+      "Plataforma de inteligencia organizacional con IA. Transcribe entrevistas, extrae conocimiento, genera organigramas y diagnostica empresas automáticamente.",
     stat: "Open source",
     years: "2025 – hoy",
     tags: ["Agentes IA", "Open Source", "SaaS"],
@@ -108,7 +108,7 @@ export function DeveloperSection() {
                   Camilo Espinoza
                 </h3>
                 <p className="text-sm text-teal-400 font-medium">
-                  Technical Founder · CEO @ Ulern
+                  Gerente General @ Citolab · CEO @ Ulern · Cofounder @ Frest
                 </p>
                 <p className="text-xs text-white/40 mt-0.5">
                   Santiago, Chile · Padre desde 2011

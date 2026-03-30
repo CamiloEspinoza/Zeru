@@ -43,11 +43,11 @@ export function MarketingFooter() {
             </h4>
             <ul className="space-y-2.5">
               {[
-                { label: "Inteligencia Organizacional", href: "#que-hace" },
-                { label: "Gesti\u00f3n de Personas", href: "#que-hace" },
-                { label: "Asistente IA", href: "#que-hace" },
-                { label: "Contabilidad", href: "#que-hace" },
-                { label: "Marketing LinkedIn", href: "#que-hace" },
+                { label: "Inteligencia Organizacional", href: "/features/inteligencia-organizacional" },
+                { label: "Gesti\u00f3n de Personas", href: "/features/personas-organigrama" },
+                { label: "Asistente IA", href: "/features/asistente-ia" },
+                { label: "Contabilidad", href: "/features/contabilidad" },
+                { label: "Marketing LinkedIn", href: "/features/marketing" },
               ].map((l) => (
                 <li key={l.label}>
                   <a
