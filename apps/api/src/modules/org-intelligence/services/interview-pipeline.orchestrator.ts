@@ -99,8 +99,18 @@ export class InterviewPipelineOrchestrator {
       // Step 2: Extract entities (5 passes)
       this.logger.log(`[${interviewId}] Starting extraction...`);
       await this.updateStatus(interviewId, tenantId, 'EXTRACTING');
-      await this.extraction.extract(tenantId, interviewId);
-      this.logger.log(`[${interviewId}] Extraction complete`);
+      const extractionResult = await this.extraction.extract(
+        tenantId,
+        interviewId,
+      );
+      if (extractionResult.metadata.completedPasses.length === 0) {
+        throw new Error(
+          'La extracción de conocimiento falló en todas las pasadas. Verifica la configuración de OpenAI.',
+        );
+      }
+      this.logger.log(
+        `[${interviewId}] Extraction complete (${extractionResult.metadata.completedPasses.length}/5 passes)`,
+      );
 
       // Step 3: Process extraction into knowledge graph
       this.logger.log(`[${interviewId}] Starting coreference resolution...`);

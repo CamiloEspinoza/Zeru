@@ -840,7 +840,7 @@ export class CoreferenceService {
     interviewId: string,
   ): Promise<void> {
     try {
-      const speakers = await client.interviewSpeaker.findMany({
+      const speakers = await this.prisma.interviewSpeaker.findMany({
         where: { interviewId },
       });
 
@@ -856,7 +856,7 @@ export class CoreferenceService {
         });
 
         if (person) {
-          await client.interviewSpeaker.update({
+          await this.prisma.interviewSpeaker.update({
             where: { id: speaker.id },
             data: { personEntityId: person.id },
           });

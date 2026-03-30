@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { zodResponseFormat } from 'openai/helpers/zod';
+import { zodTextFormat } from 'openai/helpers/zod';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
 import {
@@ -320,7 +320,7 @@ export class ExtractionPipelineService {
         { role: 'user', content: userContent },
       ],
       text: {
-        format: zodResponseFormat(schema, schemaName),
+        format: zodTextFormat(schema, schemaName),
       },
       max_output_tokens: MAX_OUTPUT_TOKENS,
     });
