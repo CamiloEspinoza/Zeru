@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { execFile } from 'node:child_process';
+import { writeFile, readFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import type {
@@ -22,6 +27,8 @@ const ALLOWED_AUDIO_MIMETYPES = [
 
 @Injectable()
 export class InterviewsService {
+  private readonly logger = new Logger(InterviewsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
@@ -149,8 +156,14 @@ export class InterviewsService {
 
     await this.findOne(tenantId, id);
 
-    const key = `tenants/${tenantId}/interviews/${id}/audio/${file.originalname}`;
-    await this.s3.upload(tenantId, key, file.buffer, file.mimetype);
+    // Normalize audio with ffmpeg to fix headers (duration, seek support).
+    // Streaming-generated MP3s (e.g. ElevenLabs) often have incorrect Xing
+    // headers that make browsers report wrong duration and break seeking.
+    const normalized = await this.normalizeAudio(file.buffer, file.originalname);
+
+    const outName = file.originalname.replace(/\.[^.]+$/, '.mp3');
+    const key = `tenants/${tenantId}/interviews/${id}/audio/${outName}`;
+    await this.s3.upload(tenantId, key, normalized, 'audio/mpeg');
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
@@ -158,10 +171,45 @@ export class InterviewsService {
       where: { id },
       data: {
         audioS3Key: key,
-        audioMimeType: file.mimetype,
+        audioMimeType: 'audio/mpeg',
         processingStatus: 'UPLOADED',
       },
     });
+  }
+
+  /**
+   * Re-encode audio through ffmpeg to produce a well-formed MP3 with correct
+   * duration headers. Falls back to the original buffer if ffmpeg is unavailable.
+   */
+  private async normalizeAudio(buffer: Buffer, filename: string): Promise<Buffer> {
+    const uid = randomUUID();
+    const inputPath = join(tmpdir(), `zeru-audio-in-${uid}-${filename}`);
+    const outputPath = join(tmpdir(), `zeru-audio-out-${uid}.mp3`);
+
+    try {
+      await writeFile(inputPath, buffer);
+
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          'ffmpeg',
+          ['-i', inputPath, '-codec:a', 'libmp3lame', '-b:a', '128k', '-y', outputPath],
+          { timeout: 120_000 },
+          (err) => (err ? reject(err) : resolve()),
+        );
+      });
+
+      const result = await readFile(outputPath);
+      this.logger.log(`Audio normalized: ${filename} (${buffer.length} → ${result.length} bytes)`);
+      return result;
+    } catch (err) {
+      this.logger.warn(
+        `ffmpeg normalization failed, using original file: ${(err as Error).message}`,
+      );
+      return buffer;
+    } finally {
+      await unlink(inputPath).catch(() => {});
+      await unlink(outputPath).catch(() => {});
+    }
   }
 
   async updateSpeakers(tenantId: string, id: string, dto: UpdateSpeakerDto) {

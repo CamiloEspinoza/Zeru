@@ -53,11 +53,23 @@ export function AudioClipPlayer({
   const playFromStart = (url: string) => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (!audio.src || audio.src !== url) {
-      audio.src = url;
+    // Use media fragment to hint the browser about the time range.
+    // This helps with MP3s that have incorrect duration headers (e.g.
+    // streaming-generated files missing the Xing/LAME header).
+    const fragUrl = `${url}#t=${startSec},${endSec}`;
+    const needsLoad = !audio.src || !audio.src.startsWith(url);
+    if (needsLoad) {
+      audio.src = fragUrl;
+      audio.onloadedmetadata = () => {
+        audio.currentTime = startSec;
+        audio.play().then(() => setPlaying(true)).catch(() => {});
+        audio.onloadedmetadata = null;
+      };
+      audio.load();
+    } else {
+      audio.currentTime = startSec;
+      audio.play().then(() => setPlaying(true)).catch(() => {});
     }
-    audio.currentTime = startSec;
-    audio.play().then(() => setPlaying(true)).catch(() => {});
   };
 
   const handlePause = () => {
