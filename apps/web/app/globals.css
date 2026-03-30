@@ -176,3 +176,9 @@
 .font-display {
   font-family: var(--font-display, var(--font-sans));
 }
+
+@media print {
+  body > *:not(.print-container) { display: none !important; }
+  .print-container { display: block !important; }
+  .no-print { display: none !important; }
+}

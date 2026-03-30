@@ -42,6 +42,9 @@ import { useFirstVisit } from "@/hooks/use-first-visit";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Edit02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
+import { InterviewQuestionsView } from "@/components/org-intelligence/interview-questions-view";
+import { InterviewAudioStep } from "@/components/org-intelligence/interview-audio-step";
+import { InterviewGuidePrint } from "@/components/org-intelligence/interview-guide-print";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -62,6 +65,10 @@ interface Interview {
   speakers: Speaker[];
   projectId: string;
   createdAt: string;
+  objective?: string;
+  generatedIntro?: string;
+  generatedQuestions?: { introText: string; sections: { theme: string; questions: { text: string; rationale?: string; priority: string }[] }[] };
+  questionsGeneratedAt?: string;
 }
 
 interface Speaker {
@@ -227,6 +234,10 @@ export default function InterviewDetailPage({
   // Success banner for first completed processing
   const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
 
+  // Questions state
+  const [generatedSections, setGeneratedSections] = useState<{ theme: string; questions: { text: string; rationale?: string; priority: string }[] }[]>([]);
+  const [generatedIntroText, setGeneratedIntroText] = useState("");
+
   const fetchInterview = useCallback(async () => {
     try {
       setLoading(true);
@@ -234,6 +245,12 @@ export default function InterviewDetailPage({
         `/org-intelligence/interviews/${interviewId}`,
       );
       setInterview(res);
+
+      // Hydrate generated questions
+      if (res.generatedQuestions) {
+        setGeneratedIntroText(res.generatedQuestions.introText ?? "");
+        setGeneratedSections(res.generatedQuestions.sections ?? []);
+      }
 
       // Hydrate processing state from DB
       setCurrentProcessingStatus(res.processingStatus);
@@ -961,7 +978,42 @@ export default function InterviewDetailPage({
         </CardContent>
       </Card>
 
-      {/* Section 2: Audio Upload */}
+      {/* Section 2: Interview Objective */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {interview.objective ?? "Sin objetivo definido."}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Section 3: Question Guide */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Guia de Preguntas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <InterviewQuestionsView
+            introText={generatedIntroText}
+            sections={generatedSections}
+            interviewId={interviewId}
+            projectId={id}
+            onQuestionsChange={(sections) => setGeneratedSections(sections)}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Section 4: Audio Upload/Recording */}
+      <InterviewAudioStep
+        interviewId={interviewId}
+        hasAudio={!!interview.audioS3Key}
+        onAudioUploaded={fetchInterview}
+      />
+
+      {/* Section 4b: Legacy Audio Upload (drag & drop) */}
       {showUpload && (
         <Card>
           <CardHeader>
@@ -1244,6 +1296,16 @@ export default function InterviewDetailPage({
           </Card>
         );
       })()}
+
+      {/* Print Guide (hidden, only visible when printing) */}
+      <InterviewGuidePrint
+        interviewTitle={interview.title ?? "Entrevista sin titulo"}
+        interviewDate={interview.interviewDate ? new Date(interview.interviewDate).toLocaleDateString("es-CL") : undefined}
+        speakers={interview.speakers.map((s) => ({ name: s.name ?? s.speakerLabel, role: s.role ?? undefined, isInterviewer: s.isInterviewer }))}
+        introText={generatedIntroText}
+        sections={generatedSections}
+        projectName={id}
+      />
 
       {/* Edit Interview Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

@@ -15,6 +15,7 @@ import { CurrentTenant } from '../../../common/decorators/current-tenant.decorat
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { ProjectsService } from '../services/projects.service';
+import { InterviewQuestionsService } from '../services/interview-questions.service';
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -27,7 +28,10 @@ import {
 @Controller('org-intelligence/projects')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly questionsService: InterviewQuestionsService,
+  ) {}
 
   @Post()
   async create(
@@ -69,5 +73,13 @@ export class ProjectsController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.projectsService.remove(tenantId, id);
+  }
+
+  @Get(':id/knowledge-summary')
+  async getKnowledgeSummary(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.questionsService.getKnowledgeSummary(tenantId, id);
   }
 }

@@ -1067,6 +1067,10 @@ model Interview {
   processingStatus      String                @default("PENDING")
   processingError       String?
   processingLog         Json?
+  objective             String?
+  generatedIntro        String?
+  generatedQuestions    Json?
+  questionsGeneratedAt  DateTime?
   deletedAt             DateTime?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt

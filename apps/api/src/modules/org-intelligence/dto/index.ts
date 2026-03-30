@@ -31,6 +31,7 @@ export const createInterviewSchema = z.object({
   projectId: z.string().uuid('ID de proyecto invalido'),
   title: z.string().max(200).optional(),
   interviewDate: z.string().datetime().optional(),
+  objective: z.string().max(2000).optional(),
   speakers: z.array(z.object({
     speakerLabel: z.string().min(1),
     name: z.string().optional(),
@@ -43,6 +44,7 @@ export const createInterviewSchema = z.object({
 export const updateInterviewSchema = z.object({
   title: z.string().max(200).optional(),
   interviewDate: z.string().datetime().nullable().optional(),
+  objective: z.string().max(2000).nullable().optional(),
 });
 
 export const updateSpeakerSchema = z.object({

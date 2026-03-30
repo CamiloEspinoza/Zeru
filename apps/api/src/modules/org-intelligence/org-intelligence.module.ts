@@ -26,6 +26,7 @@ import { PipelineEventsService } from './services/pipeline-events.service';
 import { OrgDiagramService } from './services/org-diagram.service';
 import { OrgDiagnosisService } from './services/org-diagnosis.service';
 import { OrgImprovementsService } from './services/org-improvements.service';
+import { InterviewQuestionsService } from './services/interview-questions.service';
 
 @Module({
   imports: [FilesModule, forwardRef(() => AiModule)],
@@ -57,6 +58,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
     OrgDiagramService,
     OrgDiagnosisService,
     OrgImprovementsService,
+    InterviewQuestionsService,
   ],
   exports: [
     ProjectsService,
@@ -75,6 +77,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
     OrgDiagramService,
     OrgDiagnosisService,
     OrgImprovementsService,
+    InterviewQuestionsService,
   ],
 })
 export class OrgIntelligenceModule {}

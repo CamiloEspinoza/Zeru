@@ -42,6 +42,7 @@ export class InterviewsService {
         projectId: dto.projectId,
         title: dto.title,
         interviewDate: dto.interviewDate ? new Date(dto.interviewDate) : undefined,
+        objective: dto.objective,
         ...(dto.speakers && dto.speakers.length > 0
           ? {
               speakers: {
@@ -132,6 +133,7 @@ export class InterviewsService {
         ...(dto.interviewDate !== undefined && {
           interviewDate: dto.interviewDate ? new Date(dto.interviewDate) : null,
         }),
+        ...(dto.objective !== undefined && { objective: dto.objective }),
       },
     });
   }

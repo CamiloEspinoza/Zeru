@@ -22,6 +22,7 @@ import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { InterviewsService } from '../services/interviews.service';
 import { InterviewPipelineOrchestrator } from '../services/interview-pipeline.orchestrator';
 import { PipelineEventsService } from '../services/pipeline-events.service';
+import { InterviewQuestionsService } from '../services/interview-questions.service';
 import { S3Service } from '../../files/s3.service';
 import {
   createInterviewSchema,
@@ -42,6 +43,7 @@ export class InterviewsController {
     private readonly pipeline: InterviewPipelineOrchestrator,
     private readonly pipelineEventsService: PipelineEventsService,
     private readonly s3: S3Service,
+    private readonly questionsService: InterviewQuestionsService,
   ) {}
 
   @Post()
@@ -149,6 +151,23 @@ export class InterviewsController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.interviewsService.getSegmentEntities(tenantId, id);
+  }
+
+  @Post(':id/generate-questions')
+  async generateQuestions(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.questionsService.generateQuestions(tenantId, id);
+  }
+
+  @Patch(':id/questions')
+  async updateQuestions(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Body() body: { sections: unknown },
+  ) {
+    return this.questionsService.updateQuestions(tenantId, id, body.sections);
   }
 
   /**
