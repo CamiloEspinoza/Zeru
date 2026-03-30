@@ -84,9 +84,14 @@ export class ChunkingService {
     }
 
     // Build a quick lookup: speakerLabel -> speaker record
-    const speakerMap = new Map(
-      interview.speakers.map((s) => [s.speakerLabel, s]),
-    );
+    // Also index by name for fallback (speakerLabel may have been updated from Speaker_N to real name)
+    const speakerMap = new Map<string, (typeof interview.speakers)[number]>();
+    for (const s of interview.speakers) {
+      speakerMap.set(s.speakerLabel, s);
+      if (s.name && s.name !== s.speakerLabel) {
+        speakerMap.set(s.name, s);
+      }
+    }
 
     // 3. Build raw chunks from segments (group by speaker, respect token limits)
     const rawChunks = this.buildRawChunks(segments);

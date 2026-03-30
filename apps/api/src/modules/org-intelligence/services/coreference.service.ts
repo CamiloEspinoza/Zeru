@@ -858,19 +858,11 @@ export class CoreferenceService {
         if (person) {
           await this.prisma.interviewSpeaker.update({
             where: { id: speaker.id },
-            data: {
-              personEntityId: person.id,
-              speakerLabel: speaker.name,
-            },
+            data: { personEntityId: person.id },
           });
           this.logger.debug(
             `[${interviewId}] Linked speaker "${speaker.name}" to PersonProfile ${person.id}`,
           );
-        } else if (speaker.speakerLabel !== speaker.name) {
-          await this.prisma.interviewSpeaker.update({
-            where: { id: speaker.id },
-            data: { speakerLabel: speaker.name },
-          });
         }
       }
     } catch (err) {
