@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import {
@@ -271,12 +272,12 @@ export default function InterviewDetailPage({
     // Validate file type
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!ALLOWED_AUDIO_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
-      alert(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      toast.error(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
       return;
     }
     // Validate file size
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      alert(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
+      toast.error(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
       return;
     }
 
@@ -327,7 +328,7 @@ export default function InterviewDetailPage({
       await fetchInterview();
     } catch (err) {
       console.error("Error al subir audio:", err);
-      alert("No se pudo subir el archivo de audio. Intenta nuevamente.");
+      toast.error("No se pudo subir el archivo de audio. Intenta nuevamente.");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -353,7 +354,7 @@ export default function InterviewDetailPage({
       await fetchInterview();
     } catch (err) {
       console.error("Error al iniciar procesamiento:", err);
-      alert("No se pudo iniciar el procesamiento. Intenta nuevamente.");
+      toast.error("No se pudo iniciar el procesamiento. Intenta nuevamente.");
     } finally {
       setProcessing(false);
     }
@@ -386,7 +387,7 @@ export default function InterviewDetailPage({
       await fetchInterview();
     } catch (err) {
       console.error("Error al guardar entrevista:", err);
-      alert("No se pudo guardar los cambios.");
+      toast.error("No se pudo guardar los cambios.");
     } finally {
       setSavingEdit(false);
     }
@@ -401,7 +402,7 @@ export default function InterviewDetailPage({
       router.push(`/org-intelligence/projects/${id}`);
     } catch (err) {
       console.error("Error al eliminar entrevista:", err);
-      alert("No se pudo eliminar la entrevista.");
+      toast.error("No se pudo eliminar la entrevista.");
     } finally {
       setDeleting(false);
     }
@@ -422,7 +423,7 @@ export default function InterviewDetailPage({
       await fetchInterview();
     } catch (err) {
       console.error("Error al reprocesar entrevista:", err);
-      alert("No se pudo iniciar el reprocesamiento.");
+      toast.error("No se pudo iniciar el reprocesamiento.");
     } finally {
       setReprocessing(false);
     }
@@ -502,7 +503,7 @@ export default function InterviewDetailPage({
       setEditingSpeakerIndex(null);
     } catch (err) {
       console.error("Error al guardar participante:", err);
-      alert("No se pudo guardar el participante.");
+      toast.error("No se pudo guardar el participante.");
     } finally {
       setSavingSpeakers(false);
     }
@@ -530,7 +531,7 @@ export default function InterviewDetailPage({
       await fetchInterview();
     } catch (err) {
       console.error("Error al eliminar participante:", err);
-      alert("No se pudo eliminar el participante.");
+      toast.error("No se pudo eliminar el participante.");
     } finally {
       setSavingSpeakers(false);
     }

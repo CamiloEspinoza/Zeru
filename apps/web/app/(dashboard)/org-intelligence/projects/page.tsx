@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,7 +121,7 @@ export default function ProjectsPage() {
       await fetchProjects();
     } catch (err) {
       console.error("Error al crear proyecto:", err);
-      alert("No se pudo crear el proyecto. Intenta nuevamente.");
+      toast.error("No se pudo crear el proyecto. Intenta nuevamente.");
     } finally {
       setCreating(false);
     }
@@ -148,7 +149,7 @@ export default function ProjectsPage() {
       await fetchProjects();
     } catch (err) {
       console.error("Error al editar proyecto:", err);
-      alert("No se pudo guardar los cambios. Intenta nuevamente.");
+      toast.error("No se pudo guardar los cambios. Intenta nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -169,7 +170,7 @@ export default function ProjectsPage() {
       await fetchProjects();
     } catch (err) {
       console.error("Error al eliminar proyecto:", err);
-      alert("No se pudo eliminar el proyecto. Intenta nuevamente.");
+      toast.error("No se pudo eliminar el proyecto. Intenta nuevamente.");
     } finally {
       setDeleting(false);
     }

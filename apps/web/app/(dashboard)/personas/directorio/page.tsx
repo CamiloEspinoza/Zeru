@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
+import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   MoreHorizontalCircle01Icon,
@@ -192,7 +193,7 @@ export default function DirectorioPage() {
       await fetchPersons();
     } catch (err) {
       console.error("Error al guardar persona:", err);
-      alert("No se pudo guardar la persona. Intenta nuevamente.");
+      toast.error("No se pudo guardar la persona. Intenta nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -213,7 +214,7 @@ export default function DirectorioPage() {
       await fetchPersons();
     } catch (err) {
       console.error("Error al eliminar persona:", err);
-      alert("No se pudo eliminar la persona.");
+      toast.error("No se pudo eliminar la persona.");
     } finally {
       setDeleting(false);
     }
@@ -266,7 +267,7 @@ export default function DirectorioPage() {
       await fetchPersons();
     } catch (err) {
       console.error("Error al subir avatar:", err);
-      alert("No se pudo subir la foto de perfil.");
+      toast.error("No se pudo subir la foto de perfil.");
     } finally {
       setUploadingAvatarId(null);
       avatarTargetIdRef.current = null;
@@ -282,7 +283,7 @@ export default function DirectorioPage() {
         <div>
           <h1 className="text-2xl font-bold">Directorio de Personas</h1>
           <p className="text-muted-foreground mt-1">
-            Directorio de personas de la organizaci&oacute;n. Estos perfiles se
+            Directorio de personas de la organización. Estos perfiles se
             vinculan como participantes de entrevistas y aparecen en
             transcripciones y diagramas.
           </p>
@@ -319,7 +320,7 @@ export default function DirectorioPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground text-sm">
-                No se encontraron personas con esa b&uacute;squeda.
+                No se encontraron personas con esa búsqueda.
               </p>
             </CardContent>
           </Card>
@@ -333,10 +334,10 @@ export default function DirectorioPage() {
                 <path d="M16 3.13a4 4 0 010 7.75" />
               </svg>
             }
-            title="Registra a las personas de tu organizaci&oacute;n"
-            description="El directorio de personas te permite crear perfiles con nombre, cargo, &aacute;rea y foto. Estas personas podr&aacute;n ser asignadas como participantes de las entrevistas, lo que mejora la identificaci&oacute;n de hablantes y las visualizaciones."
+            title="Registra a las personas de tu organización"
+            description="El directorio de personas te permite crear perfiles con nombre, cargo, área y foto. Estas personas podrán ser asignadas como participantes de las entrevistas, lo que mejora la identificación de hablantes y las visualizaciones."
             action={{ label: "Agregar primera persona", onClick: openCreateDialog }}
-            tip="Tip: Registra primero a los coordinadores que vas a entrevistar. Puedes agregar m&aacute;s personas despu&eacute;s."
+            tip="Tip: Registra primero a los coordinadores que vas a entrevistar. Puedes agregar más personas después."
           />
         )
       ) : (
@@ -498,7 +499,7 @@ export default function DirectorioPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="person-phone">Tel&eacute;fono</Label>
+                <Label htmlFor="person-phone">Teléfono</Label>
                 <Input
                   id="person-phone"
                   placeholder="+56 9 1234 5678"
@@ -550,8 +551,8 @@ export default function DirectorioPage() {
           <DialogHeader>
             <DialogTitle>Eliminar persona</DialogTitle>
             <DialogDescription>
-              Se eliminar&aacute; el perfil de &quot;{deletingPerson?.name}&quot;. Esta
-              acci&oacute;n no se puede deshacer.
+              Se eliminará el perfil de &ldquo;{deletingPerson?.name}&rdquo;. Esta
+              acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

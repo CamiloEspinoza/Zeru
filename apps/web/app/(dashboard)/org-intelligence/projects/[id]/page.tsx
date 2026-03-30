@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -256,7 +257,7 @@ export default function ProjectDetailPage({
       }
     } catch (err) {
       console.error("Error al crear entrevista:", err);
-      alert("No se pudo crear la entrevista. Intenta nuevamente.");
+      toast.error("No se pudo crear la entrevista. Intenta nuevamente.");
     } finally {
       setCreating(false);
     }
@@ -274,7 +275,7 @@ export default function ProjectDetailPage({
       await fetchProject();
     } catch (err) {
       console.error("Error al guardar proyecto:", err);
-      alert("No se pudo guardar los cambios del proyecto.");
+      toast.error("No se pudo guardar los cambios del proyecto.");
     } finally {
       setSaving(false);
     }
@@ -287,7 +288,7 @@ export default function ProjectDetailPage({
       router.push("/org-intelligence/projects");
     } catch (err) {
       console.error("Error al eliminar proyecto:", err);
-      alert("No se pudo eliminar el proyecto.");
+      toast.error("No se pudo eliminar el proyecto.");
     } finally {
       setDeletingProject(false);
     }
@@ -302,7 +303,7 @@ export default function ProjectDetailPage({
       await fetchProject();
     } catch (err) {
       console.error("Error al cambiar estado:", err);
-      alert("No se pudo cambiar el estado del proyecto.");
+      toast.error("No se pudo cambiar el estado del proyecto.");
     } finally {
       setChangingStatus(false);
     }
@@ -328,7 +329,7 @@ export default function ProjectDetailPage({
       await fetchInterviews();
     } catch (err) {
       console.error("Error al editar entrevista:", err);
-      alert("No se pudo guardar los cambios de la entrevista.");
+      toast.error("No se pudo guardar los cambios de la entrevista.");
     } finally {
       setSavingInterview(false);
     }
@@ -349,7 +350,7 @@ export default function ProjectDetailPage({
       await fetchInterviews();
     } catch (err) {
       console.error("Error al eliminar entrevista:", err);
-      alert("No se pudo eliminar la entrevista.");
+      toast.error("No se pudo eliminar la entrevista.");
     } finally {
       setDeletingInterviewLoading(false);
     }

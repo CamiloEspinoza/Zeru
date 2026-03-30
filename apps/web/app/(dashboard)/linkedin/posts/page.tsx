@@ -4,6 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -177,16 +184,20 @@ export default function LinkedInPostsPage() {
 
           {/* Filters */}
           <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="text-sm rounded-lg border border-border bg-background px-3 py-1.5 outline-none focus:ring-1 focus:ring-ring"
+            <Select
+              value={statusFilter || "all"}
+              onValueChange={(v) => { setStatusFilter(v === "all" ? "" : v); setPage(1); }}
             >
-              <option value="">Todos los estados</option>
-              {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todos los estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

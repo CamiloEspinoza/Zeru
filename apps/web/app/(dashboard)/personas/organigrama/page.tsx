@@ -267,7 +267,7 @@ export default function OrganigramaPage() {
       <div className="space-y-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold">Organigrama</h1>
-          <HelpTooltip text="Visualiza la estructura jer&aacute;rquica de tu organizaci&oacute;n. Cada persona aparece como un nodo conectado a su jefatura directa." />
+          <HelpTooltip text="Visualiza la estructura jerárquica de tu organización. Cada persona aparece como un nodo conectado a su jefatura directa." />
         </div>
         <EducationalEmptyState
           icon={
@@ -289,12 +289,12 @@ export default function OrganigramaPage() {
               <line x1="12" y1="12" x2="12" y2="16" />
             </svg>
           }
-          title="Construye el organigrama de tu organizaci&oacute;n"
+          title="Construye el organigrama de tu organización"
           description={
             <>
               <p>
-                El organigrama muestra la estructura jer&aacute;rquica de tu equipo.
-                Para empezar, necesitas definir qui&eacute;n reporta a qui&eacute;n.
+                El organigrama muestra la estructura jerárquica de tu equipo.
+                Para empezar, necesitas definir quién reporta a quién.
               </p>
               <p className="mt-2">
                 Ve al{" "}
@@ -304,9 +304,9 @@ export default function OrganigramaPage() {
                 >
                   Directorio de Personas
                 </a>{" "}
-                y asigna la relaci&oacute;n &quot;Reporta a&quot; en cada perfil. Una vez que
-                existan relaciones jer&aacute;rquicas, el organigrama se generar&aacute;
-                autom&aacute;ticamente.
+                y asigna la relación &ldquo;Reporta a&rdquo; en cada perfil. Una vez que
+                existan relaciones jerárquicas, el organigrama se generará
+                automáticamente.
               </p>
             </>
           }
@@ -316,13 +316,13 @@ export default function OrganigramaPage() {
               window.location.href = "/personas/directorio";
             },
           }}
-          tip='Tip: Comienza por registrar al l&iacute;der de la organizaci&oacute;n (ej: Gerente General). Luego agrega sus reportes directos y asigna la relaci&oacute;n "Reporta a".'
+          tip='Tip: Comienza por registrar al líder de la organización (ej: Gerente General). Luego agrega sus reportes directos y asigna la relación "Reporta a".'
         />
         {stats && stats.totalPersons > 0 && (
           <div className="rounded-lg border bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
             Hay {stats.totalPersons} persona{stats.totalPersons !== 1 ? "s" : ""}{" "}
             registrada{stats.totalPersons !== 1 ? "s" : ""} en el directorio, pero
-            ninguna tiene una relaci&oacute;n jer&aacute;rquica (&quot;reporta a&quot;) definida.
+            ninguna tiene una relación jerárquica (&ldquo;reporta a&rdquo;) definida.
           </div>
         )}
       </div>
@@ -335,7 +335,7 @@ export default function OrganigramaPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold">Organigrama</h1>
-          <HelpTooltip text="Visualiza la estructura jer&aacute;rquica de tu organizaci&oacute;n. Cada persona aparece como un nodo conectado a su jefatura directa." />
+          <HelpTooltip text="Visualiza la estructura jerárquica de tu organización. Cada persona aparece como un nodo conectado a su jefatura directa." />
           {stats && (
             <span className="ml-2 text-sm text-muted-foreground">
               {stats.totalPersons} persona{stats.totalPersons !== 1 ? "s" : ""}

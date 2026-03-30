@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -151,7 +152,11 @@ export default function JournalEntryDetailPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Asiento Contable</h1>
-        <p className="text-muted-foreground">Cargando...</p>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-3/4" />
+        </div>
       </div>
     );
   }
