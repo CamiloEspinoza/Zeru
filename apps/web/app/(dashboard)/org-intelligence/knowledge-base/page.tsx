@@ -115,8 +115,8 @@ export default function KnowledgeBasePage() {
         "/org-intelligence/projects",
       );
       setProjects(res.data);
-    } catch {
-      // API may not be ready
+    } catch (err) {
+      console.error("Error al cargar proyectos:", err);
     } finally {
       setLoadingProjects(false);
     }
@@ -172,7 +172,7 @@ export default function KnowledgeBasePage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="search">
+        <Tabs defaultValue="entities">
           <TabsList>
             <TabsTrigger value="entities">Entidades</TabsTrigger>
             <TabsTrigger value="search">Búsqueda</TabsTrigger>

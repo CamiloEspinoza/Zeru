@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -26,10 +27,14 @@ export class EntitiesController {
     @Query('page') page = '1',
     @Query('perPage') perPage = '20',
   ) {
+    if (!projectId) {
+      throw new BadRequestException('projectId es requerido');
+    }
+
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    const pageNum = parseInt(page, 10);
-    const perPageNum = parseInt(perPage, 10);
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const perPageNum = Math.min(Math.max(parseInt(perPage, 10) || 20, 1), 100);
     const skip = (pageNum - 1) * perPageNum;
 
     const where = {
@@ -48,12 +53,15 @@ export class EntitiesController {
         include: {
           relationsFrom: { select: { id: true } },
           relationsTo: { select: { id: true } },
+          _count: {
+            select: { relationsFrom: true, relationsTo: true },
+          },
         },
       }),
       client.orgEntity.count({ where }),
     ]);
 
-    return { items, total, page: pageNum, perPage: perPageNum };
+    return { data: items, meta: { total, page: pageNum, perPage: perPageNum } };
   }
 
   @Get(':id')
@@ -86,6 +94,13 @@ export class EntitiesController {
   ) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    const entity = await client.orgEntity.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!entity) {
+      throw new NotFoundException('Entidad no encontrada');
+    }
+
     return client.orgEntity.update({
       where: { id },
       data: { confidence: 1.0, status: 'ACTIVE' },
@@ -98,6 +113,13 @@ export class EntitiesController {
     @Param('id') id: string,
   ) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const entity = await client.orgEntity.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!entity) {
+      throw new NotFoundException('Entidad no encontrada');
+    }
 
     return client.orgEntity.update({
       where: { id },

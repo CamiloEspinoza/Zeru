@@ -31,7 +31,7 @@ const LABELS: Record<string, string> = {
   projects: "Proyectos",
   interviews: "Entrevistas",
   persons: "Personas",
-  "knowledge-base": "Knowledge Base",
+  "knowledge-base": "Base de Conocimiento",
 };
 
 export function Breadcrumbs() {

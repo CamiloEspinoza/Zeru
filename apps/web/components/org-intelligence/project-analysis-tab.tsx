@@ -40,27 +40,29 @@ interface PaginatedResponse<T> {
 
 const severityConfig: Record<
   string,
-  { label: string; color: string; bgColor: string }
+  { label: string; color: string; bgColor: string; badgeBgColor: string }
 > = {
-  CRITICAL: { label: "Crítico", color: "text-red-700", bgColor: "bg-red-500" },
-  HIGH: { label: "Alto", color: "text-orange-700", bgColor: "bg-orange-500" },
+  CRITICAL: { label: "Crítico", color: "text-red-700 dark:text-red-300", bgColor: "bg-red-500", badgeBgColor: "bg-red-100 dark:bg-red-900" },
+  HIGH: { label: "Alto", color: "text-orange-700 dark:text-orange-300", bgColor: "bg-orange-500", badgeBgColor: "bg-orange-100 dark:bg-orange-900" },
   MEDIUM: {
     label: "Medio",
-    color: "text-yellow-700",
+    color: "text-yellow-700 dark:text-yellow-300",
     bgColor: "bg-yellow-500",
+    badgeBgColor: "bg-yellow-100 dark:bg-yellow-900",
   },
-  LOW: { label: "Bajo", color: "text-gray-600", bgColor: "bg-gray-400" },
+  LOW: { label: "Bajo", color: "text-gray-600 dark:text-gray-400", bgColor: "bg-gray-400", badgeBgColor: "bg-gray-100 dark:bg-gray-800" },
 };
 
 function SeverityBadge({ severity }: { severity: string }) {
   const config = severityConfig[severity] || {
     label: severity,
-    color: "text-gray-600",
+    color: "text-gray-600 dark:text-gray-400",
     bgColor: "bg-gray-400",
+    badgeBgColor: "bg-gray-100 dark:bg-gray-800",
   };
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.color} ${config.bgColor.replace("bg-", "bg-").replace("500", "100").replace("400", "100")}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.color} ${config.badgeBgColor}`}
     >
       {config.label}
     </span>
@@ -97,9 +99,10 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
         setProblems(p);
       }
       if (entitiesRes) {
+        const raw = entitiesRes as unknown as Record<string, unknown>;
         const e = Array.isArray(entitiesRes)
           ? entitiesRes
-          : (entitiesRes as PaginatedResponse<Entity>).data ?? [];
+          : (raw.data as Entity[]) ?? (raw.items as Entity[]) ?? [];
         setEntities(e);
       }
       if (!problemsRes && !entitiesRes) {

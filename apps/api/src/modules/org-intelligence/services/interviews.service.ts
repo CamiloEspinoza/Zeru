@@ -169,7 +169,7 @@ export class InterviewsService {
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return (this.prisma as unknown as PrismaClient).$transaction(async (tx) => {
+    return client.$transaction(async (tx) => {
       await tx.interviewSpeaker.deleteMany({
         where: { interviewId: id },
       });
@@ -185,7 +185,7 @@ export class InterviewsService {
         })),
       });
 
-      return client.interview.findFirst({
+      return tx.interview.findFirst({
         where: { id },
         include: { speakers: true },
       });

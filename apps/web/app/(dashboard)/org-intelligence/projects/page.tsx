@@ -95,8 +95,8 @@ export default function ProjectsPage() {
         "/org-intelligence/projects",
       );
       setProjects(res.data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cargar proyectos:", err);
     } finally {
       setLoading(false);
     }
@@ -118,8 +118,9 @@ export default function ProjectsPage() {
       setDialogOpen(false);
       setForm({ name: "", description: "", startDate: "" });
       await fetchProjects();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al crear proyecto:", err);
+      alert("No se pudo crear el proyecto. Intenta nuevamente.");
     } finally {
       setCreating(false);
     }
@@ -145,8 +146,9 @@ export default function ProjectsPage() {
       setEditDialogOpen(false);
       setEditingProject(null);
       await fetchProjects();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al editar proyecto:", err);
+      alert("No se pudo guardar los cambios. Intenta nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -165,8 +167,9 @@ export default function ProjectsPage() {
       setDeleteDialogOpen(false);
       setDeletingProject(null);
       await fetchProjects();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar proyecto:", err);
+      alert("No se pudo eliminar el proyecto. Intenta nuevamente.");
     } finally {
       setDeleting(false);
     }

@@ -93,9 +93,10 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
         .catch(() => null);
 
       if (entitiesRes) {
+        const raw = entitiesRes as unknown as Record<string, unknown>;
         const entList = Array.isArray(entitiesRes)
           ? entitiesRes
-          : entitiesRes.data;
+          : (raw.data as Entity[]) ?? (raw.items as Entity[]) ?? [];
         setEntities(entList);
         if (entList.length > 0) gotData = true;
       }

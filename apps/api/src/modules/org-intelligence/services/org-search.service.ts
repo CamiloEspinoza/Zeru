@@ -142,14 +142,34 @@ export class OrgSearchService {
     const queryEmbedding = await this.generateQueryEmbedding(query, tenantId);
     const vector = this.formatVector(queryEmbedding);
 
-    // Validate type against allowed enum values to prevent injection
-    const typeClause =
-      type && VALID_ENTITY_TYPES.has(type)
-        ? `AND e.type = '${type}'`
-        : '';
+    // Validate type against allowed enum values for safety
+    const hasTypeFilter = !!(type && VALID_ENTITY_TYPES.has(type));
 
     const results = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`SET LOCAL hnsw.ef_search = 100`);
+
+      if (hasTypeFilter) {
+        return tx.$queryRawUnsafe<EntitySearchResult[]>(
+          `
+          SELECT e.id, e.type::text, e.name, e.description, e.metadata,
+                 e."projectId",
+                 1 - (e.embedding <=> $1::vector) AS similarity
+          FROM org_entities e
+          WHERE e."tenantId" = $2
+            AND e."projectId" = $3
+            AND e."deletedAt" IS NULL
+            AND e.embedding IS NOT NULL
+            AND e.type = $5::text::"OrgEntityType"
+          ORDER BY e.embedding <=> $1::vector
+          LIMIT $4
+          `,
+          vector,
+          tenantId,
+          projectId,
+          limit,
+          type,
+        );
+      }
 
       return tx.$queryRawUnsafe<EntitySearchResult[]>(
         `
@@ -161,7 +181,6 @@ export class OrgSearchService {
           AND e."projectId" = $3
           AND e."deletedAt" IS NULL
           AND e.embedding IS NOT NULL
-          ${typeClause}
         ORDER BY e.embedding <=> $1::vector
         LIMIT $4
         `,

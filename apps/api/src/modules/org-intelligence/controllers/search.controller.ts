@@ -10,20 +10,26 @@ export class SearchController {
   constructor(private readonly searchService: OrgSearchService) {}
 
   @Post()
-  search(
+  async search(
     @CurrentTenant() tenantId: string,
     @Body() body: { projectId: string; query: string; limit?: number },
   ) {
-    return this.searchService.search(
+    const query = (body.query ?? '').trim();
+    if (!query) {
+      return { data: [] };
+    }
+    const safeLimit = Math.min(Math.max(body.limit ?? 10, 1), 50);
+    const results = await this.searchService.search(
       tenantId,
       body.projectId,
-      body.query,
-      body.limit,
+      query,
+      safeLimit,
     );
+    return { data: results };
   }
 
   @Post('entities')
-  searchEntities(
+  async searchEntities(
     @CurrentTenant() tenantId: string,
     @Body()
     body: {
@@ -33,12 +39,18 @@ export class SearchController {
       limit?: number;
     },
   ) {
-    return this.searchService.searchEntities(
+    const query = (body.query ?? '').trim();
+    if (!query) {
+      return { data: [] };
+    }
+    const safeLimit = Math.min(Math.max(body.limit ?? 20, 1), 50);
+    const results = await this.searchService.searchEntities(
       tenantId,
       body.projectId,
-      body.query,
+      query,
       body.type,
-      body.limit,
+      safeLimit,
     );
+    return { data: results };
   }
 }

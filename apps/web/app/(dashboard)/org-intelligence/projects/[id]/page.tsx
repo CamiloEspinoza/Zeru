@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api-client";
 import {
   Card,
@@ -116,6 +116,8 @@ export default function ProjectDetailPage({
 }) {
   const { id } = React.use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") ?? "interviews";
 
   const [project, setProject] = useState<Project | null>(null);
   const [interviews, setInterviews] = useState<Interview[]>([]);
@@ -178,8 +180,8 @@ export default function ProjectDetailPage({
           ? new Date(res.endDate).toISOString().split("T")[0]
           : "",
       });
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cargar proyecto:", err);
     } finally {
       setLoadingProject(false);
     }
@@ -192,8 +194,8 @@ export default function ProjectDetailPage({
         `/org-intelligence/interviews?projectId=${id}`,
       );
       setInterviews(res.data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cargar entrevistas:", err);
     } finally {
       setLoadingInterviews(false);
     }
@@ -252,8 +254,9 @@ export default function ProjectDetailPage({
           `/org-intelligence/projects/${id}/interviews/${created.id}`,
         );
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al crear entrevista:", err);
+      alert("No se pudo crear la entrevista. Intenta nuevamente.");
     } finally {
       setCreating(false);
     }
@@ -269,8 +272,9 @@ export default function ProjectDetailPage({
         endDate: editForm.endDate ? new Date(editForm.endDate + "T12:00:00").toISOString() : undefined,
       });
       await fetchProject();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al guardar proyecto:", err);
+      alert("No se pudo guardar los cambios del proyecto.");
     } finally {
       setSaving(false);
     }
@@ -281,8 +285,9 @@ export default function ProjectDetailPage({
       setDeletingProject(true);
       await api.delete(`/org-intelligence/projects/${id}`);
       router.push("/org-intelligence/projects");
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar proyecto:", err);
+      alert("No se pudo eliminar el proyecto.");
     } finally {
       setDeletingProject(false);
     }
@@ -295,8 +300,9 @@ export default function ProjectDetailPage({
         status: newStatus,
       });
       await fetchProject();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cambiar estado:", err);
+      alert("No se pudo cambiar el estado del proyecto.");
     } finally {
       setChangingStatus(false);
     }
@@ -320,8 +326,9 @@ export default function ProjectDetailPage({
       setEditInterviewDialogOpen(false);
       setEditingInterview(null);
       await fetchInterviews();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al editar entrevista:", err);
+      alert("No se pudo guardar los cambios de la entrevista.");
     } finally {
       setSavingInterview(false);
     }
@@ -340,8 +347,9 @@ export default function ProjectDetailPage({
       setDeleteInterviewDialogOpen(false);
       setDeletingInterview(null);
       await fetchInterviews();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar entrevista:", err);
+      alert("No se pudo eliminar la entrevista.");
     } finally {
       setDeletingInterviewLoading(false);
     }
@@ -446,16 +454,16 @@ export default function ProjectDetailPage({
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="interviews">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="interviews">
             Entrevistas{interviews.length > 0 ? ` (${interviews.length})` : ""}
           </TabsTrigger>
           <TabsTrigger value="analysis">
-            Análisis{(project._count?.entities ?? 0) > 0 ? ` (${project._count!.entities})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
+            Análisis{(project._count?.entities ?? 0) > 0 ? ` (${project._count?.entities ?? 0})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
           </TabsTrigger>
           <TabsTrigger value="diagnosis">
-            Diagnóstico{(project._count?.problems ?? 0) > 0 ? ` (${project._count!.problems})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
+            Diagnóstico{(project._count?.problems ?? 0) > 0 ? ` (${project._count?.problems ?? 0})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
           </TabsTrigger>
           <TabsTrigger value="action-plan">Plan de Acción</TabsTrigger>
           <TabsTrigger value="settings">Configuración</TabsTrigger>

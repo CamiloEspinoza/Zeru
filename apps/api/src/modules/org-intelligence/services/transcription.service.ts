@@ -77,12 +77,12 @@ export class TranscriptionService {
       );
     }
 
-    // Mark as PROCESSING
+    // Mark as TRANSCRIBING
     await client.interview.update({
       where: { id: interviewId },
       data: {
         transcriptionStatus: 'PROCESSING',
-        processingStatus: 'PROCESSING',
+        processingStatus: 'TRANSCRIBING',
       },
     });
 
@@ -159,7 +159,7 @@ export class TranscriptionService {
         transcriptionProvider:
           result.metadata.provider === 'deepgram' ? 'DEEPGRAM' : 'OPENAI',
         audioDurationMs: result.durationMs,
-        processingStatus: 'TRANSCRIBED',
+        processingStatus: 'EXTRACTING',
       },
     });
 

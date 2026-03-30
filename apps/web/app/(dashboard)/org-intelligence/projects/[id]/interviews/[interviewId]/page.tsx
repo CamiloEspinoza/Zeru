@@ -84,30 +84,50 @@ interface ProcessingStatus {
   transcriptionStatus: string;
 }
 
-const pipelineSteps = ["UPLOADED", "TRANSCRIBING", "EXTRACTING", "COMPLETED"];
+const pipelineSteps = [
+  "UPLOADED",
+  "TRANSCRIBING",
+  "POST_PROCESSING",
+  "EXTRACTING",
+  "RESOLVING_COREFERENCES",
+  "SUMMARIZING",
+  "CHUNKING",
+  "EMBEDDING",
+  "COMPLETED",
+];
 const pipelineStepLabels: Record<string, string> = {
   UPLOADED: "Subido",
   TRANSCRIBING: "Transcribiendo",
+  POST_PROCESSING: "Post-procesando",
   EXTRACTING: "Extrayendo",
+  RESOLVING_COREFERENCES: "Reconciliando",
+  SUMMARIZING: "Resumiendo",
+  CHUNKING: "Fragmentando",
+  EMBEDDING: "Indexando",
   COMPLETED: "Completado",
 };
 
 const pipelineStepDescriptions: Record<string, string> = {
   UPLOADED: "Audio recibido correctamente",
   TRANSCRIBING: "Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3)",
+  POST_PROCESSING: "Limpiando y estructurando la transcripción",
   EXTRACTING: "Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas de análisis)",
+  RESOLVING_COREFERENCES: "Reconciliando entidades duplicadas y resolviendo co-referencias entre entrevistas",
+  SUMMARIZING: "Generando resúmenes de cada segmento de la entrevista",
+  CHUNKING: "Dividiendo la transcripción en fragmentos para búsqueda semántica",
+  EMBEDDING: "Generando embeddings vectoriales para búsqueda semántica",
   COMPLETED: "Procesamiento finalizado. Los resultados están disponibles en las pestañas de Análisis y Diagnóstico del proyecto.",
 };
 
 const speakerColors = [
-  "bg-blue-100 text-blue-800",
-  "bg-green-100 text-green-800",
-  "bg-purple-100 text-purple-800",
-  "bg-orange-100 text-orange-800",
-  "bg-pink-100 text-pink-800",
-  "bg-teal-100 text-teal-800",
-  "bg-indigo-100 text-indigo-800",
-  "bg-rose-100 text-rose-800",
+  "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+  "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
 ];
 
 function getSpeakerColor(speaker: string, speakerMap: Map<string, number>) {
@@ -182,13 +202,15 @@ export default function InterviewDetailPage({
       );
       setInterview(res);
       if (
-        res.processingStatus === "TRANSCRIBING" ||
-        res.processingStatus === "EXTRACTING"
+        res.processingStatus !== "PENDING" &&
+        res.processingStatus !== "UPLOADED" &&
+        res.processingStatus !== "COMPLETED" &&
+        res.processingStatus !== "FAILED"
       ) {
         startPolling();
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cargar entrevista:", err);
     } finally {
       setLoading(false);
     }
@@ -217,8 +239,8 @@ export default function InterviewDetailPage({
           );
           setInterview(res);
         }
-      } catch {
-        // silently fail
+      } catch (err) {
+        console.error("Error al verificar estado:", err);
       }
     }, 3000);
   }, [interviewId]);
@@ -232,7 +254,32 @@ export default function InterviewDetailPage({
     };
   }, [fetchInterview]);
 
+  const MAX_FILE_SIZE_MB = 500;
+  const ALLOWED_AUDIO_TYPES = [
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/mp4",
+    "audio/x-m4a",
+    "audio/ogg",
+    "audio/webm",
+  ];
+  const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm"];
+
   const handleFileUpload = async (file: File) => {
+    // Validate file type
+    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
+    if (!ALLOWED_AUDIO_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
+      alert(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      return;
+    }
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      alert(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
     try {
@@ -278,8 +325,9 @@ export default function InterviewDetailPage({
       });
 
       await fetchInterview();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al subir audio:", err);
+      alert("No se pudo subir el archivo de audio. Intenta nuevamente.");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -303,8 +351,9 @@ export default function InterviewDetailPage({
       setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
       startPolling();
       await fetchInterview();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al iniciar procesamiento:", err);
+      alert("No se pudo iniciar el procesamiento. Intenta nuevamente.");
     } finally {
       setProcessing(false);
     }
@@ -335,8 +384,9 @@ export default function InterviewDetailPage({
       });
       setEditDialogOpen(false);
       await fetchInterview();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al guardar entrevista:", err);
+      alert("No se pudo guardar los cambios.");
     } finally {
       setSavingEdit(false);
     }
@@ -349,8 +399,9 @@ export default function InterviewDetailPage({
       setDeleting(true);
       await api.delete(`/org-intelligence/interviews/${interviewId}`);
       router.push(`/org-intelligence/projects/${id}`);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar entrevista:", err);
+      alert("No se pudo eliminar la entrevista.");
     } finally {
       setDeleting(false);
     }
@@ -369,8 +420,9 @@ export default function InterviewDetailPage({
       setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
       startPolling();
       await fetchInterview();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al reprocesar entrevista:", err);
+      alert("No se pudo iniciar el reprocesamiento.");
     } finally {
       setReprocessing(false);
     }
@@ -448,8 +500,9 @@ export default function InterviewDetailPage({
       setSpeakerDialogOpen(false);
       setSpeakerForm(emptySpeakerForm);
       setEditingSpeakerIndex(null);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al guardar participante:", err);
+      alert("No se pudo guardar el participante.");
     } finally {
       setSavingSpeakers(false);
     }
@@ -475,8 +528,9 @@ export default function InterviewDetailPage({
       );
 
       await fetchInterview();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar participante:", err);
+      alert("No se pudo eliminar el participante.");
     } finally {
       setSavingSpeakers(false);
     }
@@ -519,21 +573,18 @@ export default function InterviewDetailPage({
 
   const currentStatus = processingStatus?.processingStatus ?? interview.processingStatus;
   const currentStepIndex = pipelineSteps.indexOf(currentStatus);
+  const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
   const showUpload =
     interview.processingStatus === "PENDING" && !interview.audioS3Key;
   const showProcess =
     (interview.processingStatus === "UPLOADED" ||
       (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
-    currentStatus !== "TRANSCRIBING" &&
-    currentStatus !== "EXTRACTING";
+    !isProcessing;
   const showPipeline =
-    currentStatus === "UPLOADED" ||
-    currentStatus === "TRANSCRIBING" ||
-    currentStatus === "EXTRACTING" ||
-    currentStatus === "COMPLETED" ||
-    currentStatus === "FAILED";
+    currentStatus !== "PENDING" &&
+    (pipelineSteps.includes(currentStatus) || currentStatus === "FAILED");
   const showTranscription =
-    (currentStatus === "COMPLETED" || currentStatus === "EXTRACTING") &&
+    (currentStatus === "COMPLETED" || pipelineSteps.indexOf(currentStatus) >= pipelineSteps.indexOf("EXTRACTING")) &&
     interview.transcriptionJson;
 
   const hasSpeakers = interview.speakers.length > 0;
@@ -559,7 +610,7 @@ export default function InterviewDetailPage({
           {currentStatus === "FAILED" && (
             <Button
               variant="outline"
-              onClick={() => handleReprocess()}
+              onClick={() => setReprocessDialogOpen(true)}
               disabled={reprocessing}
             >
               {reprocessing ? "Reintentando..." : "Reintentar procesamiento"}
@@ -710,11 +761,20 @@ export default function InterviewDetailPage({
               </div>
             )}
             <div
+              role="button"
+              tabIndex={0}
+              aria-label="Subir archivo de audio"
               className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
                 dragOver
                   ? "border-primary bg-primary/5"
                   : "border-muted-foreground/25 hover:border-muted-foreground/50"
               }`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOver(true);

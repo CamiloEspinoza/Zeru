@@ -113,8 +113,8 @@ export default function PersonsPage() {
         `/org-intelligence/persons?${params.toString()}`,
       );
       setPersons(res.data);
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al cargar personas:", err);
     } finally {
       setLoading(false);
     }
@@ -139,8 +139,8 @@ export default function PersonsPage() {
         if (res.url) {
           setAvatarUrls((prev) => ({ ...prev, [person.id]: res.url! }));
         }
-      } catch {
-        // silently fail
+      } catch (err) {
+        console.error("Error al cargar avatar:", err);
       }
     });
   }, [persons, avatarUrls]);
@@ -190,8 +190,9 @@ export default function PersonsPage() {
       setForm(emptyForm);
       setEditingPerson(null);
       await fetchPersons();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al guardar persona:", err);
+      alert("No se pudo guardar la persona. Intenta nuevamente.");
     } finally {
       setSaving(false);
     }
@@ -210,8 +211,9 @@ export default function PersonsPage() {
       setDeleteDialogOpen(false);
       setDeletingPerson(null);
       await fetchPersons();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al eliminar persona:", err);
+      alert("No se pudo eliminar la persona.");
     } finally {
       setDeleting(false);
     }
@@ -262,8 +264,9 @@ export default function PersonsPage() {
         setAvatarUrls((prev) => ({ ...prev, [personId]: res.url! }));
       }
       await fetchPersons();
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("Error al subir avatar:", err);
+      alert("No se pudo subir la foto de perfil.");
     } finally {
       setUploadingAvatarId(null);
       avatarTargetIdRef.current = null;
@@ -279,7 +282,7 @@ export default function PersonsPage() {
         <div>
           <h1 className="text-2xl font-bold">Personas</h1>
           <p className="text-muted-foreground mt-1">
-            Directorio de personas de la organizacion. Estos perfiles se
+            Directorio de personas de la organización. Estos perfiles se
             vinculan como participantes de entrevistas y aparecen en
             transcripciones y diagramas.
           </p>
@@ -495,7 +498,7 @@ export default function PersonsPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="person-phone">Telefono</Label>
+                <Label htmlFor="person-phone">Teléfono</Label>
                 <Input
                   id="person-phone"
                   placeholder="+56 9 1234 5678"
@@ -547,8 +550,8 @@ export default function PersonsPage() {
           <DialogHeader>
             <DialogTitle>Eliminar persona</DialogTitle>
             <DialogDescription>
-              Se eliminara el perfil de &quot;{deletingPerson?.name}&quot;. Esta
-              accion no se puede deshacer.
+              Se eliminará el perfil de &quot;{deletingPerson?.name}&quot;. Esta
+              acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
