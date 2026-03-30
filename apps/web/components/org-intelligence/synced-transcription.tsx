@@ -59,7 +59,7 @@ export function SyncedTranscription({
         const el = segmentRefs.current[index];
         if (!el || !containerRef.current) return;
         lastScrolledIndexRef.current = index;
-        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
       }, 300);
     },
     [],
