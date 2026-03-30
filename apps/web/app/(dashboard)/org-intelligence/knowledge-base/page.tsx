@@ -84,15 +84,14 @@ interface SearchResult {
     type: string;
     name: string;
     description: string | null;
-    confidence: number;
-    score?: number;
+    similarity: number;
   }>;
   chunks?: Array<{
     id: string;
     content: string;
     speaker?: string;
     timestamp?: string;
-    score?: number;
+    similarity?: number;
   }>;
 }
 
@@ -652,12 +651,8 @@ function SearchTab({ projectId }: { projectId: string }) {
                         </p>
                       )}
                     </div>
-                    <ConfidenceBadge confidence={entity.confidence} />
-                    {entity.score != null && (
-                      <span className="text-xs text-muted-foreground">
-                        Relevancia: {Math.round(entity.score * 100)}%
-                      </span>
-                    )}
+                    <ConfidenceBadge confidence={entity.similarity} />
+
                   </CardContent>
                 </Card>
               ))}
@@ -684,9 +679,9 @@ function SearchTab({ projectId }: { projectId: string }) {
                           {chunk.timestamp}
                         </span>
                       )}
-                      {chunk.score != null && (
+                      {chunk.similarity != null && (
                         <span className="ml-auto text-xs text-muted-foreground">
-                          Relevancia: {Math.round(chunk.score * 100)}%
+                          Relevancia: {Math.round(chunk.similarity * 100)}%
                         </span>
                       )}
                     </div>
