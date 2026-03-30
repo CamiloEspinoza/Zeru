@@ -5,7 +5,7 @@ export default function AuthenticationPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Introducción</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Introducción</p>
         <h1 className="text-3xl font-bold text-white mb-4">Autenticación</h1>
         <p className="text-[15px] text-white/60 leading-relaxed">
           La API de Zeru usa <strong className="text-white/80">API keys</strong>{" "}

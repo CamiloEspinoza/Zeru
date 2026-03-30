@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -164,10 +164,17 @@ function getUserVotes(): string[] {
 }
 
 export function UpcomingFeaturesSection() {
-  const [votes, setVotes] = useState<Record<string, number>>(getVotes);
-  const [userVotes, setUserVotes] = useState<string[]>(getUserVotes);
+  const [mounted, setMounted] = useState(false);
+  const [votes, setVotes] = useState<Record<string, number>>({});
+  const [userVotes, setUserVotes] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState("");
   const [suggestionSent, setSuggestionSent] = useState(false);
+
+  useEffect(() => {
+    setVotes(getVotes());
+    setUserVotes(getUserVotes());
+    setMounted(true);
+  }, []);
 
   const handleVote = useCallback(
     (featureId: string) => {
@@ -216,10 +223,12 @@ export function UpcomingFeaturesSection() {
     setTimeout(() => setSuggestionSent(false), 3000);
   };
 
-  // Sort by votes (most voted first)
-  const sortedFeatures = [...upcomingFeatures].sort(
-    (a, b) => (votes[b.id] ?? 0) - (votes[a.id] ?? 0),
-  );
+  // Sort by votes only after client mount to avoid hydration mismatch
+  const sortedFeatures = mounted
+    ? [...upcomingFeatures].sort(
+        (a, b) => (votes[b.id] ?? 0) - (votes[a.id] ?? 0),
+      )
+    : upcomingFeatures;
 
   return (
     <section id="roadmap-features" className="py-28 px-6 relative">
@@ -244,8 +253,8 @@ export function UpcomingFeaturesSection() {
         {/* Cards grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {sortedFeatures.map((feature, i) => {
-            const voteCount = votes[feature.id] ?? 0;
-            const hasVoted = userVotes.includes(feature.id);
+            const voteCount = mounted ? (votes[feature.id] ?? 0) : 0;
+            const hasVoted = mounted ? userVotes.includes(feature.id) : false;
 
             return (
               <div

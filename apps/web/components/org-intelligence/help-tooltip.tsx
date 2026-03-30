@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface HelpTooltipProps {
-  text: string;
+  text: React.ReactNode;
   className?: string;
   side?: "top" | "bottom" | "left" | "right";
   iconSize?: "sm" | "md";

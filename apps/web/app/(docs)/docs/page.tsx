@@ -5,7 +5,7 @@ export default function DocsIntroPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Introducción</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Introducción</p>
         <h1 className="text-4xl font-bold text-white mb-4">Zeru API</h1>
         <p className="text-lg text-white/60 leading-relaxed max-w-2xl">
           La API pública de Zeru te permite integrar tu contabilidad con

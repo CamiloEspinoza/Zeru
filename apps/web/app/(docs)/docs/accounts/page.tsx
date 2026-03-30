@@ -5,7 +5,7 @@ export default function AccountsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Endpoints</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Endpoints</p>
         <h1 className="text-3xl font-bold text-white mb-4">Plan de Cuentas</h1>
         <p className="text-[15px] text-white/60 leading-relaxed">
           El plan de cuentas es la estructura jerárquica de cuentas contables de
