@@ -16,10 +16,9 @@ export function MarketingNav() {
   }, []);
 
   const links = [
-    { label: "Funcionalidades", href: "#funcionalidades" },
-    { label: "Roadmap", href: "#roadmap" },
-    { label: "Open Source", href: "#opensource" },
-    { label: "Creador", href: "#creador" },
+    { label: "Qu\u00e9 hace", href: "#que-hace" },
+    { label: "C\u00f3mo funciona", href: "#como-funciona" },
+    { label: "Pricing", href: "#pricing" },
   ];
 
   return (
@@ -65,13 +64,13 @@ export function MarketingNav() {
                 href="/login"
                 className="px-4 py-1.5 text-sm text-white/70 hover:text-white transition-colors"
               >
-                Iniciar sesión
+                Iniciar sesi&oacute;n
               </Link>
               <Link
                 href="/register"
                 className="px-4 py-1.5 text-sm bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium transition-colors shadow-lg shadow-teal-500/20 hover:shadow-teal-500/30"
               >
-                Crear cuenta gratis
+                Diagnostica tu empresa
               </Link>
             </>
           )}
@@ -123,13 +122,13 @@ export function MarketingNav() {
                   href="/login"
                   className="py-2 text-sm text-center text-white/70 hover:text-white border border-white/10 rounded-lg"
                 >
-                  Iniciar sesión
+                  Iniciar sesi&oacute;n
                 </Link>
                 <Link
                   href="/register"
                   className="py-2 text-sm text-center bg-teal-500 hover:bg-teal-400 text-white rounded-lg font-medium"
                 >
-                  Crear cuenta gratis
+                  Diagnostica tu empresa
                 </Link>
               </>
             )}
