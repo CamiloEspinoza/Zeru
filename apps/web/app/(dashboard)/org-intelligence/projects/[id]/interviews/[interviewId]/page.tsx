@@ -317,6 +317,11 @@ export default function InterviewDetailPage({
                   ...prev,
                   { status: event.status, message: event.message, timestamp: event.timestamp },
                 ]);
+              } else if (event.type === "pipeline:progress") {
+                setPipelineLog((prev) => [
+                  ...prev,
+                  { status: event.status, message: event.message, timestamp: event.timestamp },
+                ]);
               }
             } catch {
               // Ignore unparseable lines
@@ -793,23 +798,20 @@ export default function InterviewDetailPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Reprocess button for FAILED status */}
-          {currentStatus === "FAILED" && (
+          {/* Reprocess/retry button — visible when pipeline finished, failed, or is stuck */}
+          {currentStatus !== "PENDING" && currentStatus !== "UPLOADED" && (
             <Button
               variant="outline"
               onClick={() => setReprocessDialogOpen(true)}
               disabled={reprocessing}
             >
-              {reprocessing ? "Reintentando..." : "Reintentar procesamiento"}
-            </Button>
-          )}
-          {/* Reprocess button for COMPLETED status */}
-          {currentStatus === "COMPLETED" && (
-            <Button
-              variant="outline"
-              onClick={() => setReprocessDialogOpen(true)}
-            >
-              Reprocesar
+              {reprocessing
+                ? "Procesando..."
+                : currentStatus === "FAILED"
+                  ? "Reintentar"
+                  : currentStatus === "COMPLETED"
+                    ? "Reprocesar"
+                    : "Reiniciar desde..."}
             </Button>
           )}
           <Button

@@ -67,6 +67,7 @@ export class ExtractionPipelineService {
   async extract(
     tenantId: string,
     interviewId: string,
+    onProgress?: (pass: number, total: number, summary: string) => void,
   ): Promise<ExtractionResult> {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
@@ -131,9 +132,9 @@ export class ExtractionPipelineService {
       totalOutputTokens += p1.usage.outputTokens;
       await this.logUsage(tenantId, MODEL_MINI, 1, p1.usage);
       completedPasses.push(1);
-      this.logger.log(
-        `[${interviewId}] Pass 1 complete: ${pass1.roles.length} roles, ${pass1.departments.length} departments, ${pass1.systems.length} systems`,
-      );
+      const p1Summary = `${pass1.roles.length} roles, ${pass1.departments.length} departamentos, ${pass1.systems.length} sistemas`;
+      this.logger.log(`[${interviewId}] Pass 1 complete: ${p1Summary}`);
+      onProgress?.(1, 5, p1Summary);
     } catch (err) {
       failedPasses.push(1);
       this.logger.error(
@@ -160,9 +161,9 @@ export class ExtractionPipelineService {
       totalOutputTokens += p2.usage.outputTokens;
       await this.logUsage(tenantId, MODEL_MINI, 2, p2.usage);
       completedPasses.push(2);
-      this.logger.log(
-        `[${interviewId}] Pass 2 complete: ${pass2.processes.length} processes`,
-      );
+      const p2Summary = `${pass2.processes.length} procesos`;
+      this.logger.log(`[${interviewId}] Pass 2 complete: ${p2Summary}`);
+      onProgress?.(2, 5, p2Summary);
     } catch (err) {
       failedPasses.push(2);
       this.logger.error(
@@ -194,9 +195,9 @@ export class ExtractionPipelineService {
       totalOutputTokens += p3.usage.outputTokens;
       await this.logUsage(tenantId, MODEL_FULL, 3, p3.usage);
       completedPasses.push(3);
-      this.logger.log(
-        `[${interviewId}] Pass 3 complete: ${pass3.problems.length} problems`,
-      );
+      const p3Summary = `${pass3.problems.length} problemas`;
+      this.logger.log(`[${interviewId}] Pass 3 complete: ${p3Summary}`);
+      onProgress?.(3, 5, p3Summary);
     } catch (err) {
       failedPasses.push(3);
       this.logger.error(
@@ -228,9 +229,9 @@ export class ExtractionPipelineService {
       totalOutputTokens += p4.usage.outputTokens;
       await this.logUsage(tenantId, MODEL_FULL, 4, p4.usage);
       completedPasses.push(4);
-      this.logger.log(
-        `[${interviewId}] Pass 4 complete: ${pass4.dependencies.length} dependencies`,
-      );
+      const p4Summary = `${pass4.dependencies.length} dependencias`;
+      this.logger.log(`[${interviewId}] Pass 4 complete: ${p4Summary}`);
+      onProgress?.(4, 5, p4Summary);
     } catch (err) {
       failedPasses.push(4);
       this.logger.error(
@@ -255,9 +256,9 @@ export class ExtractionPipelineService {
       totalOutputTokens += p5.usage.outputTokens;
       await this.logUsage(tenantId, MODEL_MINI, 5, p5.usage);
       completedPasses.push(5);
-      this.logger.log(
-        `[${interviewId}] Pass 5 complete: ${pass5.claims.length} claims`,
-      );
+      const p5Summary = `${pass5.claims.length} claims factuales`;
+      this.logger.log(`[${interviewId}] Pass 5 complete: ${p5Summary}`);
+      onProgress?.(5, 5, p5Summary);
     } catch (err) {
       failedPasses.push(5);
       this.logger.error(

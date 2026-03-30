@@ -47,7 +47,7 @@ export interface PipelineLogEntry {
 
 /** SSE event emitted during interview pipeline processing */
 export interface PipelineEvent {
-  type: 'pipeline:status';
+  type: 'pipeline:status' | 'pipeline:progress';
   interviewId: string;
   status: ProcessingStatus;
   message: string;

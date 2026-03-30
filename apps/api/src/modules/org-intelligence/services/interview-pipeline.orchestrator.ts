@@ -71,6 +71,7 @@ export class InterviewPipelineOrchestrator {
     }
 
     if (
+      !fromStep &&
       interview.processingStatus !== 'UPLOADED' &&
       interview.processingStatus !== 'FAILED' &&
       interview.processingStatus !== 'COMPLETED'
@@ -143,6 +144,15 @@ export class InterviewPipelineOrchestrator {
         const extractionResult = await this.extraction.extract(
           tenantId,
           interviewId,
+          (pass, total, summary) => {
+            this.pipelineEvents.emit(interviewId, {
+              type: 'pipeline:progress',
+              interviewId,
+              status: 'EXTRACTING',
+              message: `Pasada ${pass}/${total} completada: ${summary}`,
+              timestamp: new Date().toISOString(),
+            });
+          },
         );
         if (extractionResult.metadata.completedPasses.length === 0) {
           throw new Error(
