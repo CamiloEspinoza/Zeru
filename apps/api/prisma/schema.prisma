@@ -646,6 +646,16 @@ model WaitlistEntry {
   @@map("waitlist_entries")
 }
 
+model FeatureRequest {
+  id        String   @id @default(uuid())
+  text      String
+  email     String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@map("feature_requests")
+}
+
 // ─── LinkedIn ─────────────────────────────────────────────
 
 /// Conexión OAuth de LinkedIn por tenant (1 por tenant)

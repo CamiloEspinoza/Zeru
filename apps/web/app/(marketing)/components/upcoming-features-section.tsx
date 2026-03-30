@@ -198,21 +198,24 @@ export function UpcomingFeaturesSection() {
     [votes, userVotes],
   );
 
-  const handleSuggestion = (e: React.FormEvent) => {
+  const handleSuggestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!suggestion.trim()) return;
-    // Store locally for now
-    const suggestions = JSON.parse(
-      localStorage.getItem("zeru_feature_suggestions") ?? "[]",
-    );
-    suggestions.push({
-      text: suggestion.trim(),
-      date: new Date().toISOString(),
-    });
-    localStorage.setItem(
-      "zeru_feature_suggestions",
-      JSON.stringify(suggestions),
-    );
+    try {
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+      await fetch(`${apiBase}/public/feature-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: suggestion.trim() }),
+      });
+    } catch {
+      // Si falla el API, guardar localmente como fallback
+      const suggestions = JSON.parse(
+        localStorage.getItem("zeru_feature_suggestions") ?? "[]",
+      );
+      suggestions.push({ text: suggestion.trim(), date: new Date().toISOString() });
+      localStorage.setItem("zeru_feature_suggestions", JSON.stringify(suggestions));
+    }
     setSuggestion("");
     setSuggestionSent(true);
     setTimeout(() => setSuggestionSent(false), 3000);
@@ -339,10 +342,14 @@ export function UpcomingFeaturesSection() {
               />
               <button
                 type="submit"
-                disabled={!suggestion.trim()}
-                className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs font-medium text-white/50 hover:bg-white/10 hover:text-white/70 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={!suggestion.trim() && !suggestionSent}
+                className={`w-full rounded-lg px-3 py-2 text-xs font-medium transition-all duration-300 ${
+                  suggestionSent
+                    ? "bg-teal-500 border border-teal-400 text-white shadow-lg shadow-teal-500/30 scale-105"
+                    : "bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70 disabled:opacity-30 disabled:cursor-not-allowed"
+                }`}
               >
-                {suggestionSent ? "¡Recibido! Gracias 🎉" : "Enviar propuesta"}
+                {suggestionSent ? "✓ ¡Recibido! Gracias" : "Enviar propuesta"}
               </button>
             </form>
           </div>
