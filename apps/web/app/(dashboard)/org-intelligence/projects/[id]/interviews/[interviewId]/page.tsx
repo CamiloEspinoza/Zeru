@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import { TranscriptionPlayer } from "@/components/org-intelligence/transcription-player";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,7 @@ interface Interview {
   processingLog: PipelineLogEntry[] | null;
   audioS3Key: string | null;
   audioMimeType: string | null;
+  audioDurationMs: number | null;
   transcriptionText: string | null;
   transcriptionJson: Record<string, unknown> | null;
   transcriptionStatus: string;
@@ -1175,49 +1177,57 @@ export default function InterviewDetailPage({
       )}
 
       {/* Section 4: Transcription */}
-      {showTranscription && interview.transcriptionJson && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Transcripción</CardTitle>
-            <CardDescription>
-              Transcripción con identificación de hablantes. Cada color representa un participante diferente de la entrevista. {((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[] | undefined)?.length ?? 0} segmentos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-[600px] space-y-3 overflow-y-auto pr-2">
-              {(((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[]) ?? []).map(
-                (segment: TranscriptionSegment, i: number) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="shrink-0 pt-0.5">
-                      <Badge
-                        variant="outline"
-                        className={getSpeakerColor(
-                          segment.speaker,
-                          speakerMap,
+      {showTranscription && interview.transcriptionJson && (() => {
+        const segments = ((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[]) ?? [];
+        const hasAudio = !!interview.audioS3Key;
+
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Transcripción</CardTitle>
+              <CardDescription>
+                Transcripción con identificación de hablantes.{" "}
+                {segments.length} segmentos.
+                {hasAudio && " Haz clic en un segmento para ir a ese momento del audio."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {hasAudio ? (
+                <TranscriptionPlayer
+                  interviewId={interview.id}
+                  segments={segments}
+                  speakerNameMap={speakerNameMap}
+                  durationMs={interview.audioDurationMs ?? 0}
+                />
+              ) : (
+                <div className="max-h-[600px] space-y-3 overflow-y-auto pr-2">
+                  {segments.map((segment: TranscriptionSegment, i: number) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="shrink-0 pt-0.5">
+                        <Badge
+                          variant="outline"
+                          className={getSpeakerColor(segment.speaker, speakerMap)}
+                        >
+                          {speakerNameMap.get(segment.speaker) ?? segment.speaker}
+                        </Badge>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm leading-relaxed">{segment.text}</p>
+                        {segment.startMs != null && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTimestamp(segment.startMs / 1000)}
+                            {segment.endMs != null && ` - ${formatTimestamp(segment.endMs / 1000)}`}
+                          </span>
                         )}
-                      >
-                        {speakerNameMap.get(segment.speaker) ?? segment.speaker}
-                      </Badge>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-relaxed">
-                        {segment.text}
-                      </p>
-                      {segment.startMs != null && (
-                        <span className="text-[10px] text-muted-foreground">
-                          {formatTimestamp(segment.startMs / 1000)}
-                          {segment.endMs != null &&
-                            ` - ${formatTimestamp(segment.endMs / 1000)}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ),
+                  ))}
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Edit Interview Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

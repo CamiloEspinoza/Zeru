@@ -11,6 +11,14 @@ import { AiConfigService } from '../../ai/services/ai-config.service';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface TranscriptionWord {
+  word: string;
+  punctuatedWord: string;
+  startMs: number;
+  endMs: number;
+  confidence: number;
+}
+
 export interface TranscriptionSegment {
   speaker: string; // "Speaker_0", "Speaker_1" or identified name
   text: string;
@@ -18,6 +26,7 @@ export interface TranscriptionSegment {
   endMs: number;
   confidence: number; // 0-1
   speakerConfidence?: number;
+  words?: TranscriptionWord[];
 }
 
 export interface TranscriptionResult {
@@ -220,6 +229,14 @@ export class TranscriptionService {
             ) / words.length
           : undefined;
 
+      const mappedWords: TranscriptionWord[] = words.map((w) => ({
+        word: w.word ?? '',
+        punctuatedWord: w.punctuated_word ?? w.word ?? '',
+        startMs: Math.round((w.start ?? 0) * 1000),
+        endMs: Math.round((w.end ?? 0) * 1000),
+        confidence: w.confidence ?? 0,
+      }));
+
       return {
         speaker: `Speaker_${speaker}`,
         text: utt.transcript ?? '',
@@ -229,6 +246,7 @@ export class TranscriptionService {
         ...(avgSpeakerConf !== undefined
           ? { speakerConfidence: avgSpeakerConf }
           : {}),
+        words: mappedWords,
       };
     });
 
