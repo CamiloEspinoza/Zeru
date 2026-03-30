@@ -6,48 +6,129 @@ import {
   PuzzleIcon,
   DashboardBrowsingIcon,
   ApiIcon,
+  PackageIcon,
+  Invoice02Icon,
+  BankIcon,
+  UserMultipleIcon,
+  Store01Icon,
+  Target01Icon,
+  CreditCardIcon,
+  CustomerServiceIcon,
+  Megaphone01Icon,
 } from "@hugeicons/core-free-icons";
 
 const upcomingFeatures = [
   {
-    name: "Gestion de RRHH",
+    name: "Gestión de RRHH",
     description:
-      "Contratos, vacaciones, asistencia y evaluaciones de desempeno en una sola plataforma.",
+      "Contratos, vacaciones, asistencia y evaluaciones de desempeño en una sola plataforma.",
     href: "/features/gestion-rrhh",
     icon: Calendar01Icon,
     quarter: "Q2 2026",
   },
   {
-    name: "Gestion Documental",
+    name: "Gestión Documental",
     description:
-      "Flujos de aprobacion, firma electronica y versionado de documentos empresariales.",
+      "Flujos de aprobación, firma electrónica y versionado de documentos empresariales.",
     href: "/features/gestion-documental",
     icon: DocumentValidationIcon,
+    quarter: "Q2 2026",
+  },
+  {
+    name: "Reportes y BI",
+    description:
+      "Dashboards customizables, KPIs en tiempo real y análisis de datos avanzado.",
+    href: "/features/reportes-bi",
+    icon: DashboardBrowsingIcon,
     quarter: "Q3 2026",
   },
   {
     name: "Integraciones",
     description:
-      "SAP, Google Workspace, Microsoft 365 y mas. Conecta Zeru con tus herramientas.",
+      "SAP, Google Workspace, Microsoft 365 y más. Conecta Zeru con tus herramientas.",
     href: "/features/integraciones",
     icon: PuzzleIcon,
     quarter: "Q3 2026",
   },
   {
-    name: "Reportes y BI",
-    description:
-      "Dashboards customizables, KPIs en tiempo real y analisis de datos avanzado.",
-    href: "/features/reportes-bi",
-    icon: DashboardBrowsingIcon,
-    quarter: "Q4 2026",
-  },
-  {
-    name: "API Publica",
+    name: "API Pública",
     description:
       "Endpoints RESTful, webhooks y SDK para integrar Zeru con tus sistemas.",
     href: "/features/api-publica",
     icon: ApiIcon,
+    quarter: "Q3 2026",
+  },
+  {
+    name: "Inventario",
+    description:
+      "Control de stock, productos, movimientos y valorización en tiempo real.",
+    href: "#",
+    icon: PackageIcon,
+    quarter: "Q3 2026",
+  },
+  {
+    name: "Documentos Electrónicos (DTE)",
+    description:
+      "Emisión y recepción de facturas, boletas y notas de crédito vía SII.",
+    href: "#",
+    icon: Invoice02Icon,
     quarter: "Q4 2026",
+  },
+  {
+    name: "Conciliación Bancaria",
+    description:
+      "Importa cartolas y la IA concilia movimientos contra asientos contables automáticamente.",
+    href: "#",
+    icon: BankIcon,
+    quarter: "Q4 2026",
+  },
+  {
+    name: "Órdenes de Compra",
+    description:
+      "Flujo completo: cotización, orden de compra, recepción y contabilización automática.",
+    href: "#",
+    icon: CreditCardIcon,
+    quarter: "Q4 2026",
+  },
+  {
+    name: "CRM",
+    description:
+      "Auxiliar de clientes y proveedores con historial de operaciones e interacciones.",
+    href: "#",
+    icon: UserMultipleIcon,
+    quarter: "2027",
+  },
+  {
+    name: "Venta Online",
+    description:
+      "Tienda propia integrada al inventario, documentos electrónicos y medios de pago.",
+    href: "#",
+    icon: Store01Icon,
+    quarter: "2027",
+  },
+  {
+    name: "Control de Gestión",
+    description:
+      "Dashboard de KPIs, márgenes por línea de negocio y análisis de rentabilidad.",
+    href: "#",
+    icon: Target01Icon,
+    quarter: "2027",
+  },
+  {
+    name: "Atención al Cliente",
+    description:
+      "Bandeja unificada: WhatsApp, email e IA para respuestas automáticas.",
+    href: "#",
+    icon: CustomerServiceIcon,
+    quarter: "2027",
+  },
+  {
+    name: "Marketing Outbound",
+    description:
+      "Campañas de email y WhatsApp segmentadas desde los datos de tu CRM.",
+    href: "#",
+    icon: Megaphone01Icon,
+    quarter: "2027",
   },
 ];
 
@@ -65,17 +146,17 @@ export function UpcomingFeaturesSection() {
           <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight mb-6">
             Estamos construyendo{" "}
             <span className="text-white/40">
-              la plataforma empresarial mas completa de Latinoamerica
+              la plataforma empresarial más completa de Latinoamérica
             </span>
           </h2>
           <p className="text-white/50 text-lg leading-relaxed">
-            Nuevos modulos en desarrollo para cubrir todas las necesidades de tu
+            Nuevos módulos en desarrollo para cubrir todas las necesidades de tu
             empresa. Desde RRHH hasta integraciones con tus herramientas favoritas.
           </p>
         </div>
 
         {/* Cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {upcomingFeatures.map((feature, i) => (
             <Link
               key={feature.href}
@@ -103,7 +184,7 @@ export function UpcomingFeaturesSection() {
 
               {/* Link text */}
               <span className="text-xs text-white/30 group-hover:text-teal-400 transition-colors inline-flex items-center gap-1">
-                Mas informacion
+                Más información
                 <svg
                   className="w-3 h-3 transition-transform group-hover:translate-x-0.5"
                   fill="none"
