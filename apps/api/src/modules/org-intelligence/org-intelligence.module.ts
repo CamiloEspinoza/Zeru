@@ -22,6 +22,7 @@ import { ChunkingService } from './services/chunking.service';
 import { OrgEmbeddingService } from './services/org-embedding.service';
 import { OrgSearchService } from './services/org-search.service';
 import { InterviewPipelineOrchestrator } from './services/interview-pipeline.orchestrator';
+import { PipelineEventsService } from './services/pipeline-events.service';
 import { OrgDiagramService } from './services/org-diagram.service';
 import { OrgDiagnosisService } from './services/org-diagnosis.service';
 import { OrgImprovementsService } from './services/org-improvements.service';
@@ -52,6 +53,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
     OrgEmbeddingService,
     OrgSearchService,
     InterviewPipelineOrchestrator,
+    PipelineEventsService,
     OrgDiagramService,
     OrgDiagnosisService,
     OrgImprovementsService,
@@ -69,6 +71,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
     OrgEmbeddingService,
     OrgSearchService,
     InterviewPipelineOrchestrator,
+    PipelineEventsService,
     OrgDiagramService,
     OrgDiagnosisService,
     OrgImprovementsService,

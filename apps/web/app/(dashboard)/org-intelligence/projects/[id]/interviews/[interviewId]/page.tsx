@@ -3,7 +3,12 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api-client";
-import { TENANT_HEADER } from "@zeru/shared";
+import {
+  TENANT_HEADER,
+  PROCESSING_STATUS_MESSAGES,
+  type PipelineEvent,
+  type PipelineLogEntry,
+} from "@zeru/shared";
 import {
   Card,
   CardContent,
@@ -44,6 +49,7 @@ interface Interview {
   interviewDate: string | null;
   processingStatus: string;
   processingError: string | null;
+  processingLog: PipelineLogEntry[] | null;
   audioS3Key: string | null;
   audioMimeType: string | null;
   transcriptionText: string | null;
@@ -59,7 +65,7 @@ interface Speaker {
   speakerLabel: string;
   name: string | null;
   role: string | null;
-  department: string | null;
+  department: string | { id: string; name: string } | null;
   isInterviewer: boolean;
   personEntityId: string | null;
 }
@@ -90,13 +96,6 @@ interface TranscriptionSegment {
   endMs: number;
   confidence: number;
   speakerConfidence?: number;
-}
-
-interface ProcessingStatus {
-  id: string;
-  processingStatus: string;
-  processingError: string | null;
-  transcriptionStatus: string;
 }
 
 const pipelineSteps = [
@@ -182,11 +181,12 @@ export default function InterviewDetailPage({
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processing, setProcessing] = useState(false);
-  const [processingStatus, setProcessingStatus] =
-    useState<ProcessingStatus | null>(null);
+  const [currentProcessingStatus, setCurrentProcessingStatus] = useState<string | null>(null);
+  const [currentProcessingError, setCurrentProcessingError] = useState<string | null>(null);
+  const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseAbortRef = useRef<AbortController | null>(null);
 
   // Speaker management state
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
@@ -225,13 +225,22 @@ export default function InterviewDetailPage({
         `/org-intelligence/interviews/${interviewId}`,
       );
       setInterview(res);
+
+      // Hydrate processing state from DB
+      setCurrentProcessingStatus(res.processingStatus);
+      setCurrentProcessingError(res.processingError);
+      if (Array.isArray(res.processingLog) && res.processingLog.length > 0) {
+        setPipelineLog(res.processingLog);
+      }
+
+      // If actively processing, connect SSE
       if (
         res.processingStatus !== "PENDING" &&
         res.processingStatus !== "UPLOADED" &&
         res.processingStatus !== "COMPLETED" &&
         res.processingStatus !== "FAILED"
       ) {
-        startPolling();
+        connectSSE();
       }
     } catch (err) {
       console.error("Error al cargar entrevista:", err);
@@ -241,42 +250,102 @@ export default function InterviewDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
 
-  const startPolling = useCallback(() => {
-    if (pollingRef.current) return;
-    pollingRef.current = setInterval(async () => {
-      try {
-        const status = await api.get<ProcessingStatus>(
-          `/org-intelligence/interviews/${interviewId}/status`,
-        );
-        setProcessingStatus(status);
-        if (
-          status.processingStatus === "COMPLETED" ||
-          status.processingStatus === "FAILED"
-        ) {
-          if (pollingRef.current) {
-            clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-          // Re-fetch interview to get latest data
-          const res = await api.get<Interview>(
-            `/org-intelligence/interviews/${interviewId}`,
-          );
-          setInterview(res);
+  /** Connect to the SSE endpoint for real-time pipeline events */
+  const connectSSE = useCallback(() => {
+    // Avoid duplicate connections
+    if (sseAbortRef.current) return;
+
+    const tenantId =
+      typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+
+    const abortController = new AbortController();
+    sseAbortRef.current = abortController;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+    const headers: Record<string, string> = { Accept: "text/event-stream" };
+    if (tenantId) headers[TENANT_HEADER] = tenantId;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    fetch(`${apiBase}/org-intelligence/interviews/${interviewId}/pipeline-events`, {
+      headers,
+      signal: abortController.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok || response.status === 204 || !response.body) {
+          // No active pipeline — nothing to stream
+          sseAbortRef.current = null;
+          return;
         }
-      } catch (err) {
-        console.error("Error al verificar estado:", err);
-      }
-    }, 3000);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6).trim();
+            if (payload === "[DONE]") {
+              // Pipeline finished — re-fetch interview for full data
+              const res = await api.get<Interview>(
+                `/org-intelligence/interviews/${interviewId}`,
+              );
+              setInterview(res);
+              setCurrentProcessingStatus(res.processingStatus);
+              setCurrentProcessingError(res.processingError);
+              sseAbortRef.current = null;
+              return;
+            }
+            try {
+              const event = JSON.parse(payload) as PipelineEvent;
+              if (event.type === "pipeline:status") {
+                setCurrentProcessingStatus(event.status);
+                if (event.status === "FAILED") {
+                  setCurrentProcessingError(event.message);
+                }
+                setPipelineLog((prev) => [
+                  ...prev,
+                  { status: event.status, message: event.message, timestamp: event.timestamp },
+                ]);
+              }
+            } catch {
+              // Ignore unparseable lines
+            }
+          }
+        }
+        sseAbortRef.current = null;
+      })
+      .catch((err) => {
+        if (err?.name !== "AbortError") {
+          console.error("SSE connection error:", err);
+        }
+        sseAbortRef.current = null;
+      });
   }, [interviewId]);
+
+  /** Disconnect from SSE stream */
+  const disconnectSSE = useCallback(() => {
+    if (sseAbortRef.current) {
+      sseAbortRef.current.abort();
+      sseAbortRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     fetchInterview();
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      disconnectSSE();
     };
-  }, [fetchInterview]);
+  }, [fetchInterview, disconnectSSE]);
 
   // Debounced search for directory persons
   useEffect(() => {
@@ -429,8 +498,16 @@ export default function InterviewDetailPage({
         `/org-intelligence/interviews/${interviewId}/process`,
         {},
       );
-      setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
-      startPolling();
+      // Immediately update local state and reset log
+      setCurrentProcessingStatus("TRANSCRIBING");
+      setCurrentProcessingError(null);
+      setPipelineLog([{
+        status: "TRANSCRIBING",
+        message: PROCESSING_STATUS_MESSAGES.TRANSCRIBING,
+        timestamp: new Date().toISOString(),
+      }]);
+      // Connect SSE for real-time updates
+      connectSSE();
       await fetchInterview();
     } catch (err) {
       console.error("Error al iniciar procesamiento:", err);
@@ -498,8 +575,16 @@ export default function InterviewDetailPage({
         {},
       );
       setReprocessDialogOpen(false);
-      setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
-      startPolling();
+      // Immediately update local state and reset log
+      setCurrentProcessingStatus("TRANSCRIBING");
+      setCurrentProcessingError(null);
+      setPipelineLog([{
+        status: "TRANSCRIBING",
+        message: PROCESSING_STATUS_MESSAGES.TRANSCRIBING,
+        timestamp: new Date().toISOString(),
+      }]);
+      disconnectSSE();
+      connectSSE();
       await fetchInterview();
     } catch (err) {
       console.error("Error al reprocesar entrevista:", err);
@@ -528,11 +613,16 @@ export default function InterviewDetailPage({
   const openEditSpeakerDialog = (index: number) => {
     if (!interview) return;
     const speaker = interview.speakers[index];
+    const dept = typeof speaker.department === "string"
+      ? speaker.department
+      : speaker.department && typeof speaker.department === "object"
+        ? (speaker.department as { name: string }).name
+        : "";
     setSpeakerForm({
       speakerLabel: speaker.speakerLabel,
       name: speaker.name ?? "",
       role: speaker.role ?? "",
-      department: speaker.department ?? "",
+      department: dept,
       isInterviewer: speaker.isInterviewer,
       personEntityId: speaker.personEntityId ?? null,
     });
@@ -548,14 +638,21 @@ export default function InterviewDetailPage({
     if (!interview || !speakerForm.speakerLabel.trim()) return;
     setSavingSpeakers(true);
     try {
-      const currentSpeakers = interview.speakers.map((s) => ({
-        speakerLabel: s.speakerLabel,
-        name: s.name ?? undefined,
-        role: s.role ?? undefined,
-        department: s.department ?? undefined,
-        isInterviewer: s.isInterviewer,
-        personEntityId: s.personEntityId ?? undefined,
-      }));
+      const currentSpeakers = interview.speakers.map((s) => {
+        const dept = typeof s.department === "string"
+          ? s.department
+          : s.department && typeof s.department === "object"
+            ? String((s.department as Record<string, string>).name ?? "")
+            : undefined;
+        return {
+          speakerLabel: s.speakerLabel,
+          name: s.name ?? undefined,
+          role: s.role ?? undefined,
+          department: dept || undefined,
+          isInterviewer: s.isInterviewer ?? false,
+          personEntityId: s.personEntityId || undefined,
+        };
+      });
 
       const newSpeakerData = {
         speakerLabel: speakerForm.speakerLabel,
@@ -657,7 +754,7 @@ export default function InterviewDetailPage({
     );
   }
 
-  const currentStatus = processingStatus?.processingStatus ?? interview.processingStatus;
+  const currentStatus = currentProcessingStatus ?? interview.processingStatus;
   const currentStepIndex = pipelineSteps.indexOf(currentStatus);
   const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
   const showUpload =
@@ -792,7 +889,7 @@ export default function InterviewDetailPage({
                       <div className="flex gap-2 text-xs text-muted-foreground">
                         {speaker.role && <span>{speaker.role}</span>}
                         {speaker.role && speaker.department && <span>-</span>}
-                        {speaker.department && <span>{speaker.department}</span>}
+                        {speaker.department && <span>{typeof speaker.department === "string" ? speaker.department : (speaker.department as { name: string }).name}</span>}
                       </div>
                     </div>
                   </div>
@@ -918,16 +1015,16 @@ export default function InterviewDetailPage({
       {showProcess && interview.audioS3Key?.split("/").pop() && (
         <Card>
           <CardHeader>
-            <CardTitle>Audio Subido</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Audio Subido</CardTitle>
+              <HelpTooltip text="Al procesar, la IA transcribirá el audio, identificará quién habla, extraerá roles, procesos, problemas y dependencias, y generará un mapa de conocimiento organizacional. Este proceso toma entre 3 y 5 minutos." />
+            </div>
             <CardDescription>{interview.audioS3Key?.split("/").pop()}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleProcess} disabled={processing}>
-                {processing ? "Iniciando..." : "Procesar"}
-              </Button>
-              <HelpTooltip text="Al procesar, la IA transcribirá el audio, identificará quién habla, extraerá roles, procesos, problemas y dependencias, y generará un mapa de conocimiento organizacional. Este proceso toma entre 3 y 5 minutos." />
-            </div>
+            <Button onClick={handleProcess} disabled={processing}>
+              {processing ? "Iniciando..." : "Procesar"}
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -936,7 +1033,25 @@ export default function InterviewDetailPage({
       {showPipeline && (
         <Card>
           <CardHeader>
-            <CardTitle>Estado del Procesamiento</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle>Estado del Procesamiento</CardTitle>
+              <HelpTooltip
+                iconSize="md"
+                text={
+                  <div className="space-y-1.5 py-1">
+                    <p><strong>Subido:</strong> Audio recibido correctamente.</p>
+                    <p><strong>Transcribiendo:</strong> Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3).</p>
+                    <p><strong>Post-procesando:</strong> Limpiando y estructurando la transcripción.</p>
+                    <p><strong>Extrayendo:</strong> Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas).</p>
+                    <p><strong>Reconciliando:</strong> Resolviendo entidades duplicadas y co-referencias.</p>
+                    <p><strong>Resumiendo:</strong> Generando resúmenes de cada segmento.</p>
+                    <p><strong>Fragmentando:</strong> Dividiendo la transcripción para búsqueda semántica.</p>
+                    <p><strong>Indexando:</strong> Generando embeddings vectoriales.</p>
+                    <p><strong>Completado:</strong> Resultados disponibles en Análisis y Diagnóstico.</p>
+                  </div>
+                }
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -976,40 +1091,58 @@ export default function InterviewDetailPage({
                             ? "\u2713"
                             : i + 1}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span
-                          className={`text-[10px] ${
-                            isCurrent || isCompleted
-                              ? "font-medium text-foreground"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {pipelineStepLabels[step]}
-                        </span>
-                        <HelpTooltip text={pipelineStepDescriptions[step]} />
-                      </div>
+                      <span
+                        className={`text-[10px] ${
+                          isCurrent || isCompleted
+                            ? "font-medium text-foreground"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {pipelineStepLabels[step]}
+                      </span>
                     </div>
                   </React.Fragment>
                 );
               })}
             </div>
-            {currentStatus === "TRANSCRIBING" && (
+            {/* Current step description */}
+            {currentStatus !== "COMPLETED" && currentStatus !== "FAILED" && currentStatus !== "UPLOADED" && pipelineStepDescriptions[currentStatus] && (
               <p className="mt-4 text-xs text-muted-foreground">
-                Convirtiendo audio a texto. Esto suele tomar 1-2 minutos dependiendo de la duración del audio.
-              </p>
-            )}
-            {currentStatus === "EXTRACTING" && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                Analizando el texto para identificar personas, procesos, problemas y dependencias. Esto toma 2-3 minutos.
+                {pipelineStepDescriptions[currentStatus]}
               </p>
             )}
             {currentStatus === "FAILED" && (
               <p className="mt-4 text-xs text-red-600">
                 Error:{" "}
-                {processingStatus?.processingError ??
+                {currentProcessingError ??
                   interview.processingError ??
                   "Error desconocido"}
               </p>
+            )}
+
+            {/* Processing activity log */}
+            {pipelineLog.length > 0 && currentStatus !== "UPLOADED" && (
+              <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+                <p className="mb-2 text-xs font-medium text-muted-foreground">Log de procesamiento</p>
+                <div className="max-h-[180px] space-y-1 overflow-y-auto">
+                  {pipelineLog.map((entry, i) => (
+                    <div key={i} className="flex items-start gap-2 text-xs">
+                      <span className="shrink-0 text-muted-foreground">
+                        {new Date(entry.timestamp).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      </span>
+                      <span className={
+                        entry.status === "COMPLETED"
+                          ? "text-green-600"
+                          : entry.status === "FAILED"
+                            ? "text-red-600"
+                            : "text-foreground"
+                      }>
+                        {entry.message}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1227,7 +1360,7 @@ export default function InterviewDetailPage({
                       <button
                         key={person.id}
                         type="button"
-                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent"
+                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent hover:text-accent-foreground [&:hover_.text-muted-foreground]:text-accent-foreground/70"
                         onClick={() => {
                           setSelectedPerson(person);
                           setSpeakerForm({

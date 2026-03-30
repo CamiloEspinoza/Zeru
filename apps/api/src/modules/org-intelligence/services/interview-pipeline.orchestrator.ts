@@ -12,6 +12,13 @@ import { CoreferenceService } from './coreference.service';
 import { ChunkingService } from './chunking.service';
 import { OrgEmbeddingService } from './org-embedding.service';
 import { BackgroundQueueService } from '../../ai/services/background-queue.service';
+import { PipelineEventsService } from './pipeline-events.service';
+import {
+  PROCESSING_STATUS_MESSAGES,
+  type ProcessingStatus,
+  type PipelineLogEntry,
+  type PipelineEvent,
+} from '@zeru/shared';
 
 @Injectable()
 export class InterviewPipelineOrchestrator {
@@ -25,6 +32,7 @@ export class InterviewPipelineOrchestrator {
     private readonly chunking: ChunkingService,
     private readonly embedding: OrgEmbeddingService,
     private readonly backgroundQueue: BackgroundQueueService,
+    private readonly pipelineEvents: PipelineEventsService,
   ) {}
 
   /**
@@ -61,13 +69,13 @@ export class InterviewPipelineOrchestrator {
       );
     }
 
-    // 2. Mark as processing
-    await client.interview.update({
-      where: { id: interviewId },
-      data: { processingStatus: 'TRANSCRIBING', processingError: null },
-    });
+    // 2. Initialise the SSE subject so clients can connect immediately
+    this.pipelineEvents.getOrCreate(interviewId);
 
-    // 3. Enqueue async pipeline
+    // 3. Mark as processing and reset log
+    await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
+
+    // 4. Enqueue async pipeline
     this.backgroundQueue.enqueue({
       name: `interview-pipeline-${interviewId}`,
       fn: () => this.runPipeline(tenantId, interviewId),
@@ -130,6 +138,9 @@ export class InterviewPipelineOrchestrator {
       // Mark complete
       await this.updateStatus(interviewId, tenantId, 'COMPLETED');
       this.logger.log(`[${interviewId}] Pipeline complete`);
+
+      // Close SSE stream
+      this.pipelineEvents.complete(interviewId);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Error desconocido';
@@ -140,28 +151,62 @@ export class InterviewPipelineOrchestrator {
         stack,
       );
 
-      const client = this.prisma.forTenant(
-        tenantId,
-      ) as unknown as PrismaClient;
-      await client.interview.update({
-        where: { id: interviewId },
-        data: {
-          processingStatus: 'FAILED',
-          processingError: message,
-        },
-      });
+      await this.updateStatus(interviewId, tenantId, 'FAILED', message);
+
+      // Close SSE stream
+      this.pipelineEvents.complete(interviewId);
     }
   }
 
   private async updateStatus(
     interviewId: string,
     tenantId: string,
-    status: string,
+    status: ProcessingStatus,
+    errorMessage?: string,
   ): Promise<void> {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const statusMessage =
+      status === 'FAILED' && errorMessage
+        ? `${PROCESSING_STATUS_MESSAGES.FAILED}: ${errorMessage}`
+        : PROCESSING_STATUS_MESSAGES[status];
+
+    // Build the new log entry
+    const logEntry: PipelineLogEntry = {
+      status,
+      message: statusMessage,
+      timestamp: new Date().toISOString(),
+    };
+
+    // Read existing log from DB so we append (not overwrite)
+    const current = await client.interview.findUnique({
+      where: { id: interviewId },
+      select: { processingLog: true },
+    });
+    const existingLog = Array.isArray(current?.processingLog)
+      ? (current.processingLog as unknown as PipelineLogEntry[])
+      : [];
+
+    // If we're starting fresh (TRANSCRIBING is first real step), reset the log
+    const log = status === 'TRANSCRIBING' ? [logEntry] : [...existingLog, logEntry];
+
     await client.interview.update({
       where: { id: interviewId },
-      data: { processingStatus: status },
+      data: {
+        processingStatus: status,
+        processingError: status === 'FAILED' ? (errorMessage ?? null) : null,
+        processingLog: log as unknown as object[],
+      },
     });
+
+    // Emit SSE event
+    const event: PipelineEvent = {
+      type: 'pipeline:status',
+      interviewId,
+      status,
+      message: statusMessage,
+      timestamp: logEntry.timestamp,
+    };
+    this.pipelineEvents.emit(interviewId, event);
   }
 }

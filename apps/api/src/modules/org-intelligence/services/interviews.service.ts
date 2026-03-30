@@ -165,11 +165,13 @@ export class InterviewsService {
   }
 
   async updateSpeakers(tenantId: string, id: string, dto: UpdateSpeakerDto) {
+    // Verify interview belongs to tenant
     await this.findOne(tenantId, id);
 
-    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-
-    return client.$transaction(async (tx) => {
+    // Use base prisma client (not tenant-aware) because InterviewSpeaker
+    // doesn't have tenantId column — tenant isolation is guaranteed by
+    // the findOne check above (interview.tenantId === tenantId)
+    return this.prisma.$transaction(async (tx) => {
       await tx.interviewSpeaker.deleteMany({
         where: { interviewId: id },
       });
@@ -179,7 +181,6 @@ export class InterviewsService {
         dto.speakers.map(async (s) => {
           let personEntityId: string | null = s.personEntityId ?? null;
 
-          // Only auto-match by name if no explicit personEntityId was provided
           if (!personEntityId && s.name) {
             try {
               const person = await tx.personProfile.findFirst({
@@ -192,7 +193,7 @@ export class InterviewsService {
               });
               personEntityId = person?.id ?? null;
             } catch {
-              // Ignore matching errors — speaker will be created without link
+              // Ignore matching errors
             }
           }
 
@@ -202,7 +203,7 @@ export class InterviewsService {
             name: s.name,
             role: s.role,
             department: s.department,
-            isInterviewer: s.isInterviewer,
+            isInterviewer: s.isInterviewer ?? false,
             personEntityId,
           };
         }),
@@ -237,6 +238,7 @@ export class InterviewsService {
       processingStatus: interview.processingStatus,
       processingError: interview.processingError,
       transcriptionStatus: interview.transcriptionStatus,
+      processingLog: interview.processingLog ?? [],
     };
   }
 }

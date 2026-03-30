@@ -7,11 +7,13 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
@@ -19,6 +21,7 @@ import { CurrentTenant } from '../../../common/decorators/current-tenant.decorat
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { InterviewsService } from '../services/interviews.service';
 import { InterviewPipelineOrchestrator } from '../services/interview-pipeline.orchestrator';
+import { PipelineEventsService } from '../services/pipeline-events.service';
 import {
   createInterviewSchema,
   updateInterviewSchema,
@@ -36,6 +39,7 @@ export class InterviewsController {
   constructor(
     private readonly interviewsService: InterviewsService,
     private readonly pipeline: InterviewPipelineOrchestrator,
+    private readonly pipelineEvents: PipelineEventsService,
   ) {}
 
   @Post()
@@ -121,5 +125,49 @@ export class InterviewsController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.interviewsService.getStatus(tenantId, id);
+  }
+
+  /**
+   * SSE endpoint for real-time pipeline progress.
+   * Returns 200 + event-stream if the pipeline is active, or 204 if not.
+   */
+  @Get(':id/pipeline-events')
+  async pipelineEvents(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+    @Res() res: Response,
+  ) {
+    // Ensure interview exists and belongs to tenant
+    await this.interviewsService.findOne(tenantId, id);
+
+    const subject = this.pipelineEvents.get(id);
+    if (!subject) {
+      // No active pipeline — client should rely on DB state
+      res.status(204).end();
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const subscription = subject.subscribe({
+      next: (event) => {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      },
+      complete: () => {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      },
+      error: () => {
+        res.end();
+      },
+    });
+
+    res.on('close', () => {
+      subscription.unsubscribe();
+    });
   }
 }

@@ -1052,6 +1052,7 @@ model Interview {
   extractionResult      Json?
   processingStatus      String                @default("PENDING")
   processingError       String?
+  processingLog         Json?
   deletedAt             DateTime?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
