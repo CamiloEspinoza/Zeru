@@ -781,6 +781,13 @@ export default function InterviewDetailPage({
 
   const hasSpeakers = interview.speakers.length > 0;
   const speakerMap = new Map<string, number>();
+  // Map Deepgram labels (Speaker_0) to real names for transcription display
+  const speakerNameMap = new Map<string, string>();
+  for (const s of interview.speakers) {
+    if (s.name) {
+      speakerNameMap.set(s.speakerLabel, s.name);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -1189,7 +1196,7 @@ export default function InterviewDetailPage({
                           speakerMap,
                         )}
                       >
-                        {segment.speaker}
+                        {speakerNameMap.get(segment.speaker) ?? segment.speaker}
                       </Badge>
                     </div>
                     <div className="min-w-0 flex-1">
