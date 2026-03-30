@@ -174,12 +174,13 @@ export class InterviewsService {
         where: { interviewId: id },
       });
 
-      // For each speaker, try to match to an existing PersonProfile
+      // For each speaker, use explicit personEntityId if provided, otherwise try to match by name
       const speakersData = await Promise.all(
         dto.speakers.map(async (s) => {
-          let personEntityId: string | null = null;
+          let personEntityId: string | null = s.personEntityId ?? null;
 
-          if (s.name) {
+          // Only auto-match by name if no explicit personEntityId was provided
+          if (!personEntityId && s.name) {
             try {
               const person = await tx.personProfile.findFirst({
                 where: {

@@ -29,9 +29,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ProgressCelebration } from "@/components/org-intelligence/progress-celebration";
+import { PersonAvatar } from "@/components/org-intelligence/person-avatar";
 import { useFirstVisit } from "@/hooks/use-first-visit";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Edit02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import Link from "next/link";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -59,6 +61,17 @@ interface Speaker {
   role: string | null;
   department: string | null;
   isInterviewer: boolean;
+  personEntityId: string | null;
+}
+
+interface DirectoryPerson {
+  id: string;
+  name: string;
+  role: string | null;
+  department: { id: string; name: string; color: string | null } | null;
+  personType: string;
+  company: string | null;
+  avatarS3Key: string | null;
 }
 
 interface SpeakerFormData {
@@ -67,6 +80,7 @@ interface SpeakerFormData {
   role: string;
   department: string;
   isInterviewer: boolean;
+  personEntityId: string | null;
 }
 
 interface TranscriptionSegment {
@@ -152,6 +166,7 @@ const emptySpeakerForm: SpeakerFormData = {
   role: "",
   department: "",
   isInterviewer: false,
+  personEntityId: null,
 };
 
 export default function InterviewDetailPage({
@@ -178,6 +193,14 @@ export default function InterviewDetailPage({
   const [speakerForm, setSpeakerForm] = useState<SpeakerFormData>(emptySpeakerForm);
   const [editingSpeakerIndex, setEditingSpeakerIndex] = useState<number | null>(null);
   const [savingSpeakers, setSavingSpeakers] = useState(false);
+
+  // Person directory search (for adding participant from directory)
+  const [searchMode, setSearchMode] = useState(true);
+  const [personSearch, setPersonSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<DirectoryPerson[]>([]);
+  const [selectedPerson, setSelectedPerson] = useState<DirectoryPerson | null>(null);
+  const [personAvatarUrls, setPersonAvatarUrls] = useState<Record<string, string>>({});
+  const [speakerAvatarUrls, setSpeakerAvatarUrls] = useState<Record<string, string>>({});
 
   // Edit interview state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -254,6 +277,63 @@ export default function InterviewDetailPage({
       }
     };
   }, [fetchInterview]);
+
+  // Debounced search for directory persons
+  useEffect(() => {
+    if (!personSearch.trim() || personSearch.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get<{ data: DirectoryPerson[] }>(
+          `/org-intelligence/persons?search=${encodeURIComponent(personSearch)}`,
+        );
+        const results = res.data ?? [];
+        setSearchResults(results);
+        // Fetch avatar URLs for results that have avatarS3Key
+        results.forEach(async (person) => {
+          if (person.avatarS3Key && !personAvatarUrls[person.id]) {
+            try {
+              const avatarRes = await api.get<{ url: string | null }>(
+                `/org-intelligence/persons/${person.id}/avatar`,
+              );
+              if (avatarRes.url) {
+                setPersonAvatarUrls((prev) => ({ ...prev, [person.id]: avatarRes.url! }));
+              }
+            } catch {
+              // Ignore avatar fetch errors
+            }
+          }
+        });
+      } catch {
+        setSearchResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [personSearch, personAvatarUrls]);
+
+  // Fetch avatar URLs for speakers with personEntityId
+  useEffect(() => {
+    if (!interview?.speakers) return;
+    interview.speakers.forEach(async (speaker) => {
+      if (speaker.personEntityId && !speakerAvatarUrls[speaker.personEntityId]) {
+        try {
+          const res = await api.get<{ url: string | null }>(
+            `/org-intelligence/persons/${speaker.personEntityId}/avatar`,
+          );
+          if (res.url) {
+            setSpeakerAvatarUrls((prev) => ({
+              ...prev,
+              [speaker.personEntityId!]: res.url!,
+            }));
+          }
+        } catch {
+          // Ignore avatar fetch errors
+        }
+      }
+    });
+  }, [interview?.speakers, speakerAvatarUrls]);
 
   const MAX_FILE_SIZE_MB = 500;
   const ALLOWED_AUDIO_TYPES = [
@@ -438,6 +518,10 @@ export default function InterviewDetailPage({
       speakerLabel: `Speaker_${nextIndex}`,
     });
     setEditingSpeakerIndex(null);
+    setSearchMode(true);
+    setPersonSearch("");
+    setSearchResults([]);
+    setSelectedPerson(null);
     setSpeakerDialogOpen(true);
   };
 
@@ -450,8 +534,13 @@ export default function InterviewDetailPage({
       role: speaker.role ?? "",
       department: speaker.department ?? "",
       isInterviewer: speaker.isInterviewer,
+      personEntityId: speaker.personEntityId ?? null,
     });
     setEditingSpeakerIndex(index);
+    setSearchMode(false);
+    setPersonSearch("");
+    setSearchResults([]);
+    setSelectedPerson(null);
     setSpeakerDialogOpen(true);
   };
 
@@ -465,31 +554,26 @@ export default function InterviewDetailPage({
         role: s.role ?? undefined,
         department: s.department ?? undefined,
         isInterviewer: s.isInterviewer,
+        personEntityId: s.personEntityId ?? undefined,
       }));
+
+      const newSpeakerData = {
+        speakerLabel: speakerForm.speakerLabel,
+        name: speakerForm.name || undefined,
+        role: speakerForm.role || undefined,
+        department: speakerForm.department || undefined,
+        isInterviewer: speakerForm.isInterviewer,
+        personEntityId: speakerForm.personEntityId ?? undefined,
+      };
 
       let updatedSpeakers;
       if (editingSpeakerIndex !== null) {
         // Edit existing
         updatedSpeakers = [...currentSpeakers];
-        updatedSpeakers[editingSpeakerIndex] = {
-          speakerLabel: speakerForm.speakerLabel,
-          name: speakerForm.name || undefined,
-          role: speakerForm.role || undefined,
-          department: speakerForm.department || undefined,
-          isInterviewer: speakerForm.isInterviewer,
-        };
+        updatedSpeakers[editingSpeakerIndex] = newSpeakerData;
       } else {
         // Add new
-        updatedSpeakers = [
-          ...currentSpeakers,
-          {
-            speakerLabel: speakerForm.speakerLabel,
-            name: speakerForm.name || undefined,
-            role: speakerForm.role || undefined,
-            department: speakerForm.department || undefined,
-            isInterviewer: speakerForm.isInterviewer,
-          },
-        ];
+        updatedSpeakers = [...currentSpeakers, newSpeakerData];
       }
 
       await api.patch(
@@ -521,6 +605,7 @@ export default function InterviewDetailPage({
           role: s.role ?? undefined,
           department: s.department ?? undefined,
           isInterviewer: s.isInterviewer,
+          personEntityId: s.personEntityId ?? undefined,
         }));
 
       await api.patch(
@@ -681,9 +766,17 @@ export default function InterviewDetailPage({
                   className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                      {(speaker.name ?? speaker.speakerLabel).charAt(0).toUpperCase()}
-                    </div>
+                    {speaker.personEntityId ? (
+                      <PersonAvatar
+                        name={speaker.name ?? speaker.speakerLabel}
+                        avatarUrl={speakerAvatarUrls[speaker.personEntityId] ?? null}
+                        size="sm"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                        {(speaker.name ?? speaker.speakerLabel).charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">
@@ -1091,8 +1184,18 @@ export default function InterviewDetailPage({
       </Dialog>
 
       {/* Speaker Add/Edit Dialog */}
-      <Dialog open={speakerDialogOpen} onOpenChange={setSpeakerDialogOpen}>
-        <DialogContent>
+      <Dialog open={speakerDialogOpen} onOpenChange={(open) => {
+        setSpeakerDialogOpen(open);
+        if (!open) {
+          setSpeakerForm(emptySpeakerForm);
+          setEditingSpeakerIndex(null);
+          setSearchMode(true);
+          setPersonSearch("");
+          setSearchResults([]);
+          setSelectedPerson(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editingSpeakerIndex !== null
@@ -1102,108 +1205,246 @@ export default function InterviewDetailPage({
             <DialogDescription>
               {editingSpeakerIndex !== null
                 ? "Modifica los datos del participante."
-                : "Ingresa los datos del participante de la entrevista."}
+                : "Busca en el directorio o agrega un participante nuevo."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="speaker-name">Nombre</Label>
-              <Input
-                id="speaker-name"
-                placeholder="Nombre del participante"
-                value={speakerForm.name}
-                onChange={(e) =>
-                  setSpeakerForm({ ...speakerForm, name: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="speaker-role">Cargo / Rol</Label>
-              <Input
-                id="speaker-role"
-                placeholder="Ej: Gerente de Operaciones"
-                value={speakerForm.role}
-                onChange={(e) =>
-                  setSpeakerForm({ ...speakerForm, role: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="speaker-department">Departamento / Área</Label>
-              <Input
-                id="speaker-department"
-                placeholder="Ej: Operaciones"
-                value={speakerForm.department}
-                onChange={(e) =>
-                  setSpeakerForm({
-                    ...speakerForm,
-                    department: e.target.value,
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="speaker-interviewer"
-                checked={speakerForm.isInterviewer}
-                onCheckedChange={(checked) =>
-                  setSpeakerForm({
-                    ...speakerForm,
-                    isInterviewer: checked === true,
-                  })
-                }
-              />
-              <Label
-                htmlFor="speaker-interviewer"
-                className="text-sm font-normal"
-              >
-                Es entrevistador (quien realiza las preguntas)
-              </Label>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="speaker-label">
-                Etiqueta de hablante
-                <HelpTooltip
-                  text="Identificador único del hablante en la transcripción. Se asigna automáticamente, pero puedes cambiarlo si lo necesitas."
-                  className="ml-1"
+            {/* Person directory search (only for adding new, not editing) */}
+            {editingSpeakerIndex === null && searchMode && !selectedPerson && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Buscar en el directorio</Label>
+                  <Input
+                    placeholder="Buscar persona por nombre..."
+                    value={personSearch}
+                    onChange={(e) => setPersonSearch(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-1">
+                    {searchResults.map((person) => (
+                      <button
+                        key={person.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent"
+                        onClick={() => {
+                          setSelectedPerson(person);
+                          setSpeakerForm({
+                            speakerLabel: person.name,
+                            name: person.name,
+                            role: person.role ?? "",
+                            department: person.department?.name ?? "",
+                            isInterviewer: false,
+                            personEntityId: person.id,
+                          });
+                          setSearchMode(false);
+                        }}
+                      >
+                        <PersonAvatar
+                          name={person.name}
+                          avatarUrl={personAvatarUrls[person.id] ?? null}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-medium">
+                              {person.name}
+                            </span>
+                            {person.personType === "EXTERNAL" && (
+                              <Badge variant="secondary" className="shrink-0 text-[9px] px-1 py-0">
+                                Externo
+                              </Badge>
+                            )}
+                            {person.personType === "CONTRACTOR" && (
+                              <Badge variant="secondary" className="shrink-0 text-[9px] px-1 py-0 border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                                Contratista
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5 text-xs text-muted-foreground">
+                            {person.role && <span className="truncate">{person.role}</span>}
+                            {person.role && person.department?.name && <span>·</span>}
+                            {person.department?.name && <span className="truncate">{person.department.name}</span>}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {personSearch.length >= 2 && searchResults.length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground py-3">
+                    No se encontraron personas.{" "}
+                    <Link
+                      href="/personas/directorio"
+                      className="text-primary underline underline-offset-2"
+                    >
+                      Ir al directorio
+                    </Link>
+                  </p>
+                )}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">o</span>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setSearchMode(false);
+                    setSelectedPerson(null);
+                  }}
+                >
+                  Agregar persona que no está en directorio
+                </Button>
+              </div>
+            )}
+
+            {/* Selected person indicator */}
+            {selectedPerson && editingSpeakerIndex === null && (
+              <div className="flex items-center gap-3 rounded-md border bg-accent/50 p-3">
+                <PersonAvatar
+                  name={selectedPerson.name}
+                  avatarUrl={personAvatarUrls[selectedPerson.id] ?? null}
+                  size="sm"
                 />
-              </Label>
-              <Input
-                id="speaker-label"
-                placeholder="Ej: Speaker_0"
-                value={speakerForm.speakerLabel}
-                onChange={(e) =>
-                  setSpeakerForm({
-                    ...speakerForm,
-                    speakerLabel: e.target.value,
-                  })
-                }
-              />
-            </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-medium">{selectedPerson.name}</span>
+                  <p className="text-xs text-muted-foreground">
+                    Seleccionado del directorio
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPerson(null);
+                    setSpeakerForm({
+                      ...emptySpeakerForm,
+                      speakerLabel: `Speaker_${interview?.speakers?.length ?? 0}`,
+                    });
+                    setSearchMode(true);
+                    setPersonSearch("");
+                  }}
+                >
+                  Cambiar
+                </Button>
+              </div>
+            )}
+
+            {/* Form fields (shown when not in search mode or editing) */}
+            {(!searchMode || editingSpeakerIndex !== null) && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="speaker-name">Nombre</Label>
+                  <Input
+                    id="speaker-name"
+                    placeholder="Nombre del participante"
+                    value={speakerForm.name}
+                    onChange={(e) =>
+                      setSpeakerForm({ ...speakerForm, name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="speaker-role">Cargo / Rol</Label>
+                  <Input
+                    id="speaker-role"
+                    placeholder="Ej: Gerente de Operaciones"
+                    value={speakerForm.role}
+                    onChange={(e) =>
+                      setSpeakerForm({ ...speakerForm, role: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="speaker-department">Departamento / Área</Label>
+                  <Input
+                    id="speaker-department"
+                    placeholder="Ej: Operaciones"
+                    value={speakerForm.department}
+                    onChange={(e) =>
+                      setSpeakerForm({
+                        ...speakerForm,
+                        department: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="speaker-interviewer"
+                    checked={speakerForm.isInterviewer}
+                    onCheckedChange={(checked) =>
+                      setSpeakerForm({
+                        ...speakerForm,
+                        isInterviewer: checked === true,
+                      })
+                    }
+                  />
+                  <Label
+                    htmlFor="speaker-interviewer"
+                    className="text-sm font-normal"
+                  >
+                    Es entrevistador (quien realiza las preguntas)
+                  </Label>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="speaker-label">
+                    Etiqueta de hablante
+                    <HelpTooltip
+                      text="Identificador único del hablante en la transcripción. Se asigna automáticamente, pero puedes cambiarlo si lo necesitas."
+                      className="ml-1"
+                    />
+                  </Label>
+                  <Input
+                    id="speaker-label"
+                    placeholder="Ej: Speaker_0"
+                    value={speakerForm.speakerLabel}
+                    onChange={(e) =>
+                      setSpeakerForm({
+                        ...speakerForm,
+                        speakerLabel: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSpeakerDialogOpen(false);
-                setSpeakerForm(emptySpeakerForm);
-                setEditingSpeakerIndex(null);
-              }}
-              disabled={savingSpeakers}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveSpeaker}
-              disabled={savingSpeakers || !speakerForm.speakerLabel.trim()}
-            >
-              {savingSpeakers
-                ? "Guardando..."
-                : editingSpeakerIndex !== null
-                  ? "Guardar"
-                  : "Agregar"}
-            </Button>
-          </DialogFooter>
+          {/* Footer: only show when form is visible */}
+          {(!searchMode || editingSpeakerIndex !== null) && (
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSpeakerDialogOpen(false);
+                  setSpeakerForm(emptySpeakerForm);
+                  setEditingSpeakerIndex(null);
+                }}
+                disabled={savingSpeakers}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSaveSpeaker}
+                disabled={savingSpeakers || !speakerForm.speakerLabel.trim()}
+              >
+                {savingSpeakers
+                  ? "Guardando..."
+                  : editingSpeakerIndex !== null
+                    ? "Guardar"
+                    : "Agregar"}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -829,6 +829,8 @@ model PersonProfile {
   role        String?
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  personType  String    @default("INTERNAL") // INTERNAL, EXTERNAL, CONTRACTOR
+  company     String?   // Empresa externa (solo para externos/contratistas)
   email       String?
   phone       String?
   avatarS3Key String?

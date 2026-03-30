@@ -52,6 +52,7 @@ export const updateSpeakerSchema = z.object({
     role: z.string().optional(),
     department: z.string().optional(),
     isInterviewer: z.boolean().optional(),
+    personEntityId: z.string().uuid().nullable().optional(),
   })),
 });
 
@@ -111,6 +112,8 @@ export const createPersonProfileSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido').max(200),
   role: z.string().max(200).optional(),
   departmentId: z.string().uuid().nullable().optional(),
+  personType: z.enum(['INTERNAL', 'EXTERNAL', 'CONTRACTOR']).optional(),
+  company: z.string().max(200).optional(),
   email: z.string().email('Email inválido').optional(),
   phone: z.string().max(50).optional(),
   notes: z.string().max(5000).optional(),
@@ -125,6 +128,8 @@ export const updatePersonProfileSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   role: z.string().max(200).nullable().optional(),
   departmentId: z.string().uuid().nullable().optional(),
+  personType: z.enum(['INTERNAL', 'EXTERNAL', 'CONTRACTOR']).optional(),
+  company: z.string().max(200).nullable().optional(),
   email: z.string().email('Email inválido').nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
   notes: z.string().max(5000).nullable().optional(),

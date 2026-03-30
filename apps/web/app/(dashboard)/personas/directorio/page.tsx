@@ -7,10 +7,18 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PersonAvatar } from "@/components/org-intelligence/person-avatar";
 import {
@@ -54,6 +62,8 @@ interface PersonProfile {
   role: string | null;
   departmentId: string | null;
   department: DepartmentRef | null;
+  personType: string;
+  company: string | null;
   email: string | null;
   phone: string | null;
   avatarS3Key: string | null;
@@ -71,6 +81,8 @@ interface PersonForm {
   role: string;
   departmentId: string | null;
   departmentName: string;
+  personType: string;
+  company: string;
   email: string;
   phone: string;
   notes: string;
@@ -81,6 +93,8 @@ const emptyForm: PersonForm = {
   role: "",
   departmentId: null,
   departmentName: "",
+  personType: "INTERNAL",
+  company: "",
   email: "",
   phone: "",
   notes: "",
@@ -169,6 +183,8 @@ export default function DirectorioPage() {
       role: person.role ?? "",
       departmentId: person.departmentId ?? null,
       departmentName: person.department?.name ?? "",
+      personType: person.personType ?? "INTERNAL",
+      company: person.company ?? "",
       email: person.email ?? "",
       phone: person.phone ?? "",
       notes: person.notes ?? "",
@@ -184,6 +200,8 @@ export default function DirectorioPage() {
         name: form.name,
         role: form.role || undefined,
         departmentId: form.departmentId || null,
+        personType: form.personType || "INTERNAL",
+        company: form.personType !== "INTERNAL" ? (form.company || undefined) : undefined,
         email: form.email || undefined,
         phone: form.phone || undefined,
         notes: form.notes || undefined,
@@ -371,9 +389,21 @@ export default function DirectorioPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between">
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold">
-                        {person.name}
-                      </h3>
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="truncate text-sm font-semibold">
+                          {person.name}
+                        </h3>
+                        {person.personType === "EXTERNAL" && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0">
+                            Externo
+                          </Badge>
+                        )}
+                        {person.personType === "CONTRACTOR" && (
+                          <Badge variant="secondary" className="shrink-0 text-[10px] px-1.5 py-0 border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                            Contratista
+                          </Badge>
+                        )}
+                      </div>
                       {person.role && (
                         <p className="truncate text-xs text-muted-foreground">
                           {person.role}
@@ -382,6 +412,11 @@ export default function DirectorioPage() {
                       {person.department?.name && (
                         <p className="truncate text-xs text-muted-foreground">
                           {person.department.name}
+                        </p>
+                      )}
+                      {person.company && person.personType !== "INTERNAL" && (
+                        <p className="truncate text-xs text-muted-foreground italic">
+                          {person.company}
                         </p>
                       )}
                       {person.email && (
@@ -499,6 +534,41 @@ export default function DirectorioPage() {
                   }
                 />
               </div>
+            </div>
+            <div className={`grid gap-4 ${form.personType !== "INTERNAL" ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div className="space-y-1.5">
+                <Label htmlFor="person-type">Tipo de persona</Label>
+                <Select
+                  value={form.personType}
+                  onValueChange={(value) =>
+                    setForm({
+                      ...form,
+                      personType: value,
+                      company: value === "INTERNAL" ? "" : form.company,
+                    })
+                  }
+                >
+                  <SelectTrigger id="person-type">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INTERNAL">Interno</SelectItem>
+                    <SelectItem value="EXTERNAL">Externo</SelectItem>
+                    <SelectItem value="CONTRACTOR">Contratista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {form.personType !== "INTERNAL" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="person-company">Empresa</Label>
+                  <Input
+                    id="person-company"
+                    placeholder="Nombre de la empresa"
+                    value={form.company}
+                    onChange={(e) => setForm({ ...form, company: e.target.value })}
+                  />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
