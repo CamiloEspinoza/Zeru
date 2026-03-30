@@ -43,11 +43,21 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
    * Uses Prisma client extensions for row-level multitenancy.
    * Soft delete is applied via the base extended client.
    */
+  /** Models that do not have a tenantId column (global/auth entities) */
+  private static readonly MODELS_WITHOUT_TENANT = new Set([
+    'Tenant', 'User', 'LoginCode', 'WaitlistEntry', 'FeatureRequest',
+  ]);
+
   forTenant(tenantId: string) {
+    const skipModels = PrismaService.MODELS_WITHOUT_TENANT;
     return this._client.$extends({
       name: 'tenantScope',
       query: {
-        $allOperations({ args, query, operation }) {
+        $allOperations({ model, args, query, operation }) {
+          if (model && skipModels.has(model)) {
+            return query(args);
+          }
+
           const writeOps = ['create', 'createMany', 'upsert'];
           const readOps = [
             'findFirst',

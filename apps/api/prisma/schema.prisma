@@ -257,10 +257,12 @@ model Message {
   deletedAt   DateTime?
   createdAt   DateTime    @default(now())
 
+  tenantId       String?
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([tenantId])
   @@map("messages")
 }
 
@@ -416,6 +418,7 @@ model JournalEntryLine {
   description String?
   deletedAt   DateTime?
 
+  tenantId       String?
   journalEntryId String
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
@@ -423,6 +426,7 @@ model JournalEntryLine {
   account   Account @relation(fields: [accountId], references: [id])
 
   @@index([journalEntryId])
+  @@index([tenantId])
   @@map("journal_entry_lines")
 }
 
@@ -479,6 +483,7 @@ model AccountingStepCompletion {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  tenantId       String?
   stepId String
   step   AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
@@ -490,6 +495,7 @@ model AccountingStepCompletion {
 
   @@unique([stepId, fiscalPeriodId])
   @@index([fiscalPeriodId])
+  @@index([tenantId])
   @@map("accounting_step_completions")
 }
 
@@ -550,6 +556,7 @@ model DocumentJournalEntry {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
+  tenantId       String?
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -557,6 +564,7 @@ model DocumentJournalEntry {
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, journalEntryId])
+  @@index([tenantId])
   @@map("document_journal_entries")
 }
 
@@ -594,11 +602,13 @@ model AgentSkillFile {
   content String
   deletedAt DateTime?
 
-  skillId String
-  skill   AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  tenantId String?
+  skillId  String
+  skill    AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([skillId, path])
   @@index([skillId])
+  @@index([tenantId])
   @@map("agent_skill_files")
 }
 
@@ -739,9 +749,11 @@ model LinkedInPostVersion {
   versionNumber Int
   /// Instrucciones de regeneración que produjeron esta versión (null para la versión original)
   instructions  String?
+  tenantId      String?
   createdAt     DateTime @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_post_versions")
 }
 
@@ -760,9 +772,11 @@ model LinkedInImageVersion {
   versionNumber Int
   /// Si esta versión es la seleccionada actualmente
   isSelected    Boolean  @default(false)
+  tenantId      String?
   createdAt     DateTime @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_image_versions")
 }
 
@@ -1080,6 +1094,7 @@ model InterviewSpeaker {
   department     String?
   isInterviewer  Boolean @default(false)
 
+  tenantId    String?
   interviewId String
   interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
 
@@ -1089,6 +1104,7 @@ model InterviewSpeaker {
 
   @@unique([interviewId, speakerLabel])
   @@index([interviewId])
+  @@index([tenantId])
   @@map("interview_speakers")
 }
 
@@ -1228,6 +1244,7 @@ model ProblemLink {
   id                String @id @default(uuid())
   impactDescription String?
 
+  tenantId  String?
   problemId String
   problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
@@ -1237,6 +1254,7 @@ model ProblemLink {
   @@unique([problemId, entityId])
   @@index([problemId])
   @@index([entityId])
+  @@index([tenantId])
   @@map("problem_links")
 }
 

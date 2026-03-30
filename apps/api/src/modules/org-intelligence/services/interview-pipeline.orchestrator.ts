@@ -62,7 +62,8 @@ export class InterviewPipelineOrchestrator {
 
     if (
       interview.processingStatus !== 'UPLOADED' &&
-      interview.processingStatus !== 'FAILED'
+      interview.processingStatus !== 'FAILED' &&
+      interview.processingStatus !== 'COMPLETED'
     ) {
       throw new BadRequestException(
         `La entrevista está en estado "${interview.processingStatus}" y no puede ser procesada`,

@@ -7,13 +7,14 @@ import {
   Body,
   Param,
   Query,
-  Res,
+  Sse,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  MessageEvent,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Observable, EMPTY, from, switchMap, map, endWith } from 'rxjs';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
@@ -129,59 +130,24 @@ export class InterviewsController {
 
   /**
    * SSE endpoint for real-time pipeline progress.
-   * Returns 200 + event-stream if the pipeline is active, or 204 if not.
-   *
-   * Uses manual @Res() handling — errors must be caught before writing
-   * headers to avoid NestJS "callback.apply is not a function" crash
-   * (exception filters are bypassed when @Res() is used).
+   * Uses @Sse() with synchronous Observable return (no async).
    */
-  @Get(':id/pipeline-events')
+  @Sse(':id/pipeline-events')
   pipelineEvents(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
-    @Res() res: Response,
-  ) {
-    // Validate interview ownership first — catch errors manually because
-    // @Res() disables NestJS exception filters.
-    this.interviewsService
-      .findOne(tenantId, id)
-      .then(() => {
+  ): Observable<MessageEvent> {
+    return from(this.interviewsService.findOne(tenantId, id)).pipe(
+      switchMap(() => {
         const subject = this.pipelineEvents.get(id);
         if (!subject) {
-          // No active pipeline — client should rely on DB state
-          res.status(204).end();
-          return;
+          return EMPTY;
         }
-
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.flushHeaders();
-
-        const subscription = subject.subscribe({
-          next: (event) => {
-            res.write(`data: ${JSON.stringify(event)}\n\n`);
-          },
-          complete: () => {
-            res.write('data: [DONE]\n\n');
-            res.end();
-          },
-          error: () => {
-            res.end();
-          },
-        });
-
-        res.on('close', () => {
-          subscription.unsubscribe();
-        });
-      })
-      .catch((err) => {
-        const status = err?.status ?? err?.getStatus?.() ?? 500;
-        const message = err?.message ?? 'Error interno';
-        if (!res.headersSent) {
-          res.status(status).json({ statusCode: status, message });
-        }
-      });
+        return subject.pipe(
+          map((event) => ({ data: event }) as MessageEvent),
+          endWith({ data: '[DONE]' } as MessageEvent),
+        );
+      }),
+    );
   }
 }
