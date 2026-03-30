@@ -40,6 +40,7 @@ import {
 import { ConfidenceBadge } from "@/components/org-intelligence/confidence-badge";
 import { MermaidDiagram } from "@/components/org-intelligence/mermaid-diagram";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import { ChunkCard } from "@/components/org-intelligence/chunk-card";
 
 // ── Types ──────────────────────────────────────────────
 
@@ -78,6 +79,23 @@ interface EntitiesResponse {
   meta: { total: number; page: number; perPage: number };
 }
 
+interface SearchChunk {
+  id: string;
+  content: string;
+  interviewId: string;
+  speakerId: string | null;
+  startTimeMs: number | null;
+  endTimeMs: number | null;
+  rrfScore: number;
+  interviewTitle: string | null;
+  interviewDate: string | null;
+  hasAudio: boolean;
+  speakerName: string | null;
+  speakerRole: string | null;
+  speakerDepartment: string | null;
+  isInterviewer: boolean | null;
+}
+
 interface SearchResult {
   entities?: Array<{
     id: string;
@@ -86,13 +104,7 @@ interface SearchResult {
     description: string | null;
     similarity: number;
   }>;
-  chunks?: Array<{
-    id: string;
-    content: string;
-    speaker?: string;
-    timestamp?: string;
-    similarity?: number;
-  }>;
+  chunks?: SearchChunk[];
 }
 
 // ── Entity Type Keys ───────────────────────────────────
@@ -666,30 +678,21 @@ function SearchTab({ projectId }: { projectId: string }) {
                 Fragmentos de entrevista ({results.chunks.length})
               </h3>
               {results.chunks.map((chunk) => (
-                <Card key={chunk.id}>
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      {chunk.speaker && (
-                        <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
-                          {chunk.speaker}
-                        </span>
-                      )}
-                      {chunk.timestamp && (
-                        <span className="text-xs text-muted-foreground">
-                          {chunk.timestamp}
-                        </span>
-                      )}
-                      {chunk.similarity != null && (
-                        <span className="ml-auto text-xs text-muted-foreground">
-                          Relevancia: {Math.round(chunk.similarity * 100)}%
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-relaxed">{chunk.content}</p>
-                  </CardContent>
-                </Card>
+                <ChunkCard
+                  key={chunk.id}
+                  content={chunk.content}
+                  speakerName={chunk.speakerName ?? undefined}
+                  speakerRole={chunk.speakerRole ?? undefined}
+                  isInterviewer={chunk.isInterviewer ?? undefined}
+                  interviewId={chunk.interviewId}
+                  interviewTitle={chunk.interviewTitle ?? undefined}
+                  interviewDate={chunk.interviewDate ?? undefined}
+                  startTimeMs={chunk.startTimeMs ?? undefined}
+                  endTimeMs={chunk.endTimeMs ?? undefined}
+                  hasAudio={chunk.hasAudio}
+                  similarity={chunk.rrfScore}
+                  projectId={projectId}
+                />
               ))}
             </div>
           )}

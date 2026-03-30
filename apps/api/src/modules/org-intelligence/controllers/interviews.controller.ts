@@ -22,6 +22,7 @@ import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { InterviewsService } from '../services/interviews.service';
 import { InterviewPipelineOrchestrator } from '../services/interview-pipeline.orchestrator';
 import { PipelineEventsService } from '../services/pipeline-events.service';
+import { S3Service } from '../../files/s3.service';
 import {
   createInterviewSchema,
   updateInterviewSchema,
@@ -40,6 +41,7 @@ export class InterviewsController {
     private readonly interviewsService: InterviewsService,
     private readonly pipeline: InterviewPipelineOrchestrator,
     private readonly pipelineEventsService: PipelineEventsService,
+    private readonly s3: S3Service,
   ) {}
 
   @Post()
@@ -126,6 +128,19 @@ export class InterviewsController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.interviewsService.getStatus(tenantId, id);
+  }
+
+  @Get(':id/audio-url')
+  async getAudioUrl(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ): Promise<{ url: string | null }> {
+    const interview = await this.interviewsService.findOne(tenantId, id);
+    if (!interview.audioS3Key) {
+      return { url: null };
+    }
+    const url = await this.s3.getPresignedUrl(tenantId, interview.audioS3Key, 3600);
+    return { url };
   }
 
   /**

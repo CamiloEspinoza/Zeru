@@ -29,6 +29,14 @@ export interface SearchResult {
   startTimeMs: number | null;
   endTimeMs: number | null;
   rrfScore: number;
+  // Enriched fields
+  interviewTitle: string | null;
+  interviewDate: Date | null;
+  hasAudio: boolean;
+  speakerName: string | null;
+  speakerRole: string | null;
+  speakerDepartment: string | null;
+  isInterviewer: boolean | null;
 }
 
 export interface EntitySearchResult {
@@ -116,7 +124,20 @@ export class OrgSearchService {
           FROM vector_results v
           FULL OUTER JOIN bm25_results b ON v.id = b.id
         )
-        SELECT * FROM fused ORDER BY "rrfScore" DESC LIMIT $5
+        SELECT
+          f.*,
+          i.title AS "interviewTitle",
+          i."interviewDate",
+          (i."audioS3Key" IS NOT NULL) AS "hasAudio",
+          s.name AS "speakerName",
+          s.role AS "speakerRole",
+          s.department AS "speakerDepartment",
+          s."isInterviewer"
+        FROM fused f
+        JOIN interviews i ON i.id = f."interviewId"
+        LEFT JOIN interview_speakers s ON s.id = f."speakerId"
+        ORDER BY f."rrfScore" DESC
+        LIMIT $5
         `,
         vector,
         tenantId,
