@@ -33,10 +33,31 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ProjectAnalysisTab } from "@/components/org-intelligence/project-analysis-tab";
 import { ProjectDiagnosisTab } from "@/components/org-intelligence/project-diagnosis-tab";
 import { ProjectImprovementsTab } from "@/components/org-intelligence/project-improvements-tab";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  MoreHorizontalCircle01Icon,
+  Edit02Icon,
+  Delete02Icon,
+} from "@hugeicons/core-free-icons";
 
 interface Project {
   id: string;
@@ -81,6 +102,13 @@ interface InterviewsResponse {
   meta: { total: number; page: number; perPage: number };
 }
 
+const PROJECT_STATUSES = [
+  { value: "DRAFT", label: "Borrador" },
+  { value: "ACTIVE", label: "Activo" },
+  { value: "COMPLETED", label: "Completado" },
+  { value: "ARCHIVED", label: "Archivado" },
+];
+
 export default function ProjectDetailPage({
   params,
 }: {
@@ -112,6 +140,26 @@ export default function ProjectDetailPage({
     endDate: "",
   });
   const [saving, setSaving] = useState(false);
+
+  // Delete project state
+  const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
+
+  // Status change state
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  // Edit interview state
+  const [editInterviewDialogOpen, setEditInterviewDialogOpen] = useState(false);
+  const [editingInterview, setEditingInterview] = useState<Interview | null>(null);
+  const [editInterviewForm, setEditInterviewForm] = useState({
+    title: "",
+  });
+  const [savingInterview, setSavingInterview] = useState(false);
+
+  // Delete interview state
+  const [deleteInterviewDialogOpen, setDeleteInterviewDialogOpen] = useState(false);
+  const [deletingInterview, setDeletingInterview] = useState<Interview | null>(null);
+  const [deletingInterviewLoading, setDeletingInterviewLoading] = useState(false);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -185,8 +233,6 @@ export default function ProjectDetailPage({
         },
       );
 
-      // If we have a description, patch it onto the interview via speakers endpoint is not needed
-      // Description is stored in the project context — we navigate to the interview detail
       setDialogOpen(false);
       setInterviewForm({
         title: "",
@@ -227,6 +273,77 @@ export default function ProjectDetailPage({
       // silently fail
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    try {
+      setDeletingProject(true);
+      await api.delete(`/org-intelligence/projects/${id}`);
+      router.push("/org-intelligence/projects");
+    } catch {
+      // silently fail
+    } finally {
+      setDeletingProject(false);
+    }
+  };
+
+  const handleChangeStatus = async (newStatus: string) => {
+    try {
+      setChangingStatus(true);
+      await api.patch(`/org-intelligence/projects/${id}`, {
+        status: newStatus,
+      });
+      await fetchProject();
+    } catch {
+      // silently fail
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
+  const openEditInterviewDialog = (interview: Interview) => {
+    setEditingInterview(interview);
+    setEditInterviewForm({
+      title: interview.title ?? "",
+    });
+    setEditInterviewDialogOpen(true);
+  };
+
+  const handleEditInterview = async () => {
+    if (!editingInterview) return;
+    try {
+      setSavingInterview(true);
+      await api.patch(`/org-intelligence/interviews/${editingInterview.id}`, {
+        title: editInterviewForm.title || undefined,
+      });
+      setEditInterviewDialogOpen(false);
+      setEditingInterview(null);
+      await fetchInterviews();
+    } catch {
+      // silently fail
+    } finally {
+      setSavingInterview(false);
+    }
+  };
+
+  const openDeleteInterviewDialog = (interview: Interview) => {
+    setDeletingInterview(interview);
+    setDeleteInterviewDialogOpen(true);
+  };
+
+  const handleDeleteInterview = async () => {
+    if (!deletingInterview) return;
+    try {
+      setDeletingInterviewLoading(true);
+      await api.delete(`/org-intelligence/interviews/${deletingInterview.id}`);
+      setDeleteInterviewDialogOpen(false);
+      setDeletingInterview(null);
+      await fetchInterviews();
+    } catch {
+      // silently fail
+    } finally {
+      setDeletingInterviewLoading(false);
     }
   };
 
@@ -293,37 +410,59 @@ export default function ProjectDetailPage({
             <span>Creado: {formatDate(project.createdAt)}</span>
           </div>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => router.push("/org-intelligence/projects")}
-        >
-          Volver
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select
+            value={project.status}
+            onValueChange={handleChangeStatus}
+            disabled={changingStatus}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROJECT_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteProjectDialogOpen(true)}
+          >
+            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+            <span className="sr-only">Eliminar proyecto</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/org-intelligence/projects")}
+          >
+            Volver
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="interviews">
         <TabsList>
-          <TabsTrigger value="interviews" className="gap-1">
-            Entrevistas
-            <HelpTooltip text="Gestiona las entrevistas del proyecto. Sube audio, configura participantes y lanza el procesamiento con IA." />
+          <TabsTrigger value="interviews">
+            Entrevistas{interviews.length > 0 ? ` (${interviews.length})` : ""}
           </TabsTrigger>
-          <TabsTrigger value="analysis" className="gap-1">
-            Análisis
-            <HelpTooltip text="Análisis cruzado de todas las entrevistas. Muestra entidades extraídas, problemas detectados y estadísticas generales." />
+          <TabsTrigger value="analysis">
+            Análisis{(project._count?.entities ?? 0) > 0 ? ` (${project._count!.entities})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
           </TabsTrigger>
-          <TabsTrigger value="diagnosis" className="gap-1">
-            Diagnóstico
-            <HelpTooltip text="Diagnóstico organizacional automatizado. Detecta cuellos de botella, puntos únicos de fallo (SPOF) y contradicciones entre entrevistados." />
+          <TabsTrigger value="diagnosis">
+            Diagnóstico{(project._count?.problems ?? 0) > 0 ? ` (${project._count!.problems})` : <span className="ml-1 text-muted-foreground">(pendiente)</span>}
           </TabsTrigger>
-          <TabsTrigger value="action-plan" className="gap-1">
-            Plan de Acción
-            <HelpTooltip text="Propuestas de mejora priorizadas con framework RICE (Reach, Impact, Confidence, Effort). Incluye matriz esfuerzo-impacto." />
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-1">
-            Configuración
-            <HelpTooltip text="Edita los datos generales del proyecto: nombre, descripción y fechas." />
-          </TabsTrigger>
+          <TabsTrigger value="action-plan">Plan de Acción</TabsTrigger>
+          <TabsTrigger value="settings">Configuración</TabsTrigger>
+          <HelpTooltip
+            iconSize="md"
+            text="Entrevistas: gestiona entrevistas, sube audio y lanza el procesamiento con IA. Análisis: análisis cruzado con entidades extraídas, problemas y estadísticas. Diagnóstico: detecta cuellos de botella, puntos únicos de fallo (SPOF) y contradicciones. Plan de Acción: mejoras priorizadas con framework RICE y matriz esfuerzo-impacto. Configuración: edita nombre, descripción y fechas del proyecto."
+          />
         </TabsList>
 
         {/* Entrevistas Tab */}
@@ -356,19 +495,19 @@ export default function ProjectDetailPage({
               ))}
             </div>
           ) : interviews.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center">
-                <p className="text-sm text-muted-foreground">
-                  No hay entrevistas todavía. Agrega tu primera entrevista.
-                </p>
-                <Button
-                  className="mt-4"
-                  onClick={() => setDialogOpen(true)}
-                >
-                  Crear Entrevista
-                </Button>
-              </CardContent>
-            </Card>
+            <EducationalEmptyState
+              icon={
+                <svg className="size-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 18.5a6.5 6.5 0 100-13 6.5 6.5 0 000 13z" />
+                  <path d="M12 8v4l2.5 2.5" />
+                  <path d="M19.5 4.5l-2 2M4.5 4.5l2 2" />
+                </svg>
+              }
+              title="Agrega tu primera entrevista"
+              description="Cada entrevista es una conversación grabada con un coordinador de área. Configura los participantes, sube el audio y la IA extraerá roles, procesos, problemas y dependencias automáticamente."
+              action={{ label: "Crear entrevista", onClick: () => setDialogOpen(true) }}
+              tip="Tip: Entrevistas de 60-90 minutos dan los mejores resultados. Asegúrate de que el audio tenga buena calidad."
+            />
           ) : (
             <div className="space-y-3">
               {interviews.map((interview) => (
@@ -386,7 +525,59 @@ export default function ProjectDetailPage({
                       <CardTitle className="text-sm">
                         {interview.title ?? "Entrevista sin título"}
                       </CardTitle>
-                      <StatusBadge type="processing" value={interview.processingStatus} />
+                      <div className="flex items-center gap-1">
+                        <StatusBadge type="processing" value={interview.processingStatus} />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <HugeiconsIcon
+                                icon={MoreHorizontalCircle01Icon}
+                                className="size-4"
+                              />
+                              <span className="sr-only">Acciones</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenuItem
+                              onClick={() =>
+                                router.push(
+                                  `/org-intelligence/projects/${id}/interviews/${interview.id}`,
+                                )
+                              }
+                            >
+                              Ver detalle
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openEditInterviewDialog(interview)}
+                            >
+                              <HugeiconsIcon
+                                icon={Edit02Icon}
+                                className="mr-2 size-4"
+                              />
+                              Editar título
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => openDeleteInterviewDialog(interview)}
+                            >
+                              <HugeiconsIcon
+                                icon={Delete02Icon}
+                                className="mr-2 size-4"
+                              />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                     <CardDescription>
                       {formatDate(interview.interviewDate ?? interview.createdAt)}
@@ -667,6 +858,108 @@ export default function ProjectDetailPage({
             </Button>
             <Button onClick={handleCreateInterview} disabled={creating}>
               {creating ? "Creando..." : "Crear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog open={deleteProjectDialogOpen} onOpenChange={setDeleteProjectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar proyecto?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el proyecto
+              &quot;{project.name}&quot; y todos sus datos asociados
+              (entrevistas, análisis y diagnósticos).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteProjectDialogOpen(false)}
+              disabled={deletingProject}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProject}
+              disabled={deletingProject}
+            >
+              {deletingProject ? "Eliminando..." : "Eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Interview Dialog */}
+      <Dialog open={editInterviewDialogOpen} onOpenChange={setEditInterviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Entrevista</DialogTitle>
+            <DialogDescription>
+              Modifica el título de la entrevista.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-interview-title">Título</Label>
+              <Input
+                id="edit-interview-title"
+                placeholder="Título de la entrevista"
+                value={editInterviewForm.title}
+                onChange={(e) =>
+                  setEditInterviewForm({
+                    ...editInterviewForm,
+                    title: e.target.value,
+                  })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditInterviewDialogOpen(false)}
+              disabled={savingInterview}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditInterview}
+              disabled={savingInterview}
+            >
+              {savingInterview ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Interview Confirmation Dialog */}
+      <Dialog open={deleteInterviewDialogOpen} onOpenChange={setDeleteInterviewDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar entrevista?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará la entrevista
+              &quot;{deletingInterview?.title ?? "Sin título"}&quot; y todos sus datos asociados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteInterviewDialogOpen(false)}
+              disabled={deletingInterviewLoading}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteInterview}
+              disabled={deletingInterviewLoading}
+            >
+              {deletingInterviewLoading ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>

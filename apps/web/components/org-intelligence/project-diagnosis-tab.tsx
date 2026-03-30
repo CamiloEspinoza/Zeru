@@ -234,13 +234,13 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
           </CardContent>
         </Card>
 
-        {/* SPOFs */}
+        {/* SPOFs / Key Person Risks */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span className="text-lg">&#9888;</span>
-              Puntos únicos de falla
-              <HelpTooltip text="Puntos Únicos de Fallo: roles que participan en muchos procesos y que solo ocupa una persona. Si esa persona se ausenta, los procesos se detienen." />
+              Riesgos de persona clave
+              <HelpTooltip text="SPOF (Single Point of Failure): roles que participan en muchos procesos y que solo ocupa una persona. Si esa persona se ausenta, los procesos se detienen." />
             </CardTitle>
             <CardDescription>
               Roles que participan en múltiples procesos
@@ -266,7 +266,7 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No se detectaron puntos únicos de falla.
+                No se detectaron riesgos de persona clave.
               </p>
             )}
           </CardContent>
@@ -285,6 +285,9 @@ export function ProjectDiagnosisTab({ projectId }: { projectId: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Cuando dos personas describen el mismo tema de forma diferente, puede indicar falta de estandarización o diferentes interpretaciones.
+          </p>
           {contradictions.length > 0 ? (
             <div className="space-y-3">
               {contradictions.map((c) => (

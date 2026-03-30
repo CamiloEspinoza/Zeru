@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import { ContextualBanner } from "@/components/org-intelligence/contextual-banner";
 import {
   ScatterChart,
   Scatter,
@@ -140,6 +141,13 @@ export function ProjectImprovementsTab({
 
   return (
     <div className="space-y-6">
+      {/* Educational banner */}
+      <ContextualBanner
+        id={`improvements_intro_${projectId}`}
+        variant="info"
+        message="Estas mejoras fueron generadas automáticamente a partir de los problemas detectados. Están priorizadas con el método RICE: las que tienen mayor puntaje combinan más alcance, impacto y menor esfuerzo."
+      />
+
       {/* Improvements table */}
       <Card>
         <CardHeader>

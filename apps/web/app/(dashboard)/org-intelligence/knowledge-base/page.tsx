@@ -172,7 +172,7 @@ export default function KnowledgeBasePage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="entities">
+        <Tabs defaultValue="search">
           <TabsList>
             <TabsTrigger value="entities">Entidades</TabsTrigger>
             <TabsTrigger value="search">Búsqueda</TabsTrigger>
@@ -498,14 +498,22 @@ function EntitiesTab({ projectId }: { projectId: string }) {
 
 // ── Search Tab ─────────────────────────────────────────
 
+const SEARCH_EXAMPLES = [
+  "problemas de coordinación",
+  "procesos manuales",
+  "quién usa SAP",
+  "dependencias entre áreas",
+];
+
 function SearchTab({ projectId }: { projectId: string }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const handleSearch = async () => {
-    if (!query.trim()) return;
+  const handleSearch = async (overrideQuery?: string) => {
+    const searchQuery = overrideQuery ?? query;
+    if (!searchQuery.trim()) return;
     try {
       setLoading(true);
       setSearched(true);
@@ -519,7 +527,7 @@ function SearchTab({ projectId }: { projectId: string }) {
           data: NonNullable<SearchResult["entities"]>;
         }>("/org-intelligence/search/entities", {
           projectId,
-          query: query.trim(),
+          query: searchQuery.trim(),
           limit: 20,
         });
         entityResults = entityRes.data;
@@ -532,7 +540,7 @@ function SearchTab({ projectId }: { projectId: string }) {
           data: NonNullable<SearchResult["chunks"]>;
         }>("/org-intelligence/search", {
           projectId,
-          query: query.trim(),
+          query: searchQuery.trim(),
           limit: 20,
         });
         chunkResults = chunkRes.data;
@@ -546,6 +554,11 @@ function SearchTab({ projectId }: { projectId: string }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExampleClick = (example: string) => {
+    setQuery(example);
+    handleSearch(example);
   };
 
   const hasResults =
@@ -567,13 +580,26 @@ function SearchTab({ projectId }: { projectId: string }) {
             }}
             className="flex-1"
           />
-          <Button onClick={handleSearch} disabled={loading || !query.trim()}>
+          <Button onClick={() => handleSearch()} disabled={loading || !query.trim()}>
             {loading ? "Buscando..." : "Buscar"}
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
           La búsqueda semántica entiende el significado de tu consulta, no solo palabras exactas. Busca en todas las transcripciones y entidades del proyecto.
         </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Prueba:</span>
+          {SEARCH_EXAMPLES.map((example) => (
+            <button
+              key={example}
+              type="button"
+              onClick={() => handleExampleClick(example)}
+              className="rounded-md border border-muted-foreground/20 bg-muted/50 px-2 py-1 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-foreground"
+            >
+              {example}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Results */}

@@ -85,6 +85,32 @@ export const updateImprovementSchema = z.object({
   status: z.string().max(50).optional(),
 });
 
+// --- PersonProfile DTOs ---
+
+export const createPersonProfileSchema = z.object({
+  name: z.string().min(1, 'El nombre es requerido').max(200),
+  role: z.string().max(200).optional(),
+  department: z.string().max(200).optional(),
+  email: z.string().email('Email inválido').optional(),
+  phone: z.string().max(50).optional(),
+  notes: z.string().max(5000).optional(),
+});
+
+export const updatePersonProfileSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  role: z.string().max(200).nullable().optional(),
+  department: z.string().max(200).nullable().optional(),
+  email: z.string().email('Email inválido').nullable().optional(),
+  phone: z.string().max(50).nullable().optional(),
+  notes: z.string().max(5000).nullable().optional(),
+});
+
+export const listPersonProfilesSchema = z.object({
+  search: z.string().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  perPage: z.coerce.number().int().positive().max(100).default(50),
+});
+
 // --- Type inference ---
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
 export type UpdateProjectDto = z.infer<typeof updateProjectSchema>;
@@ -95,3 +121,6 @@ export type UpdateSpeakerDto = z.infer<typeof updateSpeakerSchema>;
 export type ListInterviewsDto = z.infer<typeof listInterviewsSchema>;
 export type CreateImprovementDto = z.infer<typeof createImprovementSchema>;
 export type UpdateImprovementDto = z.infer<typeof updateImprovementSchema>;
+export type CreatePersonProfileDto = z.infer<typeof createPersonProfileSchema>;
+export type UpdatePersonProfileDto = z.infer<typeof updatePersonProfileSchema>;
+export type ListPersonProfilesDto = z.infer<typeof listPersonProfilesSchema>;

@@ -8,8 +8,10 @@ import { EntitiesController } from './controllers/entities.controller';
 import { DiagnosisController } from './controllers/diagnosis.controller';
 import { ProblemsController } from './controllers/problems.controller';
 import { ImprovementsController } from './controllers/improvements.controller';
+import { PersonProfilesController } from './controllers/person-profiles.controller';
 import { ProjectsService } from './services/projects.service';
 import { InterviewsService } from './services/interviews.service';
+import { PersonProfilesService } from './services/person-profiles.service';
 import { DeepgramConfigService } from './services/deepgram-config.service';
 import { TranscriptionService } from './services/transcription.service';
 import { ExtractionPipelineService } from './services/extraction-pipeline.service';
@@ -32,10 +34,12 @@ import { OrgImprovementsService } from './services/org-improvements.service';
     DiagnosisController,
     ProblemsController,
     ImprovementsController,
+    PersonProfilesController,
   ],
   providers: [
     ProjectsService,
     InterviewsService,
+    PersonProfilesService,
     DeepgramConfigService,
     TranscriptionService,
     ExtractionPipelineService,
@@ -51,6 +55,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
   exports: [
     ProjectsService,
     InterviewsService,
+    PersonProfilesService,
     DeepgramConfigService,
     TranscriptionService,
     ExtractionPipelineService,

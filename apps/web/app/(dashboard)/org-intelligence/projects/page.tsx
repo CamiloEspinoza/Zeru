@@ -25,7 +25,22 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
+import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  MoreHorizontalCircle01Icon,
+  Edit02Icon,
+  Delete02Icon,
+  AnalysisTextLinkIcon,
+} from "@hugeicons/core-free-icons";
 
 interface Project {
   id: string;
@@ -58,6 +73,20 @@ export default function ProjectsPage() {
     description: "",
     startDate: "",
   });
+
+  // Edit project state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    description: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Delete project state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -93,6 +122,53 @@ export default function ProjectsPage() {
       // silently fail
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditDialog = (project: Project) => {
+    setEditingProject(project);
+    setEditForm({
+      name: project.name,
+      description: project.description ?? "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditProject = async () => {
+    if (!editingProject || !editForm.name.trim()) return;
+    try {
+      setSaving(true);
+      await api.patch(`/org-intelligence/projects/${editingProject.id}`, {
+        name: editForm.name,
+        description: editForm.description || undefined,
+      });
+      setEditDialogOpen(false);
+      setEditingProject(null);
+      await fetchProjects();
+    } catch {
+      // silently fail
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDeleteDialog = (project: Project) => {
+    setDeletingProject(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteProject = async () => {
+    if (!deletingProject) return;
+    try {
+      setDeleting(true);
+      await api.delete(`/org-intelligence/projects/${deletingProject.id}`);
+      setDeleteDialogOpen(false);
+      setDeletingProject(null);
+      await fetchProjects();
+    } catch {
+      // silently fail
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -138,16 +214,14 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground text-sm">
-              No hay proyectos todavía. Crea tu primer proyecto para comenzar.
-            </p>
-            <Button className="mt-4" onClick={() => setDialogOpen(true)}>
-              Crear Proyecto
-            </Button>
-          </CardContent>
-        </Card>
+        <EducationalEmptyState
+          icon={<HugeiconsIcon icon={AnalysisTextLinkIcon} className="size-8" />}
+          title="Comienza tu primer levantamiento organizacional"
+          description="Un proyecto agrupa las entrevistas y el análisis de una iniciativa de mejora continua. Crea un proyecto, agenda entrevistas con los coordinadores de cada área, sube los audios y deja que la IA extraiga el conocimiento organizacional."
+          action={{ label: "Crear mi primer proyecto", onClick: () => setDialogOpen(true) }}
+          secondaryAction={{ label: "Ir al directorio de Personas", href: "/org-intelligence/persons" }}
+          tip="Tip: Antes de crear el proyecto, registra a las personas que vas a entrevistar en el directorio de Personas."
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {projects.map((project) => (
@@ -163,7 +237,50 @@ export default function ProjectsPage() {
                   <CardTitle className="text-sm font-semibold">
                     {project.name}
                   </CardTitle>
-                  <StatusBadge type="project" value={project.status} />
+                  <div className="flex items-center gap-1">
+                    <StatusBadge type="project" value={project.status} />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <HugeiconsIcon
+                            icon={MoreHorizontalCircle01Icon}
+                            className="size-4"
+                          />
+                          <span className="sr-only">Acciones</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuItem
+                          onClick={() => openEditDialog(project)}
+                        >
+                          <HugeiconsIcon
+                            icon={Edit02Icon}
+                            className="mr-2 size-4"
+                          />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => openDeleteDialog(project)}
+                        >
+                          <HugeiconsIcon
+                            icon={Delete02Icon}
+                            className="mr-2 size-4"
+                          />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
                 {project.description && (
                   <CardDescription className="line-clamp-2">
@@ -210,6 +327,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
+      {/* Create Project Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -223,7 +341,7 @@ export default function ProjectsPage() {
               <Label htmlFor="name">Nombre</Label>
               <Input
                 id="name"
-                placeholder="Nombre del proyecto"
+                placeholder="Ej: Levantamiento Operacional 2026"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -232,7 +350,7 @@ export default function ProjectsPage() {
               <Label htmlFor="description">Descripción</Label>
               <Textarea
                 id="description"
-                placeholder="Describe el objetivo del proyecto"
+                placeholder="Ej: Entender cómo funciona el área de operaciones para identificar oportunidades de mejora"
                 value={form.description}
                 onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
@@ -264,6 +382,87 @@ export default function ProjectsPage() {
               disabled={!form.name.trim() || creating}
             >
               {creating ? "Creando..." : "Crear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Proyecto</DialogTitle>
+            <DialogDescription>
+              Modifica el nombre y la descripción del proyecto.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Nombre</Label>
+              <Input
+                id="edit-name"
+                placeholder="Nombre del proyecto"
+                value={editForm.name}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, name: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-description">Descripción</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Describe el objetivo del proyecto"
+                value={editForm.description}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, description: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditProject}
+              disabled={!editForm.name.trim() || saving}
+            >
+              {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar proyecto?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el proyecto
+              &quot;{deletingProject?.name}&quot; y todos sus datos asociados
+              (entrevistas, análisis y diagnósticos).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteProject}
+              disabled={deleting}
+            >
+              {deleting ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>

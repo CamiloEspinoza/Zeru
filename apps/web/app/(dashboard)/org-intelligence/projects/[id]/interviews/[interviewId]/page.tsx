@@ -27,6 +27,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ProgressCelebration } from "@/components/org-intelligence/progress-celebration";
+import { useFirstVisit } from "@/hooks/use-first-visit";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Edit02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -153,6 +157,22 @@ export default function InterviewDetailPage({
   const [speakerForm, setSpeakerForm] = useState<SpeakerFormData>(emptySpeakerForm);
   const [editingSpeakerIndex, setEditingSpeakerIndex] = useState<number | null>(null);
   const [savingSpeakers, setSavingSpeakers] = useState(false);
+
+  // Edit interview state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ title: "", interviewDate: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Delete interview state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reprocess state
+  const [reprocessDialogOpen, setReprocessDialogOpen] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
+
+  // Success banner for first completed processing
+  const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
 
   const fetchInterview = useCallback(async () => {
     try {
@@ -287,6 +307,72 @@ export default function InterviewDetailPage({
       // silently fail
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // --- Edit interview handlers ---
+
+  const openEditDialog = () => {
+    if (!interview) return;
+    setEditForm({
+      title: interview.title ?? "",
+      interviewDate: interview.interviewDate
+        ? new Date(interview.interviewDate).toISOString().split("T")[0]
+        : "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!interview) return;
+    try {
+      setSavingEdit(true);
+      await api.patch(`/org-intelligence/interviews/${interviewId}`, {
+        title: editForm.title || undefined,
+        interviewDate: editForm.interviewDate
+          ? new Date(editForm.interviewDate + "T12:00:00").toISOString()
+          : undefined,
+      });
+      setEditDialogOpen(false);
+      await fetchInterview();
+    } catch {
+      // silently fail
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // --- Delete interview handler ---
+
+  const handleDeleteInterview = async () => {
+    try {
+      setDeleting(true);
+      await api.delete(`/org-intelligence/interviews/${interviewId}`);
+      router.push(`/org-intelligence/projects/${id}`);
+    } catch {
+      // silently fail
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // --- Reprocess interview handler ---
+
+  const handleReprocess = async () => {
+    try {
+      setReprocessing(true);
+      await api.post(
+        `/org-intelligence/interviews/${interviewId}/process`,
+        {},
+      );
+      setReprocessDialogOpen(false);
+      setProcessingStatus({ id: interviewId, processingStatus: "TRANSCRIBING", processingError: null, transcriptionStatus: "PROCESSING" });
+      startPolling();
+      await fetchInterview();
+    } catch {
+      // silently fail
+    } finally {
+      setReprocessing(false);
     }
   };
 
@@ -468,12 +554,50 @@ export default function InterviewDetailPage({
             {formatDate(interview.interviewDate ?? interview.createdAt)}
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => router.push(`/org-intelligence/projects/${id}`)}
-        >
-          Volver al proyecto
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Reprocess button for FAILED status */}
+          {currentStatus === "FAILED" && (
+            <Button
+              variant="outline"
+              onClick={() => handleReprocess()}
+              disabled={reprocessing}
+            >
+              {reprocessing ? "Reintentando..." : "Reintentar procesamiento"}
+            </Button>
+          )}
+          {/* Reprocess button for COMPLETED status */}
+          {currentStatus === "COMPLETED" && (
+            <Button
+              variant="outline"
+              onClick={() => setReprocessDialogOpen(true)}
+            >
+              Reprocesar
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={openEditDialog}
+          >
+            <HugeiconsIcon icon={Edit02Icon} className="size-4" />
+            <span className="sr-only">Editar entrevista</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
+            <span className="sr-only">Eliminar entrevista</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/org-intelligence/projects/${id}`)}
+          >
+            Volver al proyecto
+          </Button>
+        </div>
       </div>
 
       {/* Section 1: Participants Configuration */}
@@ -715,6 +839,16 @@ export default function InterviewDetailPage({
                 );
               })}
             </div>
+            {currentStatus === "TRANSCRIBING" && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Convirtiendo audio a texto. Esto suele tomar 1-2 minutos dependiendo de la duración del audio.
+              </p>
+            )}
+            {currentStatus === "EXTRACTING" && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Analizando el texto para identificar personas, procesos, problemas y dependencias. Esto toma 2-3 minutos.
+              </p>
+            )}
             {currentStatus === "FAILED" && (
               <p className="mt-4 text-xs text-red-600">
                 Error:{" "}
@@ -725,6 +859,19 @@ export default function InterviewDetailPage({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Success banner after processing completes */}
+      {currentStatus === "COMPLETED" && showSuccessBanner && (
+        <ProgressCelebration
+          title="Entrevista procesada exitosamente"
+          message="La IA extrajo conocimiento organizacional de la conversación. Revisa los resultados en las pestañas de Análisis y Diagnóstico del proyecto."
+          actions={[
+            { label: "Ir a Análisis", href: `/org-intelligence/projects/${id}?tab=analysis` },
+            { label: "Ir a Diagnóstico", href: `/org-intelligence/projects/${id}?tab=diagnosis` },
+          ]}
+          onDismiss={dismissSuccessBanner}
+        />
       )}
 
       {/* Section 4: Transcription */}
@@ -771,6 +918,116 @@ export default function InterviewDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Interview Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Entrevista</DialogTitle>
+            <DialogDescription>
+              Modifica el título y la fecha de la entrevista.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-interview-title">Título</Label>
+              <Input
+                id="edit-interview-title"
+                placeholder="Título de la entrevista"
+                value={editForm.title}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, title: e.target.value })
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-interview-date">Fecha de la entrevista</Label>
+              <Input
+                id="edit-interview-date"
+                type="date"
+                value={editForm.interviewDate}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, interviewDate: e.target.value })
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialogOpen(false)}
+              disabled={savingEdit}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={savingEdit}
+            >
+              {savingEdit ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Interview Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar entrevista?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminará la entrevista
+              &quot;{interview.title ?? "Sin título"}&quot; y todos sus datos
+              asociados (transcripción, análisis y participantes).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteInterview}
+              disabled={deleting}
+            >
+              {deleting ? "Eliminando..." : "Eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reprocess Confirmation Dialog */}
+      <Dialog open={reprocessDialogOpen} onOpenChange={setReprocessDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Reprocesar entrevista?</DialogTitle>
+            <DialogDescription>
+              Se volverá a procesar la entrevista desde cero. Los resultados
+              actuales (transcripción, entidades extraídas y análisis) serán
+              sobreescritos con los nuevos resultados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReprocessDialogOpen(false)}
+              disabled={reprocessing}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReprocess}
+              disabled={reprocessing}
+            >
+              {reprocessing ? "Procesando..." : "Reprocesar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Speaker Add/Edit Dialog */}
       <Dialog open={speakerDialogOpen} onOpenChange={setSpeakerDialogOpen}>

@@ -27,6 +27,11 @@ const LABELS: Record<string, string> = {
   memory: "Memoria",
   assistant: "Asistente",
   documents: "Documentos",
+  "org-intelligence": "Inteligencia Organizacional",
+  projects: "Proyectos",
+  interviews: "Entrevistas",
+  persons: "Personas",
+  "knowledge-base": "Knowledge Base",
 };
 
 export function Breadcrumbs() {

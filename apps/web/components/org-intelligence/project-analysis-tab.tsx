@@ -238,6 +238,13 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
             <p className="mt-1 text-2xl font-bold">
               {Math.round(avgConfidence * 100)}%
             </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              {avgConfidence >= 0.8
+                ? "Alta — la mayoría de la información es confiable"
+                : avgConfidence >= 0.5
+                  ? "Buena — revisa entidades con confianza menor al 50%"
+                  : "Baja — se recomienda validar las entidades extraídas"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -321,6 +328,9 @@ export function ProjectAnalysisTab({ projectId }: { projectId: string }) {
                 );
               })}
             </div>
+            <p className="mt-4 text-xs italic text-muted-foreground">
+              Los problemas se detectan automáticamente de lo que dicen los entrevistados. Valídalos con tu equipo antes de tomar acciones.
+            </p>
           </CardContent>
         </Card>
       )}

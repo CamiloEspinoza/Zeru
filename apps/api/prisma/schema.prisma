@@ -41,6 +41,7 @@ model Tenant {
   linkedInPosts        LinkedInPost[]
   linkedInAgentConfig  LinkedInAgentConfig?
   orgProjects          OrgProject[]
+  personProfiles       PersonProfile[]
 
   @@map("tenants")
 }
@@ -773,6 +774,31 @@ model LinkedInAgentConfig {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("linkedin_agent_configs")
+}
+
+// ─── Person Profiles ─────────────────────────────────────
+
+/// Perfil de persona para inteligencia organizacional (participantes de entrevistas)
+model PersonProfile {
+  id          String  @id @default(uuid())
+  name        String
+  role        String?
+  department  String?
+  email       String?
+  phone       String?
+  avatarS3Key String?
+  notes       String?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@map("person_profiles")
 }
 
 // ─── Org Intelligence ────────────────────────────────────
