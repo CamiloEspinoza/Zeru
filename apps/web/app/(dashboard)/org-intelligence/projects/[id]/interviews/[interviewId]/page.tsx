@@ -214,6 +214,7 @@ export default function InterviewDetailPage({
   // Reprocess state
   const [reprocessDialogOpen, setReprocessDialogOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [reprocessFromStep, setReprocessFromStep] = useState("");
 
   // Success banner for first completed processing
   const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
@@ -570,17 +571,20 @@ export default function InterviewDetailPage({
   const handleReprocess = async () => {
     try {
       setReprocessing(true);
+      const query = reprocessFromStep ? `?fromStep=${reprocessFromStep}` : "";
       await api.post(
-        `/org-intelligence/interviews/${interviewId}/process`,
+        `/org-intelligence/interviews/${interviewId}/process${query}`,
         {},
       );
       setReprocessDialogOpen(false);
+      setReprocessFromStep("");
       // Immediately update local state and reset log
-      setCurrentProcessingStatus("TRANSCRIBING");
+      const startStatus = reprocessFromStep || "TRANSCRIBING";
+      setCurrentProcessingStatus(startStatus);
       setCurrentProcessingError(null);
       setPipelineLog([{
-        status: "TRANSCRIBING",
-        message: PROCESSING_STATUS_MESSAGES.TRANSCRIBING,
+        status: startStatus,
+        message: PROCESSING_STATUS_MESSAGES[startStatus as keyof typeof PROCESSING_STATUS_MESSAGES] ?? "Procesando...",
         timestamp: new Date().toISOString(),
       }]);
       disconnectSSE();
@@ -1288,16 +1292,32 @@ export default function InterviewDetailPage({
       </Dialog>
 
       {/* Reprocess Confirmation Dialog */}
-      <Dialog open={reprocessDialogOpen} onOpenChange={setReprocessDialogOpen}>
+      <Dialog open={reprocessDialogOpen} onOpenChange={(open) => {
+        setReprocessDialogOpen(open);
+        if (!open) setReprocessFromStep("");
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Reprocesar entrevista?</DialogTitle>
+            <DialogTitle>Reprocesar entrevista</DialogTitle>
             <DialogDescription>
-              Se volverá a procesar la entrevista desde cero. Los resultados
-              actuales (transcripción, entidades extraídas y análisis) serán
-              sobreescritos con los nuevos resultados.
+              Elige desde qué paso reanudar. Los pasos anteriores se reutilizarán
+              y los siguientes se ejecutarán desde cero.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">Comenzar desde</label>
+            <select
+              value={reprocessFromStep}
+              onChange={(e) => setReprocessFromStep(e.target.value)}
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Desde el inicio (completo)</option>
+              <option value="EXTRACTING">Extracción (saltar transcripción)</option>
+              <option value="RESOLVING_COREFERENCES">Reconciliación (saltar transcripción + extracción)</option>
+              <option value="CHUNKING">Fragmentación (solo chunking + indexado)</option>
+              <option value="EMBEDDING">Indexado (solo embeddings)</option>
+            </select>
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
@@ -1310,7 +1330,7 @@ export default function InterviewDetailPage({
               onClick={handleReprocess}
               disabled={reprocessing}
             >
-              {reprocessing ? "Procesando..." : "Reprocesar"}
+              {reprocessing ? "Procesando..." : reprocessFromStep ? "Reanudar" : "Reprocesar"}
             </Button>
           </DialogFooter>
         </DialogContent>
