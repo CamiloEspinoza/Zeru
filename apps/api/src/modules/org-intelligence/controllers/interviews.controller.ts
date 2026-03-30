@@ -7,14 +7,13 @@ import {
   Body,
   Param,
   Query,
-  Sse,
+  Res,
   UseGuards,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
-  MessageEvent,
 } from '@nestjs/common';
-import { Observable, EMPTY, from, switchMap, map, endWith } from 'rxjs';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
@@ -40,7 +39,7 @@ export class InterviewsController {
   constructor(
     private readonly interviewsService: InterviewsService,
     private readonly pipeline: InterviewPipelineOrchestrator,
-    private readonly pipelineEvents: PipelineEventsService,
+    private readonly pipelineEventsService: PipelineEventsService,
   ) {}
 
   @Post()
@@ -131,24 +130,54 @@ export class InterviewsController {
 
   /**
    * SSE endpoint for real-time pipeline progress.
-   * Uses @Sse() with synchronous Observable return (no async).
+   * Uses @Res() to manage the HTTP response lifecycle manually so it
+   * can return 204 when no pipeline is active or stream events.
    */
-  @Sse(':id/pipeline-events')
-  pipelineEvents(
+  @Get(':id/pipeline-events')
+  async pipelineEvents(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
-  ): Observable<MessageEvent> {
-    return from(this.interviewsService.findOne(tenantId, id)).pipe(
-      switchMap(() => {
-        const subject = this.pipelineEvents.get(id);
-        if (!subject) {
-          return EMPTY;
-        }
-        return subject.pipe(
-          map((event) => ({ data: event }) as MessageEvent),
-          endWith({ data: '[DONE]' } as MessageEvent),
-        );
-      }),
-    );
+    @Res({ passthrough: false }) res: Response,
+  ): Promise<void> {
+    try {
+      await this.interviewsService.findOne(tenantId, id);
+    } catch (err) {
+      const status =
+        (err as { status?: number })?.status ??
+        (err as { getStatus?: () => number })?.getStatus?.() ??
+        500;
+      res.status(status).json({
+        statusCode: status,
+        message: (err as Error)?.message ?? 'Error interno',
+      });
+      return;
+    }
+
+    const subject = this.pipelineEventsService.get(id);
+    if (!subject) {
+      res.status(204).end();
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const subscription = subject.subscribe({
+      next: (event) => {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      },
+      complete: () => {
+        res.write('data: [DONE]\n\n');
+        res.end();
+      },
+      error: () => {
+        res.end();
+      },
+    });
+
+    res.on('close', () => subscription.unsubscribe());
   }
 }
