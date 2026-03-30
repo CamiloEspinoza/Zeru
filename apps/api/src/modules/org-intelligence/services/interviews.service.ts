@@ -137,14 +137,38 @@ export class InterviewsService {
   }
 
   async remove(tenantId: string, id: string) {
-    await this.findOne(tenantId, id);
-
+    const interview = await this.findOne(tenantId, id);
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.interview.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    await client.$transaction(async (tx) => {
+      // Delete chunks and speakers (interview-specific data)
+      await tx.interviewChunk.deleteMany({ where: { interviewId: id } });
+      await tx.interviewSpeaker.deleteMany({ where: { interviewId: id } });
+
+      // Delete knowledge graph entities sourced from this interview.
+      // ProblemLinks and OrgRelations cascade from their parents.
+      await tx.factualClaim.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.problem.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.orgRelation.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.orgEntity.updateMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Soft-delete the interview itself
+      await tx.interview.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
     });
+
+    return { message: 'Entrevista y datos relacionados eliminados' };
   }
 
   async uploadAudio(tenantId: string, id: string, file: Express.Multer.File) {
