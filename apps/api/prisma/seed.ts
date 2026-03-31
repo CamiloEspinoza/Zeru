@@ -1,5 +1,6 @@
 import { PrismaClient, AccountType, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedPricing } from './seed-pricing';
 
 const prisma = new PrismaClient();
 
@@ -42,12 +43,13 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: { email: 'admin@zeru.cl' },
-    update: {},
+    update: { superAdmin: true },
     create: {
       email: 'admin@zeru.cl',
       password: hashedPassword,
       firstName: 'Admin',
       lastName: 'Zeru',
+      superAdmin: true,
     },
   });
 
@@ -96,8 +98,11 @@ async function main() {
     },
   });
 
+  // Seed AI model pricing
+  await seedPricing(prisma);
+
   console.log(`✓ Tenant: ${tenant.slug}`);
-  console.log(`✓ Usuario: ${user.email} → rol OWNER en tenant "${tenant.name}"`);
+  console.log(`✓ Usuario: ${user.email} → rol OWNER en tenant "${tenant.name}" (superAdmin)`);
   console.log(`✓ Plan de cuentas: ${CHART_OF_ACCOUNTS.length} cuentas`);
   console.log(`✓ Período fiscal 2026`);
 }
