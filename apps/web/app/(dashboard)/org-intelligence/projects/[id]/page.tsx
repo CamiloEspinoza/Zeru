@@ -53,6 +53,8 @@ import { ProjectDiagnosisTab } from "@/components/org-intelligence/project-diagn
 import { ProjectImprovementsTab } from "@/components/org-intelligence/project-improvements-tab";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
+import { PersonSearchSelect } from "@/components/org-intelligence/person-search-select";
+import { SpeakerList, type SpeakerItem } from "@/components/org-intelligence/speaker-list";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   MoreHorizontalCircle01Icon,
@@ -129,12 +131,15 @@ export default function ProjectDetailPage({
   const [interviewForm, setInterviewForm] = useState({
     title: "",
     date: "",
-    description: "",
-    addSpeaker: false,
-    speakerName: "",
-    speakerRole: "",
-    speakerDepartment: "",
-    speakerIsInterviewer: false,
+    objective: "",
+  });
+  const [interviewSpeakers, setInterviewSpeakers] = useState<SpeakerItem[]>([]);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    name: "",
+    role: "",
+    department: "",
+    isInterviewer: false,
   });
   const [editForm, setEditForm] = useState({
     name: "",
@@ -207,21 +212,26 @@ export default function ProjectDetailPage({
     fetchInterviews();
   }, [fetchProject, fetchInterviews]);
 
+  const resetInterviewDialog = () => {
+    setInterviewForm({ title: "", date: "", objective: "" });
+    setInterviewSpeakers([]);
+    setManualMode(false);
+    setManualForm({ name: "", role: "", department: "", isInterviewer: false });
+  };
+
   const handleCreateInterview = async () => {
     try {
       setCreating(true);
 
       const speakers =
-        interviewForm.addSpeaker && interviewForm.speakerName.trim()
-          ? [
-              {
-                speakerLabel: "Speaker_0",
-                name: interviewForm.speakerName,
-                role: interviewForm.speakerRole || undefined,
-                department: interviewForm.speakerDepartment || undefined,
-                isInterviewer: interviewForm.speakerIsInterviewer,
-              },
-            ]
+        interviewSpeakers.length > 0
+          ? interviewSpeakers.map((s, i) => ({
+              speakerLabel: `Speaker_${i}`,
+              name: s.name,
+              role: s.role || undefined,
+              department: s.department || undefined,
+              isInterviewer: s.isInterviewer,
+            }))
           : undefined;
 
       const created = await api.post<{ id: string }>(
@@ -232,21 +242,13 @@ export default function ProjectDetailPage({
           interviewDate: interviewForm.date
             ? new Date(interviewForm.date + "T12:00:00").toISOString()
             : undefined,
+          objective: interviewForm.objective || undefined,
           speakers,
         },
       );
 
       setDialogOpen(false);
-      setInterviewForm({
-        title: "",
-        date: "",
-        description: "",
-        addSpeaker: false,
-        speakerName: "",
-        speakerRole: "",
-        speakerDepartment: "",
-        speakerIsInterviewer: false,
-      });
+      resetInterviewDialog();
       await fetchInterviews();
 
       // Navigate to the new interview to continue configuration
@@ -719,12 +721,18 @@ export default function ProjectDetailPage({
       </Tabs>
 
       {/* New Interview Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetInterviewDialog();
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nueva Entrevista</DialogTitle>
             <DialogDescription>
-              Agrega una nueva entrevista al proyecto. Después podrás configurar participantes y subir el audio.
+              Agrega una nueva entrevista al proyecto. Puedes agregar participantes desde el directorio o manualmente.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -757,89 +765,96 @@ export default function ProjectDetailPage({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="interview-description">
-                Contexto / Descripción
+              <Label htmlFor="interview-objective">
+                Objetivo
                 <HelpTooltip
                   text="Describe brevemente el objetivo de la entrevista o el contexto en que se realizó. Esto ayuda a la IA a interpretar mejor las respuestas."
                   className="ml-1"
                 />
               </Label>
               <Textarea
-                id="interview-description"
+                id="interview-objective"
                 placeholder="Ej: Entrevista exploratoria sobre procesos de onboarding del área de RRHH"
-                value={interviewForm.description}
+                value={interviewForm.objective}
                 onChange={(e) =>
                   setInterviewForm({
                     ...interviewForm,
-                    description: e.target.value,
+                    objective: e.target.value,
                   })
                 }
                 rows={2}
               />
             </div>
 
-            {/* Optional first speaker */}
-            <div className="space-y-3 rounded-lg border p-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="add-first-speaker"
-                  checked={interviewForm.addSpeaker}
-                  onCheckedChange={(checked) =>
-                    setInterviewForm({
-                      ...interviewForm,
-                      addSpeaker: checked === true,
-                    })
-                  }
-                />
-                <Label
-                  htmlFor="add-first-speaker"
-                  className="text-sm font-normal"
-                >
-                  Agregar un primer participante ahora
-                </Label>
-              </div>
+            {/* Participants */}
+            <div className="space-y-2">
+              <Label>Participantes</Label>
+              <PersonSearchSelect
+                onSelect={(person) => {
+                  setInterviewSpeakers((prev) => [
+                    ...prev,
+                    {
+                      speakerLabel: `Speaker_${prev.length}`,
+                      name: person.name,
+                      role: person.role,
+                      department: person.department,
+                      isInterviewer: false,
+                      personEntityId: person.id,
+                    },
+                  ]);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => setManualMode((v) => !v)}
+              >
+                {manualMode ? "Cancelar" : "+ Agregar manualmente"}
+              </Button>
 
-              {interviewForm.addSpeaker && (
-                <div className="space-y-3 pl-6">
+              {manualMode && (
+                <div className="space-y-2 rounded-md border p-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="first-speaker-name">Nombre</Label>
+                    <Label htmlFor="manual-name" className="text-xs">
+                      Nombre *
+                    </Label>
                     <Input
-                      id="first-speaker-name"
+                      id="manual-name"
                       placeholder="Nombre del participante"
-                      value={interviewForm.speakerName}
+                      value={manualForm.name}
                       onChange={(e) =>
-                        setInterviewForm({
-                          ...interviewForm,
-                          speakerName: e.target.value,
-                        })
+                        setManualForm({ ...manualForm, name: e.target.value })
                       }
                     />
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="first-speaker-role">Cargo / Rol</Label>
+                      <Label htmlFor="manual-role" className="text-xs">
+                        Cargo / Rol
+                      </Label>
                       <Input
-                        id="first-speaker-role"
-                        placeholder="Ej: Gerente de Operaciones"
-                        value={interviewForm.speakerRole}
+                        id="manual-role"
+                        placeholder="Ej: Gerente"
+                        value={manualForm.role}
                         onChange={(e) =>
-                          setInterviewForm({
-                            ...interviewForm,
-                            speakerRole: e.target.value,
-                          })
+                          setManualForm({ ...manualForm, role: e.target.value })
                         }
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="first-speaker-dept">Área</Label>
+                      <Label htmlFor="manual-dept" className="text-xs">
+                        Area
+                      </Label>
                       <Input
-                        id="first-speaker-dept"
+                        id="manual-dept"
                         placeholder="Ej: Operaciones"
-                        value={interviewForm.speakerDepartment}
+                        value={manualForm.department}
                         onChange={(e) =>
-                          setInterviewForm({
-                            ...interviewForm,
-                            speakerDepartment: e.target.value,
+                          setManualForm({
+                            ...manualForm,
+                            department: e.target.value,
                           })
                         }
                       />
@@ -847,30 +862,78 @@ export default function ProjectDetailPage({
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      id="first-speaker-interviewer"
-                      checked={interviewForm.speakerIsInterviewer}
+                      id="manual-interviewer"
+                      checked={manualForm.isInterviewer}
                       onCheckedChange={(checked) =>
-                        setInterviewForm({
-                          ...interviewForm,
-                          speakerIsInterviewer: checked === true,
+                        setManualForm({
+                          ...manualForm,
+                          isInterviewer: checked === true,
                         })
                       }
                     />
                     <Label
-                      htmlFor="first-speaker-interviewer"
+                      htmlFor="manual-interviewer"
                       className="text-sm font-normal"
                     >
                       Es entrevistador
                     </Label>
                   </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!manualForm.name.trim()}
+                    onClick={() => {
+                      if (!manualForm.name.trim()) return;
+                      setInterviewSpeakers((prev) => [
+                        ...prev,
+                        {
+                          speakerLabel: `Speaker_${prev.length}`,
+                          name: manualForm.name.trim(),
+                          role: manualForm.role || undefined,
+                          department: manualForm.department || undefined,
+                          isInterviewer: manualForm.isInterviewer,
+                        },
+                      ]);
+                      setManualForm({
+                        name: "",
+                        role: "",
+                        department: "",
+                        isInterviewer: false,
+                      });
+                      setManualMode(false);
+                    }}
+                  >
+                    Agregar
+                  </Button>
                 </div>
               )}
+
+              <SpeakerList
+                speakers={interviewSpeakers}
+                onRemove={(index) =>
+                  setInterviewSpeakers((prev) =>
+                    prev.filter((_, i) => i !== index),
+                  )
+                }
+                onToggleInterviewer={(index) =>
+                  setInterviewSpeakers((prev) =>
+                    prev.map((s, i) =>
+                      i === index
+                        ? { ...s, isInterviewer: !s.isInterviewer }
+                        : s,
+                    ),
+                  )
+                }
+              />
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={() => {
+                setDialogOpen(false);
+                resetInterviewDialog();
+              }}
               disabled={creating}
             >
               Cancelar
