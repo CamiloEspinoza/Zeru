@@ -50,3 +50,45 @@ export type ValidateKeyDto = z.infer<typeof validateKeySchema>;
 export type ChatRequestDto = z.infer<typeof chatRequestSchema>;
 export type UpdateMemoryDto = z.infer<typeof updateMemorySchema>;
 export type UpsertGeminiConfigDto = z.infer<typeof upsertGeminiConfigSchema>;
+
+// ── AI Pricing DTOs ──────────────────────────────────────────
+
+export const createPricingSchema = z.object({
+  provider: z.string().min(1),
+  model: z.string().min(1),
+  contextTier: z.string().default('DEFAULT'),
+  pricingUnit: z.enum(['PER_1M_TOKENS', 'PER_1K_CHARS', 'PER_HOUR', 'PER_MINUTE', 'PER_IMAGE', 'PER_GENERATION']),
+  inputPrice: z.number().min(0),
+  outputPrice: z.number().min(0),
+  cachedPrice: z.number().min(0).default(0),
+  longContextThreshold: z.number().int().positive().optional(),
+  description: z.string().optional(),
+  validFrom: z.string().datetime().optional(),
+});
+
+export type CreatePricingDto = z.infer<typeof createPricingSchema>;
+
+export const updatePricingSchema = z.object({
+  inputPrice: z.number().min(0).optional(),
+  outputPrice: z.number().min(0).optional(),
+  cachedPrice: z.number().min(0).optional(),
+  description: z.string().optional(),
+});
+
+export type UpdatePricingDto = z.infer<typeof updatePricingSchema>;
+
+export const recalculateCostsSchema = z.object({
+  from: z.string().datetime(),
+  to: z.string().datetime(),
+  provider: z.string().optional(),
+  model: z.string().optional(),
+});
+
+export type RecalculateCostsDto = z.infer<typeof recalculateCostsSchema>;
+
+export const costQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+export type CostQueryDto = z.infer<typeof costQuerySchema>;

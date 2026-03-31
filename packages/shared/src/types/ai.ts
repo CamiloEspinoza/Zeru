@@ -289,3 +289,66 @@ export const AI_MODELS: Record<AiProvider, AiModelDef[]> = {
     },
   ],
 };
+
+// ── AI Cost Tracking ──────────────────────────────────────────
+
+export type AiPricingUnit =
+  | 'PER_1M_TOKENS'
+  | 'PER_1K_CHARS'
+  | 'PER_HOUR'
+  | 'PER_MINUTE'
+  | 'PER_IMAGE'
+  | 'PER_GENERATION';
+
+export interface AiModelPricingDto {
+  id: string;
+  provider: string;
+  model: string;
+  contextTier: string;
+  pricingUnit: AiPricingUnit;
+  inputPrice: number;
+  outputPrice: number;
+  cachedPrice: number;
+  longContextThreshold: number | null;
+  description: string | null;
+  validFrom: string;
+  validTo: string | null;
+}
+
+export interface CostBreakdownItem {
+  key: string;
+  label: string;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  percentage: number;
+}
+
+export interface CostBreakdownResponse {
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCachedTokens: number;
+  breakdown: CostBreakdownItem[];
+  period: { from: string; to: string };
+}
+
+export interface CostSummaryResponse {
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCachedTokens: number;
+  totalInteractions: number;
+  period: { from: string; to: string };
+}
+
+export interface DailyCostItem {
+  date: string;
+  totalCostUsd: number;
+  breakdown: Record<string, number>;
+}
+
+export interface DailyCostResponse {
+  daily: DailyCostItem[];
+  period: { from: string; to: string };
+}
