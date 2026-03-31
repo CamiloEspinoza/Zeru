@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 import {
   ExtractionP1Schema,
   ExtractionP2Schema,
@@ -57,6 +58,7 @@ export class ExtractionPipelineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiConfig: AiConfigService,
+    private readonly aiUsageService: AiUsageService,
   ) {}
 
   /**
@@ -354,18 +356,13 @@ export class ExtractionPipelineService {
     usage: { inputTokens: number; outputTokens: number },
   ): Promise<void> {
     try {
-      await this.prisma.aiUsageLog.create({
-        data: {
-          provider: 'OPENAI',
-          model,
-          feature: `org-extraction-pass-${passNumber}`,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          totalTokens: usage.inputTokens + usage.outputTokens,
-          cachedTokens: 0,
-          compacted: false,
-          tenantId,
-        },
+      await this.aiUsageService.logUsage({
+        provider: 'OPENAI',
+        model,
+        feature: `org-extraction-pass-${passNumber}`,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        tenantId,
       });
     } catch (err) {
       this.logger.warn(

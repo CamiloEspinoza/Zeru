@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { Subject } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { AiConfigService } from './ai-config.service';
+import { AiUsageService } from './ai-usage.service';
 import { MemoryService } from './memory.service';
 import { SkillsService } from './skills.service';
 import { ActiveStreamsRegistry } from './active-streams.registry';
@@ -294,6 +295,7 @@ export class ChatService {
     private readonly memoryService: MemoryService,
     private readonly activeStreams: ActiveStreamsRegistry,
     private readonly skillsService: SkillsService,
+    private readonly aiUsageService: AiUsageService,
   ) {}
 
   async streamChat(ctx: ChatStreamContext, subject: Subject<ChatEvent>): Promise<void> {
@@ -671,19 +673,18 @@ export class ChatService {
 
       // Persist usage for every iteration (tool calls, questions, etc.)
       if (completedUsage.inputTokens > 0 || completedUsage.outputTokens > 0) {
-        await this.prisma.aiUsageLog.create({
-          data: {
-            provider: 'OPENAI',
-            model,
-            feature: 'chat',
-            inputTokens: completedUsage.inputTokens,
-            outputTokens: completedUsage.outputTokens,
-            totalTokens: completedUsage.totalTokens,
-            cachedTokens: completedUsage.cachedTokens,
-            compacted: wasCompacted,
-            tenantId: ctx.tenantId,
-            conversationId: conversation.id,
-          },
+        await this.aiUsageService.logUsage({
+          provider: 'OPENAI',
+          model,
+          feature: 'chat',
+          inputTokens: completedUsage.inputTokens,
+          outputTokens: completedUsage.outputTokens,
+          totalTokens: completedUsage.totalTokens,
+          cachedTokens: completedUsage.cachedTokens,
+          compacted: wasCompacted,
+          tenantId: ctx.tenantId,
+          userId: ctx.userId,
+          conversationId: conversation.id,
         });
       }
 
@@ -737,7 +738,7 @@ export class ChatService {
 
       // Auto-generate title if agent never called update_conversation_title
       if (!titleUpdated && isNewConversation && ctx.message) {
-        await this.autoGenerateTitle(openai, model, conversation.id, ctx.message, subject, ctx.tenantId);
+        await this.autoGenerateTitle(openai, model, conversation.id, ctx.message, subject, ctx.tenantId, ctx.userId);
       }
 
       break;
@@ -916,6 +917,7 @@ export class ChatService {
     firstMessage: string,
     subject: Subject<ChatEvent>,
     tenantId: string,
+    userId: string,
   ): Promise<void> {
     try {
       const resp = await openai.responses.create({
@@ -935,20 +937,19 @@ export class ChatService {
       // Log usage for title generation
       const titleUsage = resp.usage;
       if (titleUsage) {
-        await this.prisma.aiUsageLog.create({
-          data: {
-            provider: 'OPENAI',
-            model,
-            feature: 'title-generation',
-            inputTokens: titleUsage.input_tokens ?? 0,
-            outputTokens: titleUsage.output_tokens ?? 0,
-            totalTokens: titleUsage.total_tokens ?? 0,
-            cachedTokens: (titleUsage as Record<string, unknown>)?.['input_tokens_details']
-              ? Number(((titleUsage as Record<string, unknown>)['input_tokens_details'] as Record<string, unknown>)?.['cached_tokens'] ?? 0)
-              : 0,
-            tenantId,
-            conversationId,
-          },
+        await this.aiUsageService.logUsage({
+          provider: 'OPENAI',
+          model,
+          feature: 'title-generation',
+          inputTokens: titleUsage.input_tokens ?? 0,
+          outputTokens: titleUsage.output_tokens ?? 0,
+          totalTokens: titleUsage.total_tokens ?? 0,
+          cachedTokens: (titleUsage as Record<string, unknown>)?.['input_tokens_details']
+            ? Number(((titleUsage as Record<string, unknown>)['input_tokens_details'] as Record<string, unknown>)?.['cached_tokens'] ?? 0)
+            : 0,
+          tenantId,
+          userId,
+          conversationId,
         });
       }
 

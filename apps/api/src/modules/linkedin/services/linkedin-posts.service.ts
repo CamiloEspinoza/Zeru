@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { LinkedInApiService } from './linkedin-api.service';
 import { GeminiImageService } from './gemini-image.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 import { SkillsService } from '../../ai/services/skills.service';
 import { S3Service } from '../../files/s3.service';
 
@@ -153,6 +154,7 @@ export class LinkedInPostsService {
     private readonly apiService: LinkedInApiService,
     private readonly geminiService: GeminiImageService,
     private readonly aiConfigService: AiConfigService,
+    private readonly aiUsageService: AiUsageService,
     private readonly skillsService: SkillsService,
     private readonly s3Service: S3Service,
   ) {}
@@ -478,17 +480,13 @@ export class LinkedInPostsService {
     // Log AI usage
     const usage = response.usage;
     if (usage) {
-      await this.prisma.aiUsageLog.create({
-        data: {
-          provider: 'OPENAI',
-          model,
-          feature: 'post-regeneration',
-          inputTokens: usage.input_tokens ?? 0,
-          outputTokens: usage.output_tokens ?? 0,
-          totalTokens: (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0),
-          cachedTokens: 0,
-          tenantId,
-        },
+      await this.aiUsageService.logUsage({
+        provider: 'OPENAI',
+        model,
+        feature: 'post-regeneration',
+        inputTokens: usage.input_tokens ?? 0,
+        outputTokens: usage.output_tokens ?? 0,
+        tenantId,
       });
     }
 

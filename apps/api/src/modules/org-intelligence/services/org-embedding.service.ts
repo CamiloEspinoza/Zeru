@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 
 // ---------------------------------------------------------------------------
 // Constants (matching memory.service.ts)
@@ -26,6 +27,7 @@ export class OrgEmbeddingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiConfig: AiConfigService,
+    private readonly aiUsageService: AiUsageService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -213,18 +215,13 @@ export class OrgEmbeddingService {
     feature: string,
   ): Promise<void> {
     try {
-      await this.prisma.aiUsageLog.create({
-        data: {
-          provider: 'OPENAI',
-          model: EMBEDDING_MODEL,
-          feature,
-          inputTokens,
-          outputTokens: 0,
-          totalTokens: inputTokens,
-          cachedTokens: 0,
-          compacted: false,
-          tenantId,
-        },
+      await this.aiUsageService.logUsage({
+        provider: 'OPENAI',
+        model: EMBEDDING_MODEL,
+        feature,
+        inputTokens,
+        outputTokens: 0,
+        tenantId,
       });
     } catch (err) {
       this.logger.warn(

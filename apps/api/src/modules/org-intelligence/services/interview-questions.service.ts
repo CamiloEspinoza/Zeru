@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -46,6 +47,7 @@ export class InterviewQuestionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiConfig: AiConfigService,
+    private readonly aiUsageService: AiUsageService,
   ) {}
 
   /**
@@ -315,18 +317,13 @@ ${knowledgeContext}`;
     usage: { inputTokens: number; outputTokens: number },
   ): Promise<void> {
     try {
-      await this.prisma.aiUsageLog.create({
-        data: {
-          provider: 'OPENAI',
-          model: MODEL,
-          feature: 'interview-question-generation',
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          totalTokens: usage.inputTokens + usage.outputTokens,
-          cachedTokens: 0,
-          compacted: false,
-          tenantId,
-        },
+      await this.aiUsageService.logUsage({
+        provider: 'OPENAI',
+        model: MODEL,
+        feature: 'interview-question-generation',
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        tenantId,
       });
     } catch (err) {
       this.logger.warn(

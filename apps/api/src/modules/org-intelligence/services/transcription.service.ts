@@ -6,6 +6,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { DeepgramConfigService } from './deepgram-config.service';
 import { AiConfigService } from '../../ai/services/ai-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,6 +56,7 @@ export class TranscriptionService {
     private readonly aiConfig: AiConfigService,
     private readonly s3: S3Service,
     private readonly prisma: PrismaService,
+    private readonly aiUsageService: AiUsageService,
   ) {}
 
   /**
@@ -354,18 +356,14 @@ export class TranscriptionService {
       // outputTokens ≈ transcript char count / 4 (rough token estimate).
       const audioDurationSec = Math.round(durationMs / 1000);
 
-      await this.prisma.aiUsageLog.create({
-        data: {
-          provider,
-          model,
-          feature: 'org-transcription',
-          inputTokens: audioDurationSec,
-          outputTokens: 0,
-          totalTokens: audioDurationSec,
-          cachedTokens: 0,
-          compacted: false,
-          tenantId,
-        },
+      await this.aiUsageService.logUsage({
+        provider,
+        model,
+        feature: 'org-transcription',
+        inputTokens: audioDurationSec,
+        outputTokens: 0,
+        totalTokens: audioDurationSec,
+        tenantId,
       });
     } catch (err) {
       // Non-critical — log but don't fail the transcription
