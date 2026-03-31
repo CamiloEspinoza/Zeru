@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import {
   AI_MODELS,
@@ -8,37 +8,15 @@ import {
   type AiProvider,
   type ReasoningEffort,
 } from "@zeru/shared";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { cn } from "@/lib/utils";
 import { SaveIndicator, type SaveStatus } from "@/components/config/save-indicator";
+import { ConfigStatusBanner } from "@/components/config/config-status-banner";
+import { ConfigDeleteAction } from "@/components/config/config-delete-action";
+import { SecretField } from "@/components/config/secret-field";
+import { useConfigValidation } from "@/hooks/use-config-validation";
 
 interface AiConfig {
   provider?: AiProvider;
@@ -47,8 +25,6 @@ interface AiConfig {
   isActive?: boolean;
   hasApiKey?: boolean;
 }
-
-type KeyStatus = "idle" | "validating" | "valid" | "invalid";
 
 interface AiConfigFormProps {
   onConfigured?: () => void;
@@ -65,28 +41,22 @@ export function AiConfigForm({
 }: AiConfigFormProps) {
   const [config, setConfig] = useState<AiConfig>({});
   const [loading, setLoading] = useState(true);
-  const [showApiKey, setShowApiKey] = useState(false);
-
   const [provider, setProvider] = useState<AiProvider>("OPENAI");
   const [model, setModel] = useState("gpt-5.4");
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>("medium");
   const [apiKey, setApiKey] = useState("");
-  const [keyStatus, setKeyStatus] = useState<KeyStatus>("idle");
   const [keyError, setKeyError] = useState("");
-
+  const [saveError, setSaveError] = useState("");
   const [providerSave, setProviderSave] = useState<SaveStatus>("idle");
   const [modelSave, setModelSave] = useState<SaveStatus>("idle");
   const [reasoningSave, setReasoningSave] = useState<SaveStatus>("idle");
   const [keySave, setKeySave] = useState<SaveStatus>("idle");
-  const [saveError, setSaveError] = useState("");
-  const [deleting, setDeleting] = useState(false);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const { flashSaved, validationState: keyStatus, setValidationState: setKeyStatus, debouncedValidate } =
+    useConfigValidation();
 
   useEffect(() => {
-    api
-      .get<AiConfig>("/ai/config")
+    api.get<AiConfig>("/ai/config")
       .then((data) => {
         setConfig(data);
         if (data.provider) setProvider(data.provider);
@@ -97,56 +67,30 @@ export function AiConfigForm({
       .finally(() => setLoading(false));
   }, []);
 
-  const flashSaved = (
-    setter: (s: SaveStatus) => void,
-    key: string,
-  ) => {
-    setter("saved");
-    if (savedTimers.current[key]) clearTimeout(savedTimers.current[key]);
-    savedTimers.current[key] = setTimeout(() => setter("idle"), 2500);
-  };
-
   const autoSave = useCallback(
-    async (
-      opts: {
-        provider: AiProvider;
-        model: string;
-        reasoningEffort: ReasoningEffort;
-        apiKey: string;
-        setStatus: (s: SaveStatus) => void;
-        statusKey: string;
-      },
-    ) => {
+    async (opts: {
+      provider: AiProvider; model: string; reasoningEffort: ReasoningEffort; apiKey: string;
+      setStatus: (s: SaveStatus) => void; statusKey: string;
+    }) => {
       const { setStatus, statusKey } = opts;
       setStatus("saving");
       setSaveError("");
       try {
         const updated = await api.put<AiConfig>("/ai/config", {
-          provider: opts.provider,
-          apiKey: opts.apiKey || "KEEP_EXISTING",
-          model: opts.model,
-          reasoningEffort: opts.reasoningEffort,
+          provider: opts.provider, apiKey: opts.apiKey || "KEEP_EXISTING",
+          model: opts.model, reasoningEffort: opts.reasoningEffort,
         });
         setConfig(updated);
-        if (opts.apiKey) {
-          setApiKey("");
-          setKeyStatus("idle");
-          onConfigured?.();
-        }
+        if (opts.apiKey) { setApiKey(""); setKeyStatus("idle"); onConfigured?.(); }
         flashSaved(setStatus, statusKey);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Error al guardar";
         setSaveError(msg);
         setStatus("error");
-        if (savedTimers.current[statusKey])
-          clearTimeout(savedTimers.current[statusKey]);
-        savedTimers.current[statusKey] = setTimeout(
-          () => setStatus("idle"),
-          4000,
-        );
+        flashSaved(setStatus, statusKey + "-err");
       }
     },
-    [onConfigured],
+    [onConfigured, flashSaved, setKeyStatus],
   );
 
   const handleProviderChange = (value: string) => {
@@ -154,160 +98,59 @@ export function AiConfigForm({
     const firstModel = AI_MODELS[newProvider]?.[0];
     const newModel = firstModel?.id ?? "";
     const newEffort = firstModel?.defaultReasoningEffort ?? "medium";
-    setProvider(newProvider);
-    setModel(newModel);
-    setReasoningEffort(newEffort);
-    setApiKey("");
-    setKeyStatus("idle");
-    setKeyError("");
-    if (config.hasApiKey) {
-      autoSave({
-        provider: newProvider,
-        model: newModel,
-        reasoningEffort: newEffort,
-        apiKey: "",
-        setStatus: setProviderSave,
-        statusKey: "provider",
-      });
-    }
+    setProvider(newProvider); setModel(newModel); setReasoningEffort(newEffort);
+    setApiKey(""); setKeyStatus("idle"); setKeyError("");
+    if (config.hasApiKey) autoSave({ provider: newProvider, model: newModel, reasoningEffort: newEffort, apiKey: "", setStatus: setProviderSave, statusKey: "provider" });
   };
 
   const handleModelChange = (value: string) => {
     setModel(value);
-    const modelDef = models.find((m) => m.id === value);
-    const newEffort = modelDef?.defaultReasoningEffort ?? "medium";
+    const newEffort = models.find((m) => m.id === value)?.defaultReasoningEffort ?? "medium";
     setReasoningEffort(newEffort);
-    if (config.hasApiKey) {
-      autoSave({
-        provider,
-        model: value,
-        reasoningEffort: newEffort,
-        apiKey: "",
-        setStatus: setModelSave,
-        statusKey: "model",
-      });
-    }
+    if (config.hasApiKey) autoSave({ provider, model: value, reasoningEffort: newEffort, apiKey: "", setStatus: setModelSave, statusKey: "model" });
   };
 
   const handleReasoningEffortChange = (value: string) => {
     const newEffort = value as ReasoningEffort;
     setReasoningEffort(newEffort);
-    if (config.hasApiKey) {
-      autoSave({
-        provider,
-        model,
-        reasoningEffort: newEffort,
-        apiKey: "",
-        setStatus: setReasoningSave,
-        statusKey: "reasoning",
-      });
-    }
+    if (config.hasApiKey) autoSave({ provider, model, reasoningEffort: newEffort, apiKey: "", setStatus: setReasoningSave, statusKey: "reasoning" });
   };
 
   const handleApiKeyChange = (value: string) => {
-    setApiKey(value);
-    setKeyError("");
-    setKeySave("idle");
-
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (!value.trim()) {
-      setKeyStatus("idle");
-      return;
-    }
-
+    setApiKey(value); setKeyError(""); setKeySave("idle");
+    if (!value.trim()) { setKeyStatus("idle"); return; }
     if (!value.trim().startsWith("sk-")) {
       setKeyStatus("invalid");
       setKeyError('Las API keys de OpenAI comienzan con "sk-"');
       return;
     }
-
     setKeyStatus("validating");
-
-    debounceRef.current = setTimeout(async () => {
+    debouncedValidate(async () => {
       try {
-        const res = await api.post<{ valid: boolean; error?: string }>(
-          "/ai/config/validate-key",
-          { provider, apiKey: value.trim() },
-        );
+        const res = await api.post<{ valid: boolean; error?: string }>("/ai/config/validate-key", { provider, apiKey: value.trim() });
         if (res.valid) {
-          setKeyStatus("valid");
-          setKeyError("");
-          autoSave({
-            provider,
-            model,
-            reasoningEffort,
-            apiKey: value.trim(),
-            setStatus: setKeySave,
-            statusKey: "key",
-          });
-        } else {
-          setKeyStatus("invalid");
-          setKeyError(res.error ?? "API key inválida");
-        }
-      } catch {
-        setKeyStatus("invalid");
-        setKeyError("No se pudo verificar la API key");
-      }
-    }, 800);
+          setKeyStatus("valid"); setKeyError("");
+          autoSave({ provider, model, reasoningEffort, apiKey: value.trim(), setStatus: setKeySave, statusKey: "key" });
+        } else { setKeyStatus("invalid"); setKeyError(res.error ?? "API key inválida"); }
+      } catch { setKeyStatus("invalid"); setKeyError("No se pudo verificar la API key"); }
+    });
   };
 
-  const handleDeleteKey = async () => {
-    setDeleting(true);
-    try {
-      await api.delete("/ai/config/key");
-      setConfig({});
-      setApiKey("");
-      setKeyStatus("idle");
-      setKeyError("");
-      setKeySave("idle");
-    } catch {
-      setSaveError("No se pudo eliminar la API key");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
 
   const models = AI_MODELS[provider] ?? [];
   const selectedModel = models.find((m) => m.id === model);
-  const availableEfforts = REASONING_EFFORT_OPTIONS.filter((opt) =>
-    selectedModel?.supportedReasoningEfforts.includes(opt.id),
-  );
-  const isKeyBusy = keyStatus === "validating";
+  const availableEfforts = REASONING_EFFORT_OPTIONS.filter((opt) => selectedModel?.supportedReasoningEfforts.includes(opt.id));
 
   return (
     <div className="space-y-5">
-      {config.hasApiKey && (
-        <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-300">
-          <svg className="h-4 w-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          Proveedor configurado y activo
-          <Badge variant="secondary" className="ml-auto">
-            {config.provider}
-          </Badge>
-        </div>
-      )}
+      {config.hasApiKey && <ConfigStatusBanner label="Proveedor configurado y activo" badge={config.provider} />}
 
       <Card>
         {showHeader && (
           <CardHeader>
             <CardTitle className="text-base">Proveedor</CardTitle>
-            <CardDescription>
-              Selecciona el servicio de IA que utilizará el asistente.
-            </CardDescription>
+            <CardDescription>Selecciona el servicio de IA que utilizará el asistente.</CardDescription>
           </CardHeader>
         )}
         <CardContent className="space-y-4">
@@ -317,44 +160,30 @@ export function AiConfigForm({
               <SaveIndicator status={providerSave} error={saveError} />
             </div>
             <Select value={provider} onValueChange={handleProviderChange}>
-              <SelectTrigger id="provider">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="OPENAI">OpenAI</SelectItem>
-              </SelectContent>
+              <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="OPENAI">OpenAI</SelectItem></SelectContent>
             </Select>
           </div>
-
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="model">Modelo</Label>
               <SaveIndicator status={modelSave} error={saveError} />
             </div>
             <Select value={model} onValueChange={handleModelChange}>
-              <SelectTrigger id="model">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger id="model"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {models.map((m) => (
                   <SelectItem key={m.id} value={m.id}>
                     <div className="flex items-center gap-2">
                       <span>{m.label}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {m.contextWindow}
-                      </span>
+                      <span className="text-muted-foreground text-xs">{m.contextWindow}</span>
                     </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedModel && (
-              <p className="text-xs text-muted-foreground">
-                {selectedModel.description}
-              </p>
-            )}
+            {selectedModel && <p className="text-xs text-muted-foreground">{selectedModel.description}</p>}
           </div>
-
           {availableEfforts.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -362,15 +191,9 @@ export function AiConfigForm({
                 <SaveIndicator status={reasoningSave} error={saveError} />
               </div>
               <Select value={reasoningEffort} onValueChange={handleReasoningEffortChange}>
-                <SelectTrigger id="reasoningEffort">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger id="reasoningEffort"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {availableEfforts.map((opt) => (
-                    <SelectItem key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
+                  {availableEfforts.map((opt) => <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>)}
                 </SelectContent>
               </Select>
               {REASONING_EFFORT_OPTIONS.find((o) => o.id === reasoningEffort) && (
@@ -389,48 +212,19 @@ export function AiConfigForm({
             <div>
               <CardTitle className="text-base">Autenticación</CardTitle>
               <CardDescription className="mt-1">
-                {config.hasApiKey
-                  ? "Ingresa una nueva API key para reemplazar la actual."
-                  : "Ingresa tu API key de OpenAI. Se almacena cifrada."}
+                {config.hasApiKey ? "Ingresa una nueva API key para reemplazar la actual." : "Ingresa tu API key de OpenAI. Se almacena cifrada."}
               </CardDescription>
             </div>
             {showDeleteAction && config.hasApiKey && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={deleting}
-                    className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    {deleting ? (
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-destructive border-t-transparent" />
-                    ) : (
-                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    )}
-                    Eliminar key
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Eliminar API key?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se eliminará la API key almacenada. El asistente IA dejará de funcionar hasta que configures una nueva key.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDeleteKey}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Eliminar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <ConfigDeleteAction
+                title="¿Eliminar API key?"
+                description="Se eliminará la API key almacenada. El asistente IA dejará de funcionar hasta que configures una nueva key."
+                buttonLabel="Eliminar key"
+                onConfirm={async () => {
+                  await api.delete("/ai/config/key");
+                  setConfig({}); setApiKey(""); setKeyStatus("idle"); setKeyError(""); setKeySave("idle");
+                }}
+              />
             )}
           </div>
         </CardHeader>
@@ -438,106 +232,27 @@ export function AiConfigForm({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="apiKey">
-                API Key{" "}
-                {config.hasApiKey && (
-                  <span className="text-muted-foreground font-normal">
-                    (dejar vacío para mantener la actual)
-                  </span>
-                )}
+                API Key{config.hasApiKey && <span className="text-muted-foreground font-normal"> (dejar vacío para mantener la actual)</span>}
               </Label>
               <SaveIndicator status={keySave} error={saveError} />
             </div>
-
-            <div className="relative">
-              <Input
-                id="apiKey"
-                type={showApiKey ? "text" : "password"}
-                placeholder={
-                  config.hasApiKey
-                    ? "sk-... (dejar vacío para no cambiar)"
-                    : "sk-..."
-                }
-                value={apiKey}
-                onChange={(e) => handleApiKeyChange(e.target.value)}
-                disabled={isKeyBusy || keySave === "saving"}
-                className={cn(
-                  "pr-20 transition-colors",
-                  keyStatus === "valid" &&
-                    "border-green-500 focus-visible:ring-green-500",
-                  keyStatus === "invalid" &&
-                    "border-destructive focus-visible:ring-destructive",
-                )}
-                autoComplete="off"
-                spellCheck={false}
-              />
-
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                {isKeyBusy || keySave === "saving" ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                ) : keyStatus === "valid" ? (
-                  <svg
-                    className="h-4 w-4 text-green-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                ) : keyStatus === "invalid" ? (
-                  <svg
-                    className="h-4 w-4 text-destructive"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2.5}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    {showApiKey ? "Ocultar" : "Mostrar"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {isKeyBusy && (
-              <p className="text-xs text-muted-foreground">
-                Verificando conexión con OpenAI...
-              </p>
-            )}
-            {keyStatus === "valid" && !isKeyBusy && keySave === "idle" && (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                API key válida
-              </p>
-            )}
-            {keyStatus === "invalid" && keyError && !isKeyBusy && (
-              <p className="text-xs text-destructive">{keyError}</p>
-            )}
+            <SecretField
+              id="apiKey"
+              value={apiKey}
+              onChange={handleApiKeyChange}
+              placeholder={config.hasApiKey ? "sk-... (dejar vacío para no cambiar)" : "sk-..."}
+              validationStatus={keyStatus}
+              isSaving={keySave === "saving"}
+            />
+            {keyStatus === "validating" && <p className="text-xs text-muted-foreground">Verificando conexión con OpenAI...</p>}
+            {keyStatus === "valid" && keySave === "idle" && <p className="text-xs text-green-600 dark:text-green-400">API key válida</p>}
+            {keyStatus === "invalid" && keyError && <p className="text-xs text-destructive">{keyError}</p>}
           </div>
         </CardContent>
       </Card>
 
       {docsHref && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => window.open(docsHref, "_blank", "noopener,noreferrer")}
-        >
+        <Button variant="outline" size="sm" className="w-full" onClick={() => window.open(docsHref, "_blank", "noopener,noreferrer")}>
           <svg className="h-4 w-4 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>

@@ -23,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { StatusBadge } from "@/components/org-intelligence/status-badge";
 import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import { TranscriptionPlayer } from "@/components/org-intelligence/transcription-player";
 import { useSegmentEntities } from "@/components/org-intelligence/use-segment-entities";
@@ -39,12 +38,16 @@ import {
 import { ProgressCelebration } from "@/components/org-intelligence/progress-celebration";
 import { PersonAvatar } from "@/components/org-intelligence/person-avatar";
 import { useFirstVisit } from "@/hooks/use-first-visit";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Edit02Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import Link from "next/link";
 import { InterviewQuestionsView } from "@/components/org-intelligence/interview-questions-view";
 import { InterviewAudioStep } from "@/components/org-intelligence/interview-audio-step";
 import { InterviewGuidePrint } from "@/components/org-intelligence/interview-guide-print";
+import { InterviewHeader } from "@/components/org-intelligence/interview-header";
+import { InterviewParticipantsCard } from "@/components/org-intelligence/interview-participants-card";
+import { PipelineStatusCard } from "@/components/org-intelligence/pipeline-status-card";
+import { ReprocessDialog } from "@/components/org-intelligence/reprocess-dialog";
+import { EditInterviewDialog } from "@/components/org-intelligence/edit-interview-dialog";
+import { pipelineSteps, getSpeakerColor } from "@/lib/org-intelligence/pipeline-config";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
@@ -109,60 +112,6 @@ interface TranscriptionSegment {
   speakerConfidence?: number;
 }
 
-const pipelineSteps = [
-  "UPLOADED",
-  "TRANSCRIBING",
-  "POST_PROCESSING",
-  "EXTRACTING",
-  "RESOLVING_COREFERENCES",
-  "SUMMARIZING",
-  "CHUNKING",
-  "EMBEDDING",
-  "COMPLETED",
-];
-const pipelineStepLabels: Record<string, string> = {
-  UPLOADED: "Subido",
-  TRANSCRIBING: "Transcribiendo",
-  POST_PROCESSING: "Post-procesando",
-  EXTRACTING: "Extrayendo",
-  RESOLVING_COREFERENCES: "Reconciliando",
-  SUMMARIZING: "Resumiendo",
-  CHUNKING: "Fragmentando",
-  EMBEDDING: "Indexando",
-  COMPLETED: "Completado",
-};
-
-const pipelineStepDescriptions: Record<string, string> = {
-  UPLOADED: "Audio recibido correctamente",
-  TRANSCRIBING: "Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3)",
-  POST_PROCESSING: "Limpiando y estructurando la transcripción",
-  EXTRACTING: "Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas de análisis)",
-  RESOLVING_COREFERENCES: "Reconciliando entidades duplicadas y resolviendo co-referencias entre entrevistas",
-  SUMMARIZING: "Generando resúmenes de cada segmento de la entrevista",
-  CHUNKING: "Dividiendo la transcripción en fragmentos para búsqueda semántica",
-  EMBEDDING: "Generando embeddings vectoriales para búsqueda semántica",
-  COMPLETED: "Procesamiento finalizado. Los resultados están disponibles en las pestañas de Análisis y Diagnóstico del proyecto.",
-};
-
-const speakerColors = [
-  "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
-  "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
-  "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
-];
-
-function getSpeakerColor(speaker: string, speakerMap: Map<string, number>) {
-  if (!speakerMap.has(speaker)) {
-    speakerMap.set(speaker, speakerMap.size);
-  }
-  const index = speakerMap.get(speaker)!;
-  return speakerColors[index % speakerColors.length];
-}
-
 function formatTimestamp(seconds: number | undefined) {
   if (seconds == null) return null;
   const m = Math.floor(seconds / 60);
@@ -199,13 +148,11 @@ export default function InterviewDetailPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sseAbortRef = useRef<AbortController | null>(null);
 
-  // Speaker management state
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
   const [speakerForm, setSpeakerForm] = useState<SpeakerFormData>(emptySpeakerForm);
   const [editingSpeakerIndex, setEditingSpeakerIndex] = useState<number | null>(null);
   const [savingSpeakers, setSavingSpeakers] = useState(false);
 
-  // Person directory search (for adding participant from directory)
   const [searchMode, setSearchMode] = useState(true);
   const [personSearch, setPersonSearch] = useState("");
   const [searchResults, setSearchResults] = useState<DirectoryPerson[]>([]);
@@ -213,28 +160,22 @@ export default function InterviewDetailPage({
   const [personAvatarUrls, setPersonAvatarUrls] = useState<Record<string, string>>({});
   const [speakerAvatarUrls, setSpeakerAvatarUrls] = useState<Record<string, string>>({});
 
-  // Segment entities (only fetch when processing is complete)
   const isCompleted = (currentProcessingStatus ?? interview?.processingStatus) === "COMPLETED";
   const { segmentEntityMap } = useSegmentEntities(isCompleted ? interviewId : null);
 
-  // Edit interview state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editForm, setEditForm] = useState({ title: "", interviewDate: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Delete interview state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Reprocess state
   const [reprocessDialogOpen, setReprocessDialogOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessFromStep, setReprocessFromStep] = useState("");
 
-  // Success banner for first completed processing
   const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
 
-  // Questions state
   const [generatedSections, setGeneratedSections] = useState<{ theme: string; questions: { text: string; rationale?: string; priority: string }[] }[]>([]);
   const [generatedIntroText, setGeneratedIntroText] = useState("");
 
@@ -246,20 +187,17 @@ export default function InterviewDetailPage({
       );
       setInterview(res);
 
-      // Hydrate generated questions
       if (res.generatedQuestions) {
         setGeneratedIntroText(res.generatedQuestions.introText ?? "");
         setGeneratedSections(res.generatedQuestions.sections ?? []);
       }
 
-      // Hydrate processing state from DB
       setCurrentProcessingStatus(res.processingStatus);
       setCurrentProcessingError(res.processingError);
       if (Array.isArray(res.processingLog) && res.processingLog.length > 0) {
         setPipelineLog(res.processingLog);
       }
 
-      // If actively processing, connect SSE
       if (
         res.processingStatus !== "PENDING" &&
         res.processingStatus !== "UPLOADED" &&
@@ -276,9 +214,7 @@ export default function InterviewDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
 
-  /** Connect to the SSE endpoint for real-time pipeline events */
   const connectSSE = useCallback(() => {
-    // Avoid duplicate connections
     if (sseAbortRef.current) return;
 
     const tenantId =
@@ -300,7 +236,6 @@ export default function InterviewDetailPage({
     })
       .then(async (response) => {
         if (!response.ok || response.status === 204 || !response.body) {
-          // No active pipeline — nothing to stream
           sseAbortRef.current = null;
           return;
         }
@@ -321,7 +256,6 @@ export default function InterviewDetailPage({
             if (!line.startsWith("data: ")) continue;
             const payload = line.slice(6).trim();
             if (payload === "[DONE]") {
-              // Pipeline finished — re-fetch interview for full data
               const res = await api.get<Interview>(
                 `/org-intelligence/interviews/${interviewId}`,
               );
@@ -349,7 +283,7 @@ export default function InterviewDetailPage({
                 ]);
               }
             } catch {
-              // Ignore unparseable lines
+              // ignore unparseable lines
             }
           }
         }
@@ -363,7 +297,6 @@ export default function InterviewDetailPage({
       });
   }, [interviewId]);
 
-  /** Disconnect from SSE stream */
   const disconnectSSE = useCallback(() => {
     if (sseAbortRef.current) {
       sseAbortRef.current.abort();
@@ -378,7 +311,6 @@ export default function InterviewDetailPage({
     };
   }, [fetchInterview, disconnectSSE]);
 
-  // Debounced search for directory persons
   useEffect(() => {
     if (!personSearch.trim() || personSearch.length < 2) {
       setSearchResults([]);
@@ -391,7 +323,6 @@ export default function InterviewDetailPage({
         );
         const results = res.data ?? [];
         setSearchResults(results);
-        // Fetch avatar URLs for results that have avatarS3Key
         results.forEach(async (person) => {
           if (person.avatarS3Key && !personAvatarUrls[person.id]) {
             try {
@@ -402,7 +333,7 @@ export default function InterviewDetailPage({
                 setPersonAvatarUrls((prev) => ({ ...prev, [person.id]: avatarRes.url! }));
               }
             } catch {
-              // Ignore avatar fetch errors
+              // ignore avatar fetch errors
             }
           }
         });
@@ -413,7 +344,6 @@ export default function InterviewDetailPage({
     return () => clearTimeout(timer);
   }, [personSearch, personAvatarUrls]);
 
-  // Fetch avatar URLs for speakers with personEntityId
   useEffect(() => {
     if (!interview?.speakers) return;
     interview.speakers.forEach(async (speaker) => {
@@ -429,7 +359,7 @@ export default function InterviewDetailPage({
             }));
           }
         } catch {
-          // Ignore avatar fetch errors
+          // ignore avatar fetch errors
         }
       }
     });
@@ -437,25 +367,17 @@ export default function InterviewDetailPage({
 
   const MAX_FILE_SIZE_MB = 500;
   const ALLOWED_AUDIO_TYPES = [
-    "audio/mpeg",
-    "audio/mp3",
-    "audio/wav",
-    "audio/x-wav",
-    "audio/mp4",
-    "audio/x-m4a",
-    "audio/ogg",
-    "audio/webm",
+    "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
+    "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm",
   ];
   const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm"];
 
   const handleFileUpload = async (file: File) => {
-    // Validate file type
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
     if (!ALLOWED_AUDIO_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
       toast.error(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
       return;
     }
-    // Validate file size
     if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
       toast.error(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
       return;
@@ -468,25 +390,17 @@ export default function InterviewDetailPage({
       formData.append("file", file);
 
       const tenantId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("tenantId")
-          : null;
+        typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
       const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("access_token")
-          : null;
+        typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
 
       const headers: Record<string, string> = {};
       if (tenantId) headers[TENANT_HEADER] = tenantId;
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      // Use XMLHttpRequest for progress tracking
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open(
-          "POST",
-          `${API_BASE}/org-intelligence/interviews/${interviewId}/upload-audio`,
-        );
+        xhr.open("POST", `${API_BASE}/org-intelligence/interviews/${interviewId}/upload-audio`);
         Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
 
         xhr.upload.addEventListener("progress", (e) => {
@@ -495,11 +409,8 @@ export default function InterviewDetailPage({
           }
         });
         xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error("Upload failed"));
-          }
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error("Upload failed"));
         });
         xhr.addEventListener("error", () => reject(new Error("Upload failed")));
         xhr.send(formData);
@@ -525,11 +436,7 @@ export default function InterviewDetailPage({
   const handleProcess = async () => {
     try {
       setProcessing(true);
-      await api.post(
-        `/org-intelligence/interviews/${interviewId}/process`,
-        {},
-      );
-      // Immediately update local state and reset log
+      await api.post(`/org-intelligence/interviews/${interviewId}/process`, {});
       setCurrentProcessingStatus("TRANSCRIBING");
       setCurrentProcessingError(null);
       setPipelineLog([{
@@ -537,7 +444,6 @@ export default function InterviewDetailPage({
         message: PROCESSING_STATUS_MESSAGES.TRANSCRIBING,
         timestamp: new Date().toISOString(),
       }]);
-      // Connect SSE for real-time updates
       connectSSE();
       await fetchInterview();
     } catch (err) {
@@ -547,8 +453,6 @@ export default function InterviewDetailPage({
       setProcessing(false);
     }
   };
-
-  // --- Edit interview handlers ---
 
   const openEditDialog = () => {
     if (!interview) return;
@@ -581,8 +485,6 @@ export default function InterviewDetailPage({
     }
   };
 
-  // --- Delete interview handler ---
-
   const handleDeleteInterview = async () => {
     try {
       setDeleting(true);
@@ -596,19 +498,13 @@ export default function InterviewDetailPage({
     }
   };
 
-  // --- Reprocess interview handler ---
-
   const handleReprocess = async () => {
     try {
       setReprocessing(true);
       const query = reprocessFromStep ? `?fromStep=${reprocessFromStep}` : "";
-      await api.post(
-        `/org-intelligence/interviews/${interviewId}/process${query}`,
-        {},
-      );
+      await api.post(`/org-intelligence/interviews/${interviewId}/process${query}`, {});
       setReprocessDialogOpen(false);
       setReprocessFromStep("");
-      // Immediately update local state and reset log
       const startStatus = reprocessFromStep || "TRANSCRIBING";
       setCurrentProcessingStatus(startStatus);
       setCurrentProcessingError(null);
@@ -628,14 +524,9 @@ export default function InterviewDetailPage({
     }
   };
 
-  // --- Speaker management handlers ---
-
   const openAddSpeakerDialog = () => {
     const nextIndex = interview?.speakers?.length ?? 0;
-    setSpeakerForm({
-      ...emptySpeakerForm,
-      speakerLabel: `Speaker_${nextIndex}`,
-    });
+    setSpeakerForm({ ...emptySpeakerForm, speakerLabel: `Speaker_${nextIndex}` });
     setEditingSpeakerIndex(null);
     setSearchMode(true);
     setPersonSearch("");
@@ -699,19 +590,13 @@ export default function InterviewDetailPage({
 
       let updatedSpeakers;
       if (editingSpeakerIndex !== null) {
-        // Edit existing
         updatedSpeakers = [...currentSpeakers];
         updatedSpeakers[editingSpeakerIndex] = newSpeakerData;
       } else {
-        // Add new
         updatedSpeakers = [...currentSpeakers, newSpeakerData];
       }
 
-      await api.patch(
-        `/org-intelligence/interviews/${interviewId}/speakers`,
-        { speakers: updatedSpeakers },
-      );
-
+      await api.patch(`/org-intelligence/interviews/${interviewId}/speakers`, { speakers: updatedSpeakers });
       await fetchInterview();
       setSpeakerDialogOpen(false);
       setSpeakerForm(emptySpeakerForm);
@@ -739,11 +624,7 @@ export default function InterviewDetailPage({
           personEntityId: s.personEntityId ?? undefined,
         }));
 
-      await api.patch(
-        `/org-intelligence/interviews/${interviewId}/speakers`,
-        { speakers: updatedSpeakers },
-      );
-
+      await api.patch(`/org-intelligence/interviews/${interviewId}/speakers`, { speakers: updatedSpeakers });
       await fetchInterview();
     } catch (err) {
       console.error("Error al eliminar participante:", err);
@@ -778,10 +659,7 @@ export default function InterviewDetailPage({
     return (
       <div className="space-y-6">
         <p className="text-muted-foreground">Entrevista no encontrada.</p>
-        <Button
-          variant="outline"
-          onClick={() => router.push(`/org-intelligence/projects/${id}`)}
-        >
+        <Button variant="outline" onClick={() => router.push(`/org-intelligence/projects/${id}`)}>
           Volver al proyecto
         </Button>
       </div>
@@ -789,10 +667,8 @@ export default function InterviewDetailPage({
   }
 
   const currentStatus = currentProcessingStatus ?? interview.processingStatus;
-  const currentStepIndex = pipelineSteps.indexOf(currentStatus);
   const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
-  const showUpload =
-    interview.processingStatus === "PENDING" && !interview.audioS3Key;
+  const showUpload = interview.processingStatus === "PENDING" && !interview.audioS3Key;
   const showProcess =
     (interview.processingStatus === "UPLOADED" ||
       (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
@@ -804,11 +680,7 @@ export default function InterviewDetailPage({
     (currentStatus === "COMPLETED" || pipelineSteps.indexOf(currentStatus) >= pipelineSteps.indexOf("EXTRACTING")) &&
     interview.transcriptionJson;
 
-  const hasSpeakers = interview.speakers.length > 0;
   const speakerMap = new Map<string, number>();
-  // Map Deepgram labels (Speaker_0, Speaker_1) to real names for transcription display.
-  // Index by speakerLabel AND by positional Speaker_N (fallback when speakerLabel
-  // was updated to the real name and no longer matches the Deepgram label).
   const speakerNameMap = new Map<string, string>();
   for (let idx = 0; idx < interview.speakers.length; idx++) {
     const s = interview.speakers[idx];
@@ -820,165 +692,27 @@ export default function InterviewDetailPage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">
-              {interview.title ?? "Entrevista sin título"}
-            </h1>
-            <StatusBadge type="processing" value={currentStatus} />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {formatDate(interview.interviewDate ?? interview.createdAt)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Reprocess/retry button — visible when pipeline finished, failed, or is stuck */}
-          {currentStatus !== "PENDING" && currentStatus !== "UPLOADED" && (
-            <Button
-              variant="outline"
-              onClick={() => setReprocessDialogOpen(true)}
-              disabled={reprocessing}
-            >
-              {reprocessing
-                ? "Procesando..."
-                : currentStatus === "FAILED"
-                  ? "Reintentar"
-                  : currentStatus === "COMPLETED"
-                    ? "Reprocesar"
-                    : "Reiniciar desde..."}
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={openEditDialog}
-          >
-            <HugeiconsIcon icon={Edit02Icon} className="size-4" />
-            <span className="sr-only">Editar entrevista</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="text-destructive hover:text-destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-          >
-            <HugeiconsIcon icon={Delete02Icon} className="size-4" />
-            <span className="sr-only">Eliminar entrevista</span>
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push(`/org-intelligence/projects/${id}`)}
-          >
-            Volver al proyecto
-          </Button>
-        </div>
-      </div>
+      <InterviewHeader
+        title={interview.title}
+        date={formatDate(interview.interviewDate ?? interview.createdAt)}
+        currentStatus={currentStatus}
+        onEdit={openEditDialog}
+        onReprocess={() => setReprocessDialogOpen(true)}
+        onDelete={() => setDeleteDialogOpen(true)}
+        projectId={id}
+        reprocessing={reprocessing}
+      />
 
-      {/* Section 1: Participants Configuration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CardTitle>Participantes de la Entrevista</CardTitle>
-              <HelpTooltip text="Configurar los participantes antes de procesar el audio permite que la IA identifique mejor a cada hablante y asocie correctamente roles, departamentos y perspectivas en el análisis organizacional." />
-            </div>
-            <Button
-              size="sm"
-              onClick={openAddSpeakerDialog}
-              disabled={savingSpeakers}
-            >
-              Agregar participante
-            </Button>
-          </div>
-          <CardDescription>
-            Define quiénes participaron en la entrevista, sus cargos y áreas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {hasSpeakers ? (
-            <div className="space-y-3">
-              {interview.speakers.map((speaker, index) => (
-                <div
-                  key={speaker.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    {speaker.personEntityId ? (
-                      <PersonAvatar
-                        name={speaker.name ?? speaker.speakerLabel}
-                        avatarUrl={speakerAvatarUrls[speaker.personEntityId] ?? null}
-                        size="sm"
-                      />
-                    ) : (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                        {(speaker.name ?? speaker.speakerLabel).charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {speaker.name ?? speaker.speakerLabel}
-                        </span>
-                        <Badge
-                          variant={speaker.isInterviewer ? "default" : "secondary"}
-                          className="text-[10px]"
-                        >
-                          {speaker.isInterviewer ? "Entrevistador" : "Entrevistado"}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-2 text-xs text-muted-foreground">
-                        {speaker.role && <span>{speaker.role}</span>}
-                        {speaker.role && speaker.department && <span>-</span>}
-                        {speaker.department && <span>{typeof speaker.department === "string" ? speaker.department : (speaker.department as { name: string }).name}</span>}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditSpeakerDialog(index)}
-                      disabled={savingSpeakers}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteSpeaker(index)}
-                      disabled={savingSpeakers}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                No hay participantes configurados.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Agregar participantes mejora la precisión del análisis con IA.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-3"
-                onClick={openAddSpeakerDialog}
-              >
-                Agregar primer participante
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <InterviewParticipantsCard
+        speakers={interview.speakers}
+        avatarUrls={speakerAvatarUrls}
+        onAdd={openAddSpeakerDialog}
+        onEdit={openEditSpeakerDialog}
+        onDelete={handleDeleteSpeaker}
+        saving={savingSpeakers}
+      />
 
-      {/* Section 2: Interview Objective */}
+      {/* Interview Objective */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
@@ -990,7 +724,7 @@ export default function InterviewDetailPage({
         </CardContent>
       </Card>
 
-      {/* Section 3: Question Guide */}
+      {/* Question Guide */}
       <Card>
         <CardHeader>
           <CardTitle>Guia de Preguntas</CardTitle>
@@ -1006,26 +740,26 @@ export default function InterviewDetailPage({
         </CardContent>
       </Card>
 
-      {/* Section 4: Audio Upload/Recording */}
+      {/* Audio Upload/Recording */}
       <InterviewAudioStep
         interviewId={interviewId}
         hasAudio={!!interview.audioS3Key}
         onAudioUploaded={fetchInterview}
       />
 
-      {/* Section 4b: Legacy Audio Upload (drag & drop) */}
+      {/* Legacy Audio Upload (drag & drop) */}
       {showUpload && (
         <Card>
           <CardHeader>
             <CardTitle>Subir Audio</CardTitle>
             <CardDescription>
-              Sube el audio de la entrevista (MP3, WAV, M4A, OGG o WebM, máximo 500 MB). La grabación será transcrita automáticamente con identificación de hablantes.
+              Sube el audio de la entrevista (MP3, WAV, M4A, OGG o WebM, máximo 500 MB).
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {!hasSpeakers && (
+            {interview.speakers.length === 0 && (
               <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
-                Se recomienda configurar los participantes antes de subir el audio para obtener mejores resultados en el análisis.
+                Se recomienda configurar los participantes antes de subir el audio para obtener mejores resultados.
               </div>
             )}
             <div
@@ -1043,34 +777,22 @@ export default function InterviewDetailPage({
                   fileInputRef.current?.click();
                 }
               }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
               {uploading ? (
                 <div className="space-y-2 text-center">
-                  <p className="text-sm font-medium">
-                    Subiendo... {uploadProgress}%
-                  </p>
+                  <p className="text-sm font-medium">Subiendo... {uploadProgress}%</p>
                   <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full bg-primary transition-all"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+                    <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 </div>
               ) : (
                 <div className="space-y-1 text-center">
-                  <p className="text-sm font-medium">
-                    Arrastra tu archivo de audio aquí
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    o haz clic para seleccionar
-                  </p>
+                  <p className="text-sm font-medium">Arrastra tu archivo de audio aquí</p>
+                  <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
                 </div>
               )}
             </div>
@@ -1088,13 +810,13 @@ export default function InterviewDetailPage({
         </Card>
       )}
 
-      {/* Audio uploaded - show filename and process button */}
+      {/* Audio Uploaded — show filename and process button */}
       {showProcess && interview.audioS3Key?.split("/").pop() && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <CardTitle>Audio Subido</CardTitle>
-              <HelpTooltip text="Al procesar, la IA transcribirá el audio, identificará quién habla, extraerá roles, procesos, problemas y dependencias, y generará un mapa de conocimiento organizacional. Este proceso toma entre 3 y 5 minutos." />
+              <HelpTooltip text="Al procesar, la IA transcribirá el audio, identificará quién habla, extraerá roles, procesos, problemas y dependencias, y generará un mapa de conocimiento organizacional." />
             </div>
             <CardDescription>{interview.audioS3Key?.split("/").pop()}</CardDescription>
           </CardHeader>
@@ -1106,130 +828,18 @@ export default function InterviewDetailPage({
         </Card>
       )}
 
-      {/* Section 3: Processing Status */}
       {showPipeline && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <CardTitle>Estado del Procesamiento</CardTitle>
-              <HelpTooltip
-                iconSize="md"
-                text={
-                  <div className="space-y-1.5 py-1">
-                    <p><strong>Subido:</strong> Audio recibido correctamente.</p>
-                    <p><strong>Transcribiendo:</strong> Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3).</p>
-                    <p><strong>Post-procesando:</strong> Limpiando y estructurando la transcripción.</p>
-                    <p><strong>Extrayendo:</strong> Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas).</p>
-                    <p><strong>Reconciliando:</strong> Resolviendo entidades duplicadas y co-referencias.</p>
-                    <p><strong>Resumiendo:</strong> Generando resúmenes de cada segmento.</p>
-                    <p><strong>Fragmentando:</strong> Dividiendo la transcripción para búsqueda semántica.</p>
-                    <p><strong>Indexando:</strong> Generando embeddings vectoriales.</p>
-                    <p><strong>Completado:</strong> Resultados disponibles en Análisis y Diagnóstico.</p>
-                  </div>
-                }
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              {pipelineSteps.map((step, i) => {
-                const stepIndex = pipelineSteps.indexOf(step);
-                const isCompleted = stepIndex < currentStepIndex;
-                const isCurrent = stepIndex === currentStepIndex;
-                const isFailed =
-                  currentStatus === "FAILED" && isCurrent;
-
-                return (
-                  <React.Fragment key={step}>
-                    {i > 0 && (
-                      <div
-                        className={`h-0.5 flex-1 ${
-                          isCompleted
-                            ? "bg-green-500"
-                            : "bg-muted-foreground/20"
-                        }`}
-                      />
-                    )}
-                    <div className="flex flex-col items-center gap-1">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
-                          isFailed
-                            ? "bg-red-100 text-red-800"
-                            : isCompleted
-                              ? "bg-green-100 text-green-800"
-                              : isCurrent
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {isFailed
-                          ? "!"
-                          : isCompleted
-                            ? "\u2713"
-                            : i + 1}
-                      </div>
-                      <span
-                        className={`text-[10px] ${
-                          isCurrent || isCompleted
-                            ? "font-medium text-foreground"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {pipelineStepLabels[step]}
-                      </span>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-            {/* Current step description */}
-            {currentStatus !== "COMPLETED" && currentStatus !== "FAILED" && currentStatus !== "UPLOADED" && pipelineStepDescriptions[currentStatus] && (
-              <p className="mt-4 text-xs text-muted-foreground">
-                {pipelineStepDescriptions[currentStatus]}
-              </p>
-            )}
-            {currentStatus === "FAILED" && (
-              <p className="mt-4 text-xs text-red-600">
-                Error:{" "}
-                {currentProcessingError ??
-                  interview.processingError ??
-                  "Error desconocido"}
-              </p>
-            )}
-
-            {/* Processing activity log */}
-            {pipelineLog.length > 0 && currentStatus !== "UPLOADED" && (
-              <div className="mt-4 rounded-lg border bg-muted/30 p-3">
-                <p className="mb-2 text-xs font-medium text-muted-foreground">Log de procesamiento</p>
-                <div className="max-h-[180px] space-y-1 overflow-y-auto">
-                  {pipelineLog.map((entry, i) => (
-                    <div key={i} className="flex items-start gap-2 text-xs">
-                      <span className="shrink-0 text-muted-foreground">
-                        {new Date(entry.timestamp).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                      </span>
-                      <span className={
-                        entry.status === "COMPLETED"
-                          ? "text-green-600"
-                          : entry.status === "FAILED"
-                            ? "text-red-600"
-                            : "text-foreground"
-                      }>
-                        {entry.message}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <PipelineStatusCard
+          currentStatus={currentStatus}
+          pipelineLog={pipelineLog}
+          processingError={currentProcessingError ?? interview.processingError}
+        />
       )}
 
-      {/* Success banner after processing completes */}
       {currentStatus === "COMPLETED" && showSuccessBanner && (
         <ProgressCelebration
           title="Entrevista procesada exitosamente"
-          message="La IA extrajo conocimiento organizacional de la conversación. Revisa los resultados en las pestañas de Análisis y Diagnóstico del proyecto."
+          message="La IA extrajo conocimiento organizacional de la conversación."
           actions={[
             { label: "Ir a Análisis", href: `/org-intelligence/projects/${id}?tab=analysis` },
             { label: "Ir a Diagnóstico", href: `/org-intelligence/projects/${id}?tab=diagnosis` },
@@ -1238,7 +848,7 @@ export default function InterviewDetailPage({
         />
       )}
 
-      {/* Section 4: Transcription */}
+      {/* Transcription */}
       {showTranscription && interview.transcriptionJson && (() => {
         const segments = ((interview.transcriptionJson as Record<string, unknown>).segments as TranscriptionSegment[]) ?? [];
         const hasAudio = !!interview.audioS3Key;
@@ -1248,8 +858,7 @@ export default function InterviewDetailPage({
             <CardHeader>
               <CardTitle>Transcripción</CardTitle>
               <CardDescription>
-                Transcripción con identificación de hablantes.{" "}
-                {segments.length} segmentos.
+                Transcripción con identificación de hablantes. {segments.length} segmentos.
                 {hasAudio && " Haz clic en un segmento para ir a ese momento del audio."}
               </CardDescription>
             </CardHeader>
@@ -1297,7 +906,6 @@ export default function InterviewDetailPage({
         );
       })()}
 
-      {/* Print Guide (hidden, only visible when printing) */}
       <InterviewGuidePrint
         interviewTitle={interview.title ?? "Entrevista sin titulo"}
         interviewDate={interview.interviewDate ? new Date(interview.interviewDate).toLocaleDateString("es-CL") : undefined}
@@ -1307,56 +915,14 @@ export default function InterviewDetailPage({
         projectName={id}
       />
 
-      {/* Edit Interview Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Entrevista</DialogTitle>
-            <DialogDescription>
-              Modifica el título y la fecha de la entrevista.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-interview-title">Título</Label>
-              <Input
-                id="edit-interview-title"
-                placeholder="Título de la entrevista"
-                value={editForm.title}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, title: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-interview-date">Fecha de la entrevista</Label>
-              <Input
-                id="edit-interview-date"
-                type="date"
-                value={editForm.interviewDate}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, interviewDate: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditDialogOpen(false)}
-              disabled={savingEdit}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveEdit}
-              disabled={savingEdit}
-            >
-              {savingEdit ? "Guardando..." : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EditInterviewDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        title={editForm.title}
+        onTitleChange={(t) => setEditForm({ ...editForm, title: t })}
+        onSave={handleSaveEdit}
+        saving={savingEdit}
+      />
 
       {/* Delete Interview Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -1365,73 +931,31 @@ export default function InterviewDetailPage({
             <DialogTitle>¿Eliminar entrevista?</DialogTitle>
             <DialogDescription>
               Esta acción no se puede deshacer. Se eliminará la entrevista
-              &quot;{interview.title ?? "Sin título"}&quot; y todos sus datos
-              asociados (transcripción, análisis y participantes).
+              &quot;{interview.title ?? "Sin título"}&quot; y todos sus datos asociados.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={deleting}
-            >
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
               Cancelar
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDeleteInterview}
-              disabled={deleting}
-            >
+            <Button variant="destructive" onClick={handleDeleteInterview} disabled={deleting}>
               {deleting ? "Eliminando..." : "Eliminar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reprocess Confirmation Dialog */}
-      <Dialog open={reprocessDialogOpen} onOpenChange={(open) => {
-        setReprocessDialogOpen(open);
-        if (!open) setReprocessFromStep("");
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reprocesar entrevista</DialogTitle>
-            <DialogDescription>
-              Elige desde qué paso reanudar. Los pasos anteriores se reutilizarán
-              y los siguientes se ejecutarán desde cero.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <label className="text-sm font-medium">Comenzar desde</label>
-            <select
-              value={reprocessFromStep}
-              onChange={(e) => setReprocessFromStep(e.target.value)}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              <option value="">Desde el inicio (completo)</option>
-              <option value="EXTRACTING">Extracción (saltar transcripción)</option>
-              <option value="RESOLVING_COREFERENCES">Reconciliación (saltar transcripción + extracción)</option>
-              <option value="CHUNKING">Fragmentación (solo chunking + indexado)</option>
-              <option value="EMBEDDING">Indexado (solo embeddings)</option>
-            </select>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setReprocessDialogOpen(false)}
-              disabled={reprocessing}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleReprocess}
-              disabled={reprocessing}
-            >
-              {reprocessing ? "Procesando..." : reprocessFromStep ? "Reanudar" : "Reprocesar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ReprocessDialog
+        open={reprocessDialogOpen}
+        onOpenChange={(open) => {
+          setReprocessDialogOpen(open);
+          if (!open) setReprocessFromStep("");
+        }}
+        fromStep={reprocessFromStep}
+        onFromStepChange={setReprocessFromStep}
+        onReprocess={handleReprocess}
+        reprocessing={reprocessing}
+      />
 
       {/* Speaker Add/Edit Dialog */}
       <Dialog open={speakerDialogOpen} onOpenChange={(open) => {
@@ -1448,9 +972,7 @@ export default function InterviewDetailPage({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingSpeakerIndex !== null
-                ? "Editar Participante"
-                : "Agregar Participante"}
+              {editingSpeakerIndex !== null ? "Editar Participante" : "Agregar Participante"}
             </DialogTitle>
             <DialogDescription>
               {editingSpeakerIndex !== null
@@ -1459,7 +981,6 @@ export default function InterviewDetailPage({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Person directory search (only for adding new, not editing) */}
             {editingSpeakerIndex === null && searchMode && !selectedPerson && (
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -1498,9 +1019,7 @@ export default function InterviewDetailPage({
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-medium">
-                              {person.name}
-                            </span>
+                            <span className="truncate text-sm font-medium">{person.name}</span>
                             {person.personType === "EXTERNAL" && (
                               <Badge variant="secondary" className="shrink-0 text-[9px] px-1 py-0">
                                 Externo
@@ -1525,10 +1044,7 @@ export default function InterviewDetailPage({
                 {personSearch.length >= 2 && searchResults.length === 0 && (
                   <p className="text-center text-xs text-muted-foreground py-3">
                     No se encontraron personas.{" "}
-                    <Link
-                      href="/personas/directorio"
-                      className="text-primary underline underline-offset-2"
-                    >
+                    <Link href="/personas/directorio" className="text-primary underline underline-offset-2">
                       Ir al directorio
                     </Link>
                   </p>
@@ -1546,17 +1062,13 @@ export default function InterviewDetailPage({
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => {
-                    setSearchMode(false);
-                    setSelectedPerson(null);
-                  }}
+                  onClick={() => { setSearchMode(false); setSelectedPerson(null); }}
                 >
                   Agregar persona que no está en directorio
                 </Button>
               </div>
             )}
 
-            {/* Selected person indicator */}
             {selectedPerson && editingSpeakerIndex === null && (
               <div className="flex items-center gap-3 rounded-md border bg-accent/50 p-3">
                 <PersonAvatar
@@ -1566,9 +1078,7 @@ export default function InterviewDetailPage({
                 />
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium">{selectedPerson.name}</span>
-                  <p className="text-xs text-muted-foreground">
-                    Seleccionado del directorio
-                  </p>
+                  <p className="text-xs text-muted-foreground">Seleccionado del directorio</p>
                 </div>
                 <Button
                   type="button"
@@ -1589,7 +1099,6 @@ export default function InterviewDetailPage({
               </div>
             )}
 
-            {/* Form fields (shown when not in search mode or editing) */}
             {(!searchMode || editingSpeakerIndex !== null) && (
               <>
                 <div className="space-y-1.5">
@@ -1598,9 +1107,7 @@ export default function InterviewDetailPage({
                     id="speaker-name"
                     placeholder="Nombre del participante"
                     value={speakerForm.name}
-                    onChange={(e) =>
-                      setSpeakerForm({ ...speakerForm, name: e.target.value })
-                    }
+                    onChange={(e) => setSpeakerForm({ ...speakerForm, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1609,9 +1116,7 @@ export default function InterviewDetailPage({
                     id="speaker-role"
                     placeholder="Ej: Gerente de Operaciones"
                     value={speakerForm.role}
-                    onChange={(e) =>
-                      setSpeakerForm({ ...speakerForm, role: e.target.value })
-                    }
+                    onChange={(e) => setSpeakerForm({ ...speakerForm, role: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -1620,12 +1125,7 @@ export default function InterviewDetailPage({
                     id="speaker-department"
                     placeholder="Ej: Operaciones"
                     value={speakerForm.department}
-                    onChange={(e) =>
-                      setSpeakerForm({
-                        ...speakerForm,
-                        department: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setSpeakerForm({ ...speakerForm, department: e.target.value })}
                   />
                 </div>
                 <div className="flex items-center gap-2">
@@ -1633,16 +1133,10 @@ export default function InterviewDetailPage({
                     id="speaker-interviewer"
                     checked={speakerForm.isInterviewer}
                     onCheckedChange={(checked) =>
-                      setSpeakerForm({
-                        ...speakerForm,
-                        isInterviewer: checked === true,
-                      })
+                      setSpeakerForm({ ...speakerForm, isInterviewer: checked === true })
                     }
                   />
-                  <Label
-                    htmlFor="speaker-interviewer"
-                    className="text-sm font-normal"
-                  >
+                  <Label htmlFor="speaker-interviewer" className="text-sm font-normal">
                     Es entrevistador (quien realiza las preguntas)
                   </Label>
                 </div>
@@ -1650,7 +1144,7 @@ export default function InterviewDetailPage({
                   <Label htmlFor="speaker-label">
                     Etiqueta de hablante
                     <HelpTooltip
-                      text="Identificador único del hablante en la transcripción. Se asigna automáticamente, pero puedes cambiarlo si lo necesitas."
+                      text="Identificador único del hablante en la transcripción. Se asigna automáticamente."
                       className="ml-1"
                     />
                   </Label>
@@ -1658,18 +1152,12 @@ export default function InterviewDetailPage({
                     id="speaker-label"
                     placeholder="Ej: Speaker_0"
                     value={speakerForm.speakerLabel}
-                    onChange={(e) =>
-                      setSpeakerForm({
-                        ...speakerForm,
-                        speakerLabel: e.target.value,
-                      })
-                    }
+                    onChange={(e) => setSpeakerForm({ ...speakerForm, speakerLabel: e.target.value })}
                   />
                 </div>
               </>
             )}
           </div>
-          {/* Footer: only show when form is visible */}
           {(!searchMode || editingSpeakerIndex !== null) && (
             <DialogFooter>
               <Button
@@ -1687,11 +1175,7 @@ export default function InterviewDetailPage({
                 onClick={handleSaveSpeaker}
                 disabled={savingSpeakers || !speakerForm.speakerLabel.trim()}
               >
-                {savingSpeakers
-                  ? "Guardando..."
-                  : editingSpeakerIndex !== null
-                    ? "Guardar"
-                    : "Agregar"}
+                {savingSpeakers ? "Guardando..." : editingSpeakerIndex !== null ? "Guardar" : "Agregar"}
               </Button>
             </DialogFooter>
           )}
