@@ -21,6 +21,8 @@ import {
   Calendar02Icon,
   AnalysisTextLinkIcon,
   UserGroupIcon,
+  Analytics02Icon,
+  Dollar02Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -108,6 +110,15 @@ const appNav: NavItem[] = [
       },
     ],
   },
+  {
+    title: "Administración",
+    href: "/admin",
+    icon: Dollar02Icon,
+    items: [
+      { title: "Costos IA (Global)", href: "/admin/ai-costs" },
+      { title: "Precios IA", href: "/admin/ai-pricing" },
+    ],
+  },
 ];
 
 const settingsNav: NavItem[] = [
@@ -119,6 +130,7 @@ const settingsNav: NavItem[] = [
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
   { title: "Google Gemini", href: "/settings/ai/gemini", icon: AiChat02Icon },
+  { title: "Costos IA", href: "/settings/ai/costs", icon: Analytics02Icon },
   { title: "LinkedIn", href: "/settings/linkedin", icon: Linkedin01Icon },
   { title: "Almacenamiento y Email", href: "/settings/storage", icon: HardDriveIcon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },

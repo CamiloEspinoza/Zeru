@@ -84,33 +84,51 @@ function BreakdownTable({ data, isLoading }: BreakdownTableProps) {
   );
 }
 
+type BreakdownSlot = { data: CostBreakdownResponse | null | undefined; isLoading: boolean };
+
 interface CostBreakdownTabsProps {
-  byFeature: { data: CostBreakdownResponse | null | undefined; isLoading: boolean };
-  byUser: { data: CostBreakdownResponse | null | undefined; isLoading: boolean };
-  byModel: { data: CostBreakdownResponse | null | undefined; isLoading: boolean };
+  byFeature?: BreakdownSlot;
+  byUser?: BreakdownSlot;
+  byModel?: BreakdownSlot;
+  byTenant?: BreakdownSlot;
 }
 
 export function CostBreakdownTabs({
   byFeature,
   byUser,
   byModel,
+  byTenant,
 }: CostBreakdownTabsProps) {
+  const defaultTab = byTenant ? "tenant" : "feature";
+
   return (
-    <Tabs defaultValue="feature">
+    <Tabs defaultValue={defaultTab}>
       <TabsList>
-        <TabsTrigger value="feature">Por Feature</TabsTrigger>
-        <TabsTrigger value="user">Por Usuario</TabsTrigger>
-        <TabsTrigger value="model">Por Modelo</TabsTrigger>
+        {byTenant && <TabsTrigger value="tenant">Por Tenant</TabsTrigger>}
+        {byFeature && <TabsTrigger value="feature">Por Feature</TabsTrigger>}
+        {byUser && <TabsTrigger value="user">Por Usuario</TabsTrigger>}
+        {byModel && <TabsTrigger value="model">Por Modelo</TabsTrigger>}
       </TabsList>
-      <TabsContent value="feature">
-        <BreakdownTable data={byFeature.data} isLoading={byFeature.isLoading} />
-      </TabsContent>
-      <TabsContent value="user">
-        <BreakdownTable data={byUser.data} isLoading={byUser.isLoading} />
-      </TabsContent>
-      <TabsContent value="model">
-        <BreakdownTable data={byModel.data} isLoading={byModel.isLoading} />
-      </TabsContent>
+      {byTenant && (
+        <TabsContent value="tenant">
+          <BreakdownTable data={byTenant.data} isLoading={byTenant.isLoading} />
+        </TabsContent>
+      )}
+      {byFeature && (
+        <TabsContent value="feature">
+          <BreakdownTable data={byFeature.data} isLoading={byFeature.isLoading} />
+        </TabsContent>
+      )}
+      {byUser && (
+        <TabsContent value="user">
+          <BreakdownTable data={byUser.data} isLoading={byUser.isLoading} />
+        </TabsContent>
+      )}
+      {byModel && (
+        <TabsContent value="model">
+          <BreakdownTable data={byModel.data} isLoading={byModel.isLoading} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
