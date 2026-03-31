@@ -1,0 +1,79 @@
+"use client";
+
+import { useState } from "react";
+import { CostKpiCards } from "@/components/ai/cost-kpi-cards";
+import { CostTrendChart } from "@/components/ai/cost-trend-chart";
+import { CostBreakdownTabs } from "@/components/ai/cost-breakdown-tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  useCostSummary,
+  useCostByFeature,
+  useCostByUser,
+  useCostByModel,
+  useCostDaily,
+} from "@/hooks/use-ai-costs";
+
+function getDateRange(preset: string): { from?: string; to?: string } {
+  const now = new Date();
+  switch (preset) {
+    case "7d": {
+      const from = new Date(now);
+      from.setDate(from.getDate() - 7);
+      return { from: from.toISOString(), to: now.toISOString() };
+    }
+    case "month": {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: from.toISOString(), to: now.toISOString() };
+    }
+    case "prev-month": {
+      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return { from: from.toISOString(), to: to.toISOString() };
+    }
+    default:
+      return {};
+  }
+}
+
+export default function AiCostsPage() {
+  const [preset, setPreset] = useState("month");
+  const params = getDateRange(preset);
+
+  const summary = useCostSummary(params);
+  const byFeature = useCostByFeature(params);
+  const byUser = useCostByUser(params);
+  const byModel = useCostByModel(params);
+  const daily = useCostDaily(params);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Costos de IA</h1>
+        <Select value={preset} onValueChange={setPreset}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7d">Ultimos 7 dias</SelectItem>
+            <SelectItem value="month">Mes actual</SelectItem>
+            <SelectItem value="prev-month">Mes anterior</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <CostKpiCards data={summary.data} isLoading={summary.isLoading} />
+      <CostTrendChart data={daily.data} isLoading={daily.isLoading} />
+      <CostBreakdownTabs
+        byFeature={{ data: byFeature.data, isLoading: byFeature.isLoading }}
+        byUser={{ data: byUser.data, isLoading: byUser.isLoading }}
+        byModel={{ data: byModel.data, isLoading: byModel.isLoading }}
+      />
+    </div>
+  );
+}
