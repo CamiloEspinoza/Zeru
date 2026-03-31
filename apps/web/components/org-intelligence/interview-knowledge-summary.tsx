@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface KnowledgeSummary {
   totalInterviews: number;
-  departments: number;
-  roles: number;
-  processes: number;
-  issues: number;
+  departments: Array<{ id: string; name: string }>;
+  roles: Array<{ id: string; name: string }>;
+  processes: Array<{ id: string; name: string }>;
+  systems: Array<{ id: string; name: string }>;
+  problems: Array<{ id: string; title: string }>;
 }
 
 export function InterviewKnowledgeSummary({ projectId }: { projectId: string }) {
@@ -34,10 +35,10 @@ export function InterviewKnowledgeSummary({ projectId }: { projectId: string }) 
           <p className="text-sm text-muted-foreground">Primera entrevista del proyecto</p>
         ) : (
           <div className="flex flex-wrap gap-4 text-sm">
-            <span><strong>{summary.departments}</strong> departamentos</span>
-            <span><strong>{summary.roles}</strong> roles</span>
-            <span><strong>{summary.processes}</strong> procesos</span>
-            <span><strong>{summary.issues}</strong> problemas identificados</span>
+            <span><strong>{summary.departments.length}</strong> departamentos</span>
+            <span><strong>{summary.roles.length}</strong> roles</span>
+            <span><strong>{summary.processes.length}</strong> procesos</span>
+            <span><strong>{summary.problems.length}</strong> problemas</span>
           </div>
         )}
       </CardContent>
