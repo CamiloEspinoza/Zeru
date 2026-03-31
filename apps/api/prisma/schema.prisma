@@ -54,19 +54,21 @@ model User {
   password  String?
   firstName String
   lastName  String
-  isActive  Boolean  @default(true)
-  deletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive   Boolean  @default(true)
+  superAdmin Boolean  @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  memberships        UserTenant[]
-  conversations      Conversation[]
-  documents          Document[]
-  stepCompletions    AccountingStepCompletion[]
+  memberships           UserTenant[]
+  conversations         Conversation[]
+  documents             Document[]
+  stepCompletions       AccountingStepCompletion[]
   memories              Memory[]
   journalEntriesCreated JournalEntry[]
   apiKeys               ApiKey[]
   orgProjectsCreated    OrgProject[] @relation("OrgProjectsCreated")
+  aiUsageLogs           AiUsageLog[]
 
   @@map("users")
 }
@@ -119,8 +121,12 @@ model AiUsageLog {
   totalTokens    Int      @default(0)
   cachedTokens   Int      @default(0)
   /// Whether compaction was triggered during this interaction
-  compacted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  compacted       Boolean  @default(false)
+  costUsd         Decimal  @default(0)
+  costOverrideUsd Decimal?
+  units           Decimal?
+  pricingUnit     String?
+  createdAt       DateTime @default(now())
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -128,10 +134,35 @@ model AiUsageLog {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([conversationId])
+  @@index([tenantId, userId, createdAt])
   @@map("ai_usage_logs")
+}
+
+model AiModelPricing {
+  id                   String    @id @default(uuid())
+  provider             String
+  model                String
+  contextTier          String    @default("DEFAULT")
+  pricingUnit          String    // PER_1M_TOKENS, PER_1K_CHARS, PER_HOUR, PER_MINUTE, PER_IMAGE, PER_GENERATION
+  inputPrice           Decimal   @default(0)
+  outputPrice          Decimal   @default(0)
+  cachedPrice          Decimal   @default(0)
+  longContextThreshold Int?
+  description          String?
+  validFrom            DateTime
+  validTo              DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([provider, model, contextTier, validFrom])
+  @@index([provider, model])
+  @@map("ai_model_pricing")
 }
 
 /// Configuracion de proveedor de IA por tenant
