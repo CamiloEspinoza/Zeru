@@ -197,6 +197,7 @@ export default function ProjectDetailPage({
               role: s.role || undefined,
               department: s.department || undefined,
               isInterviewer: s.isInterviewer,
+              personEntityId: s.personEntityId || undefined,
             }))
           : undefined;
 
