@@ -13,7 +13,29 @@ interface Props { introText?: string; sections?: Section[]; interviewId: string;
 export function InterviewQuestionsView({ introText: init, sections: initS, interviewId, projectId, onQuestionsChange }: Props) {
   const [intro, setIntro] = useState(init ?? "");
   const [sections, setSections] = useState<Section[]>(initS ?? []);
+  const [downloading, setDownloading] = useState(false);
   const has = sections.length > 0;
+
+  const downloadPdf = async () => {
+    const el = document.querySelector(".print-container") as HTMLElement | null;
+    if (!el) return;
+    setDownloading(true);
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      el.style.display = "block";
+      await html2pdf().set({
+        margin: [10, 10, 10, 10],
+        filename: "guia-entrevista.pdf",
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "mm", format: "letter", orientation: "portrait" },
+      }).from(el).save();
+      el.style.display = "";
+    } catch {
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const update = (s: Section[]) => { setSections(s); onQuestionsChange?.(s); };
   const onGen = (d: { introText: string; sections: Section[] }) => { setIntro(d.introText); update(d.sections); };
@@ -27,7 +49,7 @@ export function InterviewQuestionsView({ introText: init, sections: initS, inter
       {!has && <InterviewKnowledgeSummary projectId={projectId} />}
       <div className="flex items-center gap-2">
         <InterviewGenerateButton interviewId={interviewId} onGenerated={onGen} />
-        {has && <Button variant="outline" onClick={() => window.print()}>Imprimir guia</Button>}
+        {has && <Button variant="outline" onClick={downloadPdf} disabled={downloading}>{downloading ? "Generando PDF..." : "Descargar PDF"}</Button>}
       </div>
       {has && (
         <div className="space-y-4">
