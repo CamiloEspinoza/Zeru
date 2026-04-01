@@ -20,14 +20,18 @@ import {
 import type { DailyCostResponse } from "@zeru/shared";
 
 const CHART_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(210, 76%, 55%)",
-  "hsl(280, 65%, 60%)",
-  "hsl(30, 80%, 55%)",
+  "hsl(221, 83%, 53%)",  // blue
+  "hsl(160, 84%, 39%)",  // emerald
+  "hsl(271, 91%, 65%)",  // violet
+  "hsl(25, 95%, 53%)",   // orange
+  "hsl(346, 77%, 50%)",  // rose
+  "hsl(45, 93%, 47%)",   // amber
+  "hsl(192, 91%, 36%)",  // cyan
+  "hsl(330, 81%, 60%)",  // pink
+  "hsl(142, 71%, 45%)",  // green
+  "hsl(15, 75%, 57%)",   // coral
+  "hsl(199, 89%, 48%)",  // sky
+  "hsl(280, 68%, 48%)",  // purple
 ];
 
 interface CostTrendChartProps {
@@ -102,9 +106,25 @@ export function CostTrendChart({ data, isLoading }: CostTrendChartProps) {
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  formatter={(value) =>
-                    typeof value === "number" ? `$${value.toFixed(4)}` : String(value)
-                  }
+                  formatter={(value, name) => (
+                    <>
+                      <div
+                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                        style={{
+                          backgroundColor:
+                            chartConfig[name as string]?.color,
+                        }}
+                      />
+                      <span className="text-muted-foreground">
+                        {chartConfig[name as string]?.label ?? name}
+                      </span>
+                      <span className="ml-auto font-mono font-medium tabular-nums text-foreground">
+                        {typeof value === "number"
+                          ? `$${value.toFixed(4)}`
+                          : String(value)}
+                      </span>
+                    </>
+                  )}
                 />
               }
             />
