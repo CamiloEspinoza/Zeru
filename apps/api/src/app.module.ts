@@ -19,6 +19,7 @@ import { LinkedInModule } from './modules/linkedin/linkedin.module';
 import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligence.module';
 import { RedisModule } from './common/services/redis.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
+import { PresenceModule } from './modules/presence/presence.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 
 @Module({
@@ -43,6 +44,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     OrgIntelligenceModule,
     RedisModule,
     RealtimeModule,
+    PresenceModule,
   ],
 })
 export class AppModule implements NestModule {
