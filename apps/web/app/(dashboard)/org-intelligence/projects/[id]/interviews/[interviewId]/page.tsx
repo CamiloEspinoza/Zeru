@@ -35,6 +35,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ProgressCelebration } from "@/components/org-intelligence/progress-celebration";
 import { PersonAvatar } from "@/components/org-intelligence/person-avatar";
 import { useFirstVisit } from "@/hooks/use-first-visit";
@@ -164,7 +174,7 @@ export default function InterviewDetailPage({
   const { segmentEntityMap } = useSegmentEntities(isCompleted ? interviewId : null);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", interviewDate: "" });
+  const [editForm, setEditForm] = useState({ title: "", interviewDate: "", objective: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -173,6 +183,8 @@ export default function InterviewDetailPage({
   const [reprocessDialogOpen, setReprocessDialogOpen] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessFromStep, setReprocessFromStep] = useState("");
+
+  const [deleteSpeakerIndex, setDeleteSpeakerIndex] = useState<number | null>(null);
 
   const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
 
@@ -402,6 +414,7 @@ export default function InterviewDetailPage({
       interviewDate: interview.interviewDate
         ? new Date(interview.interviewDate).toISOString().split("T")[0]
         : "",
+      objective: interview.objective ?? "",
     });
     setEditDialogOpen(true);
   };
@@ -415,6 +428,7 @@ export default function InterviewDetailPage({
         interviewDate: editForm.interviewDate
           ? new Date(editForm.interviewDate + "T12:00:00").toISOString()
           : undefined,
+        objective: editForm.objective,
       });
       setEditDialogOpen(false);
       await fetchInterview();
@@ -648,18 +662,23 @@ export default function InterviewDetailPage({
         avatarUrls={speakerAvatarUrls}
         onAdd={openAddSpeakerDialog}
         onEdit={openEditSpeakerDialog}
-        onDelete={handleDeleteSpeaker}
+        onDelete={(index) => setDeleteSpeakerIndex(index)}
         saving={savingSpeakers}
       />
 
       {/* Interview Objective */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={openEditDialog}>
+              Editar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {interview.objective ?? "Sin objetivo definido."}
+            {interview.objective ?? "Sin objetivo definido. Haz clic en Editar para agregarlo."}
           </p>
         </CardContent>
       </Card>
@@ -811,6 +830,10 @@ export default function InterviewDetailPage({
         onOpenChange={setEditDialogOpen}
         title={editForm.title}
         onTitleChange={(t) => setEditForm({ ...editForm, title: t })}
+        interviewDate={editForm.interviewDate}
+        onDateChange={(d) => setEditForm({ ...editForm, interviewDate: d })}
+        objective={editForm.objective}
+        onObjectiveChange={(o) => setEditForm({ ...editForm, objective: o })}
         onSave={handleSaveEdit}
         saving={savingEdit}
       />
@@ -847,6 +870,38 @@ export default function InterviewDetailPage({
         onReprocess={handleReprocess}
         reprocessing={reprocessing}
       />
+
+      {/* Speaker Delete Confirmation */}
+      <AlertDialog
+        open={deleteSpeakerIndex !== null}
+        onOpenChange={(open) => { if (!open) setDeleteSpeakerIndex(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará a &quot;{deleteSpeakerIndex !== null
+                ? (interview.speakers[deleteSpeakerIndex]?.name ?? interview.speakers[deleteSpeakerIndex]?.speakerLabel)
+                : ""}&quot; de la entrevista.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingSpeakers}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={savingSpeakers}
+              onClick={() => {
+                if (deleteSpeakerIndex !== null) {
+                  handleDeleteSpeaker(deleteSpeakerIndex);
+                  setDeleteSpeakerIndex(null);
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Speaker Add/Edit Dialog */}
       <Dialog open={speakerDialogOpen} onOpenChange={(open) => {
