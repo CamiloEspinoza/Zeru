@@ -40,6 +40,10 @@ model Tenant {
   linkedInConnection   LinkedInConnection?
   linkedInPosts        LinkedInPost[]
   linkedInAgentConfig  LinkedInAgentConfig?
+  orgProjects          OrgProject[]
+  departments          Department[]
+  personProfiles       PersonProfile[]
+  orgSuggestions       OrgSuggestion[]
 
   @@map("tenants")
 }
@@ -50,18 +54,21 @@ model User {
   password  String?
   firstName String
   lastName  String
-  isActive  Boolean  @default(true)
-  deletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive   Boolean  @default(true)
+  superAdmin Boolean  @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  memberships        UserTenant[]
-  conversations      Conversation[]
-  documents          Document[]
-  stepCompletions    AccountingStepCompletion[]
+  memberships           UserTenant[]
+  conversations         Conversation[]
+  documents             Document[]
+  stepCompletions       AccountingStepCompletion[]
   memories              Memory[]
   journalEntriesCreated JournalEntry[]
   apiKeys               ApiKey[]
+  orgProjectsCreated    OrgProject[] @relation("OrgProjectsCreated")
+  aiUsageLogs           AiUsageLog[]
 
   @@map("users")
 }
@@ -114,8 +121,12 @@ model AiUsageLog {
   totalTokens    Int      @default(0)
   cachedTokens   Int      @default(0)
   /// Whether compaction was triggered during this interaction
-  compacted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  compacted       Boolean  @default(false)
+  costUsd         Decimal  @default(0)
+  costOverrideUsd Decimal?
+  units           Decimal?
+  pricingUnit     String?
+  createdAt       DateTime @default(now())
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -123,10 +134,35 @@ model AiUsageLog {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([conversationId])
+  @@index([tenantId, userId, createdAt])
   @@map("ai_usage_logs")
+}
+
+model AiModelPricing {
+  id                   String    @id @default(uuid())
+  provider             String
+  model                String
+  contextTier          String    @default("DEFAULT")
+  pricingUnit          String    // PER_1M_TOKENS, PER_1K_CHARS, PER_HOUR, PER_MINUTE, PER_IMAGE, PER_GENERATION
+  inputPrice           Decimal   @default(0)
+  outputPrice          Decimal   @default(0)
+  cachedPrice          Decimal   @default(0)
+  longContextThreshold Int?
+  description          String?
+  validFrom            DateTime
+  validTo              DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([provider, model, contextTier, validFrom])
+  @@index([provider, model])
+  @@map("ai_model_pricing")
 }
 
 /// Configuracion de proveedor de IA por tenant
@@ -252,10 +288,12 @@ model Message {
   deletedAt   DateTime?
   createdAt   DateTime    @default(now())
 
+  tenantId       String?
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([tenantId])
   @@map("messages")
 }
 
@@ -411,6 +449,7 @@ model JournalEntryLine {
   description String?
   deletedAt   DateTime?
 
+  tenantId       String?
   journalEntryId String
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
@@ -418,6 +457,7 @@ model JournalEntryLine {
   account   Account @relation(fields: [accountId], references: [id])
 
   @@index([journalEntryId])
+  @@index([tenantId])
   @@map("journal_entry_lines")
 }
 
@@ -474,6 +514,7 @@ model AccountingStepCompletion {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
+  tenantId       String?
   stepId String
   step   AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
@@ -485,6 +526,7 @@ model AccountingStepCompletion {
 
   @@unique([stepId, fiscalPeriodId])
   @@index([fiscalPeriodId])
+  @@index([tenantId])
   @@map("accounting_step_completions")
 }
 
@@ -545,6 +587,7 @@ model DocumentJournalEntry {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
+  tenantId       String?
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -552,6 +595,7 @@ model DocumentJournalEntry {
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, journalEntryId])
+  @@index([tenantId])
   @@map("document_journal_entries")
 }
 
@@ -589,11 +633,13 @@ model AgentSkillFile {
   content String
   deletedAt DateTime?
 
-  skillId String
-  skill   AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  tenantId String?
+  skillId  String
+  skill    AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([skillId, path])
   @@index([skillId])
+  @@index([tenantId])
   @@map("agent_skill_files")
 }
 
@@ -639,6 +685,16 @@ model WaitlistEntry {
   createdAt DateTime @default(now())
 
   @@map("waitlist_entries")
+}
+
+model FeatureRequest {
+  id        String   @id @default(uuid())
+  text      String
+  email     String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@map("feature_requests")
 }
 
 // ─── LinkedIn ─────────────────────────────────────────────
@@ -724,9 +780,11 @@ model LinkedInPostVersion {
   versionNumber Int
   /// Instrucciones de regeneración que produjeron esta versión (null para la versión original)
   instructions  String?
+  tenantId      String?
   createdAt     DateTime @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_post_versions")
 }
 
@@ -745,9 +803,11 @@ model LinkedInImageVersion {
   versionNumber Int
   /// Si esta versión es la seleccionada actualmente
   isSelected    Boolean  @default(false)
+  tenantId      String?
   createdAt     DateTime @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_image_versions")
 }
 
@@ -771,4 +831,535 @@ model LinkedInAgentConfig {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("linkedin_agent_configs")
+}
+
+// ─── Person Profiles ─────────────────────────────────────
+
+enum PersonStatus {
+  ACTIVE
+  INACTIVE
+  VACANT
+
+  @@map("person_status")
+}
+
+enum PersonSource {
+  MANUAL
+  AI_INFERRED
+  AI_CONFIRMED
+  CSV_IMPORT
+
+  @@map("person_source")
+}
+
+/// Departamento organizacional
+model Department {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+
+  parentId    String?
+  parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Department[] @relation("DepartmentHierarchy")
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  persons   PersonProfile[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("departments")
+}
+
+/// Perfil de persona para inteligencia organizacional (participantes de entrevistas)
+model PersonProfile {
+  id          String  @id @default(uuid())
+  name        String
+  role        String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  personType  String    @default("INTERNAL") // INTERNAL, EXTERNAL, CONTRACTOR
+  company     String?   // Empresa externa (solo para externos/contratistas)
+  email       String?
+  phone       String?
+  avatarS3Key String?
+  notes       String?
+
+  // ─── Jerarquia organizacional ───
+  reportsToId   String?
+  reportsTo     PersonProfile?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  directReports PersonProfile[] @relation("ReportsTo")
+
+  // ─── Metadata organizacional ───
+  employeeCode String?
+  startDate    DateTime?
+  status       PersonStatus @default(ACTIVE)
+  source       PersonSource @default(MANUAL)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orgSuggestions OrgSuggestion[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, reportsToId])
+  @@index([tenantId, departmentId])
+  @@map("person_profiles")
+}
+
+// ─── Org Suggestions ─────────────────────────────────────
+
+enum OrgSuggestionType {
+  CREATE_PERSON
+  UPDATE_PERSON
+  SET_REPORTS_TO
+  DELETE_PERSON
+
+  @@map("org_suggestion_type")
+}
+
+enum OrgSuggestionStatus {
+  PENDING
+  APPROVED
+  APPROVED_MODIFIED
+  REJECTED
+
+  @@map("org_suggestion_status")
+}
+
+model OrgSuggestion {
+  id              String              @id @default(uuid())
+  type            OrgSuggestionType
+  status          OrgSuggestionStatus @default(PENDING)
+  confidence      Float
+  data            Json
+  evidence        String?
+  evidenceTimeSec Int?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  rejectReason    String?
+
+  personId    String?
+  person      PersonProfile? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  interviewId String?
+
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, personId])
+  @@map("org_suggestions")
+}
+
+// ─── Org Intelligence ────────────────────────────────────
+
+enum OrgProjectStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+
+  @@map("org_project_status")
+}
+
+enum TranscriptionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("transcription_status")
+}
+
+enum TranscriptionProvider {
+  DEEPGRAM
+  OPENAI
+
+  @@map("transcription_provider")
+}
+
+enum OrgEntityType {
+  ORGANIZATION
+  DEPARTMENT
+  ROLE
+  PROCESS
+  ACTIVITY
+  SYSTEM
+  DOCUMENT_TYPE
+  PROBLEM
+  IMPROVEMENT
+
+  @@map("org_entity_type")
+}
+
+enum OrgRelationType {
+  BELONGS_TO
+  EXECUTES
+  OWNS
+  CONTAINS
+  DEPENDS_ON
+  USES
+  PRECEDES
+  FOLLOWS
+  TRIGGERS
+  INPUTS
+  OUTPUTS
+
+  @@map("org_relation_type")
+}
+
+enum ProblemSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+
+  @@map("problem_severity")
+}
+
+enum ConflictType {
+  FACTUAL
+  PERSPECTIVE
+  SCOPE
+
+  @@map("conflict_type")
+}
+
+enum ConflictResolution {
+  PENDING
+  RESOLVED_VERIFIED
+  RESOLVED_BOTH_VALID
+  RESOLVED_MERGED
+  DISMISSED
+
+  @@map("conflict_resolution")
+}
+
+/// Proyecto de inteligencia organizacional
+model OrgProject {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  status      OrgProjectStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  config      Json?
+  deletedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?  @relation("OrgProjectsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  interviews      Interview[]
+  orgEntities     OrgEntity[]
+  orgRelations    OrgRelation[]
+  problems        Problem[]
+  improvements    Improvement[]
+  factualClaims   FactualClaim[]
+  conflictRecords ConflictRecord[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("org_projects")
+}
+
+/// Entrevista de diagnóstico organizacional
+model Interview {
+  id                    String                @id @default(uuid())
+  title                 String?
+  audioS3Key            String?
+  audioMimeType         String?
+  audioDurationMs       Int?
+  transcriptionText     String?
+  transcriptionJson     Json?
+  transcriptionStatus   TranscriptionStatus   @default(PENDING)
+  transcriptionProvider TranscriptionProvider?
+  interviewDate         DateTime?
+  extractionResult      Json?
+  processingStatus      String                @default("PENDING")
+  processingError       String?
+  processingLog         Json?
+  objective             String?
+  generatedIntro        String?
+  generatedQuestions    Json?
+  questionsGeneratedAt  DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  speakers InterviewSpeaker[]
+  chunks   InterviewChunk[]
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@index([tenantId, processingStatus])
+  @@map("interviews")
+}
+
+/// Hablante identificado en una entrevista
+model InterviewSpeaker {
+  id             String  @id @default(uuid())
+  speakerLabel   String
+  name           String?
+  role           String?
+  department     String?
+  isInterviewer  Boolean @default(false)
+
+  tenantId    String?
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  personEntityId String?
+
+  chunks InterviewChunk[]
+
+  @@unique([interviewId, speakerLabel])
+  @@index([interviewId])
+  @@index([tenantId])
+  @@map("interview_speakers")
+}
+
+/// Fragmento de transcripción con embedding para búsqueda semántica
+model InterviewChunk {
+  id             String  @id @default(uuid())
+  content        String
+  contextPrefix  String?
+  topicSummary   String?
+  startTimeMs    Int?
+  endTimeMs      Int?
+  chunkOrder     Int
+  tokenCount     Int?
+  embeddingModel String?
+
+  embedding Unsupported("vector(1536)")?
+  tsv       Unsupported("tsvector")?
+
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  speakerId String?
+  speaker   InterviewSpeaker? @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+
+  parentChunkId String?
+
+  tenantId String
+
+  @@index([interviewId])
+  @@index([tenantId])
+  @@index([tenantId, interviewId])
+  @@map("interview_chunks")
+}
+
+/// Entidad del grafo organizacional (departamento, rol, proceso, etc.)
+model OrgEntity {
+  id                String        @id @default(uuid())
+  type              OrgEntityType
+  name              String
+  description       String?
+  metadata          Json?
+  status            String        @default("ACTIVE")
+  aliases           String[]
+  validFrom         DateTime      @default(now())
+  validTo           DateTime?
+  version           Int           @default(1)
+  originalEntityId  String?
+  confidence        Float         @default(0.5)
+  sourceChunkIds    String[]
+  sourceInterviewId String?
+
+  embedding Unsupported("vector(1536)")?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  relationsFrom OrgRelation[] @relation("FromEntity")
+  relationsTo   OrgRelation[] @relation("ToEntity")
+  problemLinks  ProblemLink[]
+
+  @@index([tenantId, projectId, type])
+  @@index([tenantId, type, status])
+  @@index([tenantId, projectId, type, validTo])
+  @@map("org_entities")
+}
+
+/// Relación entre dos entidades organizacionales
+model OrgRelation {
+  id          String          @id @default(uuid())
+  type        OrgRelationType
+  description String?
+  metadata    Json?
+  weight      Float           @default(1.0)
+
+  fromEntityId String
+  fromEntity   OrgEntity @relation("FromEntity", fields: [fromEntityId], references: [id], onDelete: Cascade)
+
+  toEntityId String
+  toEntity   OrgEntity @relation("ToEntity", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  validFrom         DateTime @default(now())
+  validTo           DateTime?
+  confidence        Float    @default(0.5)
+  sourceInterviewId String?
+  sourceChunkId     String?
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, projectId])
+  @@index([fromEntityId])
+  @@index([toEntityId])
+  @@index([type])
+  @@index([tenantId, type, validTo])
+  @@map("org_relations")
+}
+
+/// Problema detectado en el diagnóstico organizacional
+model Problem {
+  id                String          @id @default(uuid())
+  title             String
+  description       String
+  severity          ProblemSeverity
+  category          String?
+  evidence          Json?
+  confidence        Float           @default(0.5)
+  sourceInterviewId String?
+  riceScore         Json?
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  affectedEntities ProblemLink[]
+  improvements     Improvement[]
+
+  @@index([tenantId, projectId])
+  @@index([severity])
+  @@index([tenantId, projectId, severity])
+  @@map("problems")
+}
+
+/// Vínculo entre problema y entidad afectada
+model ProblemLink {
+  id                String @id @default(uuid())
+  impactDescription String?
+
+  tenantId  String?
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  entityId String
+  entity   OrgEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, entityId])
+  @@index([problemId])
+  @@index([entityId])
+  @@index([tenantId])
+  @@map("problem_links")
+}
+
+/// Mejora propuesta vinculada a un problema
+model Improvement {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  type        String?
+  effort      String?
+  impact      String?
+  priority    Int?
+  status      String   @default("PROPOSED")
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([problemId])
+  @@map("improvements")
+}
+
+/// Claim factual extraído de entrevistas (inmutable)
+model FactualClaim {
+  id                String @id @default(uuid())
+  subject           String
+  predicate         String
+  object            String
+  claimType         String
+  confidence        Float  @default(0.5)
+  evidence          String?
+  sourceInterviewId String?
+  sourceChunkId     String?
+  createdAt         DateTime @default(now())
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([subject])
+  @@index([tenantId, projectId, subject, predicate])
+  @@map("factual_claims")
+}
+
+/// Registro de conflicto entre claims o perspectivas
+model ConflictRecord {
+  id              String             @id @default(uuid())
+  type            ConflictType
+  description     String
+  claimsData      Json
+  interviewIds    String[]
+  resolution      ConflictResolution @default(PENDING)
+  resolutionNotes String?
+  resolvedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, projectId, resolution])
+  @@map("conflict_records")
 }

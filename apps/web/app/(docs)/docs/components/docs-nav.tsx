@@ -38,7 +38,7 @@ export function DocsNav() {
     <nav className="space-y-6">
       {nav.map((section) => (
         <div key={section.group}>
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-2 px-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-2 px-2">
             {section.group}
           </p>
           <ul className="space-y-0.5">

@@ -12,6 +12,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
@@ -63,6 +72,9 @@ export default function JournalEntryDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [openingDocId, setOpeningDocId] = useState<string | null>(null);
+
+  // Confirmation dialog state
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
 
   const handleViewDocument = async (documentId: string) => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
@@ -119,6 +131,7 @@ export default function JournalEntryDetailPage() {
   const handleVoid = async () => {
     const tenantId = tenant?.id ?? localStorage.getItem("tenant_id");
     if (!tenantId || !id) return;
+    setVoidConfirmOpen(false);
     setActionLoading(true);
     try {
       await api.patch(`/accounting/journal-entries/${id}/void`, {}, { tenantId });
@@ -139,7 +152,11 @@ export default function JournalEntryDetailPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Asiento Contable</h1>
-        <p className="text-muted-foreground">Cargando...</p>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-3/4" />
+        </div>
       </div>
     );
   }
@@ -185,7 +202,7 @@ export default function JournalEntryDetailPage() {
             <Button
               size="sm"
               variant="destructive"
-              onClick={handleVoid}
+              onClick={() => setVoidConfirmOpen(true)}
               disabled={actionLoading}
             >
               Anular
@@ -321,6 +338,35 @@ export default function JournalEntryDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog: Confirmar anulación */}
+      <Dialog open={voidConfirmOpen} onOpenChange={setVoidConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Anular asiento contable?</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. El asiento #{entry.number} quedará
+              marcado como anulado y sus movimientos dejarán de afectar los saldos
+              contables.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setVoidConfirmOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleVoid}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "Anulando..." : "Anular asiento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

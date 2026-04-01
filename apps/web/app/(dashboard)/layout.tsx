@@ -9,6 +9,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function DashboardLayout({
   children,
@@ -32,11 +33,12 @@ export default function DashboardLayout({
                   <Breadcrumbs />
                 </div>
               </header>
-              <div className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-y-auto">
+              <main className="flex flex-1 flex-col gap-4 p-6 min-h-0 overflow-y-auto">
                 {children}
-              </div>
+              </main>
             </SidebarInset>
           </SidebarProvider>
+          <Toaster />
         </OnboardingGuard>
       </TenantProvider>
     </AuthProvider>

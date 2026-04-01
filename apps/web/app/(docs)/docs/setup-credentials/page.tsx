@@ -2,7 +2,7 @@ export default function SetupCredentialsPage() {
   return (
     <div className="space-y-12">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">
+        <p className="text-sm font-mono text-white/50 mb-3">
           Guías de configuración
         </p>
         <h1 className="text-4xl font-bold text-white mb-4">

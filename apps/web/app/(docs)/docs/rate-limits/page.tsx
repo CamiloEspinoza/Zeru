@@ -4,7 +4,7 @@ export default function RateLimitsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Introducción</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Introducción</p>
         <h1 className="text-3xl font-bold text-white mb-4">Rate Limiting</h1>
         <p className="text-[15px] text-white/60 leading-relaxed">
           Para garantizar la estabilidad del servicio, la API aplica límites de
@@ -48,18 +48,18 @@ export default function RateLimitsPage() {
         </h2>
         <ul className="space-y-2 text-sm text-white/60">
           <li className="flex gap-2">
-            <span className="text-white/30 shrink-0">—</span>
+            <span className="text-white/50 shrink-0">—</span>
             Implementa un mecanismo de retry con backoff exponencial para
             manejar errores{" "}
             <code className="font-mono text-xs text-[#f38ba8]">429</code>.
           </li>
           <li className="flex gap-2">
-            <span className="text-white/30 shrink-0">—</span>
+            <span className="text-white/50 shrink-0">—</span>
             Para sincronizaciones masivas, usa lotes (batch) en lugar de
             peticiones individuales por cada transacción.
           </li>
           <li className="flex gap-2">
-            <span className="text-white/30 shrink-0">—</span>
+            <span className="text-white/50 shrink-0">—</span>
             Cachea las respuestas de endpoints de solo lectura (plan de cuentas,
             períodos) que no cambian frecuentemente.
           </li>

@@ -33,7 +33,7 @@ RUN pnpm turbo run build --filter @zeru/api
 
 # ─── Stage 4: Runner ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init ffmpeg
 WORKDIR /app
 ENV NODE_ENV=production
 

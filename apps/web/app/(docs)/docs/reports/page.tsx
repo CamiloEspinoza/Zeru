@@ -5,7 +5,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Endpoints</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Endpoints</p>
         <h1 className="text-3xl font-bold text-white mb-4">Reportes</h1>
         <p className="text-[15px] text-white/60 leading-relaxed">
           Todos los endpoints de reportes requieren el scope{" "}

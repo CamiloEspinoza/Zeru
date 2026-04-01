@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface LinkedInConnectionInfo {
   id?: string;
@@ -223,14 +230,15 @@ export default function LinkedInSettingsPage() {
         {/* Visibility */}
         <div>
           <label className="text-sm font-medium block mb-1.5">Visibilidad por defecto</label>
-          <select
-            value={defaultVisibility}
-            onChange={(e) => setDefaultVisibility(e.target.value)}
-            className="text-sm rounded-lg border border-border bg-background px-3 py-2 w-full outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="PUBLIC">Público (todos en LinkedIn)</option>
-            <option value="CONNECTIONS">Solo mis conexiones</option>
-          </select>
+          <Select value={defaultVisibility} onValueChange={setDefaultVisibility}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Seleccionar visibilidad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PUBLIC">Público (todos en LinkedIn)</SelectItem>
+              <SelectItem value="CONNECTIONS">Solo mis conexiones</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Image prompt language */}
@@ -239,15 +247,16 @@ export default function LinkedInSettingsPage() {
           <p className="text-xs text-muted-foreground mb-2">
             El agente escribirá los prompts de generación de imágenes en este idioma.
           </p>
-          <select
-            value={preferredLanguage}
-            onChange={(e) => setPreferredLanguage(e.target.value)}
-            className="text-sm rounded-lg border border-border bg-background px-3 py-2 w-full outline-none focus:ring-1 focus:ring-ring"
-          >
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>{lang.label}</option>
-            ))}
-          </select>
+          <Select value={preferredLanguage} onValueChange={setPreferredLanguage}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Seleccionar idioma" />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <SelectItem key={lang.code} value={lang.code}>{lang.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Content pillars */}

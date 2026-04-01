@@ -2,6 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api-client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Post {
   id: string;
@@ -132,17 +139,18 @@ export default function CalendarPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Posts programados y publicados en LinkedIn</p>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            value={filter}
-            onChange={e => setFilter(e.target.value as typeof filter)}
-            className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-ring"
-          >
-            <option value="all">Todos</option>
-            <option value="DRAFT">Borradores</option>
-            <option value="PENDING_APPROVAL">Pendientes</option>
-            <option value="SCHEDULED">Programados</option>
-            <option value="PUBLISHED">Publicados</option>
-          </select>
+          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Todos" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="DRAFT">Borradores</SelectItem>
+              <SelectItem value="PENDING_APPROVAL">Pendientes</SelectItem>
+              <SelectItem value="SCHEDULED">Programados</SelectItem>
+              <SelectItem value="PUBLISHED">Publicados</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

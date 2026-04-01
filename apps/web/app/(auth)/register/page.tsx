@@ -138,7 +138,7 @@ function WaitlistForm() {
                 autoComplete="email"
                 disabled={loading}
                 required
-                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60"
               />
             </Field>
 
@@ -235,7 +235,7 @@ function RegisterForm() {
                 placeholder="Juan"
                 autoComplete="given-name"
                 disabled={loading}
-                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60"
               />
             </Field>
             <Field>
@@ -250,7 +250,7 @@ function RegisterForm() {
                 placeholder="Pérez"
                 autoComplete="family-name"
                 disabled={loading}
-                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60"
               />
             </Field>
           </div>
@@ -267,7 +267,7 @@ function RegisterForm() {
               placeholder="tu@email.com"
               autoComplete="email"
               disabled={loading}
-              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60"
             />
           </Field>
 
@@ -282,7 +282,7 @@ function RegisterForm() {
               onChange={(e) => setTenantName(e.target.value)}
               placeholder="Mi Empresa SpA"
               disabled={loading}
-              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60"
+              className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60"
             />
           </Field>
 

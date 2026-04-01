@@ -51,7 +51,7 @@ export function Endpoint({ method, path, description, scope, params, children }:
       )}
       {params && params.length > 0 && (
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/30 mb-2">
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-2">
             Parámetros
           </p>
           <div className="rounded-lg border border-white/10 overflow-hidden">
@@ -76,7 +76,7 @@ export function Endpoint({ method, path, description, scope, params, children }:
                     <td className="px-4 py-2.5">
                       <code className="text-xs font-mono text-[#89dceb]">{p.name}</code>
                       {p.location && (
-                        <span className="ml-1.5 text-[10px] text-white/25">{p.location}</span>
+                        <span className="ml-1.5 text-[10px] text-white/50">{p.location}</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5">

@@ -176,3 +176,10 @@
 .font-display {
   font-family: var(--font-display, var(--font-sans));
 }
+
+@media print {
+  body * { visibility: hidden; }
+  .print-container, .print-container * { visibility: visible; }
+  .print-container { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}

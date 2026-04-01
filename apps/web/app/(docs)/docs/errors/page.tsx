@@ -4,7 +4,7 @@ export default function ErrorsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Introducción</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Introducción</p>
         <h1 className="text-3xl font-bold text-white mb-4">Errores</h1>
         <p className="text-[15px] text-white/60 leading-relaxed">
           La API usa códigos HTTP estándar para indicar el resultado de cada

@@ -25,61 +25,61 @@ const roadmap: Array<{
   icon: string;
 }> = [
   {
+    title: "Gestión de RRHH",
+    description: "Contratos, vacaciones, asistencia y evaluaciones de desempeño.",
+    status: "proximas-semanas",
+    icon: "📋",
+  },
+  {
+    title: "Gestión Documental",
+    description: "Flujos de aprobación, firma electrónica y versionado de documentos.",
+    status: "proximas-semanas",
+    icon: "📄",
+  },
+  {
+    title: "Reportes y BI",
+    description: "Dashboards customizables y KPIs en tiempo real.",
+    status: "proximas-semanas",
+    icon: "📊",
+  },
+  {
+    title: "Integraciones",
+    description: "Conexión con SAP, Google Workspace, Microsoft 365 y más.",
+    status: "proximo-mes",
+    icon: "🔗",
+  },
+  {
+    title: "API Pública",
+    description: "Endpoints, webhooks y SDK para desarrolladores.",
+    status: "proximo-mes",
+    icon: "🔌",
+  },
+  {
     title: "Inventario",
     description: "Control de stock, productos, movimientos y valorización en tiempo real.",
-    status: "proximas-semanas",
+    status: "proximo-mes",
     icon: "📦",
   },
   {
     title: "Órdenes de compra",
-    description: "Flujo completo de compras: cotización, OC, recepción y contabilización automática.",
-    status: "proximas-semanas",
+    description: "Cotización, OC, recepción y contabilización automática.",
+    status: "planificado",
     icon: "🛒",
   },
   {
     title: "Documentos electrónicos (DTE)",
-    description: "Emisión y recepción de facturas, boletas y notas de crédito via SII.",
-    status: "proximas-semanas",
+    description: "Emisión y recepción de facturas, boletas y notas de crédito vía SII.",
+    status: "planificado",
     icon: "🧾",
   },
   {
-    title: "Conciliación bancaria automática",
+    title: "Conciliación bancaria",
     description: "Importa cartolas y la IA concilia movimientos contra asientos contables.",
-    status: "proximo-mes",
+    status: "planificado",
     icon: "🏦",
   },
   {
-    title: "Medios de pago",
-    description: "Recibe pagos online con Khipu, Transbank y otros. Conciliación automática.",
-    status: "proximo-mes",
-    icon: "💳",
-  },
-  {
-    title: "Automatización de cobranza",
-    description: "Emails, WhatsApp y llamadas automáticas para recordar deudas pendientes.",
-    status: "proximo-mes",
-    icon: "📞",
-  },
-  {
-    title: "Presupuestos y proyecciones",
-    description: "Crea presupuestos anuales, compara con la ejecución real y proyecta flujos.",
-    status: "planificado",
-    icon: "📊",
-  },
-  {
-    title: "Alertas de presupuesto",
-    description: "Notificaciones cuando un centro de costo supera un % del presupuesto.",
-    status: "planificado",
-    icon: "🔔",
-  },
-  {
-    title: "Productos y catálogo",
-    description: "Ficha de producto con precios, costos, impuestos y variantes.",
-    status: "planificado",
-    icon: "🏷️",
-  },
-  {
-    title: "CRM básico",
+    title: "CRM",
     description: "Auxiliar de clientes y proveedores con historial de operaciones.",
     status: "planificado",
     icon: "👥",
@@ -91,28 +91,10 @@ const roadmap: Array<{
     icon: "🛍️",
   },
   {
-    title: "Atención al cliente",
-    description: "Bandeja unificada: WhatsApp, email e IA para respuestas automáticas.",
-    status: "planificado",
-    icon: "💬",
-  },
-  {
-    title: "Marketing outbound",
-    description: "Campañas de email y WhatsApp segmentadas desde los datos de tu CRM.",
-    status: "planificado",
-    icon: "📣",
-  },
-  {
     title: "Control de gestión",
     description: "Dashboard de KPIs, márgenes por línea de negocio y análisis de rentabilidad.",
     status: "planificado",
     icon: "🎯",
-  },
-  {
-    title: "Nuevos modelos de IA",
-    description: "Soporte para Claude, Gemini, Llama y más proveedores según el usuario elija.",
-    status: "planificado",
-    icon: "🤖",
   },
 ];
 
@@ -176,7 +158,7 @@ export function RoadmapSection() {
                         <h3 className="font-semibold text-sm text-white/80 group-hover:text-white transition-colors">
                           {item.title}
                         </h3>
-                        <p className="text-xs text-white/35 mt-1 leading-relaxed">
+                        <p className="text-xs text-white/55 mt-1 leading-relaxed">
                           {item.description}
                         </p>
                       </div>

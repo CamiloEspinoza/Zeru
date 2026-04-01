@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -195,7 +196,11 @@ export default function NewJournalEntryPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Nuevo Asiento Contable</h1>
-        <p className="text-muted-foreground">Cargando datos...</p>
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-3/4" />
+        </div>
       </div>
     );
   }
