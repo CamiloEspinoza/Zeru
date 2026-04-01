@@ -14,7 +14,6 @@ interface Props {
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
   onEdit?: (t: string) => void;
-  onDelete?: () => void;
   onDiscard?: () => void;
 }
 
@@ -36,7 +35,6 @@ export function InterviewQuestionCard({
   checked = false,
   onCheckedChange,
   onEdit,
-  onDelete,
   onDiscard,
 }: Props) {
   const [editing, setEditing] = useState(false);
