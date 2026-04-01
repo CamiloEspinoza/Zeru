@@ -9,8 +9,8 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/org-intelligence/status-badge";
+import { SpeakerAvatarChip } from "@/components/org-intelligence/speaker-avatar-chip";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -126,19 +126,17 @@ export function InterviewCard({
         </CardDescription>
       </CardHeader>
       <CardFooter>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-1.5">
           {interview.speakers && interview.speakers.length > 0 ? (
             interview.speakers.map((speaker) => (
-              <Badge
+              <SpeakerAvatarChip
                 key={speaker.id}
-                variant={speaker.isInterviewer ? "default" : "secondary"}
-                className="text-[10px]"
-              >
-                {speaker.name ?? speaker.speakerLabel}
-              </Badge>
+                name={speaker.name ?? speaker.speakerLabel}
+                isInterviewer={speaker.isInterviewer}
+              />
             ))
           ) : (
-            <span className="text-muted-foreground/70">
+            <span className="text-xs text-muted-foreground/70">
               Sin participantes configurados
             </span>
           )}
