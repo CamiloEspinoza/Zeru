@@ -11,6 +11,7 @@ import {
   useEdgesState,
   type Node,
   type Edge,
+  type Connection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import dagre from "@dagrejs/dagre";
@@ -29,6 +30,7 @@ import {
   Search01Icon,
   Maximize01Icon,
 } from "@hugeicons/core-free-icons";
+import { toast } from "sonner";
 
 /* ---------- Types ---------- */
 
@@ -241,6 +243,35 @@ export default function OrganigramaPage() {
     });
   }, [nodes, debouncedSearch]);
 
+  const onConnect = useCallback(
+    async (connection: Connection) => {
+      if (!connection.source || !connection.target) return;
+      // source (bottom handle) = manager, target (top handle) = subordinate
+      const personId = connection.target;
+      const reportsToId = connection.source;
+
+      if (personId === reportsToId) {
+        toast.error("Una persona no puede reportar a sí misma");
+        return;
+      }
+
+      try {
+        await api.patch(
+          `/org-intelligence/persons/${personId}/reports-to`,
+          { reportsToId },
+        );
+        toast.success("Relación jerárquica actualizada");
+        await fetchOrgChart();
+      } catch (err: unknown) {
+        const message =
+          (err as { message?: string })?.message ??
+          "Error al actualizar la relación";
+        toast.error(message);
+      }
+    },
+    [fetchOrgChart],
+  );
+
   const handleFitView = useCallback(() => {
     reactFlowRef.current?.fitView();
   }, []);
@@ -383,6 +414,7 @@ export default function OrganigramaPage() {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
           nodeTypes={nodeTypes}
           fitView
           fitViewOptions={{ padding: 0.2 }}
