@@ -8,6 +8,7 @@ import {
   PROCESSING_STATUS_MESSAGES,
   type PipelineEvent,
   type PipelineLogEntry,
+  type ProcessingStatus,
 } from "@zeru/shared";
 import {
   Card,
@@ -460,7 +461,7 @@ export default function InterviewDetailPage({
       await api.post(`/org-intelligence/interviews/${interviewId}/process${query}`, {});
       setReprocessDialogOpen(false);
       setReprocessFromStep("");
-      const startStatus = reprocessFromStep || "TRANSCRIBING";
+      const startStatus = (reprocessFromStep || "TRANSCRIBING") as ProcessingStatus;
       setCurrentProcessingStatus(startStatus);
       setCurrentProcessingError(null);
       setPipelineLog([{

@@ -10,7 +10,7 @@ export interface AudioSyncState {
 }
 
 interface UseAudioSyncResult {
-  audioRef: React.RefObject<HTMLAudioElement>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
   state: AudioSyncState;
   play: () => void;
   pause: () => void;
