@@ -17,3 +17,5 @@ export * from './utils/format-rut';
 export * from './utils/currency';
 
 export * from './org-intelligence';
+
+export * from './realtime';
