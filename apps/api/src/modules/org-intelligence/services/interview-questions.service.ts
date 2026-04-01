@@ -151,7 +151,10 @@ ${knowledgeContext}`;
       where: { id: interviewId },
       data: {
         generatedIntro: parsed.introText,
-        generatedQuestions: parsed.sections as unknown as Record<string, unknown>[],
+        generatedQuestions: {
+          introText: parsed.introText,
+          sections: parsed.sections,
+        } as unknown as Record<string, unknown>,
         questionsGeneratedAt: new Date(),
       },
     });
@@ -189,7 +192,10 @@ ${knowledgeContext}`;
     return client.interview.update({
       where: { id: interviewId },
       data: {
-        generatedQuestions: sections as unknown as Record<string, unknown>[],
+        generatedQuestions: {
+          introText: interview.generatedIntro ?? '',
+          sections,
+        } as unknown as Record<string, unknown>,
       },
       select: {
         id: true,

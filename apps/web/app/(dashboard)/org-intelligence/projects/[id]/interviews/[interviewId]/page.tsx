@@ -35,6 +35,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ProgressCelebration } from "@/components/org-intelligence/progress-celebration";
 import { PersonAvatar } from "@/components/org-intelligence/person-avatar";
 import { useFirstVisit } from "@/hooks/use-first-visit";
@@ -48,9 +58,13 @@ import { PipelineStatusCard } from "@/components/org-intelligence/pipeline-statu
 import { ReprocessDialog } from "@/components/org-intelligence/reprocess-dialog";
 import { EditInterviewDialog } from "@/components/org-intelligence/edit-interview-dialog";
 import { pipelineSteps, getSpeakerColor } from "@/lib/org-intelligence/pipeline-config";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 
 interface Interview {
   id: string;
@@ -138,14 +152,10 @@ export default function InterviewDetailPage({
 
   const [interview, setInterview] = useState<Interview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [currentProcessingStatus, setCurrentProcessingStatus] = useState<string | null>(null);
   const [currentProcessingError, setCurrentProcessingError] = useState<string | null>(null);
   const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const sseAbortRef = useRef<AbortController | null>(null);
 
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
@@ -164,7 +174,7 @@ export default function InterviewDetailPage({
   const { segmentEntityMap } = useSegmentEntities(isCompleted ? interviewId : null);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", interviewDate: "" });
+  const [editForm, setEditForm] = useState({ title: "", interviewDate: "", objective: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -174,10 +184,15 @@ export default function InterviewDetailPage({
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessFromStep, setReprocessFromStep] = useState("");
 
+  const [deleteSpeakerIndex, setDeleteSpeakerIndex] = useState<number | null>(null);
+
   const { isFirstVisit: showSuccessBanner, markVisited: dismissSuccessBanner } = useFirstVisit(`interview_completed_${interviewId}`);
 
   const [generatedSections, setGeneratedSections] = useState<{ theme: string; questions: { text: string; rationale?: string; priority: string }[] }[]>([]);
   const [generatedIntroText, setGeneratedIntroText] = useState("");
+
+  const [questionsOpen, setQuestionsOpen] = useState(true);
+  const questionsInitRef = useRef(false);
 
   const fetchInterview = useCallback(async () => {
     try {
@@ -187,9 +202,15 @@ export default function InterviewDetailPage({
       );
       setInterview(res);
 
+      if (!questionsInitRef.current) {
+        questionsInitRef.current = true;
+        setQuestionsOpen(!res.audioS3Key);
+      }
+
       if (res.generatedQuestions) {
-        setGeneratedIntroText(res.generatedQuestions.introText ?? "");
-        setGeneratedSections(res.generatedQuestions.sections ?? []);
+        const gq = res.generatedQuestions as { introText?: string; sections?: typeof generatedSections };
+        setGeneratedIntroText(gq.introText ?? res.generatedIntro ?? "");
+        setGeneratedSections(gq.sections ?? []);
       }
 
       setCurrentProcessingStatus(res.processingStatus);
@@ -365,74 +386,6 @@ export default function InterviewDetailPage({
     });
   }, [interview?.speakers, speakerAvatarUrls]);
 
-  const MAX_FILE_SIZE_MB = 500;
-  const ALLOWED_AUDIO_TYPES = [
-    "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
-    "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm",
-  ];
-  const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm"];
-
-  const handleFileUpload = async (file: File) => {
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!ALLOWED_AUDIO_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
-      toast.error(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      toast.error(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
-      return;
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const tenantId =
-        typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-
-      const headers: Record<string, string> = {};
-      if (tenantId) headers[TENANT_HEADER] = tenantId;
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${API_BASE}/org-intelligence/interviews/${interviewId}/upload-audio`);
-        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
-
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error("Upload failed"));
-        });
-        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-        xhr.send(formData);
-      });
-
-      await fetchInterview();
-    } catch (err) {
-      console.error("Error al subir audio:", err);
-      toast.error("No se pudo subir el archivo de audio. Intenta nuevamente.");
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  };
-
   const handleProcess = async () => {
     try {
       setProcessing(true);
@@ -461,6 +414,7 @@ export default function InterviewDetailPage({
       interviewDate: interview.interviewDate
         ? new Date(interview.interviewDate).toISOString().split("T")[0]
         : "",
+      objective: interview.objective ?? "",
     });
     setEditDialogOpen(true);
   };
@@ -474,6 +428,7 @@ export default function InterviewDetailPage({
         interviewDate: editForm.interviewDate
           ? new Date(editForm.interviewDate + "T12:00:00").toISOString()
           : undefined,
+        objective: editForm.objective,
       });
       setEditDialogOpen(false);
       await fetchInterview();
@@ -668,7 +623,6 @@ export default function InterviewDetailPage({
 
   const currentStatus = currentProcessingStatus ?? interview.processingStatus;
   const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
-  const showUpload = interview.processingStatus === "PENDING" && !interview.audioS3Key;
   const showProcess =
     (interview.processingStatus === "UPLOADED" ||
       (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
@@ -708,37 +662,55 @@ export default function InterviewDetailPage({
         avatarUrls={speakerAvatarUrls}
         onAdd={openAddSpeakerDialog}
         onEdit={openEditSpeakerDialog}
-        onDelete={handleDeleteSpeaker}
+        onDelete={(index) => setDeleteSpeakerIndex(index)}
         saving={savingSpeakers}
       />
 
       {/* Interview Objective */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Objetivo de la entrevista</CardTitle>
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={openEditDialog}>
+              Editar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            {interview.objective ?? "Sin objetivo definido."}
+            {interview.objective ?? "Sin objetivo definido. Haz clic en Editar para agregarlo."}
           </p>
         </CardContent>
       </Card>
 
-      {/* Question Guide */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Guia de Preguntas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InterviewQuestionsView
-            introText={generatedIntroText}
-            sections={generatedSections}
-            interviewId={interviewId}
-            projectId={id}
-            onQuestionsChange={(sections) => setGeneratedSections(sections)}
-          />
-        </CardContent>
-      </Card>
+      {/* Question Guide — collapsible, auto-collapsed when audio exists */}
+      <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer select-none">
+              <div className="flex items-center justify-between">
+                <CardTitle>Guía de Preguntas</CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  className={`size-4 text-muted-foreground transition-transform ${
+                    questionsOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              <InterviewQuestionsView
+                introText={generatedIntroText}
+                sections={generatedSections}
+                interviewId={interviewId}
+                onQuestionsChange={(sections) => setGeneratedSections(sections)}
+              />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Audio Upload/Recording */}
       <InterviewAudioStep
@@ -747,68 +719,6 @@ export default function InterviewDetailPage({
         onAudioUploaded={fetchInterview}
       />
 
-      {/* Legacy Audio Upload (drag & drop) */}
-      {showUpload && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Subir Audio</CardTitle>
-            <CardDescription>
-              Sube el audio de la entrevista (MP3, WAV, M4A, OGG o WebM, máximo 500 MB).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {interview.speakers.length === 0 && (
-              <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
-                Se recomienda configurar los participantes antes de subir el audio para obtener mejores resultados.
-              </div>
-            )}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Subir archivo de audio"
-              className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-                dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 hover:border-muted-foreground/50"
-              }`}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }
-              }}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {uploading ? (
-                <div className="space-y-2 text-center">
-                  <p className="text-sm font-medium">Subiendo... {uploadProgress}%</p>
-                  <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1 text-center">
-                  <p className="text-sm font-medium">Arrastra tu archivo de audio aquí</p>
-                  <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {/* Audio Uploaded — show filename and process button */}
       {showProcess && interview.audioS3Key?.split("/").pop() && (
@@ -920,6 +830,10 @@ export default function InterviewDetailPage({
         onOpenChange={setEditDialogOpen}
         title={editForm.title}
         onTitleChange={(t) => setEditForm({ ...editForm, title: t })}
+        interviewDate={editForm.interviewDate}
+        onDateChange={(d) => setEditForm({ ...editForm, interviewDate: d })}
+        objective={editForm.objective}
+        onObjectiveChange={(o) => setEditForm({ ...editForm, objective: o })}
         onSave={handleSaveEdit}
         saving={savingEdit}
       />
@@ -956,6 +870,38 @@ export default function InterviewDetailPage({
         onReprocess={handleReprocess}
         reprocessing={reprocessing}
       />
+
+      {/* Speaker Delete Confirmation */}
+      <AlertDialog
+        open={deleteSpeakerIndex !== null}
+        onOpenChange={(open) => { if (!open) setDeleteSpeakerIndex(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar participante?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará a &quot;{deleteSpeakerIndex !== null
+                ? (interview.speakers[deleteSpeakerIndex]?.name ?? interview.speakers[deleteSpeakerIndex]?.speakerLabel)
+                : ""}&quot; de la entrevista.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingSpeakers}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={savingSpeakers}
+              onClick={() => {
+                if (deleteSpeakerIndex !== null) {
+                  handleDeleteSpeaker(deleteSpeakerIndex);
+                  setDeleteSpeakerIndex(null);
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Speaker Add/Edit Dialog */}
       <Dialog open={speakerDialogOpen} onOpenChange={(open) => {
