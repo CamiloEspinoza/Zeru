@@ -19,12 +19,15 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
   Label,
   Cell,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip as ShadcnChartTooltip,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 interface Improvement {
   id: string;
@@ -63,11 +66,11 @@ interface CustomTooltipProps {
   payload?: { payload: Improvement }[];
 }
 
-function ChartTooltip({ active, payload }: CustomTooltipProps) {
+function ImprovementTooltip({ active, payload }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
   const item = payload[0].payload;
   return (
-    <div className="rounded-md border bg-background p-2 shadow-sm">
+    <div className="rounded-lg border border-border/50 bg-background px-2.5 py-1.5 shadow-xl">
       <p className="text-sm font-medium">{item.title}</p>
       <p className="text-xs text-muted-foreground">
         Esfuerzo: {item.effort} | Impacto: {item.impact}
@@ -76,6 +79,10 @@ function ChartTooltip({ active, payload }: CustomTooltipProps) {
     </div>
   );
 }
+
+const scatterChartConfig: ChartConfig = {
+  improvements: { label: "Mejoras", color: "hsl(var(--chart-1))" },
+};
 
 export function ProjectImprovementsTab({
   projectId,
@@ -243,17 +250,20 @@ export function ProjectImprovementsTab({
                 </div>
               </div>
 
-              <ResponsiveContainer width="100%" height={400}>
+              <ChartContainer config={scatterChartConfig} className="h-[400px] w-full">
                 <ScatterChart
                   margin={{ top: 20, right: 20, bottom: 30, left: 20 }}
+                  accessibilityLayer
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <CartesianGrid vertical={false} />
                   <XAxis
                     type="number"
                     dataKey="effort"
                     name="Esfuerzo"
                     domain={[0, 10]}
                     tickCount={6}
+                    tickLine={false}
+                    axisLine={false}
                   >
                     <Label value="Esfuerzo &#8594;" position="bottom" offset={10} />
                   </XAxis>
@@ -263,6 +273,8 @@ export function ProjectImprovementsTab({
                     name="Impacto"
                     domain={[0, 10]}
                     tickCount={6}
+                    tickLine={false}
+                    axisLine={false}
                   >
                     <Label
                       value="Impacto &#8594;"
@@ -271,10 +283,10 @@ export function ProjectImprovementsTab({
                       offset={0}
                     />
                   </YAxis>
-                  <ReferenceLine x={5} stroke="#e5e7eb" strokeDasharray="4 4" />
-                  <ReferenceLine y={5} stroke="#e5e7eb" strokeDasharray="4 4" />
-                  <Tooltip
-                    content={<ChartTooltip />}
+                  <ReferenceLine x={5} stroke="hsl(var(--border))" strokeDasharray="4 4" />
+                  <ReferenceLine y={5} stroke="hsl(var(--border))" strokeDasharray="4 4" />
+                  <ShadcnChartTooltip
+                    content={<ImprovementTooltip />}
                     cursor={{ strokeDasharray: "3 3" }}
                   />
                   <Scatter name="Mejoras" data={scatterData}>
@@ -288,7 +300,7 @@ export function ProjectImprovementsTab({
                     ))}
                   </Scatter>
                 </ScatterChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
 
             {/* Legend */}

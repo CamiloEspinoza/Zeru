@@ -1,26 +1,33 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo } from "react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import type { DailyCostResponse } from "@zeru/shared";
 
-const COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#06b6d4",
-  "#84cc16",
+const CHART_COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(210, 76%, 55%)",
+  "hsl(280, 65%, 60%)",
+  "hsl(30, 80%, 55%)",
 ];
 
 interface CostTrendChartProps {
@@ -29,62 +36,90 @@ interface CostTrendChartProps {
 }
 
 export function CostTrendChart({ data, isLoading }: CostTrendChartProps) {
-  if (isLoading || !data?.daily?.length) {
+  const { chartData, keys, chartConfig } = useMemo(() => {
+    if (!data?.daily?.length) return { chartData: [], keys: [], chartConfig: {} as ChartConfig };
+
+    const allKeys = new Set<string>();
+    for (const day of data.daily) {
+      for (const key of Object.keys(day.breakdown)) allKeys.add(key);
+    }
+    const sortedKeys = Array.from(allKeys);
+
+    const config: ChartConfig = {};
+    for (let i = 0; i < sortedKeys.length; i++) {
+      config[sortedKeys[i]] = {
+        label: sortedKeys[i],
+        color: CHART_COLORS[i % CHART_COLORS.length],
+      };
+    }
+
+    const transformed = data.daily.map((day) => ({
+      date: new Date(day.date).toLocaleDateString("es-CL", {
+        day: "2-digit",
+        month: "short",
+      }),
+      ...day.breakdown,
+    }));
+
+    return { chartData: transformed, keys: sortedKeys, chartConfig: config };
+  }, [data]);
+
+  if (isLoading || !chartData.length) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Tendencia Diaria</CardTitle>
+          <CardDescription>Costos por feature desglosados por dia</CardDescription>
         </CardHeader>
         <CardContent className="flex h-[350px] items-center justify-center text-muted-foreground">
-          {isLoading
-            ? "Cargando..."
-            : "Sin datos para el periodo seleccionado"}
+          {isLoading ? "Cargando..." : "Sin datos para el periodo seleccionado"}
         </CardContent>
       </Card>
     );
   }
 
-  const allKeys = new Set<string>();
-  for (const day of data.daily) {
-    for (const key of Object.keys(day.breakdown)) allKeys.add(key);
-  }
-  const keys = Array.from(allKeys);
-
-  const chartData = data.daily.map((day) => ({
-    date: new Date(day.date).toLocaleDateString("es-CL", {
-      day: "2-digit",
-      month: "short",
-    }),
-    ...day.breakdown,
-  }));
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Tendencia Diaria</CardTitle>
+        <CardDescription>Costos por feature desglosados por dia</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={chartData}>
-            <XAxis dataKey="date" fontSize={12} />
+        <ChartContainer config={chartConfig} className="h-[350px] w-full">
+          <BarChart data={chartData} accessibilityLayer>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              dataKey="date"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+            />
             <YAxis
-              fontSize={12}
+              tickLine={false}
+              axisLine={false}
               tickFormatter={(v: number) => `$${v.toFixed(2)}`}
             />
-            <Tooltip
-              formatter={(value: number) => `$${value.toFixed(4)}`}
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value) =>
+                    typeof value === "number" ? `$${value.toFixed(4)}` : String(value)
+                  }
+                />
+              }
             />
-            <Legend />
-            {keys.map((key, i) => (
+            <ChartLegend content={<ChartLegendContent />} />
+            {keys.map((key) => (
               <Bar
                 key={key}
                 dataKey={key}
-                stackId="a"
-                fill={COLORS[i % COLORS.length]}
+                stackId="costs"
+                fill={`var(--color-${key})`}
+                radius={[0, 0, 0, 0]}
               />
             ))}
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );
