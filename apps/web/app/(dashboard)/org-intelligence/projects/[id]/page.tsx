@@ -72,6 +72,7 @@ interface Interview {
   id: string;
   title: string | null;
   interviewDate: string | null;
+  objective: string | null;
   processingStatus: string;
   speakers: InterviewSpeaker[];
   createdAt: string;
@@ -130,7 +131,7 @@ export default function ProjectDetailPage({
 
   const [editInterviewDialogOpen, setEditInterviewDialogOpen] = useState(false);
   const [editingInterview, setEditingInterview] = useState<Interview | null>(null);
-  const [editInterviewForm, setEditInterviewForm] = useState({ title: "" });
+  const [editInterviewForm, setEditInterviewForm] = useState({ title: "", interviewDate: "", objective: "" });
   const [savingInterview, setSavingInterview] = useState(false);
 
   const [deleteInterviewDialogOpen, setDeleteInterviewDialogOpen] = useState(false);
@@ -279,7 +280,11 @@ export default function ProjectDetailPage({
 
   const openEditInterviewDialog = (interview: Interview) => {
     setEditingInterview(interview);
-    setEditInterviewForm({ title: interview.title ?? "" });
+    setEditInterviewForm({
+      title: interview.title ?? "",
+      interviewDate: interview.interviewDate ? interview.interviewDate.slice(0, 10) : "",
+      objective: interview.objective ?? "",
+    });
     setEditInterviewDialogOpen(true);
   };
 
@@ -289,6 +294,8 @@ export default function ProjectDetailPage({
       setSavingInterview(true);
       await api.patch(`/org-intelligence/interviews/${editingInterview.id}`, {
         title: editInterviewForm.title || undefined,
+        interviewDate: editInterviewForm.interviewDate || undefined,
+        objective: editInterviewForm.objective || undefined,
       });
       setEditInterviewDialogOpen(false);
       setEditingInterview(null);
@@ -818,7 +825,11 @@ export default function ProjectDetailPage({
         open={editInterviewDialogOpen}
         onOpenChange={setEditInterviewDialogOpen}
         title={editInterviewForm.title}
-        onTitleChange={(t) => setEditInterviewForm({ title: t })}
+        onTitleChange={(t) => setEditInterviewForm((prev) => ({ ...prev, title: t }))}
+        interviewDate={editInterviewForm.interviewDate}
+        onDateChange={(d) => setEditInterviewForm((prev) => ({ ...prev, interviewDate: d }))}
+        objective={editInterviewForm.objective}
+        onObjectiveChange={(o) => setEditInterviewForm((prev) => ({ ...prev, objective: o }))}
         onSave={handleEditInterview}
         saving={savingInterview}
       />

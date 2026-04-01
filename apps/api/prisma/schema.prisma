@@ -44,6 +44,8 @@ model Tenant {
   departments          Department[]
   personProfiles       PersonProfile[]
   orgSuggestions       OrgSuggestion[]
+  channels             Channel[]
+  notifications        Notification[]
 
   @@map("tenants")
 }
@@ -60,15 +62,22 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  memberships           UserTenant[]
-  conversations         Conversation[]
-  documents             Document[]
-  stepCompletions       AccountingStepCompletion[]
-  memories              Memory[]
-  journalEntriesCreated JournalEntry[]
-  apiKeys               ApiKey[]
-  orgProjectsCreated    OrgProject[] @relation("OrgProjectsCreated")
-  aiUsageLogs           AiUsageLog[]
+  memberships             UserTenant[]
+  conversations           Conversation[]
+  documents               Document[]
+  stepCompletions         AccountingStepCompletion[]
+  memories                Memory[]
+  journalEntriesCreated   JournalEntry[]
+  apiKeys                 ApiKey[]
+  orgProjectsCreated      OrgProject[] @relation("OrgProjectsCreated")
+  aiUsageLogs             AiUsageLog[]
+  channelsCreated         Channel[]       @relation("ChannelCreator")
+  channelMemberships      ChannelMember[]
+  chatMessages            ChatMessage[]   @relation("ChatMessageAuthor")
+  chatReactions           ChatReaction[]  @relation("ChatReactionUser")
+  chatMentionsOf          ChatMention[]   @relation("ChatMentionTarget")
+  notifications           Notification[]           @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[] @relation("NotificationPref")
 
   @@map("users")
 }
@@ -1362,4 +1371,214 @@ model ConflictRecord {
   @@index([tenantId, projectId])
   @@index([tenantId, projectId, resolution])
   @@map("conflict_records")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  changes    Json?
+  snapshot   Json?
+  actorType  String
+  actorId    String?
+  source     String
+  ipAddress  String?
+  userAgent  String?
+  socketId   String?
+  tenantId   String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Team Chat ────────────────────────────────────────────
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DM
+  GROUP_DM
+}
+
+model Channel {
+  id           String      @id @default(uuid())
+  name         String?
+  slug         String?
+  type         ChannelType
+  topic        String?
+  description  String?
+  lastSequence BigInt      @default(0)
+  isArchived   Boolean     @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ChannelCreator", fields: [createdById], references: [id])
+
+  members  ChannelMember[]
+  messages ChatMessage[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("channels")
+}
+
+model ChannelMember {
+  id               String   @id @default(uuid())
+  role             String   @default("MEMBER")
+  lastReadSequence BigInt   @default(0)
+  isMuted          Boolean  @default(false)
+  joinedAt         DateTime @default(now())
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+  @@map("channel_members")
+}
+
+model ChatMessage {
+  id        String    @id @default(uuid())
+  content   String
+  sequence  BigInt
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+
+  threadParentId    String?
+  threadParent      ChatMessage?  @relation("Thread", fields: [threadParentId], references: [id])
+  threadReplies     ChatMessage[] @relation("Thread")
+  threadReplyCount  Int           @default(0)
+  lastThreadReplyAt DateTime?
+
+  attachments ChatAttachment[]
+  reactions   ChatReaction[]
+  mentions    ChatMention[]
+
+  @@index([channelId, sequence])
+  @@index([channelId, createdAt])
+  @@index([threadParentId])
+  @@map("chat_messages")
+}
+
+model ChatAttachment {
+  id        String @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_attachments")
+}
+
+model ChatReaction {
+  id    String @id @default(uuid())
+  emoji String
+
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation("ChatReactionUser", fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@map("chat_reactions")
+}
+
+model ChatMention {
+  id String @id @default(uuid())
+
+  messageId       String
+  message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  mentionedUserId String
+  mentionedUser   User @relation("ChatMentionTarget", fields: [mentionedUserId], references: [id])
+
+  @@index([mentionedUserId])
+  @@map("chat_mentions")
+}
+
+// ─── Notifications ────────────────────────────────────────
+
+model Notification {
+  id          String    @id @default(uuid())
+  type        String
+  title       String
+  body        String?
+  data        Json
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  groupKey    String?
+  createdAt   DateTime  @default(now())
+
+  recipientId String
+  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([recipientId, tenantId, createdAt])
+  @@index([groupKey])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id             String  @id @default(uuid())
+  eventPattern   String
+  inApp          Boolean @default(true)
+  email          Boolean @default(false)
+  push           Boolean @default(false)
+  emailFrequency String  @default("INSTANT")
+
+  userId String
+  user   User @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventPattern])
+  @@map("notification_preferences")
+}
+
+// ─── Resource Locks ───────────────────────────────────────
+
+model ResourceLock {
+  id            String   @id @default(uuid())
+  entityType    String
+  entityId      String
+  fieldName     String
+  userId        String
+  tenantId      String
+  socketId      String
+  acquiredAt    DateTime @default(now())
+  expiresAt     DateTime
+  lastHeartbeat DateTime @default(now())
+
+  @@unique([entityType, entityId, fieldName])
+  @@index([socketId])
+  @@index([expiresAt])
+  @@map("resource_locks")
 }

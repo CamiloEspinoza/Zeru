@@ -29,6 +29,8 @@ interface InterviewSpeaker {
   id: string;
   speakerLabel: string;
   name: string | null;
+  role: string | null;
+  department: string | null;
   isInterviewer: boolean;
 }
 
@@ -36,6 +38,7 @@ interface Interview {
   id: string;
   title: string | null;
   interviewDate: string | null;
+  objective: string | null;
   processingStatus: string;
   speakers: InterviewSpeaker[];
   createdAt: string;

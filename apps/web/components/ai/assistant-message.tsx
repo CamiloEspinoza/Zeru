@@ -61,7 +61,7 @@ export function AssistantMessage({
   }
 
   const carouselBlockId = postDrafts.length > 0
-    ? msg.blocks.find((block) => block.kind === "tool" && skipToolCallIds.has(block.state.toolCallId))?.state.toolCallId
+    ? (msg.blocks.find((block) => block.kind === "tool" && skipToolCallIds.has((block as Extract<typeof block, { kind: "tool" }>).state.toolCallId)) as Extract<(typeof msg.blocks)[number], { kind: "tool" }> | undefined)?.state.toolCallId
     : undefined;
 
   return (

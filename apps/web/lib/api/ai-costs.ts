@@ -19,6 +19,7 @@ function qs(params: Record<string, string | undefined>): string {
 export interface DateRangeParams {
   from?: string;
   to?: string;
+  [key: string]: string | undefined;
 }
 
 // ── Tenant-scoped endpoints ──────────────────────────────────
