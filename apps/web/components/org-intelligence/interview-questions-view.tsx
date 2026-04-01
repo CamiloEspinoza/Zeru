@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { InterviewKnowledgeSummary } from "./interview-knowledge-summary";
 import { InterviewGenerateButton } from "./interview-generate-button";
 import { InterviewQuestionGroup } from "./interview-question-group";
 
 type Question = { text: string; rationale?: string; priority: string };
 type Section = { theme: string; questions: Question[] };
-interface Props { introText?: string; sections?: Section[]; interviewId: string; projectId: string; onQuestionsChange?: (s: Section[]) => void }
+interface Props { introText?: string; sections?: Section[]; interviewId: string; onQuestionsChange?: (s: Section[]) => void }
 
-export function InterviewQuestionsView({ introText: init, sections: initS, interviewId, projectId, onQuestionsChange }: Props) {
+export function InterviewQuestionsView({ introText: init, sections: initS, interviewId, onQuestionsChange }: Props) {
   const [intro, setIntro] = useState(init ?? "");
   const [sections, setSections] = useState<Section[]>(initS ?? []);
   const [downloading, setDownloading] = useState(false);
@@ -46,7 +45,6 @@ export function InterviewQuestionsView({ introText: init, sections: initS, inter
 
   return (
     <div className="space-y-4">
-      {!has && <InterviewKnowledgeSummary projectId={projectId} />}
       <div className="flex items-center gap-2">
         <InterviewGenerateButton interviewId={interviewId} onGenerated={onGen} />
         {has && <Button variant="outline" onClick={downloadPdf} disabled={downloading}>{downloading ? "Generando PDF..." : "Descargar PDF"}</Button>}
