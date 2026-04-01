@@ -132,20 +132,19 @@ export class AiCostController {
   @Get('daily')
   async daily(@CurrentTenant() tenantId: string, @Query('from') from?: string, @Query('to') to?: string) {
     const period = this.dateRange(from, to);
-    const logs = await this.prisma.$queryRaw<Array<{ date: string; feature: string; cost: number }>>`
-      SELECT DATE(created_at) as date, feature, SUM(cost_usd)::float as cost
-      FROM ai_usage_logs
-      WHERE tenant_id = ${tenantId} AND created_at >= ${period.gte} AND created_at <= ${period.lte}
-      GROUP BY DATE(created_at), feature
-      ORDER BY date
-    `;
+    const logs = await this.prisma.aiUsageLog.findMany({
+      where: { tenantId, createdAt: period },
+      select: { createdAt: true, feature: true, costUsd: true },
+      orderBy: { createdAt: 'asc' },
+    });
     const dailyMap = new Map<string, { totalCostUsd: number; breakdown: Record<string, number> }>();
-    for (const row of logs) {
-      const dateStr = String(row.date);
+    for (const log of logs) {
+      const dateStr = log.createdAt.toISOString().split('T')[0];
       if (!dailyMap.has(dateStr)) dailyMap.set(dateStr, { totalCostUsd: 0, breakdown: {} });
       const day = dailyMap.get(dateStr)!;
-      day.totalCostUsd += row.cost;
-      day.breakdown[row.feature] = (day.breakdown[row.feature] ?? 0) + row.cost;
+      const cost = Number(log.costUsd);
+      day.totalCostUsd += cost;
+      day.breakdown[log.feature] = (day.breakdown[log.feature] ?? 0) + cost;
     }
     return {
       daily: Array.from(dailyMap.entries()).map(([date, data]) => ({ date, ...data })),

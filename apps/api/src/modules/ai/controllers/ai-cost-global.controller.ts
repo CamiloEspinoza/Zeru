@@ -105,27 +105,26 @@ export class AiCostGlobalController {
   @Get('daily')
   async daily(@Query('from') from?: string, @Query('to') to?: string) {
     const period = this.dateRange(from, to);
-    const logs = await this.prisma.$queryRaw<Array<{ date: string; tenant_id: string; cost: number }>>`
-      SELECT DATE(created_at) as date, tenant_id, SUM(cost_usd)::float as cost
-      FROM ai_usage_logs
-      WHERE created_at >= ${period.gte} AND created_at <= ${period.lte}
-      GROUP BY DATE(created_at), tenant_id
-      ORDER BY date
-    `;
-    const tenantIds = [...new Set(logs.map((l) => l.tenant_id))];
+    const logs = await this.prisma.aiUsageLog.findMany({
+      where: { createdAt: period },
+      select: { createdAt: true, tenantId: true, costUsd: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const tenantIds = [...new Set(logs.map((l) => l.tenantId))];
     const tenants = await this.prisma.tenant.findMany({
       where: { id: { in: tenantIds } },
       select: { id: true, name: true },
     });
     const tenantMap = new Map(tenants.map((t) => [t.id, t.name]));
     const dailyMap = new Map<string, { totalCostUsd: number; breakdown: Record<string, number> }>();
-    for (const row of logs) {
-      const dateStr = String(row.date);
+    for (const log of logs) {
+      const dateStr = log.createdAt.toISOString().split('T')[0];
       if (!dailyMap.has(dateStr)) dailyMap.set(dateStr, { totalCostUsd: 0, breakdown: {} });
       const day = dailyMap.get(dateStr)!;
-      day.totalCostUsd += row.cost;
-      const label = tenantMap.get(row.tenant_id) ?? row.tenant_id;
-      day.breakdown[label] = (day.breakdown[label] ?? 0) + row.cost;
+      const cost = Number(log.costUsd);
+      day.totalCostUsd += cost;
+      const label = tenantMap.get(log.tenantId) ?? log.tenantId;
+      day.breakdown[label] = (day.breakdown[label] ?? 0) + cost;
     }
     return {
       daily: Array.from(dailyMap.entries()).map(([date, data]) => ({ date, ...data })),
