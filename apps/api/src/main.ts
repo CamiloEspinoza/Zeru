@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { json } from 'express';
 import { AppModule } from './app.module';
+import { RedisIoAdapter } from './modules/realtime/realtime.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,6 +23,11 @@ async function bootstrap() {
     origin: origins,
     credentials: true,
   });
+
+  // WebSocket adapter with Redis
+  const redisIoAdapter = new RedisIoAdapter(app, config);
+  await redisIoAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisIoAdapter);
 
   await app.listen(port);
 }
