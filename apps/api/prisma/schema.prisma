@@ -1363,3 +1363,26 @@ model ConflictRecord {
   @@index([tenantId, projectId, resolution])
   @@map("conflict_records")
 }
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  changes    Json?
+  snapshot   Json?
+  actorType  String
+  actorId    String?
+  source     String
+  ipAddress  String?
+  userAgent  String?
+  socketId   String?
+  tenantId   String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, createdAt])
+  @@map("audit_logs")
+}

@@ -21,6 +21,8 @@ import { RedisModule } from './common/services/redis.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { PresenceModule } from './modules/presence/presence.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
+import { AuditModule } from './modules/audit/audit.module';
+import { AuditContextMiddleware } from './modules/audit/audit.middleware';
 
 @Module({
   imports: [
@@ -45,10 +47,13 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     RedisModule,
     RealtimeModule,
     PresenceModule,
+    AuditModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantResolverMiddleware).forRoutes('*');
+    consumer
+      .apply(TenantResolverMiddleware, AuditContextMiddleware)
+      .forRoutes('*');
   }
 }
