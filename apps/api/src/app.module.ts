@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -24,11 +25,14 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
 import { AuditModule } from './modules/audit/audit.module';
 import { AuditContextMiddleware } from './modules/audit/audit.middleware';
 import { TeamChatModule } from './modules/team-chat/team-chat.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { LockModule } from './modules/lock/lock.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    EventEmitterModule.forRoot(),
     EncryptionModule,
     EmailModule,
     PrismaModule,
@@ -50,6 +54,8 @@ import { TeamChatModule } from './modules/team-chat/team-chat.module';
     PresenceModule,
     AuditModule,
     TeamChatModule,
+    NotificationModule,
+    LockModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -45,6 +45,7 @@ model Tenant {
   personProfiles       PersonProfile[]
   orgSuggestions       OrgSuggestion[]
   channels             Channel[]
+  notifications        Notification[]
 
   @@map("tenants")
 }
@@ -61,20 +62,22 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  memberships           UserTenant[]
-  conversations         Conversation[]
-  documents             Document[]
-  stepCompletions       AccountingStepCompletion[]
-  memories              Memory[]
-  journalEntriesCreated JournalEntry[]
-  apiKeys               ApiKey[]
-  orgProjectsCreated    OrgProject[] @relation("OrgProjectsCreated")
-  aiUsageLogs           AiUsageLog[]
-  channelsCreated       Channel[]       @relation("ChannelCreator")
-  channelMemberships    ChannelMember[]
-  chatMessages          ChatMessage[]   @relation("ChatMessageAuthor")
-  chatReactions         ChatReaction[]  @relation("ChatReactionUser")
-  chatMentionsOf        ChatMention[]   @relation("ChatMentionTarget")
+  memberships             UserTenant[]
+  conversations           Conversation[]
+  documents               Document[]
+  stepCompletions         AccountingStepCompletion[]
+  memories                Memory[]
+  journalEntriesCreated   JournalEntry[]
+  apiKeys                 ApiKey[]
+  orgProjectsCreated      OrgProject[] @relation("OrgProjectsCreated")
+  aiUsageLogs             AiUsageLog[]
+  channelsCreated         Channel[]       @relation("ChannelCreator")
+  channelMemberships      ChannelMember[]
+  chatMessages            ChatMessage[]   @relation("ChatMessageAuthor")
+  chatReactions           ChatReaction[]  @relation("ChatReactionUser")
+  chatMentionsOf          ChatMention[]   @relation("ChatMentionTarget")
+  notifications           Notification[]           @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[] @relation("NotificationPref")
 
   @@map("users")
 }
@@ -1518,4 +1521,64 @@ model ChatMention {
 
   @@index([mentionedUserId])
   @@map("chat_mentions")
+}
+
+// ─── Notifications ────────────────────────────────────────
+
+model Notification {
+  id          String    @id @default(uuid())
+  type        String
+  title       String
+  body        String?
+  data        Json
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  groupKey    String?
+  createdAt   DateTime  @default(now())
+
+  recipientId String
+  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([recipientId, tenantId, createdAt])
+  @@index([groupKey])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id             String  @id @default(uuid())
+  eventPattern   String
+  inApp          Boolean @default(true)
+  email          Boolean @default(false)
+  push           Boolean @default(false)
+  emailFrequency String  @default("INSTANT")
+
+  userId String
+  user   User @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventPattern])
+  @@map("notification_preferences")
+}
+
+// ─── Resource Locks ───────────────────────────────────────
+
+model ResourceLock {
+  id            String   @id @default(uuid())
+  entityType    String
+  entityId      String
+  fieldName     String
+  userId        String
+  tenantId      String
+  socketId      String
+  acquiredAt    DateTime @default(now())
+  expiresAt     DateTime
+  lastHeartbeat DateTime @default(now())
+
+  @@unique([entityType, entityId, fieldName])
+  @@index([socketId])
+  @@index([expiresAt])
+  @@map("resource_locks")
 }

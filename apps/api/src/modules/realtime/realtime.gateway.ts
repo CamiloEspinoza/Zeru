@@ -17,6 +17,7 @@ import {
 } from '@zeru/shared';
 import { PresenceService } from '../presence/presence.service';
 import { TeamChatService } from '../team-chat/team-chat.service';
+import { LockService } from '../lock/lock.service';
 
 export interface AuthenticatedSocket extends Socket {
   data: {
@@ -50,6 +51,8 @@ export class RealtimeGateway
     private readonly presenceService: PresenceService,
     @Inject(forwardRef(() => TeamChatService))
     private readonly chatService: TeamChatService,
+    @Inject(forwardRef(() => LockService))
+    private readonly lockService: LockService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -117,6 +120,18 @@ export class RealtimeGateway
     if (client.data?.userId) {
       const { userId, tenantId } = client.data;
       this.logger.log(`Client disconnected: ${userId}`);
+
+      // Release all locks held by this socket
+      const releasedLocks = await this.lockService.releaseBySocketId(client.id);
+      for (const lock of releasedLocks) {
+        this.emitToTenant(lock.tenantId, 'field:unlocked', {
+          entityType: lock.entityType,
+          entityId: lock.entityId,
+          fieldName: lock.fieldName,
+          userId: lock.userId,
+          reason: 'disconnect',
+        });
+      }
 
       // Remove from all views
       const affectedViews =
@@ -371,6 +386,83 @@ export class RealtimeGateway
 
     const room = `tenant:${tenantId}:channel:${channelId}`;
     this.emitToRoom(room, 'chat:deleted', result);
+  }
+
+  // ─── Lock event handlers ──────────────────────────────────
+
+  @SubscribeMessage('lock:acquire')
+  async handleLockAcquire(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: { entityType: string; entityId: string; fieldName: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { entityType, entityId, fieldName } = data;
+
+    const result = await this.lockService.acquire(
+      entityType,
+      entityId,
+      fieldName,
+      userId,
+      tenantId,
+      client.id,
+    );
+
+    if (result.acquired) {
+      client.emit('lock:acquired' as any, { entityType, entityId, fieldName, lock: result.lock } as any);
+      this.emitToTenant(tenantId, 'field:locked', {
+        entityType,
+        entityId,
+        fieldName,
+        userId,
+        socketId: client.id,
+        expiresAt: result.lock.expiresAt,
+      });
+    } else {
+      client.emit('lock:denied' as any, { entityType, entityId, fieldName, heldBy: result.heldBy } as any);
+    }
+  }
+
+  @SubscribeMessage('lock:release')
+  async handleLockRelease(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: { entityType: string; entityId: string; fieldName: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { entityType, entityId, fieldName } = data;
+
+    const released = await this.lockService.release(
+      entityType,
+      entityId,
+      fieldName,
+      userId,
+    );
+
+    if (released) {
+      this.emitToTenant(tenantId, 'field:unlocked', {
+        entityType,
+        entityId,
+        fieldName,
+        userId,
+        reason: 'released',
+      });
+    }
+  }
+
+  @SubscribeMessage('lock:heartbeat')
+  async handleLockHeartbeat(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: { entityType: string; entityId: string; fieldName: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId } = client.data;
+    const { entityType, entityId, fieldName } = data;
+
+    await this.lockService.heartbeat(entityType, entityId, fieldName, userId);
   }
 
   emitToUser(userId: string, event: string, data: unknown) {

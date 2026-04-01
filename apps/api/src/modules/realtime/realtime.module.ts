@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RealtimeGateway } from './realtime.gateway';
 import { PresenceModule } from '../presence/presence.module';
 import { TeamChatModule } from '../team-chat/team-chat.module';
+import { LockModule } from '../lock/lock.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TeamChatModule } from '../team-chat/team-chat.module';
     }),
     forwardRef(() => PresenceModule),
     forwardRef(() => TeamChatModule),
+    forwardRef(() => LockModule),
   ],
   providers: [RealtimeGateway],
   exports: [RealtimeGateway],
