@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -9,6 +9,8 @@ import {
   BackgroundVariant,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type Connection,
@@ -25,6 +27,7 @@ import {
   OrgChartNode,
   type OrgChartNodeData,
 } from "@/components/org-intelligence/orgchart-node";
+import { OrgChartEdge } from "@/components/org-intelligence/orgchart-edge";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Search01Icon,
@@ -91,8 +94,8 @@ function treeToNodesAndEdges(
         id: `e-${parentId}-${person.id}`,
         source: parentId,
         target: person.id,
-        type: "smoothstep",
-        style: { stroke: "#94A3B8", strokeWidth: 1.5 },
+        type: "orgChartEdge",
+        className: "orgchart-edge",
       });
     }
 
@@ -135,8 +138,17 @@ function getLayoutedElements(
 /* ---------- Component ---------- */
 
 const nodeTypes = { orgChartNode: OrgChartNode };
+const edgeTypes = { orgChartEdge: OrgChartEdge };
 
 export default function OrganigramaPage() {
+  return (
+    <ReactFlowProvider>
+      <OrganigramaContent />
+    </ReactFlowProvider>
+  );
+}
+
+function OrganigramaContent() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<OrgChartNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +157,7 @@ export default function OrganigramaPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [stats, setStats] = useState<OrgChartResponse["stats"] | null>(null);
-  const reactFlowRef = useRef<{ fitView: () => void } | null>(null);
+  const { getViewport, setViewport, fitView } = useReactFlow();
 
   // Debounce search
   useEffect(() => {
@@ -243,6 +255,14 @@ export default function OrganigramaPage() {
     });
   }, [nodes, debouncedSearch]);
 
+  /** Re-fetch org chart preserving the current viewport position */
+  const refetchPreservingViewport = useCallback(async () => {
+    const vp = getViewport();
+    await fetchOrgChart();
+    // Restore viewport after React has rendered the new nodes
+    requestAnimationFrame(() => setViewport(vp));
+  }, [fetchOrgChart, getViewport, setViewport]);
+
   const onConnect = useCallback(
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return;
@@ -261,7 +281,7 @@ export default function OrganigramaPage() {
           { reportsToId },
         );
         toast.success("Relación jerárquica actualizada");
-        await fetchOrgChart();
+        await refetchPreservingViewport();
       } catch (err: unknown) {
         const message =
           (err as { message?: string })?.message ??
@@ -269,12 +289,32 @@ export default function OrganigramaPage() {
         toast.error(message);
       }
     },
-    [fetchOrgChart],
+    [refetchPreservingViewport],
   );
 
-  const handleFitView = useCallback(() => {
-    reactFlowRef.current?.fitView();
-  }, []);
+  const onEdgesDelete = useCallback(
+    async (deletedEdges: Edge[]) => {
+      for (const edge of deletedEdges) {
+        const personId = edge.target;
+        try {
+          await api.patch(
+            `/org-intelligence/persons/${personId}/reports-to`,
+            { reportsToId: null },
+          );
+          toast.success("Conexión eliminada");
+        } catch (err: unknown) {
+          const message =
+            (err as { message?: string })?.message ??
+            "Error al eliminar la conexión";
+          toast.error(message);
+        }
+      }
+      await refetchPreservingViewport();
+    },
+    [refetchPreservingViewport],
+  );
+
+  const handleFitView = fitView;
 
   /* ---------- Render ---------- */
 
@@ -415,15 +455,16 @@ export default function OrganigramaPage() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onEdgesDelete={onEdgesDelete}
           nodeTypes={nodeTypes}
-          fitView
+          edgeTypes={edgeTypes}
           fitViewOptions={{ padding: 0.2 }}
           minZoom={0.1}
           maxZoom={2}
+          edgesReconnectable={false}
+          deleteKeyCode={["Backspace", "Delete"]}
           proOptions={{ hideAttribution: true }}
-          onInit={(instance) => {
-            reactFlowRef.current = instance;
-          }}
+          onInit={() => fitView({ padding: 0.2 })}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} className="!bg-background" />
           <MiniMap

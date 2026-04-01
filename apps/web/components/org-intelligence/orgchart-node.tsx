@@ -15,17 +15,17 @@ export interface OrgChartNodeData {
 
 export function OrgChartNode({ data }: { data: OrgChartNodeData }) {
   return (
-    <div className="relative rounded-lg border bg-card p-3 shadow-sm min-w-[200px] max-w-[240px]">
+    <div className="group/node relative rounded-lg border bg-card p-3 shadow-sm min-w-[200px] max-w-[240px]">
       <Handle
         type="target"
         position={Position.Top}
-        className="!bg-muted-foreground !w-2 !h-2 !border-0"
+        className="!w-3 !h-3 !border-2 !border-card !bg-muted-foreground/40 !opacity-0 group-hover/node:!opacity-100 !transition-opacity"
       />
       <div className="flex items-center gap-3">
         <PersonAvatar
           name={data.name}
           avatarUrl={data.avatarUrl ?? undefined}
-          size="sm"
+          size="md"
           className="shrink-0"
         />
         <div className="min-w-0">
@@ -44,15 +44,10 @@ export function OrgChartNode({ data }: { data: OrgChartNodeData }) {
           )}
         </div>
       </div>
-      {data.directReportsCount > 0 && (
-        <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium leading-none text-primary-foreground">
-          {data.directReportsCount}
-        </span>
-      )}
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!bg-muted-foreground !w-2 !h-2 !border-0"
+        className="!w-3 !h-3 !border-2 !border-card !bg-muted-foreground/40 !opacity-0 group-hover/node:!opacity-100 !transition-opacity"
       />
     </div>
   );
