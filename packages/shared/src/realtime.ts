@@ -1,3 +1,16 @@
+import type {
+  ChatSendPayload,
+  ChatMessageEvent,
+  ChatTypingPayload,
+  ChatTypingEvent,
+  ChatReadPayload,
+  ChatReactPayload,
+  ChatReactedEvent,
+  ChatEditPayload,
+  ChatEditedEvent,
+  ChatDeletedEvent,
+} from './chat';
+
 // ─── Presence ────────────────────────────────────────────
 
 export interface PresenceUser {
@@ -69,6 +82,14 @@ export interface ClientToServerEvents {
   'lock:acquire': (data: LockAcquirePayload) => void;
   'lock:release': (data: LockAcquirePayload) => void;
   'lock:heartbeat': (data: LockAcquirePayload) => void;
+  'chat:send': (data: ChatSendPayload) => void;
+  'chat:typing': (data: ChatTypingPayload) => void;
+  'chat:read': (data: ChatReadPayload) => void;
+  'chat:react': (data: ChatReactPayload) => void;
+  'chat:edit': (data: ChatEditPayload) => void;
+  'chat:delete': (data: { messageId: string }) => void;
+  'channel:join': (data: { channelId: string }) => void;
+  'channel:leave': (data: { channelId: string }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -90,4 +111,11 @@ export interface ServerToClientEvents {
     data: Record<string, unknown>;
   }) => void;
   'notification:count': (data: { unread: number }) => void;
+  'chat:message': (data: ChatMessageEvent) => void;
+  'chat:typing': (data: ChatTypingEvent) => void;
+  'chat:typing:stop': (data: ChatTypingEvent) => void;
+  'chat:read': (data: { channelId: string; userId: string; sequence: string }) => void;
+  'chat:reacted': (data: ChatReactedEvent) => void;
+  'chat:edited': (data: ChatEditedEvent) => void;
+  'chat:deleted': (data: ChatDeletedEvent) => void;
 }

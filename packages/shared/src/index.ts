@@ -19,3 +19,5 @@ export * from './utils/currency';
 export * from './org-intelligence';
 
 export * from './realtime';
+export * from './chat';
+export * from './notification';
