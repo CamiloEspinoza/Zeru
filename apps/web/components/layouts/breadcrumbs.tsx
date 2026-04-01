@@ -44,6 +44,18 @@ const LABELS: Record<string, string> = {
   storage: "Almacenamiento",
   "accounting-process": "Proceso Contable",
   "api-keys": "API Keys",
+  clients: "Clientes",
+  collections: "Cobranzas",
+  liquidations: "Liquidaciones",
+  tracking: "Seguimiento",
+  invoicing: "Facturación",
+  dtes: "DTEs",
+  books: "Libros",
+  laboratory: "Laboratorio",
+  reception: "Recepción",
+  processing: "Procesamiento",
+  coding: "Codificación",
+  integrations: "Integraciones",
 };
 
 export function Breadcrumbs() {
