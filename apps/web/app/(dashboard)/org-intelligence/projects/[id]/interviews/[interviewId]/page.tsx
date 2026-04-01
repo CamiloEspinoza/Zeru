@@ -48,6 +48,13 @@ import { PipelineStatusCard } from "@/components/org-intelligence/pipeline-statu
 import { ReprocessDialog } from "@/components/org-intelligence/reprocess-dialog";
 import { EditInterviewDialog } from "@/components/org-intelligence/edit-interview-dialog";
 import { pipelineSteps, getSpeakerColor } from "@/lib/org-intelligence/pipeline-config";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
 
 interface Interview {
   id: string;
@@ -172,6 +179,9 @@ export default function InterviewDetailPage({
   const [generatedSections, setGeneratedSections] = useState<{ theme: string; questions: { text: string; rationale?: string; priority: string }[] }[]>([]);
   const [generatedIntroText, setGeneratedIntroText] = useState("");
 
+  const [questionsOpen, setQuestionsOpen] = useState(true);
+  const questionsInitRef = useRef(false);
+
   const fetchInterview = useCallback(async () => {
     try {
       setLoading(true);
@@ -179,6 +189,11 @@ export default function InterviewDetailPage({
         `/org-intelligence/interviews/${interviewId}`,
       );
       setInterview(res);
+
+      if (!questionsInitRef.current) {
+        questionsInitRef.current = true;
+        setQuestionsOpen(!res.audioS3Key);
+      }
 
       if (res.generatedQuestions) {
         const gq = res.generatedQuestions as { introText?: string; sections?: typeof generatedSections };
@@ -649,21 +664,34 @@ export default function InterviewDetailPage({
         </CardContent>
       </Card>
 
-      {/* Question Guide */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Guia de Preguntas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <InterviewQuestionsView
-            introText={generatedIntroText}
-            sections={generatedSections}
-            interviewId={interviewId}
-            projectId={id}
-            onQuestionsChange={(sections) => setGeneratedSections(sections)}
-          />
-        </CardContent>
-      </Card>
+      {/* Question Guide — collapsible, auto-collapsed when audio exists */}
+      <Collapsible open={questionsOpen} onOpenChange={setQuestionsOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer select-none">
+              <div className="flex items-center justify-between">
+                <CardTitle>Guía de Preguntas</CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowDown01Icon}
+                  className={`size-4 text-muted-foreground transition-transform ${
+                    questionsOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              <InterviewQuestionsView
+                introText={generatedIntroText}
+                sections={generatedSections}
+                interviewId={interviewId}
+                onQuestionsChange={(sections) => setGeneratedSections(sections)}
+              />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* Audio Upload/Recording */}
       <InterviewAudioStep
