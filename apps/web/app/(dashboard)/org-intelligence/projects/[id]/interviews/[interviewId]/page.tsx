@@ -49,9 +49,6 @@ import { ReprocessDialog } from "@/components/org-intelligence/reprocess-dialog"
 import { EditInterviewDialog } from "@/components/org-intelligence/edit-interview-dialog";
 import { pipelineSteps, getSpeakerColor } from "@/lib/org-intelligence/pipeline-config";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
-
 interface Interview {
   id: string;
   title: string | null;
@@ -138,14 +135,10 @@ export default function InterviewDetailPage({
 
   const [interview, setInterview] = useState<Interview | null>(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [processing, setProcessing] = useState(false);
   const [currentProcessingStatus, setCurrentProcessingStatus] = useState<string | null>(null);
   const [currentProcessingError, setCurrentProcessingError] = useState<string | null>(null);
   const [pipelineLog, setPipelineLog] = useState<PipelineLogEntry[]>([]);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const sseAbortRef = useRef<AbortController | null>(null);
 
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
@@ -188,8 +181,9 @@ export default function InterviewDetailPage({
       setInterview(res);
 
       if (res.generatedQuestions) {
-        setGeneratedIntroText(res.generatedQuestions.introText ?? "");
-        setGeneratedSections(res.generatedQuestions.sections ?? []);
+        const gq = res.generatedQuestions as { introText?: string; sections?: typeof generatedSections };
+        setGeneratedIntroText(gq.introText ?? res.generatedIntro ?? "");
+        setGeneratedSections(gq.sections ?? []);
       }
 
       setCurrentProcessingStatus(res.processingStatus);
@@ -364,74 +358,6 @@ export default function InterviewDetailPage({
       }
     });
   }, [interview?.speakers, speakerAvatarUrls]);
-
-  const MAX_FILE_SIZE_MB = 500;
-  const ALLOWED_AUDIO_TYPES = [
-    "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
-    "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm",
-  ];
-  const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".m4a", ".ogg", ".webm"];
-
-  const handleFileUpload = async (file: File) => {
-    const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (!ALLOWED_AUDIO_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(ext)) {
-      toast.error(`Tipo de archivo no permitido. Usa: ${ALLOWED_EXTENSIONS.join(", ")}`);
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      toast.error(`El archivo excede el tamaño máximo de ${MAX_FILE_SIZE_MB} MB.`);
-      return;
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const tenantId =
-        typeof window !== "undefined" ? localStorage.getItem("tenantId") : null;
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-
-      const headers: Record<string, string> = {};
-      if (tenantId) headers[TENANT_HEADER] = tenantId;
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${API_BASE}/org-intelligence/interviews/${interviewId}/upload-audio`);
-        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
-
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error("Upload failed"));
-        });
-        xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-        xhr.send(formData);
-      });
-
-      await fetchInterview();
-    } catch (err) {
-      console.error("Error al subir audio:", err);
-      toast.error("No se pudo subir el archivo de audio. Intenta nuevamente.");
-    } finally {
-      setUploading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  };
 
   const handleProcess = async () => {
     try {
@@ -668,7 +594,6 @@ export default function InterviewDetailPage({
 
   const currentStatus = currentProcessingStatus ?? interview.processingStatus;
   const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
-  const showUpload = interview.processingStatus === "PENDING" && !interview.audioS3Key;
   const showProcess =
     (interview.processingStatus === "UPLOADED" ||
       (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
@@ -747,68 +672,6 @@ export default function InterviewDetailPage({
         onAudioUploaded={fetchInterview}
       />
 
-      {/* Legacy Audio Upload (drag & drop) */}
-      {showUpload && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Subir Audio</CardTitle>
-            <CardDescription>
-              Sube el audio de la entrevista (MP3, WAV, M4A, OGG o WebM, máximo 500 MB).
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {interview.speakers.length === 0 && (
-              <div className="mb-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-xs text-yellow-800 dark:border-yellow-900/50 dark:bg-yellow-900/20 dark:text-yellow-200">
-                Se recomienda configurar los participantes antes de subir el audio para obtener mejores resultados.
-              </div>
-            )}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label="Subir archivo de audio"
-              className={`flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
-                dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-muted-foreground/25 hover:border-muted-foreground/50"
-              }`}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  fileInputRef.current?.click();
-                }
-              }}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {uploading ? (
-                <div className="space-y-2 text-center">
-                  <p className="text-sm font-medium">Subiendo... {uploadProgress}%</p>
-                  <div className="mx-auto h-2 w-48 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1 text-center">
-                  <p className="text-sm font-medium">Arrastra tu archivo de audio aquí</p>
-                  <p className="text-xs text-muted-foreground">o haz clic para seleccionar</p>
-                </div>
-              )}
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".mp3,.wav,.m4a,.ogg,.webm,audio/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       {/* Audio Uploaded — show filename and process button */}
       {showProcess && interview.audioS3Key?.split("/").pop() && (
