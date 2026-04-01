@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CostKpiCards } from "@/components/ai/cost-kpi-cards";
 import { CostTrendChart } from "@/components/ai/cost-trend-chart";
 import { CostBreakdownTabs } from "@/components/ai/cost-breakdown-tabs";
@@ -17,17 +17,19 @@ import {
   useGlobalCostDaily,
 } from "@/hooks/use-ai-costs";
 
-function getDateRange(preset: string): { from?: string; to?: string } {
+function getDateRange(preset: string): { from: string; to: string } {
   const now = new Date();
+  now.setSeconds(0, 0);
+  const toStr = now.toISOString();
   switch (preset) {
     case "7d": {
       const from = new Date(now);
       from.setDate(from.getDate() - 7);
-      return { from: from.toISOString(), to: now.toISOString() };
+      return { from: from.toISOString(), to: toStr };
     }
     case "month": {
       const from = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { from: from.toISOString(), to: now.toISOString() };
+      return { from: from.toISOString(), to: toStr };
     }
     case "prev-month": {
       const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -35,13 +37,13 @@ function getDateRange(preset: string): { from?: string; to?: string } {
       return { from: from.toISOString(), to: to.toISOString() };
     }
     default:
-      return {};
+      return { from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), to: toStr };
   }
 }
 
 export default function GlobalAiCostsPage() {
   const [preset, setPreset] = useState("month");
-  const params = getDateRange(preset);
+  const params = useMemo(() => getDateRange(preset), [preset]);
 
   const summary = useGlobalCostSummary(params);
   const byTenant = useGlobalCostByTenant(params);
