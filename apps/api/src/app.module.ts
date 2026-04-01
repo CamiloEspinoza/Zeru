@@ -23,6 +23,7 @@ import { PresenceModule } from './modules/presence/presence.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuditContextMiddleware } from './modules/audit/audit.middleware';
+import { TeamChatModule } from './modules/team-chat/team-chat.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { AuditContextMiddleware } from './modules/audit/audit.middleware';
     RealtimeModule,
     PresenceModule,
     AuditModule,
+    TeamChatModule,
   ],
 })
 export class AppModule implements NestModule {

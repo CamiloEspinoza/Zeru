@@ -16,6 +16,7 @@ import {
   ServerToClientEvents,
 } from '@zeru/shared';
 import { PresenceService } from '../presence/presence.service';
+import { TeamChatService } from '../team-chat/team-chat.service';
 
 export interface AuthenticatedSocket extends Socket {
   data: {
@@ -47,6 +48,8 @@ export class RealtimeGateway
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => PresenceService))
     private readonly presenceService: PresenceService,
+    @Inject(forwardRef(() => TeamChatService))
+    private readonly chatService: TeamChatService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -221,6 +224,153 @@ export class RealtimeGateway
         await this.presenceService.heartbeatView(tenantId, userId, viewPath);
       }
     }
+  }
+
+  // ─── Chat event handlers ──────────────────────────────────
+
+  @SubscribeMessage('channel:join')
+  async handleChannelJoin(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { channelId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { tenantId } = client.data;
+    const { channelId } = data;
+    await client.join(`tenant:${tenantId}:channel:${channelId}`);
+  }
+
+  @SubscribeMessage('channel:leave')
+  async handleChannelLeave(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { channelId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { tenantId } = client.data;
+    const { channelId } = data;
+    await client.leave(`tenant:${tenantId}:channel:${channelId}`);
+  }
+
+  @SubscribeMessage('chat:send')
+  async handleChatSend(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: {
+      channelId: string;
+      content: string;
+      threadParentId?: string;
+      mentionedUserIds?: string[];
+    },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { channelId, content, threadParentId, mentionedUserIds } = data;
+
+    const message = await this.chatService.sendMessage(
+      channelId,
+      userId,
+      content,
+      threadParentId,
+      mentionedUserIds,
+    );
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    this.emitToRoom(room, 'chat:message', message);
+  }
+
+  @SubscribeMessage('chat:typing')
+  async handleChatTyping(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { channelId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId, userName, userAvatar } = client.data;
+    const { channelId } = data;
+
+    await this.chatService.setTyping(tenantId, channelId, userId);
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    // Broadcast to room excluding sender
+    this.server.to(room).except(client.id).emit(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'chat:typing' as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { channelId, userId, userName, userAvatar } as any,
+    );
+  }
+
+  @SubscribeMessage('chat:read')
+  async handleChatRead(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { channelId: string; sequence: number },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { channelId, sequence } = data;
+
+    await this.chatService.markRead(channelId, userId, sequence);
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    this.emitToRoom(room, 'chat:read', { channelId, userId, sequence });
+  }
+
+  @SubscribeMessage('chat:react')
+  async handleChatReact(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { messageId: string; channelId: string; emoji: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { messageId, channelId, emoji } = data;
+
+    const action = await this.chatService.toggleReaction(
+      messageId,
+      userId,
+      emoji,
+    );
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    this.emitToRoom(room, 'chat:reacted', {
+      messageId,
+      channelId,
+      userId,
+      emoji,
+      action,
+    });
+  }
+
+  @SubscribeMessage('chat:edit')
+  async handleChatEdit(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    data: { messageId: string; channelId: string; content: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { messageId, channelId, content } = data;
+
+    const message = await this.chatService.editMessage(
+      messageId,
+      userId,
+      content,
+    );
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    this.emitToRoom(room, 'chat:edited', message);
+  }
+
+  @SubscribeMessage('chat:delete')
+  async handleChatDelete(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { messageId: string; channelId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const { userId, tenantId } = client.data;
+    const { messageId, channelId } = data;
+
+    const result = await this.chatService.deleteMessage(messageId, userId);
+
+    const room = `tenant:${tenantId}:channel:${channelId}`;
+    this.emitToRoom(room, 'chat:deleted', result);
   }
 
   emitToUser(userId: string, event: string, data: unknown) {
