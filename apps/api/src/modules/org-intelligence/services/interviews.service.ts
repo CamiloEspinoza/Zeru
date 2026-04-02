@@ -108,6 +108,7 @@ export class InterviewsService {
       where: { id, deletedAt: null },
       include: {
         speakers: true,
+        audioTracks: { orderBy: { trackOrder: 'asc' as const } },
         _count: {
           select: { chunks: true },
         },
@@ -200,6 +201,79 @@ export class InterviewsService {
         audioMimeType: 'audio/mpeg',
         processingStatus: 'UPLOADED',
       },
+    });
+  }
+
+  async uploadAudioTrack(
+    tenantId: string,
+    interviewId: string,
+    file: Express.Multer.File,
+    trackOrder: number,
+    sourceLabel?: string,
+  ) {
+    if (!ALLOWED_AUDIO_MIMETYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Tipo de archivo no permitido: ${file.mimetype}`,
+      );
+    }
+
+    await this.findOne(tenantId, interviewId);
+
+    const normalized = await this.normalizeAudio(file.buffer, file.originalname);
+    const outName = file.originalname.replace(/\.[^.]+$/, '.mp3');
+    const key = `tenants/${tenantId}/interviews/${interviewId}/audio/track-${trackOrder}-${outName}`;
+    await this.s3.upload(tenantId, key, normalized, 'audio/mpeg');
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    await client.interviewAudioTrack.upsert({
+      where: { interviewId_trackOrder: { interviewId, trackOrder } },
+      create: {
+        interviewId,
+        trackOrder,
+        s3Key: key,
+        mimeType: 'audio/mpeg',
+        sourceLabel,
+        originalName: file.originalname,
+        tenantId,
+      },
+      update: {
+        s3Key: key,
+        sourceLabel,
+        originalName: file.originalname,
+      },
+    });
+
+    if (trackOrder === 1) {
+      await client.interview.update({
+        where: { id: interviewId },
+        data: {
+          audioS3Key: key,
+          audioMimeType: 'audio/mpeg',
+          processingStatus: 'UPLOADED',
+        },
+      });
+    } else {
+      await client.interview.update({
+        where: { id: interviewId },
+        data: { processingStatus: 'UPLOADED' },
+      });
+    }
+
+    const tracks = await client.interviewAudioTrack.findMany({
+      where: { interviewId },
+      orderBy: { trackOrder: 'asc' },
+    });
+
+    return { tracks };
+  }
+
+  async getAudioTracks(tenantId: string, interviewId: string) {
+    await this.findOne(tenantId, interviewId);
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+    return client.interviewAudioTrack.findMany({
+      where: { interviewId },
+      orderBy: { trackOrder: 'asc' },
     });
   }
 

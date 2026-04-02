@@ -90,12 +90,33 @@ export class InterviewsController {
   @Post(':id/upload-audio')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 500 * 1024 * 1024 } }))
   async uploadAudio(
+    @CurrentTenant() tenantId: string,
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @CurrentTenant() tenantId: string,
+    @Query('trackOrder') trackOrderStr?: string,
+    @Query('sourceLabel') sourceLabel?: string,
   ) {
     if (!file) throw new BadRequestException('No se recibio ningun archivo de audio');
+
+    const trackOrder = trackOrderStr ? parseInt(trackOrderStr, 10) : undefined;
+    if (trackOrder !== undefined && (trackOrder < 1 || trackOrder > 2)) {
+      throw new BadRequestException('trackOrder must be 1 or 2');
+    }
+
+    if (trackOrder) {
+      return this.interviewsService.uploadAudioTrack(
+        tenantId, id, file, trackOrder, sourceLabel,
+      );
+    }
     return this.interviewsService.uploadAudio(tenantId, id, file);
+  }
+
+  @Get(':id/audio-tracks')
+  async getAudioTracks(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+  ) {
+    return this.interviewsService.getAudioTracks(tenantId, id);
   }
 
   @Post(':id/process')
