@@ -50,6 +50,13 @@ model Tenant {
   @@map("tenants")
 }
 
+enum UserType {
+  HUMAN
+  SERVICE
+
+  @@map("user_type")
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -58,6 +65,7 @@ model User {
   lastName  String
   isActive   Boolean  @default(true)
   superAdmin Boolean  @default(false)
+  type       UserType @default(HUMAN)
   deletedAt  DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -78,6 +86,7 @@ model User {
   chatMentionsOf          ChatMention[]   @relation("ChatMentionTarget")
   notifications           Notification[]           @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[] @relation("NotificationPref")
+  personProfiles          PersonProfile[]
 
   @@map("users")
 }
@@ -918,12 +927,16 @@ model PersonProfile {
   tenantId  String
   tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   orgSuggestions OrgSuggestion[]
 
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, reportsToId])
   @@index([tenantId, departmentId])
+  @@unique([userId, tenantId])
   @@map("person_profiles")
 }
 
