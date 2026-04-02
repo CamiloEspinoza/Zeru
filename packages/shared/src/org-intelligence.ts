@@ -17,7 +17,7 @@ export const PROBLEM_SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
 export type ProblemSeverity = (typeof PROBLEM_SEVERITIES)[number];
 
 export const PROCESSING_STATUSES = [
-  'PENDING', 'UPLOADED', 'TRANSCRIBING', 'POST_PROCESSING',
+  'PENDING', 'UPLOADED', 'MERGING', 'MERGE_REVIEW', 'TRANSCRIBING', 'POST_PROCESSING',
   'EXTRACTING', 'RESOLVING_COREFERENCES', 'SUMMARIZING',
   'CHUNKING', 'EMBEDDING', 'COMPLETED', 'FAILED',
 ] as const;
@@ -27,6 +27,8 @@ export type ProcessingStatus = (typeof PROCESSING_STATUSES)[number];
 export const PROCESSING_STATUS_MESSAGES: Record<ProcessingStatus, string> = {
   PENDING: 'Entrevista pendiente de procesamiento',
   UPLOADED: 'Audio recibido correctamente',
+  MERGING: 'Mezclando y sincronizando audios de múltiples fuentes',
+  MERGE_REVIEW: 'Audio mezclado listo para revisión — escucha el resultado antes de continuar',
   TRANSCRIBING: 'Convirtiendo audio a texto con identificación de hablantes (Deepgram Nova-3)',
   POST_PROCESSING: 'Limpiando y estructurando la transcripción',
   EXTRACTING: 'Extrayendo roles, procesos, problemas y dependencias con IA (5 pasadas de análisis)',

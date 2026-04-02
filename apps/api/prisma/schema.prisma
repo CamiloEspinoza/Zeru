@@ -1133,13 +1133,33 @@ model Interview {
 
   tenantId String
 
-  speakers InterviewSpeaker[]
-  chunks   InterviewChunk[]
+  speakers    InterviewSpeaker[]
+  chunks      InterviewChunk[]
+  audioTracks InterviewAudioTrack[]
 
   @@index([projectId])
   @@index([tenantId])
   @@index([tenantId, processingStatus])
   @@map("interviews")
+}
+
+/// Pista de audio individual dentro de una entrevista multi-audio
+model InterviewAudioTrack {
+  id            String   @id @default(uuid())
+  interviewId   String
+  interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  trackOrder    Int
+  s3Key         String
+  mimeType      String   @default("audio/mpeg")
+  durationMs    Int?
+  sourceLabel   String?
+  originalName  String?
+  createdAt     DateTime @default(now())
+  tenantId      String
+
+  @@unique([interviewId, trackOrder])
+  @@index([interviewId])
+  @@map("interview_audio_tracks")
 }
 
 /// Hablante identificado en una entrevista
