@@ -29,6 +29,8 @@ import {
   type ListPersonProfilesDto,
   type UpdatePersonReportsToDto,
   type OrgchartQueryDto,
+  createUserFromPersonSchema,
+  type CreateUserFromPersonDto,
 } from '../dto';
 
 @Controller('org-intelligence/persons')
@@ -82,6 +84,15 @@ export class PersonProfilesController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.personProfilesService.update(tenantId, id, dto);
+  }
+
+  @Post(':id/create-user')
+  async createUser(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(createUserFromPersonSchema)) dto: CreateUserFromPersonDto,
+  ) {
+    return this.personProfilesService.createUserFromPerson(tenantId, id, dto.role);
   }
 
   @Patch(':id/reports-to')

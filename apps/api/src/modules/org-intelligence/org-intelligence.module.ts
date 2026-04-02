@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { FilesModule } from '../files/files.module';
 import { AiModule } from '../ai/ai.module';
+import { UsersModule } from '../users/users.module';
 import { ProjectsController } from './controllers/projects.controller';
 import { InterviewsController } from './controllers/interviews.controller';
 import { SearchController } from './controllers/search.controller';
@@ -29,7 +30,7 @@ import { OrgImprovementsService } from './services/org-improvements.service';
 import { InterviewQuestionsService } from './services/interview-questions.service';
 
 @Module({
-  imports: [FilesModule, forwardRef(() => AiModule)],
+  imports: [FilesModule, forwardRef(() => AiModule), UsersModule],
   controllers: [
     ProjectsController,
     InterviewsController,
