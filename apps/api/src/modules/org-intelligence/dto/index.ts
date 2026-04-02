@@ -140,6 +140,7 @@ export const updatePersonProfileSchema = z.object({
   startDate: z.string().datetime().nullable().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'VACANT']).optional(),
   source: z.enum(['MANUAL', 'AI_INFERRED', 'AI_CONFIRMED', 'CSV_IMPORT']).optional(),
+  userId: z.string().uuid().nullable().optional(),
 });
 
 export const listPersonProfilesSchema = z.object({
@@ -160,6 +161,10 @@ export const orgchartQuerySchema = z.object({
   depth: z.coerce.number().int().min(1).max(20).default(10),
 });
 
+export const createUserFromPersonSchema = z.object({
+  role: z.enum(['OWNER', 'ADMIN', 'ACCOUNTANT', 'VIEWER']).optional().default('VIEWER'),
+});
+
 // --- Type inference ---
 export type CreateDepartmentDto = z.infer<typeof createDepartmentSchema>;
 export type UpdateDepartmentDto = z.infer<typeof updateDepartmentSchema>;
@@ -178,3 +183,4 @@ export type UpdatePersonProfileDto = z.infer<typeof updatePersonProfileSchema>;
 export type ListPersonProfilesDto = z.infer<typeof listPersonProfilesSchema>;
 export type UpdatePersonReportsToDto = z.infer<typeof updatePersonReportsToSchema>;
 export type OrgchartQueryDto = z.infer<typeof orgchartQuerySchema>;
+export type CreateUserFromPersonDto = z.infer<typeof createUserFromPersonSchema>;
