@@ -87,6 +87,7 @@ interface Interview {
   generatedIntro?: string;
   generatedQuestions?: { introText: string; sections: { theme: string; questions: { text: string; rationale?: string; priority: string }[] }[] };
   questionsGeneratedAt?: string;
+  audioTracks?: { id: string; trackOrder: number; originalName: string | null; sourceLabel: string | null }[];
 }
 
 interface Speaker {
@@ -390,8 +391,11 @@ export default function InterviewDetailPage({
   const handleProcess = async () => {
     try {
       setProcessing(true);
-      await api.post(`/org-intelligence/interviews/${interviewId}/process`, {});
-      setCurrentProcessingStatus("TRANSCRIBING");
+      const isMergeReview = interview.processingStatus === "MERGE_REVIEW";
+      await api.post(`/org-intelligence/interviews/${interviewId}/process`, {
+        ...(isMergeReview ? { fromStep: "TRANSCRIBING" } : {}),
+      });
+      setCurrentProcessingStatus(isMergeReview ? "TRANSCRIBING" : "MERGING");
       setCurrentProcessingError(null);
       setPipelineLog([{
         status: "TRANSCRIBING",
@@ -626,6 +630,7 @@ export default function InterviewDetailPage({
   const isProcessing = pipelineSteps.indexOf(currentStatus) > 0 && currentStatus !== "COMPLETED";
   const showProcess =
     (interview.processingStatus === "UPLOADED" ||
+      interview.processingStatus === "MERGE_REVIEW" ||
       (interview.audioS3Key && interview.processingStatus === "PENDING")) &&
     !isProcessing;
   const showPipeline =
@@ -717,6 +722,7 @@ export default function InterviewDetailPage({
       <InterviewAudioStep
         interviewId={interviewId}
         hasAudio={!!interview.audioS3Key}
+        tracks={interview.audioTracks ?? []}
         onAudioUploaded={fetchInterview}
       />
 
@@ -733,7 +739,11 @@ export default function InterviewDetailPage({
           </CardHeader>
           <CardContent>
             <Button onClick={handleProcess} disabled={processing}>
-              {processing ? "Iniciando..." : "Procesar"}
+              {processing
+                ? "Iniciando..."
+                : interview.processingStatus === "MERGE_REVIEW"
+                  ? "Continuar procesamiento"
+                  : "Procesar"}
             </Button>
           </CardContent>
         </Card>
