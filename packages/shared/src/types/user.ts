@@ -1,10 +1,12 @@
 export type UserRole = 'OWNER' | 'ADMIN' | 'ACCOUNTANT' | 'VIEWER';
+export type UserType = 'HUMAN' | 'SERVICE';
 
 export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  type: UserType;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
