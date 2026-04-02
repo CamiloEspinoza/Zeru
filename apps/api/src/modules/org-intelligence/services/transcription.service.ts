@@ -88,6 +88,12 @@ export class TranscriptionService {
       );
     }
 
+    // Detect multi-track interviews for multichannel transcription
+    const trackCount = await client.interviewAudioTrack.count({
+      where: { interviewId },
+    });
+    const useMultichannel = trackCount >= 2;
+
     // Mark as TRANSCRIBING
     await client.interview.update({
       where: { id: interviewId },
@@ -107,7 +113,7 @@ export class TranscriptionService {
 
     try {
       const apiKey = await this.deepgramConfig.getApiKey(tenantId);
-      result = await this.transcribeWithDeepgram(audioBuffer, mimeType, apiKey);
+      result = await this.transcribeWithDeepgram(audioBuffer, mimeType, apiKey, useMultichannel);
       this.logger.log(
         `Deepgram transcription succeeded for interview ${interviewId}`,
       );
@@ -185,6 +191,7 @@ export class TranscriptionService {
     audioBuffer: Buffer,
     _mimeType: string,
     apiKey: string,
+    multichannel = false,
   ): Promise<TranscriptionResult> {
     const dgClient = new DeepgramClient({ apiKey });
 
@@ -193,7 +200,9 @@ export class TranscriptionService {
       {
         model: 'nova-3',
         language: 'es',
-        diarize: true,
+        ...(multichannel
+          ? { multichannel: true }
+          : { diarize: true }),
         smart_format: true,
         punctuate: true,
         utterances: true,
@@ -214,6 +223,48 @@ export class TranscriptionService {
     // Detect language from the first channel if available
     const detectedLanguage =
       result.results?.channels?.[0]?.detected_language ?? 'es';
+
+    // Multichannel: build segments using channel index as speaker identity
+    if (multichannel && utterances.length > 0) {
+      const channelSet = new Set<number>();
+      const mcSegments: TranscriptionSegment[] = utterances.map((utt) => {
+        const channel = utt.channel ?? 0;
+        channelSet.add(channel);
+
+        const words = utt.words ?? [];
+        const mappedWords: TranscriptionWord[] = words.map((w) => ({
+          word: w.word ?? '',
+          punctuatedWord: w.punctuated_word ?? w.word ?? '',
+          startMs: Math.round((w.start ?? 0) * 1000),
+          endMs: Math.round((w.end ?? 0) * 1000),
+          confidence: w.confidence ?? 0,
+        }));
+
+        return {
+          speaker: `Speaker_Track${channel + 1}`,
+          text: utt.transcript ?? '',
+          startMs: Math.round((utt.start ?? 0) * 1000),
+          endMs: Math.round((utt.end ?? 0) * 1000),
+          confidence: utt.confidence ?? 0,
+          words: mappedWords,
+        };
+      });
+
+      const mcFullText = mcSegments.map((s) => s.text).join(' ');
+
+      return {
+        segments: mcSegments,
+        fullText: mcFullText,
+        durationMs,
+        language: detectedLanguage,
+        speakerCount: channelSet.size || 1,
+        metadata: {
+          provider: 'deepgram',
+          model: 'nova-3',
+          processedAt: new Date(),
+        },
+      };
+    }
 
     // Build segments from utterances
     const speakerSet = new Set<number>();
