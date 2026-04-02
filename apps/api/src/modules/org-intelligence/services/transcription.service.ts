@@ -340,6 +340,117 @@ export class TranscriptionService {
   }
 
   // -----------------------------------------------------------------------
+  // Speaker identification from introductions
+  // -----------------------------------------------------------------------
+
+  /**
+   * Analyze the first ~2 minutes of transcript to identify speakers by name.
+   * Participants typically introduce themselves at the beginning of interviews.
+   * Updates InterviewSpeaker records with identified names.
+   */
+  async identifySpeakers(
+    tenantId: string,
+    interviewId: string,
+  ): Promise<void> {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const interview = await client.interview.findFirst({
+      where: { id: interviewId, deletedAt: null },
+      include: { speakers: true },
+    });
+
+    if (!interview?.transcriptionJson || interview.speakers.length < 2) {
+      return; // Nothing to identify
+    }
+
+    const transcription = interview.transcriptionJson as unknown as TranscriptionResult;
+    if (!transcription.segments?.length) return;
+
+    // Take first ~2 minutes of segments
+    const introSegments = transcription.segments.filter(
+      (s) => s.startMs <= 120_000,
+    );
+    if (introSegments.length === 0) return;
+
+    const introText = introSegments
+      .map((s) => `[${s.speaker}]: ${s.text}`)
+      .join('\n');
+
+    const speakerLabels = [...new Set(introSegments.map((s) => s.speaker))];
+
+    try {
+      const apiKey = await this.aiConfig.getDecryptedApiKey(tenantId);
+      if (!apiKey) return;
+
+      const openai = new OpenAI({ apiKey });
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4.1-mini',
+        temperature: 0,
+        messages: [
+          {
+            role: 'system',
+            content: `Eres un asistente que identifica participantes de entrevistas. Analiza el inicio de esta transcripción donde los participantes se presentan. Identifica qué speaker corresponde a qué nombre real.
+
+Responde SOLO con JSON válido en este formato exacto (sin markdown, sin backticks):
+{"mappings": [{"speakerLabel": "Speaker_0", "name": "Nombre Completo"}, ...]}
+
+Si no puedes identificar a un speaker con certeza, omítelo del array. Solo incluye speakers donde haya evidencia clara de su nombre (se presentan o son nombrados por otro participante).`,
+          },
+          {
+            role: 'user',
+            content: `Speakers detectados: ${speakerLabels.join(', ')}\n\nTranscripción (primeros 2 minutos):\n${introText}`,
+          },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content?.trim();
+      if (!content) return;
+
+      const parsed = JSON.parse(content) as {
+        mappings: { speakerLabel: string; name: string }[];
+      };
+
+      if (!parsed.mappings?.length) return;
+
+      // Update speaker names
+      for (const mapping of parsed.mappings) {
+        const speaker = interview.speakers.find(
+          (s) => s.speakerLabel === mapping.speakerLabel,
+        );
+        if (speaker && mapping.name) {
+          await this.prisma.interviewSpeaker.update({
+            where: { id: speaker.id },
+            data: { name: mapping.name },
+          });
+        }
+      }
+
+      // Log usage
+      const inputTokens = response.usage?.prompt_tokens ?? 0;
+      const outputTokens = response.usage?.completion_tokens ?? 0;
+      await this.aiUsageService.logUsage({
+        provider: 'OPENAI',
+        model: 'gpt-4.1-mini',
+        feature: 'org-speaker-identification',
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        tenantId,
+      });
+
+      this.logger.log(
+        `Identified ${parsed.mappings.length} speaker(s) for interview ${interviewId}`,
+      );
+    } catch (err) {
+      // Non-critical — speakers can still be renamed manually
+      this.logger.warn(
+        `Speaker identification failed for interview ${interviewId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // Usage logging
   // -----------------------------------------------------------------------
 

@@ -135,6 +135,11 @@ export class InterviewPipelineOrchestrator {
         await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
         await this.transcription.transcribe(tenantId, interviewId);
         this.logger.log(`[${interviewId}] Transcription complete`);
+
+        // Auto-identify speakers from introductions
+        this.logger.log(`[${interviewId}] Identifying speakers...`);
+        await this.transcription.identifySpeakers(tenantId, interviewId);
+        this.logger.log(`[${interviewId}] Speaker identification complete`);
       }
 
       // Step 1: Extract entities (5 passes)
