@@ -28,6 +28,7 @@ import { OrgDiagramService } from './services/org-diagram.service';
 import { OrgDiagnosisService } from './services/org-diagnosis.service';
 import { OrgImprovementsService } from './services/org-improvements.service';
 import { InterviewQuestionsService } from './services/interview-questions.service';
+import { AudioMergeService } from './services/audio-merge.service';
 
 @Module({
   imports: [FilesModule, forwardRef(() => AiModule), UsersModule],
@@ -60,6 +61,7 @@ import { InterviewQuestionsService } from './services/interview-questions.servic
     OrgDiagnosisService,
     OrgImprovementsService,
     InterviewQuestionsService,
+    AudioMergeService,
   ],
   exports: [
     ProjectsService,
@@ -79,6 +81,7 @@ import { InterviewQuestionsService } from './services/interview-questions.servic
     OrgDiagnosisService,
     OrgImprovementsService,
     InterviewQuestionsService,
+    AudioMergeService,
   ],
 })
 export class OrgIntelligenceModule {}
