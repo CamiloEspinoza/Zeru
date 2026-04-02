@@ -11,6 +11,7 @@ import { ExtractionPipelineService } from './extraction-pipeline.service';
 import { CoreferenceService } from './coreference.service';
 import { ChunkingService } from './chunking.service';
 import { OrgEmbeddingService } from './org-embedding.service';
+import { AudioMergeService } from './audio-merge.service';
 import { BackgroundQueueService } from '../../ai/services/background-queue.service';
 import { PipelineEventsService } from './pipeline-events.service';
 import {
@@ -31,6 +32,7 @@ export class InterviewPipelineOrchestrator {
     private readonly coreference: CoreferenceService,
     private readonly chunking: ChunkingService,
     private readonly embedding: OrgEmbeddingService,
+    private readonly audioMerge: AudioMergeService,
     private readonly backgroundQueue: BackgroundQueueService,
     private readonly pipelineEvents: PipelineEventsService,
   ) {}
@@ -41,6 +43,7 @@ export class InterviewPipelineOrchestrator {
    */
   /** Ordered pipeline steps — used to resolve fromStep parameter */
   private static readonly PIPELINE_STEPS = [
+    'MERGING',
     'TRANSCRIBING',
     'EXTRACTING',
     'RESOLVING_COREFERENCES',
@@ -129,8 +132,34 @@ export class InterviewPipelineOrchestrator {
         );
       }
 
-      // Step 0: Transcribe
+      // Step 0: Merge audio tracks (if multi-track)
       if (startStep <= 0) {
+        const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+        const trackCount = await client.interviewAudioTrack.count({
+          where: { interviewId },
+        });
+
+        if (trackCount >= 2) {
+          this.logger.log(`[${interviewId}] Merging ${trackCount} audio tracks...`);
+          await this.updateStatus(interviewId, tenantId, 'MERGING');
+          const { offsetMs } = await this.audioMerge.mergeAndAlign(tenantId, interviewId);
+          this.logger.log(`[${interviewId}] Merge complete (offset: ${offsetMs}ms)`);
+
+          // Pause for review — user must resume with fromStep=TRANSCRIBING
+          await this.updateStatus(interviewId, tenantId, 'MERGE_REVIEW');
+          this.pipelineEvents.emit(interviewId, {
+            type: 'pipeline:status',
+            interviewId,
+            status: 'MERGE_REVIEW',
+            message: `Audio mezclado listo (offset: ${(offsetMs / 1000).toFixed(1)}s). Escucha el resultado y continúa.`,
+            timestamp: new Date().toISOString(),
+          });
+          return; // Pipeline pauses here
+        }
+      }
+
+      // Step 1: Transcribe
+      if (startStep <= 1) {
         this.logger.log(`[${interviewId}] Starting transcription...`);
         await this.updateStatus(interviewId, tenantId, 'TRANSCRIBING');
         await this.transcription.transcribe(tenantId, interviewId);
@@ -142,8 +171,8 @@ export class InterviewPipelineOrchestrator {
         this.logger.log(`[${interviewId}] Speaker identification complete`);
       }
 
-      // Step 1: Extract entities (5 passes)
-      if (startStep <= 1) {
+      // Step 2: Extract entities (5 passes)
+      if (startStep <= 2) {
         this.logger.log(`[${interviewId}] Starting extraction...`);
         await this.updateStatus(interviewId, tenantId, 'EXTRACTING');
         const extractionResult = await this.extraction.extract(
@@ -177,8 +206,8 @@ export class InterviewPipelineOrchestrator {
         select: { projectId: true },
       });
 
-      // Step 2: Process extraction into knowledge graph
-      if (startStep <= 2) {
+      // Step 3: Process extraction into knowledge graph
+      if (startStep <= 3) {
         this.logger.log(`[${interviewId}] Starting coreference resolution...`);
         await this.updateStatus(interviewId, tenantId, 'RESOLVING_COREFERENCES');
         if (interview) {
@@ -191,16 +220,16 @@ export class InterviewPipelineOrchestrator {
         this.logger.log(`[${interviewId}] Coreference resolution complete`);
       }
 
-      // Step 3: Chunk transcription for RAG
-      if (startStep <= 3) {
+      // Step 4: Chunk transcription for RAG
+      if (startStep <= 4) {
         this.logger.log(`[${interviewId}] Starting chunking...`);
         await this.updateStatus(interviewId, tenantId, 'CHUNKING');
         await this.chunking.chunkInterview(tenantId, interviewId);
         this.logger.log(`[${interviewId}] Chunking complete`);
       }
 
-      // Step 4: Generate embeddings for chunks and entities
-      if (startStep <= 4) {
+      // Step 5: Generate embeddings for chunks and entities
+      if (startStep <= 5) {
         this.logger.log(`[${interviewId}] Starting embedding generation...`);
         await this.updateStatus(interviewId, tenantId, 'EMBEDDING');
         await this.embedding.embedInterviewChunks(tenantId, interviewId);
@@ -262,8 +291,11 @@ export class InterviewPipelineOrchestrator {
       ? (current.processingLog as unknown as PipelineLogEntry[])
       : [];
 
-    // If we're starting fresh (TRANSCRIBING is first real step), reset the log
-    const log = status === 'TRANSCRIBING' ? [logEntry] : [...existingLog, logEntry];
+    // If we're starting fresh, reset the log
+    const log =
+      status === 'MERGING' || status === 'TRANSCRIBING'
+        ? [logEntry]
+        : [...existingLog, logEntry];
 
     await client.interview.update({
       where: { id: interviewId },
