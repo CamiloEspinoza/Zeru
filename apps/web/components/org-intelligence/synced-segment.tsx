@@ -33,10 +33,12 @@ export const SyncedSegment = React.memo(function SyncedSegment({
   entities,
 }: SyncedSegmentProps) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`w-full rounded-md px-3 py-2.5 text-left transition-colors ${
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+      className={`w-full cursor-pointer rounded-md px-3 py-2.5 text-left transition-colors ${
         isActive
           ? "border-l-2 border-primary bg-primary/5"
           : "border-l-2 border-transparent hover:bg-muted/50"
@@ -59,6 +61,6 @@ export const SyncedSegment = React.memo(function SyncedSegment({
           <SegmentEntityBadges entities={entities} />
         </div>
       )}
-    </button>
+    </div>
   );
 });

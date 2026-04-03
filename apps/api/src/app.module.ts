@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -21,19 +22,17 @@ import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligen
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { RedisModule } from './common/services/redis.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
-import { PresenceModule } from './modules/presence/presence.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuditContextMiddleware } from './modules/audit/audit.middleware';
-import { TeamChatModule } from './modules/team-chat/team-chat.module';
 import { NotificationModule } from './modules/notification/notification.module';
-import { LockModule } from './modules/lock/lock.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     EncryptionModule,
     EmailModule,
     PrismaModule,
@@ -53,11 +52,8 @@ import { LockModule } from './modules/lock/lock.module';
     CalendarModule,
     RedisModule,
     RealtimeModule,
-    PresenceModule,
     AuditModule,
-    TeamChatModule,
     NotificationModule,
-    LockModule,
   ],
 })
 export class AppModule implements NestModule {

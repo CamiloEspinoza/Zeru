@@ -69,6 +69,12 @@ interface PersonProfile {
   avatarS3Key: string | null;
   notes: string | null;
   createdAt: string;
+  user?: {
+    id: string;
+    email: string;
+    isActive: boolean;
+    type: string;
+  } | null;
 }
 
 interface PersonsResponse {
@@ -117,6 +123,11 @@ export default function DirectorioPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPerson, setDeletingPerson] = useState<PersonProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Create user from person
+  const [createUserPerson, setCreateUserPerson] = useState<PersonProfile | null>(null);
+  const [createUserRole, setCreateUserRole] = useState<string>("VIEWER");
+  const [creatingUser, setCreatingUser] = useState(false);
 
   // Avatar upload
   const [uploadingAvatarId, setUploadingAvatarId] = useState<string | null>(null);
@@ -253,6 +264,44 @@ export default function DirectorioPage() {
     avatarTargetIdRef.current = personId;
     avatarInputRef.current?.click();
   };
+
+  function openCreateUserDialog(person: PersonProfile) {
+    setCreateUserPerson(person);
+    setCreateUserRole("VIEWER");
+  }
+
+  async function handleCreateUser() {
+    if (!createUserPerson) return;
+    setCreatingUser(true);
+    try {
+      await api.post(
+        `/org-intelligence/persons/${createUserPerson.id}/create-user`,
+        { role: createUserRole },
+      );
+      toast.success(`Cuenta creada para ${createUserPerson.name}`);
+      setCreateUserPerson(null);
+      fetchPersons();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al crear cuenta";
+      toast.error(msg);
+    } finally {
+      setCreatingUser(false);
+    }
+  }
+
+  async function handleUnlinkUser(person: PersonProfile) {
+    if (!confirm(`¿Desvincular el usuario de ${person.name}?`)) return;
+    try {
+      await api.patch(
+        `/org-intelligence/persons/${person.id}`,
+        { userId: null },
+      );
+      toast.success("Usuario desvinculado");
+      fetchPersons();
+    } catch {
+      toast.error("Error al desvincular");
+    }
+  }
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -403,6 +452,11 @@ export default function DirectorioPage() {
                             Contratista
                           </Badge>
                         )}
+                        {person.user && (
+                          <Badge variant={person.user.isActive ? "default" : "destructive"} className="text-[10px]">
+                            {person.user.isActive ? "Usuario activo" : "Usuario inactivo"}
+                          </Badge>
+                        )}
                       </div>
                       {person.role && (
                         <p className="truncate text-xs text-muted-foreground">
@@ -458,6 +512,19 @@ export default function DirectorioPage() {
                           />
                           {person.avatarS3Key ? "Cambiar foto" : "Subir foto"}
                         </DropdownMenuItem>
+                        {!person.user && (
+                          <DropdownMenuItem
+                            onClick={() => openCreateUserDialog(person)}
+                            disabled={!person.email}
+                          >
+                            {person.email ? "Crear cuenta de usuario" : "Sin email — no se puede crear cuenta"}
+                          </DropdownMenuItem>
+                        )}
+                        {person.user && (
+                          <DropdownMenuItem onClick={() => handleUnlinkUser(person)}>
+                            Desvincular usuario
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
@@ -652,6 +719,48 @@ export default function DirectorioPage() {
               disabled={deleting}
             >
               {deleting ? "Eliminando..." : "Eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User Dialog */}
+      <Dialog open={!!createUserPerson} onOpenChange={(open) => !open && setCreateUserPerson(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Crear cuenta de usuario</DialogTitle>
+            <DialogDescription>
+              Se creará una cuenta y se enviará una invitación por email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1">
+              <Label className="text-muted-foreground text-xs">Nombre</Label>
+              <p className="text-sm font-medium">{createUserPerson?.name}</p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-muted-foreground text-xs">Email</Label>
+              <p className="text-sm font-medium">{createUserPerson?.email}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Rol en la organización</Label>
+              <Select value={createUserRole} onValueChange={setCreateUserRole}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OWNER">Propietario</SelectItem>
+                  <SelectItem value="ADMIN">Administrador</SelectItem>
+                  <SelectItem value="ACCOUNTANT">Contador</SelectItem>
+                  <SelectItem value="VIEWER">Solo lectura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateUserPerson(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateUser} disabled={creatingUser}>
+              {creatingUser ? "Creando..." : "Crear cuenta y enviar invitación"}
             </Button>
           </DialogFooter>
         </DialogContent>

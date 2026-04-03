@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Inject, forwardRef } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { PresenceService } from '../presence/presence.service';
 import { PresenceUser } from '@zeru/shared';
 
@@ -31,9 +30,7 @@ export class LockService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => RealtimeGateway))
-    private readonly gateway: RealtimeGateway,
-    @Inject(forwardRef(() => PresenceService))
+    private readonly eventEmitter: EventEmitter2,
     private readonly presenceService: PresenceService,
   ) {}
 
@@ -190,12 +187,12 @@ export class LockService {
 
     // Broadcast field-unlocked for each expired lock
     for (const lock of expired) {
-      this.gateway.emitToTenant(lock.tenantId, 'field:unlocked', {
+      this.eventEmitter.emit('lock.expired', {
+        tenantId: lock.tenantId,
         entityType: lock.entityType,
         entityId: lock.entityId,
         fieldName: lock.fieldName,
         userId: lock.userId,
-        reason: 'expired',
       });
     }
   }

@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RealtimeGateway } from './realtime.gateway';
@@ -15,9 +15,9 @@ import { LockModule } from '../lock/lock.module';
       }),
       inject: [ConfigService],
     }),
-    forwardRef(() => PresenceModule),
-    forwardRef(() => TeamChatModule),
-    forwardRef(() => LockModule),
+    PresenceModule,
+    TeamChatModule,
+    LockModule,
   ],
   providers: [RealtimeGateway],
   exports: [RealtimeGateway],

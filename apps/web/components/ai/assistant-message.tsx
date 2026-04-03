@@ -9,6 +9,16 @@ import { PostDraftCard, type PostDraftData } from "@/components/linkedin/post-dr
 import { PostCarousel } from "@/components/linkedin/post-carousel";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+
+/** Convert \[...\] to $$...$$ and \(...\) to $...$ for remark-math */
+function normalizeLatex(text: string): string {
+  return text
+    .replace(/\\\[([\s\S]*?)\\\]/g, (_, expr) => `$$${expr}$$`)
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_, expr) => `$${expr}$`);
+}
 import type { MessageBlock } from "@/hooks/use-chat-stream";
 
 type AssistantMsg = Extract<MessageBlock, { type: "assistant" }>;
@@ -206,8 +216,11 @@ export function AssistantMessage({
                   prose-blockquote:border-l-muted-foreground prose-blockquote:text-muted-foreground
                   prose-a:text-primary"
               >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {showCursor ? block.text + "▋" : block.text}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
+                >
+                  {normalizeLatex(showCursor ? block.text + "▋" : block.text)}
                 </ReactMarkdown>
               </div>
             );

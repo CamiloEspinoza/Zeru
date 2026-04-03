@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PresenceService } from './presence.service';
-import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class PresenceCleanup {
@@ -9,7 +9,7 @@ export class PresenceCleanup {
 
   constructor(
     private readonly presenceService: PresenceService,
-    private readonly gateway: RealtimeGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Cron('*/15 * * * * *')
@@ -28,8 +28,10 @@ export class PresenceCleanup {
           );
           const onlineUsers =
             await this.presenceService.getOnlineUsers(tenantId);
-          this.gateway.emitToTenant(tenantId, 'presence:online', {
-            users: onlineUsers,
+          this.eventEmitter.emit('presence.broadcast', {
+            tenantId,
+            event: 'presence:online',
+            data: { users: onlineUsers },
           });
         }
 
@@ -52,16 +54,16 @@ export class PresenceCleanup {
               tenantId,
               viewPath,
             );
-            this.gateway.emitToRoom(
-              `view:${tenantId}:${viewPath}`,
-              'presence:update',
-              {
+            this.eventEmitter.emit('presence.broadcast-room', {
+              room: `view:${tenantId}:${viewPath}`,
+              event: 'presence:update',
+              data: {
                 viewPath,
                 event: 'left',
                 user: staleView[0],
                 users: viewUsers,
               },
-            );
+            });
           }
         }
       }

@@ -1,7 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
+import { UsersService } from '../../users/users.service';
 import type {
   CreatePersonProfileDto,
   UpdatePersonProfileDto,
@@ -20,6 +26,7 @@ export class PersonProfilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly s3: S3Service,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(tenantId: string, dto: CreatePersonProfileDto) {
@@ -86,6 +93,7 @@ export class PersonProfilesService {
         include: {
           reportsTo: { select: { id: true, name: true, role: true } },
           department: { select: { id: true, name: true, color: true } },
+          user: { select: { id: true, email: true, isActive: true, type: true } },
         },
         orderBy: { name: 'asc' },
         skip: (dto.page - 1) * dto.perPage,
@@ -113,6 +121,7 @@ export class PersonProfilesService {
       include: {
         reportsTo: { select: { id: true, name: true, role: true } },
         department: { select: { id: true, name: true, color: true } },
+        user: { select: { id: true, email: true, isActive: true, type: true } },
         directReports: {
           where: { deletedAt: null },
           select: {
@@ -147,6 +156,15 @@ export class PersonProfilesService {
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    if (dto.userId !== undefined && dto.userId !== null) {
+      const membership = await this.prisma.userTenant.findFirst({
+        where: { userId: dto.userId, tenantId },
+      });
+      if (!membership) {
+        throw new NotFoundException('User not found in this tenant');
+      }
+    }
+
     return client.personProfile.update({
       where: { id },
       data: {
@@ -165,9 +183,56 @@ export class PersonProfilesService {
         }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.source !== undefined && { source: dto.source }),
+        ...(dto.userId !== undefined && { userId: dto.userId }),
       },
       include: {
         department: { select: { id: true, name: true, color: true } },
+        user: { select: { id: true, email: true, isActive: true, type: true } },
+      },
+    });
+  }
+
+  async createUserFromPerson(
+    tenantId: string,
+    personId: string,
+    role: 'OWNER' | 'ADMIN' | 'ACCOUNTANT' | 'VIEWER' = 'VIEWER',
+  ) {
+    const person = await this.prisma.personProfile.findFirst({
+      where: { id: personId, tenantId, deletedAt: null },
+    });
+
+    if (!person) {
+      throw new NotFoundException('Person not found');
+    }
+
+    if (person.userId) {
+      throw new ConflictException('Person already has a linked user account');
+    }
+
+    if (!person.email) {
+      throw new BadRequestException(
+        'Person must have an email to create a user account',
+      );
+    }
+
+    const nameParts = person.name.trim().split(/\s+/);
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(' ') || firstName;
+
+    const user = await this.usersService.create(tenantId, {
+      email: person.email,
+      firstName,
+      lastName,
+      role,
+    });
+
+    return this.prisma.personProfile.update({
+      where: { id: personId },
+      data: { userId: user.id },
+      include: {
+        department: true,
+        reportsTo: { select: { id: true, name: true, role: true } },
+        user: { select: { id: true, email: true, isActive: true, type: true } },
       },
     });
   }

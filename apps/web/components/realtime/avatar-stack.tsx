@@ -56,8 +56,10 @@ function UserAvatar({ user, size = 32 }: { user: PresenceUser; size?: number }) 
   );
 }
 
+const EMPTY_USERS: PresenceUser[] = [];
+
 export function AvatarStack({ viewPath }: { viewPath: string }) {
-  const viewUsers = usePresenceStore((s) => s.viewUsers.get(viewPath) ?? []);
+  const viewUsers = usePresenceStore((s) => s.viewUsers.get(viewPath) ?? EMPTY_USERS);
 
   if (viewUsers.length === 0) return null;
 

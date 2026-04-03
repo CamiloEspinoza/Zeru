@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { api } from "@/lib/api-client";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -58,9 +60,89 @@ const LABELS: Record<string, string> = {
   integrations: "Integraciones",
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolves a UUID segment to a human-readable name based on route context.
+ * Uses the previous segment to determine what kind of entity the UUID refers to.
+ */
+async function resolveUuid(
+  uuid: string,
+  parentSegment: string,
+): Promise<string | null> {
+  try {
+    switch (parentSegment) {
+      case "projects": {
+        const res = await api.get(`/org-intelligence/projects/${uuid}`);
+        return res.name ?? null;
+      }
+      case "interviews": {
+        const res = await api.get(`/org-intelligence/interviews/${uuid}`);
+        return res.title ?? null;
+      }
+      case "assistant": {
+        const res = await api.get(`/ai/conversations/${uuid}`);
+        return res.title ?? null;
+      }
+      case "journal": {
+        const res = await api.get(`/accounting/journal-entries/${uuid}`);
+        return res.description ? `#${res.number}` : null;
+      }
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+// Module-level cache to avoid re-fetching on every render
+const nameCache = new Map<string, string>();
+
 export function Breadcrumbs() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+
+  // Synchronously populate from cache on each render
+  const cachedNames = useMemo(() => {
+    const cached: Record<string, string> = {};
+    for (const seg of segments) {
+      if (nameCache.has(seg)) cached[seg] = nameCache.get(seg)!;
+    }
+    return cached;
+  }, [segments]);
+
+  useEffect(() => {
+    const uuidsToResolve: { uuid: string; parent: string }[] = [];
+
+    for (let i = 0; i < segments.length; i++) {
+      if (UUID_RE.test(segments[i]) && !nameCache.has(segments[i])) {
+        const parent = segments[i - 1] ?? "";
+        uuidsToResolve.push({ uuid: segments[i], parent });
+      }
+    }
+
+    if (uuidsToResolve.length === 0) return;
+
+    Promise.all(
+      uuidsToResolve.map(async ({ uuid, parent }) => {
+        const name = await resolveUuid(uuid, parent);
+        if (name) nameCache.set(uuid, name);
+        return { uuid, name };
+      }),
+    ).then((results) => {
+      const names: Record<string, string> = {};
+      // Include previously cached
+      for (const seg of segments) {
+        if (nameCache.has(seg)) names[seg] = nameCache.get(seg)!;
+      }
+      for (const { uuid, name } of results) {
+        if (name) names[uuid] = name;
+      }
+      setResolvedNames(names);
+    });
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (segments.length === 0) {
     return (
@@ -85,7 +167,10 @@ export function Breadcrumbs() {
         {segments.map((segment, index) => {
           const href = "/" + segments.slice(0, index + 1).join("/");
           const isLast = index === segments.length - 1;
-          const label = LABELS[segment] ?? segment;
+          const label =
+            LABELS[segment] ??
+            resolvedNames[segment] ?? cachedNames[segment] ??
+            (UUID_RE.test(segment) ? "..." : segment);
 
           return (
             <span key={href} className="contents">

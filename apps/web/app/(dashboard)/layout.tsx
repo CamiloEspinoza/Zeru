@@ -15,6 +15,7 @@ import { PresenceSync } from "@/components/realtime/presence-sync";
 import { NotificationSync } from "@/components/realtime/notification-sync";
 import { ReconnectionBanner } from "@/components/realtime/reconnection-banner";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { ViewPresence } from "@/components/realtime/view-presence";
 
 export default function DashboardLayout({
   children,
@@ -41,6 +42,7 @@ export default function DashboardLayout({
                     />
                     <Breadcrumbs />
                     <div className="ml-auto flex items-center gap-2 pr-2">
+                      <ViewPresence />
                       <NotificationBell />
                     </div>
                   </div>

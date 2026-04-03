@@ -7,7 +7,8 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Inject, Logger, forwardRef } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -47,11 +48,8 @@ export class RealtimeGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => PresenceService))
     private readonly presenceService: PresenceService,
-    @Inject(forwardRef(() => TeamChatService))
     private readonly chatService: TeamChatService,
-    @Inject(forwardRef(() => LockService))
     private readonly lockService: LockService,
   ) {}
 
@@ -463,6 +461,41 @@ export class RealtimeGateway
     const { entityType, entityId, fieldName } = data;
 
     await this.lockService.heartbeat(entityType, entityId, fieldName, userId);
+  }
+
+  @OnEvent('lock.expired')
+  handleLockExpired(payload: {
+    tenantId: string;
+    entityType: string;
+    entityId: string;
+    fieldName: string;
+    userId: string;
+  }) {
+    this.emitToTenant(payload.tenantId, 'field:unlocked', {
+      entityType: payload.entityType,
+      entityId: payload.entityId,
+      fieldName: payload.fieldName,
+      userId: payload.userId,
+      reason: 'expired',
+    });
+  }
+
+  @OnEvent('presence.broadcast')
+  handlePresenceBroadcast(payload: {
+    tenantId: string;
+    event: string;
+    data: unknown;
+  }) {
+    this.emitToTenant(payload.tenantId, payload.event, payload.data);
+  }
+
+  @OnEvent('presence.broadcast-room')
+  handlePresenceBroadcastRoom(payload: {
+    room: string;
+    event: string;
+    data: unknown;
+  }) {
+    this.emitToRoom(payload.room, payload.event, payload.data);
   }
 
   emitToUser(userId: string, event: string, data: unknown) {
