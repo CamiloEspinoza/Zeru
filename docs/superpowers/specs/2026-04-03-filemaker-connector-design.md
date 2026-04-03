@@ -328,19 +328,24 @@ interface FmTransformer<TZeru, TFmCreate = Record<string, unknown>> {
 
 ### 6.1 Schema de PostgreSQL
 
-Las tablas del puente FM viven en un schema separado `citolab_fm` dentro de la misma base de datos de Zeru. Esto mantiene el proyecto limpio — los modelos core de Zeru (incluyendo laboratorio, cobranzas, clientes) van en `public` como siempre. Solo las tablas de sincronización específicas del puente Citolab-FM van en `citolab_fm`.
+Zeru usa **schemas de PostgreSQL** para aislar módulos verticales y extensiones específicas por cliente. Cada módulo vertical (laboratorio, ecommerce, etc.) tiene su propio schema. Los tenants activan/desactivan módulos, y los schemas permiten separación lógica sin sacrificar performance (joins nativos, transacciones cross-schema, mismos índices).
 
 ```
 zeru (database)
-├── public        ← Todo Zeru (core, lab, cobranzas, clientes, etc.)
-└── citolab_fm    ← Solo el puente FM (sync records, sync logs)
+├── public           ← Core Zeru (users, tenants, roles, clients, cobranzas, etc.)
+├── mod_lab          ← Módulo Laboratorio (service_requests, specimens, etc.)
+├── mod_ecommerce    ← Módulo Ecommerce (futuro)
+└── citolab_fm       ← Puente FM Citolab (sync records, sync logs — NO es módulo Zeru)
 ```
 
-Ventajas:
+El puente FM es una **extensión específica de Citolab**, no un módulo Zeru. Vive en `citolab_fm` separado de los módulos verticales. El día que Citolab se desacople de FM, se borra el schema sin afectar nada más.
+
+La arquitectura completa de módulos verticales con schemas (activación por tenant, migraciones por módulo, etc.) se diseñará en un spec separado. Este spec solo define el schema `citolab_fm`.
+
+Ventajas del patrón de schemas:
 - Joins nativos entre schemas con full performance.
 - Transacciones funcionan normalmente entre schemas.
 - Prisma soporta `@@schema("citolab_fm")` nativamente.
-- El día que Citolab se desacople de FM, se borra el schema y listo.
 
 Configuración Prisma:
 
