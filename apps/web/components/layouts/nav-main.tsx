@@ -326,7 +326,7 @@ function NavItemRenderer({ item, pathname }: { item: NavItem; pathname: string }
 export function NavMain() {
   const pathname = usePathname();
   const router = useRouter();
-  const { canAccess, loading: permissionsLoading } = usePermissions();
+  const { canAccess, loading: permissionsLoading, error: permissionsError } = usePermissions();
   const isSettings = pathname.startsWith("/settings");
 
   if (isSettings) {
@@ -355,7 +355,7 @@ export function NavMain() {
   return (
     <>
       {appNavSections.map((section, idx) => {
-        const visibleItems = permissionsLoading
+        const visibleItems = permissionsLoading || permissionsError
           ? section.items
           : section.items.filter((item) => !item.moduleKey || canAccess(item.moduleKey));
         if (visibleItems.length === 0) return null;

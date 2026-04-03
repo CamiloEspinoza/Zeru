@@ -26,6 +26,7 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
 import { AuditModule } from './modules/audit/audit.module';
 import { AuditContextMiddleware } from './modules/audit/audit.middleware';
 import { NotificationModule } from './modules/notification/notification.module';
+import { RolesModule } from './modules/roles/roles.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     RealtimeModule,
     AuditModule,
     NotificationModule,
+    RolesModule,
   ],
 })
 export class AppModule implements NestModule {
