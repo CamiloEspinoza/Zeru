@@ -49,6 +49,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { usePermissions } from "@/hooks/use-permissions";
 
 interface NavLeafItem {
   title: string;
@@ -60,6 +61,7 @@ interface NavSubItem {
   href: string;
   icon?: IconSvgElement;
   items?: NavLeafItem[];
+  moduleKey?: string;
 }
 
 interface NavItem {
@@ -67,6 +69,7 @@ interface NavItem {
   href: string;
   icon: IconSvgElement;
   items?: NavSubItem[];
+  moduleKey?: string;
 }
 
 interface NavSection {
@@ -77,20 +80,21 @@ interface NavSection {
 const appNavSections: NavSection[] = [
   {
     items: [
-      { title: "Inicio", href: "/dashboard", icon: DashboardSquare01Icon },
-      { title: "Asistente", href: "/assistant/new", icon: AiChat02Icon },
-      { title: "Calendario", href: "/calendar", icon: Calendar02Icon },
-      { title: "Documentos", href: "/documents", icon: File02Icon },
+      { title: "Inicio", href: "/dashboard", icon: DashboardSquare01Icon, moduleKey: "dashboard" },
+      { title: "Asistente", href: "/assistant/new", icon: AiChat02Icon, moduleKey: "assistant" },
+      { title: "Calendario", href: "/calendar", icon: Calendar02Icon, moduleKey: "calendar" },
+      { title: "Documentos", href: "/documents", icon: File02Icon, moduleKey: "documents" },
     ],
   },
   {
     label: "Negocio",
     items: [
-      { title: "Clientes", href: "/clients", icon: Building03Icon },
+      { title: "Clientes", href: "/clients", icon: Building03Icon, moduleKey: "clients" },
       {
         title: "Cobranzas",
         href: "/collections",
         icon: MoneyReceive01Icon,
+        moduleKey: "collections",
         items: [
           { title: "Liquidaciones", href: "/collections/liquidations" },
           { title: "Seguimiento", href: "/collections/tracking" },
@@ -100,6 +104,7 @@ const appNavSections: NavSection[] = [
         title: "Facturación",
         href: "/invoicing",
         icon: Invoice01Icon,
+        moduleKey: "invoicing",
         items: [
           { title: "DTEs", href: "/invoicing/dtes" },
           { title: "Libros", href: "/invoicing/books" },
@@ -109,6 +114,7 @@ const appNavSections: NavSection[] = [
         title: "Contabilidad",
         href: "/accounting",
         icon: BookOpen01Icon,
+        moduleKey: "accounting",
         items: [
           { title: "Plan de Cuentas", href: "/accounting/chart-of-accounts" },
           { title: "Asientos", href: "/accounting/journal" },
@@ -121,12 +127,13 @@ const appNavSections: NavSection[] = [
   {
     label: "Personas",
     items: [
-      { title: "Directorio", href: "/personas/directorio", icon: UserListIcon },
-      { title: "Organigrama", href: "/personas/organigrama", icon: HierarchySquare02Icon },
+      { title: "Directorio", href: "/personas/directorio", icon: UserListIcon, moduleKey: "directory" },
+      { title: "Organigrama", href: "/personas/organigrama", icon: HierarchySquare02Icon, moduleKey: "orgchart" },
       {
         title: "Inteligencia Org.",
         href: "/org-intelligence",
         icon: AnalysisTextLinkIcon,
+        moduleKey: "org-intelligence",
         items: [
           { title: "Proyectos", href: "/org-intelligence/projects" },
           { title: "Knowledge Base", href: "/org-intelligence/knowledge-base" },
@@ -137,10 +144,10 @@ const appNavSections: NavSection[] = [
   {
     label: "Laboratorio",
     items: [
-      { title: "Recepción", href: "/laboratory/reception", icon: InboxIcon },
-      { title: "Procesamiento", href: "/laboratory/processing", icon: MicroscopeIcon },
-      { title: "Informes", href: "/laboratory/reports", icon: MedicalFileIcon },
-      { title: "Codificación", href: "/laboratory/coding", icon: BarCode01Icon },
+      { title: "Recepción", href: "/laboratory/reception", icon: InboxIcon, moduleKey: "lab-reception" },
+      { title: "Procesamiento", href: "/laboratory/processing", icon: MicroscopeIcon, moduleKey: "lab-processing" },
+      { title: "Informes", href: "/laboratory/reports", icon: MedicalFileIcon, moduleKey: "lab-reports" },
+      { title: "Codificación", href: "/laboratory/coding", icon: BarCode01Icon, moduleKey: "lab-coding" },
     ],
   },
   {
@@ -150,6 +157,7 @@ const appNavSections: NavSection[] = [
         title: "LinkedIn",
         href: "/linkedin",
         icon: Linkedin01Icon,
+        moduleKey: "linkedin",
         items: [
           { title: "Posts", href: "/linkedin/posts" },
           { title: "Configuración", href: "/settings/linkedin" },
@@ -160,12 +168,13 @@ const appNavSections: NavSection[] = [
   {
     label: "Sistema",
     items: [
-      { title: "Integraciones", href: "/integrations", icon: Plug01Icon },
-      { title: "Reportes", href: "/reports", icon: ChartColumnIcon },
+      { title: "Integraciones", href: "/integrations", icon: Plug01Icon, moduleKey: "integrations" },
+      { title: "Reportes", href: "/reports", icon: ChartColumnIcon, moduleKey: "reports" },
       {
         title: "Administración",
         href: "/admin",
         icon: Dollar02Icon,
+        moduleKey: "admin",
         items: [
           { title: "Costos IA (Global)", href: "/admin/ai-costs" },
           { title: "Precios IA", href: "/admin/ai-pricing" },
@@ -180,6 +189,7 @@ const settingsNav: NavItem[] = [
   { title: "Apariencia", href: "/settings/appearance", icon: PaintBrush04Icon },
   { title: "Organización", href: "/settings/organization", icon: Building06Icon },
   { title: "Usuarios", href: "/settings/users", icon: UserMultipleIcon },
+  { title: "Roles", href: "/settings/roles", icon: Key01Icon },
   { title: "Asistente IA", href: "/settings/ai", icon: AiChat02Icon },
   { title: "Memoria", href: "/settings/ai/memory", icon: AiChat02Icon },
   { title: "Skills", href: "/settings/ai/skills", icon: AiChat02Icon },
@@ -316,6 +326,7 @@ function NavItemRenderer({ item, pathname }: { item: NavItem; pathname: string }
 export function NavMain() {
   const pathname = usePathname();
   const router = useRouter();
+  const { canAccess, loading: permissionsLoading } = usePermissions();
   const isSettings = pathname.startsWith("/settings");
 
   if (isSettings) {
@@ -343,16 +354,22 @@ export function NavMain() {
 
   return (
     <>
-      {appNavSections.map((section, idx) => (
-        <SidebarGroup key={section.label ?? `section-${idx}`}>
-          {section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
-          <SidebarMenu>
-            {section.items.map((item) => (
-              <NavItemRenderer key={item.title} item={item} pathname={pathname} />
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
-      ))}
+      {appNavSections.map((section, idx) => {
+        const visibleItems = permissionsLoading
+          ? section.items
+          : section.items.filter((item) => !item.moduleKey || canAccess(item.moduleKey));
+        if (visibleItems.length === 0) return null;
+        return (
+          <SidebarGroup key={section.label ?? `section-${idx}`}>
+            {section.label && <SidebarGroupLabel>{section.label}</SidebarGroupLabel>}
+            <SidebarMenu>
+              {visibleItems.map((item) => (
+                <NavItemRenderer key={item.title} item={item} pathname={pathname} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        );
+      })}
     </>
   );
 }
