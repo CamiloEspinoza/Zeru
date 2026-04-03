@@ -1,11 +1,15 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RolesService } from '../roles/roles.service';
 import type { CreateTenantSchema, UpdateTenantSchema } from '@zeru/shared';
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rolesService: RolesService,
+  ) {}
 
   /** Create a new organization and add the requesting user as OWNER */
   async create(userId: string, data: CreateTenantSchema) {
@@ -14,8 +18,8 @@ export class TenantsService {
       throw new ConflictException('Ya existe una organización con ese identificador (slug)');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
+    const tenant = await this.prisma.$transaction(async (tx) => {
+      const t = await tx.tenant.create({
         data: {
           name: data.name,
           slug: data.slug,
@@ -28,13 +32,29 @@ export class TenantsService {
       await tx.userTenant.create({
         data: {
           userId,
-          tenantId: tenant.id,
+          tenantId: t.id,
           role: UserRole.OWNER,
         },
       });
 
-      return tenant;
+      return t;
     });
+
+    // Seed default system roles for the new tenant
+    await this.rolesService.seedDefaultRoles(tenant.id);
+
+    // Assign the owner role to the creating user
+    const ownerRole = await this.prisma.role.findFirst({
+      where: { tenantId: tenant.id, slug: 'owner' },
+    });
+    if (ownerRole) {
+      await this.prisma.userTenant.updateMany({
+        where: { userId, tenantId: tenant.id },
+        data: { roleId: ownerRole.id },
+      });
+    }
+
+    return tenant;
   }
 
   async findById(id: string) {

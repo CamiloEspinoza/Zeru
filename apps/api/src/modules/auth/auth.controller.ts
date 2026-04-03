@@ -11,6 +11,9 @@ import {
 import { AuthService, type AuthUser } from './auth.service';
 import { LocalAuthGuard } from '../../common/guards/local-auth.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { registerSchema } from './dto/register.dto';
 import type { RegisterSchema, TenantSelectionRequired } from '@zeru/shared';
@@ -61,6 +64,15 @@ export class AuthController {
     @Body(new ZodValidationPipe(registerSchema)) body: RegisterSchema,
   ) {
     return this.authService.register(body);
+  }
+
+  @Get('my-permissions')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  async getMyPermissions(
+    @CurrentUser('userId') userId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.authService.getMyPermissions(userId, tenantId);
   }
 
   @Get('me')

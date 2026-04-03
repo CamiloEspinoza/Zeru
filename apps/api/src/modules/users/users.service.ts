@@ -19,9 +19,11 @@ const userSelect = {
 const _membershipSelect = {
   id: true,
   role: true,
+  roleId: true,
   isActive: true,
   createdAt: true,
   tenantId: true,
+  roleRef: { select: { id: true, name: true, slug: true } },
 } as const;
 
 @Injectable()
@@ -42,7 +44,10 @@ export class UsersService {
     const [memberships, total] = await Promise.all([
       this.prisma.userTenant.findMany({
         where: { tenantId },
-        include: { user: { select: userSelect } },
+        include: {
+          user: { select: userSelect },
+          roleRef: { select: { id: true, name: true, slug: true } },
+        },
         skip,
         take: perPage,
         orderBy: { createdAt: 'desc' },
@@ -54,6 +59,7 @@ export class UsersService {
       data: memberships.map((m) => ({
         ...m.user,
         role: m.role,
+        roleRef: m.roleRef ?? null,
         membershipId: m.id,
         membershipActive: m.isActive,
       })),
@@ -65,7 +71,10 @@ export class UsersService {
   async findById(userId: string, tenantId: string) {
     const membership = await this.prisma.userTenant.findUnique({
       where: { userId_tenantId: { userId, tenantId } },
-      include: { user: { select: userSelect } },
+      include: {
+        user: { select: userSelect },
+        roleRef: { select: { id: true, name: true, slug: true } },
+      },
     });
 
     if (!membership) {
@@ -75,6 +84,7 @@ export class UsersService {
     return {
       ...membership.user,
       role: membership.role,
+      roleRef: membership.roleRef ?? null,
       membershipId: membership.id,
       membershipActive: membership.isActive,
     };
@@ -89,6 +99,13 @@ export class UsersService {
     });
     const tenantName = tenant?.name ?? 'tu organización';
 
+    // Resolve roleId: match by slug (lowercase of enum), fallback to default role
+    const matchedRole = await this.prisma.role.findFirst({
+      where: { tenantId, slug: role.toLowerCase() },
+      select: { id: true },
+    });
+    const roleId = matchedRole?.id ?? undefined;
+
     // Si el usuario ya existe, solo crear membresía
     const user = await this.prisma.user.findUnique({ where: { email: data.email } });
 
@@ -102,8 +119,11 @@ export class UsersService {
       }
 
       const membership = await this.prisma.userTenant.create({
-        data: { userId: user.id, tenantId, role },
-        include: { user: { select: userSelect } },
+        data: { userId: user.id, tenantId, role, roleId },
+        include: {
+          user: { select: userSelect },
+          roleRef: { select: { id: true, name: true, slug: true } },
+        },
       });
 
       void this.sendWelcomeEmail(data.email, user.firstName, tenantName);
@@ -111,6 +131,7 @@ export class UsersService {
       return {
         ...membership.user,
         role: membership.role,
+        roleRef: membership.roleRef ?? null,
         membershipId: membership.id,
         membershipActive: membership.isActive,
       };
@@ -126,11 +147,12 @@ export class UsersService {
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        memberships: { create: { tenantId, role } },
+        memberships: { create: { tenantId, role, roleId } },
       },
       include: {
         memberships: {
           where: { tenantId },
+          include: { roleRef: { select: { id: true, name: true, slug: true } } },
         },
       },
     });
@@ -143,6 +165,7 @@ export class UsersService {
     return {
       ...userFields,
       role: membership.role,
+      roleRef: membership.roleRef ?? null,
       membershipId: membership.id,
       membershipActive: membership.isActive,
     };
@@ -194,15 +217,25 @@ export class UsersService {
       throw new NotFoundException(`Membresía no encontrada`);
     }
 
+    // Resolve roleId from slug
+    const matchedRole = await this.prisma.role.findFirst({
+      where: { tenantId, slug: role.toLowerCase() },
+      select: { id: true },
+    });
+
     const updated = await this.prisma.userTenant.update({
       where: { id: membership.id },
-      data: { role },
-      include: { user: { select: userSelect } },
+      data: { role, roleId: matchedRole?.id ?? undefined },
+      include: {
+        user: { select: userSelect },
+        roleRef: { select: { id: true, name: true, slug: true } },
+      },
     });
 
     return {
       ...updated.user,
       role: updated.role,
+      roleRef: updated.roleRef ?? null,
       membershipId: updated.id,
       membershipActive: updated.isActive,
     };

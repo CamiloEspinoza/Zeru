@@ -46,6 +46,7 @@ model Tenant {
   orgSuggestions       OrgSuggestion[]
   channels             Channel[]
   notifications        Notification[]
+  roles                Role[]
 
   @@map("tenants")
 }
@@ -106,6 +107,9 @@ model UserTenant {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  roleId   String?
+  roleRef  Role?  @relation(fields: [roleId], references: [id])
+
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
@@ -118,6 +122,60 @@ enum UserRole {
   ADMIN
   ACCOUNTANT
   VIEWER
+}
+
+// ─── RBAC ────────────────────────────────────────────────
+
+enum AccessLevel {
+  NONE
+  VIEW
+  EDIT
+  MANAGE
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  isSystem    Boolean   @default(false)
+  isDefault   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  moduleAccess  RoleModuleAccess[]
+  overrides     RolePermissionOverride[]
+  members       UserTenant[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("roles")
+}
+
+model RoleModuleAccess {
+  id          String      @id @default(uuid())
+  roleId      String
+  role        Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  moduleKey   String
+  accessLevel AccessLevel @default(NONE)
+
+  @@unique([roleId, moduleKey])
+  @@index([roleId])
+  @@map("role_module_access")
+}
+
+model RolePermissionOverride {
+  id         String  @id @default(uuid())
+  roleId     String
+  role       Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission String
+  granted    Boolean
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+  @@map("role_permission_overrides")
 }
 
 // ─── AI ──────────────────────────────────────────────────

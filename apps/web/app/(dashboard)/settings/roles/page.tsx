@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import {
   MODULE_DEFINITIONS,
@@ -503,9 +503,9 @@ export default function RolesSettingsPage() {
                 </TableHeader>
                 <TableBody>
                   {MODULE_SECTIONS.map(({ section, modules }) => (
-                    <>
+                    <Fragment key={section}>
                       {/* Section header */}
-                      <TableRow key={`section-${section}`}>
+                      <TableRow>
                         <TableCell
                           colSpan={ACCESS_LEVELS.length + 2}
                           className="bg-muted/50 font-semibold text-xs uppercase tracking-wide"
@@ -616,7 +616,7 @@ export default function RolesSettingsPage() {
                           </Collapsible>
                         );
                       })}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>

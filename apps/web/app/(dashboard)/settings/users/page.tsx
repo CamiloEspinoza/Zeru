@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
-import type { UserInTenant } from "@zeru/shared";
+import type { UserInTenant, RoleInfo } from "@zeru/shared";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -21,6 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function UsersSettingsPage() {
   const [users, setUsers] = useState<UserInTenant[]>([]);
+  const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchUsers = useCallback(() => {
@@ -34,14 +35,19 @@ export default function UsersSettingsPage() {
 
   useEffect(() => {
     Promise.resolve().then(fetchUsers);
+    api
+      .get<RoleInfo[]>("/roles")
+      .then((res) => setRoles(Array.isArray(res) ? res : []))
+      .catch(() => setRoles([]));
   }, [fetchUsers]);
 
   const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case "OWNER":
-      case "ADMIN":
+    switch (role.toLowerCase()) {
+      case "owner":
+      case "admin":
         return "default";
-      case "ACCOUNTANT":
+      case "accountant":
+      case "finance-manager":
         return "secondary";
       default:
         return "outline";
@@ -55,7 +61,7 @@ export default function UsersSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Usuarios</h1>
-        <CreateUserDialog onCreated={fetchUsers} />
+        <CreateUserDialog onCreated={fetchUsers} roles={roles} />
       </div>
 
       <Card>
@@ -94,8 +100,8 @@ export default function UsersSettingsPage() {
                         </td>
                         <td className="py-3 px-4">{user.email}</td>
                         <td className="py-3 px-4">
-                          <Badge variant={getRoleBadgeVariant(user.role)}>
-                            {ROLE_LABELS[user.role] ?? user.role}
+                          <Badge variant={getRoleBadgeVariant(user.roleRef?.slug ?? user.role)}>
+                            {user.roleRef?.name ?? ROLE_LABELS[user.role] ?? user.role}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
