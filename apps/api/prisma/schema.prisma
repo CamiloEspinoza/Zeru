@@ -8,6 +8,54 @@ datasource db {
   schemas  = ["public", "citolab_fm"]
 }
 
+enum PaymentTerms {
+  IMMEDIATE
+  NET_15
+  NET_30
+  NET_45
+  NET_60
+  NET_90
+  CUSTOM
+
+  @@schema("public")
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  VISTA
+  OTHER
+
+  @@schema("public")
+}
+
+enum LabOriginCategory {
+  CONSULTA
+  CENTRO_MEDICO
+  CLINICA_HOSPITAL
+  LABORATORIO
+  OTRO
+
+  @@schema("public")
+}
+
+enum SampleReceptionMode {
+  PRESENCIAL
+  COURIER
+  AMBAS
+
+  @@schema("public")
+}
+
+enum ReportDeliveryMethod {
+  WEB
+  IMPRESO
+  FTP
+  EMAIL
+
+  @@schema("public")
+}
+
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
@@ -49,6 +97,8 @@ model Tenant {
   notifications        Notification[]
   roles                Role[]
   fmSyncRecords        FmSyncRecord[]
+  legalEntities        LegalEntity[]
+  labOrigins           LabOrigin[]
 
   @@schema("public")
   @@map("tenants")
@@ -1769,6 +1819,182 @@ model ResourceLock {
   @@map("resource_locks")
 }
 
+// ─── Legal Entity & Lab Origin ───────────────────────────
+
+model LegalEntity {
+  id                String       @id @default(uuid())
+
+  rut               String
+  legalName         String
+  tradeName         String?
+  businessActivity  String?
+
+  isClient          Boolean      @default(false)
+  isSupplier        Boolean      @default(false)
+
+  street            String?
+  streetNumber      String?
+  unit              String?
+  commune           String?
+  city              String?
+
+  email             String?
+  phone             String?
+  website           String?
+
+  paymentTerms      PaymentTerms @default(NET_30)
+  customPaymentDays Int?
+  billingDayOfMonth Int?
+
+  isActive          Boolean      @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenantId          String
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contacts          LegalEntityContact[]
+  bankAccounts      LegalEntityBankAccount[]
+  labOrigins        LabOrigin[]
+
+  @@unique([tenantId, rut])
+  @@index([tenantId])
+  @@index([tenantId, isClient])
+  @@index([tenantId, isSupplier])
+  @@schema("public")
+  @@map("legal_entities")
+}
+
+model LegalEntityContact {
+  id              String   @id @default(uuid())
+  name            String
+  role            String?
+  email           String?
+  phone           String?
+  mobile          String?
+  isPrimary       Boolean  @default(false)
+  notes           String?
+  isActive        Boolean  @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  legalEntityId   String
+  legalEntity     LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId        String
+
+  @@index([legalEntityId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("legal_entity_contacts")
+}
+
+model LegalEntityBankAccount {
+  id              String          @id @default(uuid())
+  bankName        String
+  accountType     BankAccountType
+  accountNumber   String
+  holderName      String
+  holderRut       String?
+  isPrimary       Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  legalEntityId   String
+  legalEntity     LegalEntity     @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId        String
+
+  @@index([legalEntityId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("legal_entity_bank_accounts")
+}
+
+model LabOrigin {
+  id                         String              @id @default(uuid())
+  code                       String
+  name                       String
+  category                   LabOriginCategory   @default(OTRO)
+
+  legalEntityId              String?
+  legalEntity                LegalEntity?        @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+
+  parentId                   String?
+  parent                     LabOrigin?          @relation("LabOriginHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children                   LabOrigin[]         @relation("LabOriginHierarchy")
+
+  street                     String?
+  streetNumber               String?
+  unit                       String?
+  commune                    String?
+  city                       String?
+  phone                      String?
+  email                      String?
+
+  sampleReceptionMode        SampleReceptionMode @default(PRESENCIAL)
+  reportDeliveryMethods      ReportDeliveryMethod[]
+
+  deliveryDaysBiopsy         Int?
+  deliveryDaysPap            Int?
+  deliveryDaysCytology       Int?
+  deliveryDaysIhc            Int?
+  deliveryDaysDefault        Int?
+
+  encryptedFtpHost           String?
+  encryptedFtpUser           String?
+  encryptedFtpPassword       String?
+  ftpPath                    String?
+
+  criticalNotificationEmails String[]
+  sendsQualityReports        Boolean             @default(false)
+
+  contractDate               DateTime?
+  notes                      String?
+  isActive                   Boolean             @default(true)
+  deletedAt                  DateTime?
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+
+  tenantId                   String
+  tenant                     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  pricing                    LabOriginPricing[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+  @@index([legalEntityId])
+  @@schema("public")
+  @@map("lab_origins")
+}
+
+model LabOriginPricing {
+  id              String   @id @default(uuid())
+  billingConcept  String
+  description     String?
+  basePrice       Decimal  @db.Decimal(18, 2)
+  referencePrice  Decimal? @db.Decimal(18, 2)
+  multiplier      Decimal  @default(1) @db.Decimal(8, 4)
+  isActive        Boolean  @default(true)
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  labOriginId     String
+  labOrigin       LabOrigin @relation(fields: [labOriginId], references: [id], onDelete: Cascade)
+  tenantId        String
+
+  @@unique([labOriginId, billingConcept])
+  @@index([labOriginId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("lab_origin_pricing")
+}
+
 // ─── FileMaker Connector ─────────────────────────────────
 
 enum FmSyncStatus {
@@ -1802,7 +2028,7 @@ model FmSyncRecord {
   updatedAt   DateTime     @updatedAt
 
   @@unique([tenantId, entityType, entityId])
-  @@unique([tenantId, fmDatabase, fmLayout, fmRecordId])
+  @@unique([tenantId, fmDatabase, fmLayout, fmRecordId, entityType])
   @@index([syncStatus])
   @@schema("citolab_fm")
   @@map("fm_sync_records")
