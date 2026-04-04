@@ -52,6 +52,81 @@ interface FmSyncLog {
   createdAt: string;
 }
 
+// ── Search Fields Panel ──
+
+function SearchFieldsPanel({
+  fields,
+  searchFields,
+  onFieldChange,
+}: {
+  fields: { name: string; type: string; result: string }[];
+  searchFields: Record<string, string>;
+  onFieldChange: (name: string, value: string) => void;
+}) {
+  const [fieldFilter, setFieldFilter] = useState("");
+
+  const filteredFields = useMemo(() => {
+    if (!fieldFilter.trim()) return fields;
+    const q = fieldFilter.toLowerCase();
+    return fields.filter((f) => f.name.toLowerCase().includes(q));
+  }, [fields, fieldFilter]);
+
+  // Deduplicate fields by name (FM can have duplicates)
+  const uniqueFields = useMemo(() => {
+    const seen = new Set<string>();
+    return filteredFields.filter((f) => {
+      if (seen.has(f.name)) return false;
+      seen.add(f.name);
+      return true;
+    });
+  }, [filteredFields]);
+
+  const activeCount = Object.values(searchFields).filter(Boolean).length;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Filtrar campos..."
+          value={fieldFilter}
+          onChange={(e) => setFieldFilter(e.target.value)}
+          className="h-8 text-sm"
+        />
+        {activeCount > 0 && (
+          <Badge variant="secondary" className="shrink-0">
+            {activeCount} filtro{activeCount !== 1 ? "s" : ""}
+          </Badge>
+        )}
+      </div>
+      <div className="max-h-[40vh] overflow-y-auto rounded-md border p-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {uniqueFields.map((field, idx) => (
+            <div key={`search-${field.name}-${idx}`} className="space-y-1">
+              <label className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
+                <span className="truncate">{field.name}</span>
+                <span className="shrink-0 text-[10px] opacity-50">
+                  {field.result}
+                </span>
+              </label>
+              <Input
+                placeholder={`Buscar en ${field.name}`}
+                value={searchFields[field.name] ?? ""}
+                onChange={(e) => onFieldChange(field.name, e.target.value)}
+                className="h-7 text-xs"
+              />
+            </div>
+          ))}
+        </div>
+        {uniqueFields.length === 0 && (
+          <p className="text-muted-foreground py-4 text-center text-sm">
+            Sin campos que coincidan con &quot;{fieldFilter}&quot;
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Layout List with search + animated chevrons ──
 
 function LayoutList({
@@ -489,25 +564,13 @@ function ExplorerTab() {
             </CardHeader>
             <CardContent className="space-y-3">
               {metadata && (
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {metadata.fields.slice(0, 12).map((field, sfIdx) => (
-                    <div key={`${field.name}-${sfIdx}`} className="space-y-1">
-                      <label className="text-xs text-muted-foreground">
-                        {field.name}
-                      </label>
-                      <Input
-                        placeholder={field.name}
-                        value={searchFields[field.name] ?? ""}
-                        onChange={(e) =>
-                          setSearchFields((prev) => ({
-                            ...prev,
-                            [field.name]: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
+                <SearchFieldsPanel
+                  fields={metadata.fields}
+                  searchFields={searchFields}
+                  onFieldChange={(name, value) =>
+                    setSearchFields((prev) => ({ ...prev, [name]: value }))
+                  }
+                />
               )}
               <div className="flex items-center gap-2">
                 <Button
