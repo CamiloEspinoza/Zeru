@@ -340,28 +340,45 @@ function ExplorerTab() {
 
       {/* Layouts */}
       {selectedDb && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Layouts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingLayouts ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Spinner size="sm" /> Cargando layouts...
-              </div>
-            ) : layouts.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                No se encontraron layouts
-              </p>
-            ) : (
-              <LayoutList
-                layouts={layouts}
-                selectedLayout={selectedLayout}
-                onSelect={selectLayout}
-              />
-            )}
-          </CardContent>
-        </Card>
+        <Collapsible defaultOpen open={!selectedLayout || undefined} className="group/layouts">
+          <Card>
+            <CardHeader className="cursor-pointer" asChild>
+              <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-4">
+                <CardTitle className="text-sm">
+                  Layouts
+                  {selectedLayout && (
+                    <span className="ml-2 font-normal text-muted-foreground">
+                      — {selectedLayout}
+                    </span>
+                  )}
+                </CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/layouts:rotate-90"
+                />
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent>
+                {loadingLayouts ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Spinner size="sm" /> Cargando layouts...
+                  </div>
+                ) : layouts.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No se encontraron layouts
+                  </p>
+                ) : (
+                  <LayoutList
+                    layouts={layouts}
+                    selectedLayout={selectedLayout}
+                    onSelect={selectLayout}
+                  />
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
       {/* Layout Detail */}
@@ -389,8 +406,8 @@ function ExplorerTab() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {metadata.fields.map((field) => (
-                      <TableRow key={field.name}>
+                    {metadata.fields.map((field, fIdx) => (
+                      <TableRow key={`${field.name}-${fIdx}`}>
                         <TableCell className="font-mono text-xs">
                           {field.name}
                         </TableCell>
@@ -411,10 +428,13 @@ function ExplorerTab() {
                 <CardTitle className="text-sm">Portales</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {metadata.portals.map((portal) => (
-                  <Collapsible key={portal.name}>
-                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
-                      <span className="text-muted-foreground">&#9660;</span>
+                {metadata.portals.map((portal, pIdx) => (
+                  <Collapsible key={`${portal.name}-${pIdx}`} className="group/portal">
+                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
+                      <HugeiconsIcon
+                        icon={ArrowRight01Icon}
+                        className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/portal:rotate-90"
+                      />
                       {portal.name}{" "}
                       <Badge variant="outline">{portal.fields.length}</Badge>
                     </CollapsibleTrigger>
@@ -428,8 +448,8 @@ function ExplorerTab() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {portal.fields.map((field) => (
-                            <TableRow key={field.name}>
+                          {portal.fields.map((field, pfIdx) => (
+                            <TableRow key={`${field.name}-${pfIdx}`}>
                               <TableCell className="font-mono text-xs">
                                 {field.name}
                               </TableCell>
@@ -470,8 +490,8 @@ function ExplorerTab() {
             <CardContent className="space-y-3">
               {metadata && (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {metadata.fields.slice(0, 12).map((field) => (
-                    <div key={field.name} className="space-y-1">
+                  {metadata.fields.slice(0, 12).map((field, sfIdx) => (
+                    <div key={`${field.name}-${sfIdx}`} className="space-y-1">
                       <label className="text-xs text-muted-foreground">
                         {field.name}
                       </label>
@@ -784,11 +804,7 @@ export default function FileMakerDiscoveryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">FileMaker Discovery</h1>
-        <a
-          href="https://github.com/CamiloEspinoza/Zeru/blob/main/docs/guides/filemaker-webhook-setup.md"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="/docs/filemaker-webhooks" target="_blank" rel="noopener noreferrer">
           <Button variant="outline" size="sm">
             Guía: Configurar webhooks en FM
           </Button>

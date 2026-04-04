@@ -27,6 +27,7 @@ const nav = [
     group: "Guías",
     items: [
       { label: "Obtener credenciales", href: "/docs/setup-credentials" },
+      { label: "Webhooks FileMaker", href: "/docs/filemaker-webhooks" },
     ],
   },
 ];
