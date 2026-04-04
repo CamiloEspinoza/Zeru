@@ -123,32 +123,31 @@ export class FmSyncService {
   }) {
     this.logger.log(`FM webhook: ${data.action} ${data.database}/${data.layout}/${data.recordId}`);
 
-    // Find existing sync record for this FM record
-    const existing = await this.prisma.fmSyncRecord.findUnique({
+    // Find all sync records for this FM record (may be multiple for composite transformers)
+    const existing = await this.prisma.fmSyncRecord.findMany({
       where: {
-        tenantId_fmDatabase_fmLayout_fmRecordId: {
-          tenantId,
-          fmDatabase: data.database,
-          fmLayout: data.layout,
-          fmRecordId: data.recordId,
-        },
+        tenantId,
+        fmDatabase: data.database,
+        fmLayout: data.layout,
+        fmRecordId: data.recordId,
       },
     });
 
-    if (existing) {
-      // Mark as pending to sync from FM to Zeru
-      await this.prisma.fmSyncRecord.update({
-        where: { id: existing.id },
-        data: { syncStatus: 'PENDING_TO_ZERU' },
-      });
+    if (existing.length > 0) {
+      // Mark all as pending to sync from FM to Zeru
+      for (const record of existing) {
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: { syncStatus: 'PENDING_TO_ZERU' },
+        });
+      }
     } else {
       // New record in FM — create a sync record for future processing
-      // The actual entity creation in Zeru happens when a transformer is registered for this layout
       await this.prisma.fmSyncRecord.create({
         data: {
           tenantId,
-          entityType: 'unknown', // Will be resolved by transformer when processing
-          entityId: '',          // Will be filled when Zeru entity is created
+          entityType: 'unknown',
+          entityId: '',
           fmDatabase: data.database,
           fmLayout: data.layout,
           fmRecordId: data.recordId,
@@ -160,11 +159,11 @@ export class FmSyncService {
 
     await this.logSync({
       tenantId,
-      entityType: existing?.entityType ?? 'unknown',
+      entityType: existing[0]?.entityType ?? 'unknown',
       fmRecordId: data.recordId,
       action: `webhook:${data.action}`,
       direction: 'fm_to_zeru',
-      details: data,
+      details: { ...data, syncRecordCount: existing.length },
     });
   }
 
