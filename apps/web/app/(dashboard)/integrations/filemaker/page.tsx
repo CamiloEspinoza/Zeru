@@ -458,110 +458,155 @@ function ExplorerTab() {
 
       {/* Layout Detail */}
       {selectedLayout && (
-        <div className="space-y-4">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            {selectedLayout}
+          </h3>
+
           {/* Fields */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                Campos — {selectedLayout}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingMetadata ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Spinner size="sm" /> Cargando metadata...
-                </div>
-              ) : metadata ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Resultado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {metadata.fields.map((field, fIdx) => (
-                      <TableRow key={`${field.name}-${fIdx}`}>
-                        <TableCell className="font-mono text-xs">
-                          {field.name}
-                        </TableCell>
-                        <TableCell>{field.type}</TableCell>
-                        <TableCell>{field.result}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : null}
-            </CardContent>
-          </Card>
+          <Collapsible className="group/fields">
+            <Card>
+              <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-3 cursor-pointer">
+                <CardTitle className="text-sm">
+                  Campos
+                  {metadata && (
+                    <Badge variant="outline" className="ml-2">{metadata.fields.length}</Badge>
+                  )}
+                </CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/fields:rotate-90"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
+                  {loadingMetadata ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Spinner size="sm" /> Cargando metadata...
+                    </div>
+                  ) : metadata ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nombre</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Resultado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {metadata.fields.map((field, fIdx) => (
+                          <TableRow key={`${field.name}-${fIdx}`}>
+                            <TableCell className="font-mono text-xs">
+                              {field.name}
+                            </TableCell>
+                            <TableCell>{field.type}</TableCell>
+                            <TableCell>{field.result}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : null}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Portals */}
           {metadata && metadata.portals.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Portales</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {metadata.portals.map((portal, pIdx) => (
-                  <Collapsible key={`${portal.name}-${pIdx}`} className="group/portal">
-                    <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
-                      <HugeiconsIcon
-                        icon={ArrowRight01Icon}
-                        className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/portal:rotate-90"
-                      />
-                      {portal.name}{" "}
-                      <Badge variant="outline">{portal.fields.length}</Badge>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-1">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Nombre</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Resultado</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {portal.fields.map((field, pfIdx) => (
-                            <TableRow key={`${field.name}-${pfIdx}`}>
-                              <TableCell className="font-mono text-xs">
-                                {field.name}
-                              </TableCell>
-                              <TableCell>{field.type}</TableCell>
-                              <TableCell>{field.result}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
-              </CardContent>
-            </Card>
+            <Collapsible className="group/portals-section">
+              <Card>
+                <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-3 cursor-pointer">
+                  <CardTitle className="text-sm">
+                    Portales
+                    <Badge variant="outline" className="ml-2">{metadata.portals.length}</Badge>
+                  </CardTitle>
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/portals-section:rotate-90"
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-2">
+                    {metadata.portals.map((portal, pIdx) => (
+                      <Collapsible key={`${portal.name}-${pIdx}`} className="group/portal">
+                        <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
+                          <HugeiconsIcon
+                            icon={ArrowRight01Icon}
+                            className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/portal:rotate-90"
+                          />
+                          {portal.name}{" "}
+                          <Badge variant="outline">{portal.fields.length}</Badge>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="mt-1">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Nombre</TableHead>
+                                <TableHead>Tipo</TableHead>
+                                <TableHead>Resultado</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {portal.fields.map((field, pfIdx) => (
+                                <TableRow key={`${field.name}-${pfIdx}`}>
+                                  <TableCell className="font-mono text-xs">
+                                    {field.name}
+                                  </TableCell>
+                                  <TableCell>{field.type}</TableCell>
+                                  <TableCell>{field.result}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           )}
 
           {/* Sample Records */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Registros de ejemplo</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingSample ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Spinner size="sm" /> Cargando registros...
-                </div>
-              ) : (
-                <RecordTable records={sampleRecords} />
-              )}
-            </CardContent>
-          </Card>
+          <Collapsible className="group/sample">
+            <Card>
+              <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-3 cursor-pointer">
+                <CardTitle className="text-sm">
+                  Registros de ejemplo
+                  {sampleRecords.length > 0 && (
+                    <Badge variant="outline" className="ml-2">{sampleRecords.length}</Badge>
+                  )}
+                </CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/sample:rotate-90"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
+                  {loadingSample ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Spinner size="sm" /> Cargando registros...
+                    </div>
+                  ) : (
+                    <RecordTable records={sampleRecords} />
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           {/* Search */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Buscar registros</CardTitle>
-            </CardHeader>
+          <Collapsible className="group/search">
+            <Card>
+              <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-3 cursor-pointer">
+                <CardTitle className="text-sm">Buscar registros</CardTitle>
+                <HugeiconsIcon
+                  icon={ArrowRight01Icon}
+                  className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/search:rotate-90"
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
             <CardContent className="space-y-3">
               {metadata && (
                 <SearchFieldsPanel
@@ -614,7 +659,9 @@ function ExplorerTab() {
                 </>
               )}
             </CardContent>
-          </Card>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
       )}
     </div>
