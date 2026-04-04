@@ -445,9 +445,53 @@ Cuando un módulo Zeru crea/actualiza/elimina un registro sincronizado:
 3. En background: lee el registro Zeru, lo pasa por el transformer, escribe a FM.
 4. Si éxito: marca `SYNCED`. Si falla: marca `ERROR` con mensaje.
 
-#### Reconciliación periódica (FM → Zeru)
+#### Webhook (FM → Zeru, push en tiempo real)
 
-Cron opcional (cada 30 min) para capturar cambios hechos directamente en FM:
+FileMaker soporta `Insert from URL` (desde FM 19) que permite hacer HTTP requests desde scripts. Se configura un script trigger `OnRecordCommit` en las tablas relevantes de FM que hace POST al webhook de Zeru.
+
+**Endpoint:** `POST /filemaker/webhook`
+
+**Auth:** API key en header `X-FM-Webhook-Key` (no JWT — es server-to-server). La key se configura como env var `FM_WEBHOOK_KEY`.
+
+**Payload que envía FM:**
+
+```json
+{
+  "database": "BIOPSIAS",
+  "layout": "Liquidaciones",
+  "recordId": "12176",
+  "action": "update"
+}
+```
+
+**Procesamiento:**
+1. Valida API key.
+2. Busca o crea un `FmSyncRecord` para el registro.
+3. Lo marca como `PENDING_TO_ZERU`.
+4. Retorna 200 inmediatamente (no procesa sincrónicamente).
+5. El procesamiento real (leer FM, transformar, escribir Zeru) lo hace el `FmSyncService` cuando existan los transformers del módulo correspondiente.
+
+**Script FM de ejemplo (para configurar manualmente en FM):**
+
+```
+# OnRecordCommit trigger en tabla Liquidaciones
+Set Variable [$payload; Value: JSONSetElement ( "{}" ;
+  ["database"; "BIOPSIAS"; JSONString];
+  ["layout"; "Liquidaciones"; JSONString];
+  ["recordId"; Get(RecordID); JSONString];
+  ["action"; "update"; JSONString]
+)]
+Insert from URL [
+  URL: "https://api.zeru.cl/filemaker/webhook";
+  cURL options: "-X POST -H \"Content-Type: application/json\" -H \"X-FM-Webhook-Key: {key}\" -d " & $payload
+]
+```
+
+La configuración de triggers en FM es manual (no automatizable via Data API). Se documenta como guía para el equipo de Citolab.
+
+#### Reconciliación periódica (FM → Zeru, fallback)
+
+Cron opcional (cada 30 min) como safety net para cambios que el webhook no capture (imports masivos, scripts batch, triggers no configurados):
 
 1. Busca registros FM modificados desde el último sync (por campo timestamp si existe).
 2. Compara con datos en Zeru via `FmSyncRecord`.
@@ -514,12 +558,12 @@ El módulo de cobranzas ya existe parcialmente en Zeru. El conector FM se integr
 - Credenciales FM almacenadas en env vars (no en DB — single tenant).
 - Session tokens FM en memoria, nunca persistidos.
 - El módulo FileMaker requiere autenticación JWT + TenantGuard (como todos los módulos).
+- El endpoint webhook usa API key (`FM_WEBHOOK_KEY` en env var) en vez de JWT (server-to-server desde FM).
 - La UI de discovery solo es accesible para roles con permiso `settings:manage-org` (via RBAC existente).
 - Los datos de FM con credenciales FTP se encriptan al importar a Zeru (via `EncryptionService`).
 
 ## 10. Fuera de alcance (futuro)
 
-- Sync en tiempo real (webhooks FM → Zeru). FM no tiene webhooks nativos.
 - Multi-tenant (otros clientes conectando sus propios FM). Solo Citolab.
 - Módulos más allá de cobranzas. Se migran incrementalmente, cada uno con su transformer.
 - Reimplementación completa de scripts FM. Se hace gradualmente.

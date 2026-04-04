@@ -26,6 +26,7 @@
 | `apps/api/src/modules/filemaker/services/fm-sync.service.ts` | Create | Sync orchestration (import, export, retry, events) |
 | `apps/api/src/modules/filemaker/controllers/fm-discovery.controller.ts` | Create | REST API for discovery UI |
 | `apps/api/src/modules/filemaker/controllers/fm-sync.controller.ts` | Create | REST API for sync status and manual operations |
+| `apps/api/src/modules/filemaker/controllers/fm-webhook.controller.ts` | Create | Webhook endpoint for FM push notifications (API key auth) |
 | `apps/api/src/modules/filemaker/transformers/transformer.interface.ts` | Create | Base transformer interface |
 | `apps/api/src/modules/filemaker/dto/index.ts` | Create | Zod schemas for controller validation |
 | `apps/api/src/app.module.ts` | Modify | Import FileMakerModule |
@@ -886,11 +887,12 @@ git add apps/api/src/modules/filemaker/ && git commit -m "feat: add FmDiscoveryS
 
 ---
 
-### Task 6: FmSyncService + Controller
+### Task 6: FmSyncService + Controller + Webhook
 
 **Files:**
 - Create: `apps/api/src/modules/filemaker/services/fm-sync.service.ts`
 - Create: `apps/api/src/modules/filemaker/controllers/fm-sync.controller.ts`
+- Create: `apps/api/src/modules/filemaker/controllers/fm-webhook.controller.ts`
 - Create: `apps/api/src/modules/filemaker/transformers/transformer.interface.ts`
 
 - [ ] **Step 1: Create transformer interface**
@@ -1105,10 +1107,141 @@ export class FmSyncController {
 
 Note: Verify import paths for `JwtAuthGuard`, `TenantGuard`, and `CurrentTenant` by reading an existing controller in the project.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Add webhook DTO**
+
+In `apps/api/src/modules/filemaker/dto/index.ts`, add:
+
+```typescript
+export const fmWebhookSchema = z.object({
+  database: z.string().min(1),
+  layout: z.string().min(1),
+  recordId: z.string().min(1),
+  action: z.enum(['create', 'update', 'delete']),
+});
+
+export type FmWebhookDto = z.infer<typeof fmWebhookSchema>;
+```
+
+- [ ] **Step 5: Add handleWebhook to FmSyncService**
+
+Add this method to `FmSyncService`:
+
+```typescript
+  async handleWebhook(tenantId: string, data: {
+    database: string;
+    layout: string;
+    recordId: string;
+    action: 'create' | 'update' | 'delete';
+  }) {
+    this.logger.log(`FM webhook: ${data.action} ${data.database}/${data.layout}/${data.recordId}`);
+
+    // Find existing sync record for this FM record
+    const existing = await this.prisma.fmSyncRecord.findUnique({
+      where: {
+        tenantId_fmDatabase_fmLayout_fmRecordId: {
+          tenantId,
+          fmDatabase: data.database,
+          fmLayout: data.layout,
+          fmRecordId: data.recordId,
+        },
+      },
+    });
+
+    if (existing) {
+      // Mark as pending to sync from FM to Zeru
+      await this.prisma.fmSyncRecord.update({
+        where: { id: existing.id },
+        data: { syncStatus: 'PENDING_TO_ZERU' },
+      });
+    } else {
+      // New record in FM — create a sync record for future processing
+      // The actual entity creation in Zeru happens when a transformer is registered for this layout
+      await this.prisma.fmSyncRecord.create({
+        data: {
+          tenantId,
+          entityType: 'unknown', // Will be resolved by transformer when processing
+          entityId: '',          // Will be filled when Zeru entity is created
+          fmDatabase: data.database,
+          fmLayout: data.layout,
+          fmRecordId: data.recordId,
+          syncStatus: 'PENDING_TO_ZERU',
+          lastSyncAt: new Date(),
+        },
+      });
+    }
+
+    await this.logSync({
+      tenantId,
+      entityType: existing?.entityType ?? 'unknown',
+      fmRecordId: data.recordId,
+      action: `webhook:${data.action}`,
+      direction: 'fm_to_zeru',
+      details: data,
+    });
+  }
+```
+
+- [ ] **Step 6: Create webhook controller**
+
+Create `apps/api/src/modules/filemaker/controllers/fm-webhook.controller.ts`:
+
+```typescript
+import {
+  Controller,
+  Post,
+  Body,
+  Headers,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { FmSyncService } from '../services/fm-sync.service';
+import { ZodPipe } from '../../../common/pipes/zod.pipe';
+import { fmWebhookSchema, type FmWebhookDto } from '../dto';
+
+@Controller('filemaker/webhook')
+export class FmWebhookController {
+  private readonly logger = new Logger(FmWebhookController.name);
+  private readonly webhookKey: string;
+  private readonly tenantId: string;
+
+  constructor(
+    private readonly sync: FmSyncService,
+    config: ConfigService,
+  ) {
+    this.webhookKey = config.getOrThrow<string>('FM_WEBHOOK_KEY');
+    // Single-tenant: Citolab's tenant ID is configured via env
+    this.tenantId = config.getOrThrow<string>('FM_TENANT_ID');
+  }
+
+  @Post()
+  async handleWebhook(
+    @Headers('x-fm-webhook-key') apiKey: string,
+    @Body(new ZodPipe(fmWebhookSchema)) body: FmWebhookDto,
+  ) {
+    if (apiKey !== this.webhookKey) {
+      this.logger.warn('Invalid webhook key received');
+      throw new UnauthorizedException('Invalid webhook key');
+    }
+
+    await this.sync.handleWebhook(this.tenantId, body);
+    return { received: true };
+  }
+}
+```
+
+Note: This controller does NOT use `JwtAuthGuard` or `TenantGuard` — it uses API key auth via `X-FM-Webhook-Key` header since it's called from FileMaker Server, not from a browser. The tenant ID is hardcoded from `FM_TENANT_ID` env var (single-tenant for Citolab).
+
+Add these env vars to `.env`:
+```
+FM_WEBHOOK_KEY=your-secure-random-key-here
+FM_TENANT_ID=citolab-tenant-uuid
+```
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add apps/api/src/modules/filemaker/ && git commit -m "feat: add FmSyncService with event handling, retry cron, and sync controller"
+git add apps/api/src/modules/filemaker/ && git commit -m "feat: add FmSyncService with event handling, retry cron, webhook, and sync controller"
 ```
 
 ---
@@ -1132,10 +1265,11 @@ import { FmDiscoveryService } from './services/fm-discovery.service';
 import { FmSyncService } from './services/fm-sync.service';
 import { FmDiscoveryController } from './controllers/fm-discovery.controller';
 import { FmSyncController } from './controllers/fm-sync.controller';
+import { FmWebhookController } from './controllers/fm-webhook.controller';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [FmDiscoveryController, FmSyncController],
+  controllers: [FmDiscoveryController, FmSyncController, FmWebhookController],
   providers: [FmAuthService, FmApiService, FmDiscoveryService, FmSyncService],
   exports: [FmAuthService, FmApiService, FmSyncService],
 })
