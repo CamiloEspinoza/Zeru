@@ -28,6 +28,7 @@ import { AuditContextMiddleware } from './modules/audit/audit.middleware';
 import { NotificationModule } from './modules/notification/notification.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { FileMakerModule } from './modules/filemaker/filemaker.module';
+import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { FileMakerModule } from './modules/filemaker/filemaker.module';
     NotificationModule,
     RolesModule,
     FileMakerModule,
+    LegalEntitiesModule,
   ],
 })
 export class AppModule implements NestModule {
