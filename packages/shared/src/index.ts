@@ -10,6 +10,8 @@ export * from './schemas/auth.schema';
 export * from './schemas/tenant.schema';
 export * from './schemas/user.schema';
 export * from './schemas/accounting.schema';
+export * from './schemas/legal-entity.schema';
+export * from './schemas/lab-origin.schema';
 
 export * from './constants';
 
