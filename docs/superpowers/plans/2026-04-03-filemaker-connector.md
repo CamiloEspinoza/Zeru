@@ -1400,3 +1400,225 @@ cd apps/api && npx nest build
 ```bash
 git add -A && git commit -m "fix: lint and build fixes for FileMaker connector"
 ```
+
+---
+
+### Task 10: Create `filemaker-module-migration` Skill
+
+**Files:**
+- Create: `.claude/skills/filemaker-module-migration.md`
+
+- [ ] **Step 1: Create the skill file**
+
+Create `.claude/skills/filemaker-module-migration.md`:
+
+````markdown
+---
+name: filemaker-module-migration
+description: Guide for migrating a FileMaker module to Zeru. Use when implementing a new transformer, connecting a new FM layout to Zeru, or migrating data from FM to a Zeru module. Triggers on "migrar módulo FM", "crear transformer", "conectar layout FM", "sync FM".
+---
+
+# FileMaker Module Migration Guide
+
+You are migrating a module from Citolab's FileMaker Server to Zeru. The FM connector infrastructure is already built. Your job is to create a **transformer** that maps FM data to a Zeru model and wire up the sync.
+
+## Architecture Overview
+
+```
+FM Data API ←→ FmApiService ←→ Transformer ←→ Zeru Model (Prisma)
+                                     ↕
+                              FmSyncRecord (citolab_fm schema)
+```
+
+- **FmApiService** (`apps/api/src/modules/filemaker/services/fm-api.service.ts`): Generic HTTP client. Use `findRecords()`, `createRecord()`, `updateRecord()`, `getRecords()`, `findAll()`.
+- **FmAuthService** (`apps/api/src/modules/filemaker/services/fm-auth.service.ts`): Session management. You don't call this directly — FmApiService handles auth.
+- **FmSyncService** (`apps/api/src/modules/filemaker/services/fm-sync.service.ts`): Orchestrates sync. Listens to `fm.sync` events and processes `PENDING_TO_FM`/`PENDING_TO_ZERU` records.
+- **FmSyncRecord** (Prisma, `citolab_fm` schema): Links a Zeru entity to its FM counterpart.
+- **FmSyncLog** (Prisma, `citolab_fm` schema): Audit log for all sync operations.
+- **Discovery API**: `GET /filemaker/discovery/:db/layouts/:layout/metadata` and `/sample` to explore FM structure.
+- **Webhook**: `POST /filemaker/webhook` receives push notifications from FM when records change.
+
+## Step-by-Step Process
+
+### 1. Explore the FM Structure
+
+Before writing any code, explore the FM layouts for this module:
+
+```bash
+# Get layout metadata (fields, types, portals)
+curl -s "https://api.zeru.cl/filemaker/discovery/BIOPSIAS/layouts/{LAYOUT_NAME}/metadata" \
+  -H "Authorization: Bearer {token}" | jq
+
+# Get sample records to understand actual data
+curl -s "https://api.zeru.cl/filemaker/discovery/BIOPSIAS/layouts/{LAYOUT_NAME}/sample?limit=5" \
+  -H "Authorization: Bearer {token}" | jq
+```
+
+Or use the Discovery UI at `/integrations/filemaker` to explore visually.
+
+**Document what you find:**
+- Layout name(s) and which FM database they're in
+- Key fields and their types (watch for: calculated fields, container fields, portals)
+- Data quality issues (mixed types, free text where enum expected, dirty numbers)
+- Relationships: what FM portals exist, how they map to Zeru relations
+
+### 2. Design the Zeru Model
+
+Create or modify the Prisma model in `apps/api/prisma/schema.prisma` (in `public` schema — FM models are NOT in `citolab_fm`, only sync metadata is).
+
+**Naming conventions:**
+- Use HL7/FHIR resource names when applicable (ServiceRequest, Specimen, DiagnosticReport, Patient, Observation)
+- Use English for model/field names, Spanish for UI labels
+- Use `Decimal` for financial amounts (not `Float`)
+- Use enums for status fields (not free text)
+- Always include `tenantId`, `createdAt`, `updatedAt`, `deletedAt` (soft delete)
+
+### 3. Create the Transformer
+
+Create `apps/api/src/modules/filemaker/transformers/{module}.transformer.ts`:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import type { FmRecord, FmFindQuery } from '@zeru/shared';
+import type { FmTransformer } from './transformer.interface';
+
+// Define the Zeru type for this module
+interface MyZeruEntity {
+  // ... fields matching your Prisma model
+}
+
+@Injectable()
+export class MyModuleTransformer implements FmTransformer<MyZeruEntity> {
+  readonly database = 'BIOPSIAS'; // or 'PAPANICOLAOU', etc.
+  readonly layouts = { primary: 'FM_Layout_Name' };
+
+  fromFm(record: FmRecord): MyZeruEntity {
+    const d = record.fieldData;
+    return {
+      // Map FM fields → Zeru fields
+      // Handle dirty data: parseFloat, trim, date parsing, etc.
+    };
+  }
+
+  toFm(data: MyZeruEntity): Record<string, unknown> {
+    return {
+      // Map Zeru fields → FM field names
+      // Only include writable fields (skip calculated/summary fields)
+    };
+  }
+
+  buildFmQuery(filters: Record<string, unknown>): FmFindQuery[] {
+    // Convert Zeru filter criteria to FM find query format
+    return [{ /* field: value */ }];
+  }
+}
+```
+
+**Key rules for transformers:**
+- Handle `null`, `undefined`, empty string, and `0` consistently
+- Parse dirty numeric fields: `"172146por estudios"` → extract `172146`
+- FM dates with `dateformats: 2` come as ISO 8601 — parse directly
+- FM dates without `dateformats` come as `MM/DD/YYYY` — parse accordingly
+- Portal data is in `record.portalData['Portal Name']` — iterate and flatten to related entities
+- Calculated fields (`type: "calculation"` or `type: "summary"`) are read-only — never include in `toFm()`
+- Container fields (PDFs, images) require separate download via FM API — handle outside the transformer
+
+### 4. Register the Transformer
+
+Add the transformer to `apps/api/src/modules/filemaker/filemaker.module.ts`:
+
+```typescript
+providers: [
+  // ... existing providers
+  MyModuleTransformer,
+],
+```
+
+### 5. Wire Up Sync Events
+
+In the Zeru module that owns this entity, emit events when data changes:
+
+```typescript
+// In your service (e.g., CollectionsService)
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+// After creating/updating/deleting a record:
+this.eventEmitter.emit('fm.sync', {
+  tenantId,
+  entityType: 'my-entity-type', // must match FmSyncRecord.entityType
+  entityId: record.id,
+  action: 'create', // or 'update', 'delete'
+});
+```
+
+### 6. Initial Import
+
+Create a one-time import script or endpoint to load historical FM data:
+
+```typescript
+// In your transformer or a dedicated import service
+const records = await this.fmApi.findAll('BIOPSIAS', 'Layout_Name', [{}]);
+for (const record of records) {
+  const zeruData = this.transformer.fromFm(record);
+  // Create Zeru entity
+  const entity = await this.prisma.myModel.create({ data: { ...zeruData, tenantId } });
+  // Create sync link
+  await this.prisma.fmSyncRecord.create({
+    data: {
+      tenantId,
+      entityType: 'my-entity-type',
+      entityId: entity.id,
+      fmDatabase: 'BIOPSIAS',
+      fmLayout: 'Layout_Name',
+      fmRecordId: record.recordId,
+      fmModId: record.modId,
+      syncStatus: 'SYNCED',
+      lastSyncAt: new Date(),
+    },
+  });
+}
+```
+
+### 7. Configure FM Webhook Triggers
+
+Document (for the Citolab FM admin) which script triggers to set up in FileMaker:
+
+```
+Table: [FM Table Name]
+Trigger: OnRecordCommit
+Script: (create a script that does Insert from URL to POST /filemaker/webhook)
+```
+
+## FM Server Reference (Citolab)
+
+- **Host**: `rdp.citolab.cl`
+- **Main DB**: `BIOPSIAS` (488 layouts)
+- **Other DBs**: PAPANICOLAOU, BIOPSIAS LAB MALAGA, ExternosNueva, etc.
+- **Credentials**: env vars `FM_HOST`, `FM_DATABASE`, `FM_USERNAME`, `FM_PASSWORD`
+
+### Key Layouts by Module
+
+| Module | Layout(s) | DB | Records |
+|--------|-----------|-----|---------|
+| Cobranzas | `Liquidaciones`, `FICHA INSTITUCION COBRANZAS`, `Conceptos de cobro (CDC)*`, `Listado Cobros -` | BIOPSIAS | 2,571 liquidaciones |
+| Procedencias | `Procedencias*` | BIOPSIAS | 862 |
+| Estado pagos | `ESTADO PAGO INSTITUCIONES*` | BIOPSIAS | — |
+
+### Common FM Data Issues
+
+- **Mixed types**: `SALDO A FAVOR` can be `number` or `"172146por estudios"` — always parse defensively
+- **Date formats**: Use `dateformats: 2` in all API calls to get ISO 8601
+- **Period text**: FM uses free text like `"Enero 2025"` or `"1-2025"` — normalize to `Date` (first day of month)
+- **Portal repetition**: Portals in FM repeat the same field names with different data per row — iterate `portalData[name][]`
+- **Encoding**: Some fields have non-ASCII chars (ñ, accents) — handled correctly by JSON encoding
+
+## Spec Reference
+
+Full design spec: `docs/superpowers/specs/2026-04-03-filemaker-connector-design.md`
+````
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add .claude/skills/filemaker-module-migration.md && git commit -m "feat: add filemaker-module-migration skill for guided FM→Zeru module migration"
+```
