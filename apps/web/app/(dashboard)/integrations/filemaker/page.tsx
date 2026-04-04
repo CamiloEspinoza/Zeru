@@ -242,6 +242,7 @@ function ExplorerTab() {
   const [metadata, setMetadata] = useState<FmLayoutMetadata | null>(null);
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [sampleRecords, setSampleRecords] = useState<FmRecord[]>([]);
+  const [totalRecords, setTotalRecords] = useState<number>(0);
   const [loadingSample, setLoadingSample] = useState(false);
   const [searchFields, setSearchFields] = useState<Record<string, string>>({});
   const [searchResults, setSearchResults] = useState<FmRecord[]>([]);
@@ -281,6 +282,7 @@ function ExplorerTab() {
       setLayoutsPanelOpen(true);
       setMetadata(null);
       setSampleRecords([]);
+      setTotalRecords(0);
       setSearchResults([]);
       try {
         const data = await api.get<FmLayout[]>(
@@ -329,10 +331,11 @@ function ExplorerTab() {
       }
 
       try {
-        const sample = await api.get<{ records: FmRecord[] }>(
+        const sample = await api.get<{ records: FmRecord[]; totalRecordCount: number }>(
           `/filemaker/discovery/${encodeURIComponent(selectedDb)}/layouts/${encodeURIComponent(layout)}/sample`,
         );
         setSampleRecords(sample.records ?? []);
+        setTotalRecords(sample.totalRecordCount ?? 0);
       } catch {
         toast.error("Error al cargar registros de ejemplo");
       } finally {
@@ -462,9 +465,16 @@ function ExplorerTab() {
       {/* Layout Detail */}
       {selectedLayout && (
         <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground">
-            {selectedLayout}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-muted-foreground">
+              {selectedLayout}
+            </h3>
+            {totalRecords > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {totalRecords.toLocaleString()} registros
+              </Badge>
+            )}
+          </div>
 
           {/* Fields */}
           <Collapsible className="group/fields">
