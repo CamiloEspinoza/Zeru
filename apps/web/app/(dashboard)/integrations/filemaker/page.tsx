@@ -423,22 +423,24 @@ function ExplorerTab() {
       {selectedDb && (
         <Collapsible open={layoutsPanelOpen} onOpenChange={setLayoutsPanelOpen} className="group/layouts">
           <Card>
-            <CardHeader className="cursor-pointer" asChild>
-              <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-4">
-                <CardTitle className="text-sm">
-                  Layouts
-                  {selectedLayout && (
-                    <span className="ml-2 font-normal text-muted-foreground">
-                      — {selectedLayout}
-                    </span>
-                  )}
-                </CardTitle>
-                <HugeiconsIcon
-                  icon={ArrowRight01Icon}
-                  className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/layouts:rotate-90"
-                />
-              </CollapsibleTrigger>
-            </CardHeader>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer">
+                <div className="flex w-full items-center justify-between">
+                  <CardTitle className="text-sm">
+                    Layouts
+                    {selectedLayout && (
+                      <span className="ml-2 font-normal text-muted-foreground">
+                        — {selectedLayout}
+                      </span>
+                    )}
+                  </CardTitle>
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/layouts:rotate-90"
+                  />
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent>
                 {loadingLayouts ? (
