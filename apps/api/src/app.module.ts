@@ -29,6 +29,7 @@ import { NotificationModule } from './modules/notification/notification.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { FileMakerModule } from './modules/filemaker/filemaker.module';
 import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.module';
+import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.mod
     RolesModule,
     FileMakerModule,
     LegalEntitiesModule,
+    LabOriginsModule,
   ],
 })
 export class AppModule implements NestModule {
