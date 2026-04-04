@@ -252,17 +252,17 @@ function ExplorerTab() {
               </p>
             ) : (
               <div className="space-y-1">
-                {layouts.map((layout) =>
+                {layouts.map((layout, idx) =>
                   layout.isFolder ? (
-                    <Collapsible key={layout.name}>
+                    <Collapsible key={`${layout.name}-${idx}`}>
                       <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
                         <span className="text-muted-foreground">&#9660;</span>
                         {layout.name}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="ml-4 space-y-0.5">
-                        {layout.folderLayoutNames?.map((sub) => (
+                        {layout.folderLayoutNames?.map((sub, subIdx) => (
                           <button
-                            key={sub.name}
+                            key={`${sub.name}-${subIdx}`}
                             onClick={() => selectLayout(sub.name)}
                             className={`block w-full rounded-md px-2 py-1 text-left text-sm hover:bg-muted ${
                               selectedLayout === sub.name
@@ -277,7 +277,7 @@ function ExplorerTab() {
                     </Collapsible>
                   ) : (
                     <button
-                      key={layout.name}
+                      key={`${layout.name}-${idx}`}
                       onClick={() => selectLayout(layout.name)}
                       className={`block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${
                         selectedLayout === layout.name
