@@ -713,7 +713,18 @@ function StatCard({
 export default function FileMakerDiscoveryPage() {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">FileMaker Discovery</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">FileMaker Discovery</h1>
+        <a
+          href="https://github.com/CamiloEspinoza/Zeru/blob/main/docs/guides/filemaker-webhook-setup.md"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Button variant="outline" size="sm">
+            Guía: Configurar webhooks en FM
+          </Button>
+        </a>
+      </div>
 
       <Tabs defaultValue="explorer">
         <TabsList>
