@@ -173,7 +173,24 @@ export class FmApiService {
   // ── Metadata ──
 
   async getDatabases(): Promise<string[]> {
-    const raw: any = await this.request('BIOPSIAS', '/../databases', { method: 'GET' });
+    const url = `${this.auth.fmHost}/fmi/data/vLatest/databases`;
+    const credentials = this.auth.getBasicAuthHeader();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${credentials}`,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(`FM getDatabases error ${response.status}: ${text}`);
+      throw new Error(`FileMaker getDatabases error: ${response.status}`);
+    }
+
+    const raw: any = await response.json();
     return (raw.response?.databases ?? []).map((d: any) => d.name);
   }
 

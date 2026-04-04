@@ -24,6 +24,10 @@ export class FmAuthService {
     return this.host;
   }
 
+  getBasicAuthHeader(): string {
+    return Buffer.from(`${this.username}:${this.password}`).toString('base64');
+  }
+
   async getToken(database: string): Promise<string> {
     const existing = this.sessions.get(database);
     if (existing) {
