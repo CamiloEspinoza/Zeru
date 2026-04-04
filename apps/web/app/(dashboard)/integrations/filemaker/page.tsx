@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 import type {
@@ -48,6 +50,107 @@ interface FmSyncLog {
   status: string;
   message?: string;
   createdAt: string;
+}
+
+// ── Layout List with search + animated chevrons ──
+
+function LayoutList({
+  layouts,
+  selectedLayout,
+  onSelect,
+}: {
+  layouts: FmLayout[];
+  selectedLayout: string | null;
+  onSelect: (name: string) => void;
+}) {
+  const [layoutSearch, setLayoutSearch] = useState("");
+
+  const filteredLayouts = useMemo(() => {
+    if (!layoutSearch.trim()) return layouts;
+    const q = layoutSearch.toLowerCase();
+    return layouts
+      .map((layout) => {
+        if (!layout.isFolder) {
+          return layout.name.toLowerCase().includes(q) ? layout : null;
+        }
+        const matchingChildren = layout.folderLayoutNames?.filter((sub) =>
+          sub.name.toLowerCase().includes(q),
+        );
+        const folderMatches = layout.name.toLowerCase().includes(q);
+        if (folderMatches) return layout;
+        if (matchingChildren && matchingChildren.length > 0) {
+          return { ...layout, folderLayoutNames: matchingChildren };
+        }
+        return null;
+      })
+      .filter(Boolean) as FmLayout[];
+  }, [layouts, layoutSearch]);
+
+  return (
+    <div className="space-y-2">
+      <Input
+        placeholder="Buscar layout..."
+        value={layoutSearch}
+        onChange={(e) => setLayoutSearch(e.target.value)}
+        className="h-8 text-sm"
+      />
+      <div className="max-h-[60vh] space-y-0.5 overflow-y-auto">
+        {filteredLayouts.length === 0 ? (
+          <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+            Sin resultados para &quot;{layoutSearch}&quot;
+          </p>
+        ) : (
+          filteredLayouts.map((layout, idx) =>
+            layout.isFolder ? (
+              <Collapsible
+                key={`${layout.name}-${idx}`}
+                defaultOpen={!!layoutSearch.trim()}
+                className="group/folder"
+              >
+                <CollapsibleTrigger className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
+                  <HugeiconsIcon
+                    icon={ArrowRight01Icon}
+                    className="size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/folder:rotate-90"
+                  />
+                  <span>{layout.name}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {layout.folderLayoutNames?.length ?? 0}
+                  </span>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="ml-5 border-l border-border pl-2 space-y-0.5">
+                  {layout.folderLayoutNames?.map((sub, subIdx) => (
+                    <button
+                      key={`${sub.name}-${subIdx}`}
+                      onClick={() => onSelect(sub.name)}
+                      className={`block w-full rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-muted ${
+                        selectedLayout === sub.name
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-foreground"
+                      }`}
+                    >
+                      {sub.name}
+                    </button>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <button
+                key={`${layout.name}-${idx}`}
+                onClick={() => onSelect(layout.name)}
+                className={`block w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted ${
+                  selectedLayout === layout.name
+                    ? "bg-primary/10 font-medium text-primary"
+                    : "text-foreground"
+                }`}
+              >
+                {layout.name}
+              </button>
+            ),
+          )
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ── Explorer Tab ──
@@ -251,45 +354,11 @@ function ExplorerTab() {
                 No se encontraron layouts
               </p>
             ) : (
-              <div className="space-y-1">
-                {layouts.map((layout, idx) =>
-                  layout.isFolder ? (
-                    <Collapsible key={`${layout.name}-${idx}`}>
-                      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
-                        <span className="text-muted-foreground">&#9660;</span>
-                        {layout.name}
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="ml-4 space-y-0.5">
-                        {layout.folderLayoutNames?.map((sub, subIdx) => (
-                          <button
-                            key={`${sub.name}-${subIdx}`}
-                            onClick={() => selectLayout(sub.name)}
-                            className={`block w-full rounded-md px-2 py-1 text-left text-sm hover:bg-muted ${
-                              selectedLayout === sub.name
-                                ? "bg-muted font-medium"
-                                : ""
-                            }`}
-                          >
-                            {sub.name}
-                          </button>
-                        ))}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ) : (
-                    <button
-                      key={`${layout.name}-${idx}`}
-                      onClick={() => selectLayout(layout.name)}
-                      className={`block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${
-                        selectedLayout === layout.name
-                          ? "bg-muted font-medium"
-                          : ""
-                      }`}
-                    >
-                      {layout.name}
-                    </button>
-                  ),
-                )}
-              </div>
+              <LayoutList
+                layouts={layouts}
+                selectedLayout={selectedLayout}
+                onSelect={selectLayout}
+              />
             )}
           </CardContent>
         </Card>
