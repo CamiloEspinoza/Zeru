@@ -238,6 +238,7 @@ function ExplorerTab() {
   const [layouts, setLayouts] = useState<FmLayout[]>([]);
   const [loadingLayouts, setLoadingLayouts] = useState(false);
   const [selectedLayout, setSelectedLayout] = useState<string>("");
+  const [layoutsPanelOpen, setLayoutsPanelOpen] = useState(true);
   const [metadata, setMetadata] = useState<FmLayoutMetadata | null>(null);
   const [loadingMetadata, setLoadingMetadata] = useState(false);
   const [sampleRecords, setSampleRecords] = useState<FmRecord[]>([]);
@@ -277,6 +278,7 @@ function ExplorerTab() {
     async (db: string) => {
       setLoadingLayouts(true);
       setSelectedLayout("");
+      setLayoutsPanelOpen(true);
       setMetadata(null);
       setSampleRecords([]);
       setSearchResults([]);
@@ -307,6 +309,7 @@ function ExplorerTab() {
     async (layout: string) => {
       if (!selectedDb) return;
       setSelectedLayout(layout);
+      setLayoutsPanelOpen(false);
       setSearchResults([]);
       setSearchFields({});
       setSearchPage(1);
@@ -415,7 +418,7 @@ function ExplorerTab() {
 
       {/* Layouts */}
       {selectedDb && (
-        <Collapsible defaultOpen open={!selectedLayout || undefined} className="group/layouts">
+        <Collapsible open={layoutsPanelOpen} onOpenChange={setLayoutsPanelOpen} className="group/layouts">
           <Card>
             <CardHeader className="cursor-pointer" asChild>
               <CollapsibleTrigger className="flex w-full items-center justify-between px-6 py-4">
