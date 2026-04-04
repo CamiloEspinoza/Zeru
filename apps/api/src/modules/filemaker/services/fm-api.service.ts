@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { FmAuthService } from './fm-auth.service';
 import type {
   FmRecord,
@@ -52,7 +52,18 @@ export class FmApiService {
     if (!response.ok) {
       const text = await response.text();
       this.logger.error(`FM API error ${response.status}: ${options.method} ${path} — ${text}`);
-      throw new Error(`FileMaker API error: ${response.status} — ${text}`);
+
+      // Try to extract FM error message from JSON response
+      let fmMessage = `FileMaker error ${response.status}`;
+      try {
+        const parsed = JSON.parse(text);
+        const msg = parsed?.messages?.[0];
+        if (msg) fmMessage = `FileMaker error ${msg.code}: ${msg.message}`;
+      } catch {
+        // Not JSON, use raw text
+        fmMessage = `FileMaker error ${response.status}: ${text.slice(0, 200)}`;
+      }
+      throw new BadRequestException(fmMessage);
     }
 
     return response.json() as Promise<T>;

@@ -365,7 +365,7 @@ function ExplorerTab() {
           `/filemaker/discovery/${encodeURIComponent(selectedDb)}/layouts/${encodeURIComponent(selectedLayout)}/search`,
           { query: [activeFields], offset: (page - 1) * 20 + 1, limit: 20 },
         );
-        setSearchResults(res.records ?? []);
+        setSearchResults(res?.records ?? []);
         setSearchTotal(res.totalRecordCount ?? 0);
       } catch {
         toast.error("Error en la busqueda");
