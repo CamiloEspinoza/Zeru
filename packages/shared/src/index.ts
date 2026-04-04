@@ -23,3 +23,5 @@ export * from './chat';
 export * from './notification';
 
 export * from './permissions';
+
+export * from './types/filemaker';

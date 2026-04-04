@@ -1,0 +1,734 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api-client";
+import { toast } from "sonner";
+import type {
+  FmLayout,
+  FmLayoutMetadata,
+  FmRecord,
+  FmSyncStats,
+  FmSyncRecordInfo,
+  FmConnectionStatus,
+} from "@zeru/shared";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Spinner } from "@/components/ui/spinner";
+
+// ── Sync log type (not in shared, defined locally) ──
+
+interface FmSyncLog {
+  id: string;
+  operation: string;
+  entityType: string;
+  entityId: string;
+  status: string;
+  message?: string;
+  createdAt: string;
+}
+
+// ── Explorer Tab ──
+
+function ExplorerTab() {
+  const [databases, setDatabases] = useState<string[]>([]);
+  const [selectedDb, setSelectedDb] = useState<string>("");
+  const [connection, setConnection] = useState<FmConnectionStatus | null>(null);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [layouts, setLayouts] = useState<FmLayout[]>([]);
+  const [loadingLayouts, setLoadingLayouts] = useState(false);
+  const [selectedLayout, setSelectedLayout] = useState<string>("");
+  const [metadata, setMetadata] = useState<FmLayoutMetadata | null>(null);
+  const [loadingMetadata, setLoadingMetadata] = useState(false);
+  const [sampleRecords, setSampleRecords] = useState<FmRecord[]>([]);
+  const [loadingSample, setLoadingSample] = useState(false);
+  const [searchFields, setSearchFields] = useState<Record<string, string>>({});
+  const [searchResults, setSearchResults] = useState<FmRecord[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchTotal, setSearchTotal] = useState(0);
+
+  useEffect(() => {
+    api
+      .get<string[]>("/filemaker/discovery/databases")
+      .then(setDatabases)
+      .catch(() => toast.error("Error al cargar bases de datos"));
+  }, []);
+
+  const testConnection = useCallback(async () => {
+    if (!selectedDb) return;
+    setTestingConnection(true);
+    try {
+      const status = await api.get<FmConnectionStatus>(
+        `/filemaker/discovery/test-connection/${encodeURIComponent(selectedDb)}`,
+      );
+      setConnection(status);
+      toast.success(
+        status.connected ? "Conexion exitosa" : "Conexion fallida",
+      );
+    } catch {
+      toast.error("Error al probar conexion");
+    } finally {
+      setTestingConnection(false);
+    }
+  }, [selectedDb]);
+
+  const loadLayouts = useCallback(
+    async (db: string) => {
+      setLoadingLayouts(true);
+      setSelectedLayout("");
+      setMetadata(null);
+      setSampleRecords([]);
+      setSearchResults([]);
+      try {
+        const data = await api.get<FmLayout[]>(
+          `/filemaker/discovery/${encodeURIComponent(db)}/layouts`,
+        );
+        setLayouts(data);
+      } catch {
+        toast.error("Error al cargar layouts");
+      } finally {
+        setLoadingLayouts(false);
+      }
+    },
+    [],
+  );
+
+  const handleDbChange = useCallback(
+    (db: string) => {
+      setSelectedDb(db);
+      setConnection(null);
+      loadLayouts(db);
+    },
+    [loadLayouts],
+  );
+
+  const selectLayout = useCallback(
+    async (layout: string) => {
+      if (!selectedDb) return;
+      setSelectedLayout(layout);
+      setSearchResults([]);
+      setSearchFields({});
+      setSearchPage(1);
+
+      setLoadingMetadata(true);
+      setLoadingSample(true);
+
+      try {
+        const meta = await api.get<FmLayoutMetadata>(
+          `/filemaker/discovery/${encodeURIComponent(selectedDb)}/layouts/${encodeURIComponent(layout)}/metadata`,
+        );
+        setMetadata(meta);
+      } catch {
+        toast.error("Error al cargar metadata");
+      } finally {
+        setLoadingMetadata(false);
+      }
+
+      try {
+        const sample = await api.get<{ records: FmRecord[] }>(
+          `/filemaker/discovery/${encodeURIComponent(selectedDb)}/layouts/${encodeURIComponent(layout)}/sample`,
+        );
+        setSampleRecords(sample.records ?? []);
+      } catch {
+        toast.error("Error al cargar registros de ejemplo");
+      } finally {
+        setLoadingSample(false);
+      }
+    },
+    [selectedDb],
+  );
+
+  const handleSearch = useCallback(
+    async (page = 1) => {
+      if (!selectedDb || !selectedLayout) return;
+      const activeFields = Object.fromEntries(
+        Object.entries(searchFields).filter(([, v]) => v.trim() !== ""),
+      );
+      if (Object.keys(activeFields).length === 0) {
+        toast.error("Ingresa al menos un criterio de busqueda");
+        return;
+      }
+      setSearching(true);
+      setSearchPage(page);
+      try {
+        const res = await api.post<{
+          records: FmRecord[];
+          totalRecordCount: number;
+        }>(
+          `/filemaker/discovery/${encodeURIComponent(selectedDb)}/layouts/${encodeURIComponent(selectedLayout)}/search`,
+          { query: [activeFields], offset: (page - 1) * 20 + 1, limit: 20 },
+        );
+        setSearchResults(res.records ?? []);
+        setSearchTotal(res.totalRecordCount ?? 0);
+      } catch {
+        toast.error("Error en la busqueda");
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [selectedDb, selectedLayout, searchFields],
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Connection + DB Selector */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Conexion a FileMaker</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-3">
+          <Select value={selectedDb} onValueChange={handleDbChange}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Seleccionar base de datos" />
+            </SelectTrigger>
+            <SelectContent>
+              {databases.map((db) => (
+                <SelectItem key={db} value={db}>
+                  {db}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={testConnection}
+            disabled={!selectedDb || testingConnection}
+          >
+            {testingConnection ? (
+              <Spinner size="sm" />
+            ) : (
+              "Probar conexion"
+            )}
+          </Button>
+
+          {connection && (
+            <Badge variant={connection.connected ? "default" : "destructive"}>
+              {connection.connected ? "Conectado" : "Desconectado"}
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Layouts */}
+      {selectedDb && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Layouts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingLayouts ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Spinner size="sm" /> Cargando layouts...
+              </div>
+            ) : layouts.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No se encontraron layouts
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {layouts.map((layout) =>
+                  layout.isFolder ? (
+                    <Collapsible key={layout.name}>
+                      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
+                        <span className="text-muted-foreground">&#9660;</span>
+                        {layout.name}
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="ml-4 space-y-0.5">
+                        {layout.folderLayoutNames?.map((sub) => (
+                          <button
+                            key={sub.name}
+                            onClick={() => selectLayout(sub.name)}
+                            className={`block w-full rounded-md px-2 py-1 text-left text-sm hover:bg-muted ${
+                              selectedLayout === sub.name
+                                ? "bg-muted font-medium"
+                                : ""
+                            }`}
+                          >
+                            {sub.name}
+                          </button>
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : (
+                    <button
+                      key={layout.name}
+                      onClick={() => selectLayout(layout.name)}
+                      className={`block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted ${
+                        selectedLayout === layout.name
+                          ? "bg-muted font-medium"
+                          : ""
+                      }`}
+                    >
+                      {layout.name}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Layout Detail */}
+      {selectedLayout && (
+        <div className="space-y-4">
+          {/* Fields */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">
+                Campos — {selectedLayout}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingMetadata ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Spinner size="sm" /> Cargando metadata...
+                </div>
+              ) : metadata ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Resultado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {metadata.fields.map((field) => (
+                      <TableRow key={field.name}>
+                        <TableCell className="font-mono text-xs">
+                          {field.name}
+                        </TableCell>
+                        <TableCell>{field.type}</TableCell>
+                        <TableCell>{field.result}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          {/* Portals */}
+          {metadata && metadata.portals.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Portales</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {metadata.portals.map((portal) => (
+                  <Collapsible key={portal.name}>
+                    <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium hover:bg-muted">
+                      <span className="text-muted-foreground">&#9660;</span>
+                      {portal.name}{" "}
+                      <Badge variant="outline">{portal.fields.length}</Badge>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-1">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Tipo</TableHead>
+                            <TableHead>Resultado</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {portal.fields.map((field) => (
+                            <TableRow key={field.name}>
+                              <TableCell className="font-mono text-xs">
+                                {field.name}
+                              </TableCell>
+                              <TableCell>{field.type}</TableCell>
+                              <TableCell>{field.result}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Sample Records */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Registros de ejemplo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingSample ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Spinner size="sm" /> Cargando registros...
+                </div>
+              ) : (
+                <RecordTable records={sampleRecords} />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Search */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Buscar registros</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {metadata && (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {metadata.fields.slice(0, 12).map((field) => (
+                    <div key={field.name} className="space-y-1">
+                      <label className="text-xs text-muted-foreground">
+                        {field.name}
+                      </label>
+                      <Input
+                        placeholder={field.name}
+                        value={searchFields[field.name] ?? ""}
+                        onChange={(e) =>
+                          setSearchFields((prev) => ({
+                            ...prev,
+                            [field.name]: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => handleSearch(1)}
+                  disabled={searching}
+                >
+                  {searching ? <Spinner size="sm" /> : "Buscar"}
+                </Button>
+                {searchTotal > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {searchTotal} resultado{searchTotal !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              {searchResults.length > 0 && (
+                <>
+                  <RecordTable records={searchResults} />
+                  {searchTotal > 20 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={searchPage <= 1}
+                        onClick={() => handleSearch(searchPage - 1)}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        Pagina {searchPage} de {Math.ceil(searchTotal / 20)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={searchPage >= Math.ceil(searchTotal / 20)}
+                        onClick={() => handleSearch(searchPage + 1)}
+                      >
+                        Siguiente
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Record Table (reusable for sample + search) ──
+
+function RecordTable({ records }: { records: FmRecord[] }) {
+  if (records.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">No hay registros</p>
+    );
+  }
+
+  const columns = Object.keys(records[0].fieldData);
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            {columns.slice(0, 10).map((col) => (
+              <TableHead key={col}>{col}</TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {records.map((record) => (
+            <TableRow key={record.recordId}>
+              <TableCell className="font-mono">{record.recordId}</TableCell>
+              {columns.slice(0, 10).map((col) => (
+                <TableCell key={col} className="max-w-48 truncate">
+                  {String(record.fieldData[col] ?? "")}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {columns.length > 10 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Mostrando 10 de {columns.length} columnas
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Sync Status Tab ──
+
+function SyncStatusTab() {
+  const [stats, setStats] = useState<FmSyncStats | null>(null);
+  const [errors, setErrors] = useState<FmSyncRecordInfo[]>([]);
+  const [logs, setLogs] = useState<FmSyncLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statsRes, errorsRes, logsRes] = await Promise.all([
+        api.get<FmSyncStats>("/filemaker/sync/stats"),
+        api.get<FmSyncRecordInfo[]>("/filemaker/sync/errors"),
+        api.get<FmSyncLog[]>("/filemaker/sync/logs"),
+      ]);
+      setStats(statsRes);
+      setErrors(errorsRes);
+      setLogs(logsRes);
+    } catch {
+      toast.error("Error al cargar estado de sincronizacion");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const retry = useCallback(
+    async (id: string) => {
+      setRetrying(id);
+      try {
+        await api.post(`/filemaker/sync/retry/${id}`, {});
+        toast.success("Reintento iniciado");
+        fetchData();
+      } catch {
+        toast.error("Error al reintentar");
+      } finally {
+        setRetrying(null);
+      }
+    },
+    [fetchData],
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-8 text-muted-foreground">
+        <Spinner size="sm" /> Cargando estado de sincronizacion...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Stats Counters */}
+      {stats && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Sincronizados" value={stats.synced} variant="default" />
+          <StatCard label="Pendientes FM" value={stats.pendingToFm} variant="secondary" />
+          <StatCard label="Pendientes Zeru" value={stats.pendingToZeru} variant="secondary" />
+          <StatCard label="Errores" value={stats.error} variant="destructive" />
+          <StatCard label="Total" value={stats.total} variant="outline" />
+        </div>
+      )}
+
+      {/* Errors Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Errores recientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {errors.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin errores</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Entidad</TableHead>
+                  <TableHead>Layout</TableHead>
+                  <TableHead>Error</TableHead>
+                  <TableHead>Reintentos</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {errors.map((err) => (
+                  <TableRow key={err.id}>
+                    <TableCell>
+                      {err.entityType}:{err.entityId}
+                    </TableCell>
+                    <TableCell>{err.fmLayout}</TableCell>
+                    <TableCell className="max-w-64 truncate text-destructive">
+                      {err.syncError}
+                    </TableCell>
+                    <TableCell>{err.retryCount}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        onClick={() => retry(err.id)}
+                        disabled={retrying === err.id}
+                      >
+                        {retrying === err.id ? (
+                          <Spinner size="sm" />
+                        ) : (
+                          "Reintentar"
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Logs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Logs recientes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {logs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin logs</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Operacion</TableHead>
+                  <TableHead>Entidad</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Mensaje</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {new Date(log.createdAt).toLocaleString("es-CL")}
+                    </TableCell>
+                    <TableCell>{log.operation}</TableCell>
+                    <TableCell>
+                      {log.entityType}:{log.entityId}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          log.status === "SUCCESS" ? "default" : "destructive"
+                        }
+                      >
+                        {log.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="max-w-64 truncate">
+                      {log.message}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Stat Card ──
+
+function StatCard({
+  label,
+  value,
+  variant,
+}: {
+  label: string;
+  value: number;
+  variant: "default" | "secondary" | "destructive" | "outline";
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-between py-3">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <Badge variant={variant} className="text-sm">
+          {value}
+        </Badge>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Main Page ──
+
+export default function FileMakerDiscoveryPage() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">FileMaker Discovery</h1>
+
+      <Tabs defaultValue="explorer">
+        <TabsList>
+          <TabsTrigger value="explorer">Explorador</TabsTrigger>
+          <TabsTrigger value="sync">Estado de Sync</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="explorer">
+          <ExplorerTab />
+        </TabsContent>
+
+        <TabsContent value="sync">
+          <SyncStatusTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

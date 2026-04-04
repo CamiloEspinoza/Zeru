@@ -157,8 +157,8 @@ export default function RolesSettingsPage() {
   const fetchRoles = useCallback(() => {
     setLoading(true);
     api
-      .get<{ data: Role[] }>("/roles")
-      .then((res) => setRoles(res.data ?? []))
+      .get<Role[]>("/roles")
+      .then((res) => setRoles(Array.isArray(res) ? res : []))
       .catch(() => setRoles([]))
       .finally(() => setLoading(false));
   }, []);

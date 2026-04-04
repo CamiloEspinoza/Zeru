@@ -1,20 +1,31 @@
-import { Plug01Icon } from "@hugeicons/core-free-icons";
-import { ModulePlaceholder } from "@/components/module-placeholder";
+"use client";
+
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function IntegrationsPage() {
   return (
-    <ModulePlaceholder
-      icon={Plug01Icon}
-      title="Integraciones"
-      description="Conexiones con sistemas externos: bridge FileMaker, SII, APIs de terceros. Monitoreo del estado de sincronización."
-      features={[
-        "Bridge bidireccional con FileMaker vía API",
-        "Estado de sincronización en tiempo real por módulo",
-        "Integración con SII para facturación electrónica",
-        "Log de errores y reintentos automáticos",
-        "Configuración de webhooks y endpoints externos",
-        "Panel de salud de cada integración activa",
-      ]}
-    />
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Integraciones</h1>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Link href="/integrations/filemaker">
+          <Card className="cursor-pointer transition-colors hover:bg-muted/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">FileMaker</CardTitle>
+                <Badge variant="secondary">Activo</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Bridge bidireccional con FileMaker Server via Data API.
+                Discovery de layouts, campos y scripts.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
+    </div>
   );
 }

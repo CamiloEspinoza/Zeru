@@ -5,6 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "citolab_fm"]
 }
 
 // ─── Core ────────────────────────────────────────────────
@@ -47,7 +48,9 @@ model Tenant {
   channels             Channel[]
   notifications        Notification[]
   roles                Role[]
+  fmSyncRecords        FmSyncRecord[]
 
+  @@schema("public")
   @@map("tenants")
 }
 
@@ -55,6 +58,7 @@ enum UserType {
   HUMAN
   SERVICE
 
+  @@schema("public")
   @@map("user_type")
 }
 
@@ -89,6 +93,7 @@ model User {
   notificationPreferences NotificationPreference[] @relation("NotificationPref")
   personProfiles          PersonProfile[]
 
+  @@schema("public")
   @@map("users")
 }
 
@@ -113,6 +118,7 @@ model UserTenant {
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
+  @@schema("public")
   @@map("user_tenants")
 }
 
@@ -122,6 +128,8 @@ enum UserRole {
   ADMIN
   ACCOUNTANT
   VIEWER
+
+  @@schema("public")
 }
 
 // ─── RBAC ────────────────────────────────────────────────
@@ -131,6 +139,8 @@ enum AccessLevel {
   VIEW
   EDIT
   MANAGE
+
+  @@schema("public")
 }
 
 model Role {
@@ -151,6 +161,7 @@ model Role {
 
   @@unique([tenantId, slug])
   @@index([tenantId])
+  @@schema("public")
   @@map("roles")
 }
 
@@ -163,6 +174,7 @@ model RoleModuleAccess {
 
   @@unique([roleId, moduleKey])
   @@index([roleId])
+  @@schema("public")
   @@map("role_module_access")
 }
 
@@ -175,6 +187,7 @@ model RolePermissionOverride {
 
   @@unique([roleId, permission])
   @@index([roleId])
+  @@schema("public")
   @@map("role_permission_overrides")
 }
 
@@ -183,6 +196,7 @@ model RolePermissionOverride {
 enum AiProvider {
   OPENAI
 
+  @@schema("public")
   @@map("ai_provider")
 }
 
@@ -217,6 +231,7 @@ model AiUsageLog {
   @@index([tenantId, createdAt])
   @@index([conversationId])
   @@index([tenantId, userId, createdAt])
+  @@schema("public")
   @@map("ai_usage_logs")
 }
 
@@ -238,6 +253,7 @@ model AiModelPricing {
 
   @@unique([provider, model, contextTier, validFrom])
   @@index([provider, model])
+  @@schema("public")
   @@map("ai_model_pricing")
 }
 
@@ -256,6 +272,7 @@ model AiProviderConfig {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("ai_provider_configs")
 }
 
@@ -271,6 +288,7 @@ model GeminiConfig {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("gemini_configs")
 }
 
@@ -289,6 +307,7 @@ model StorageConfig {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("storage_configs")
 }
 
@@ -307,6 +326,7 @@ model EmailConfig {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("email_configs")
 }
 
@@ -341,6 +361,7 @@ model Conversation {
   @@index([userId])
   @@index([tenantId])
   @@index([tenantId, agentType])
+  @@schema("public")
   @@map("conversations")
 }
 
@@ -350,6 +371,7 @@ enum MessageRole {
   tool
   question
 
+  @@schema("public")
   @@map("message_role")
 }
 
@@ -370,6 +392,7 @@ model Message {
 
   @@index([conversationId])
   @@index([tenantId])
+  @@schema("public")
   @@map("messages")
 }
 
@@ -382,6 +405,7 @@ enum MemoryCategory {
   DECISION
   CONTEXT
 
+  @@schema("public")
   @@map("memory_category")
 }
 
@@ -413,6 +437,7 @@ model Memory {
   @@index([tenantId])
   @@index([userId, tenantId])
   @@index([documentId])
+  @@schema("public")
   @@map("memories")
 }
 
@@ -441,6 +466,7 @@ model Account {
 
   @@unique([code, tenantId])
   @@index([tenantId])
+  @@schema("public")
   @@map("accounts")
 }
 
@@ -450,6 +476,8 @@ enum AccountType {
   EQUITY
   REVENUE
   EXPENSE
+
+  @@schema("public")
 }
 
 /// Clasificación funcional IFRS (IAS 1) para el Estado de Resultados.
@@ -465,6 +493,7 @@ enum AccountIFRSSection {
   FINANCE_COST
   TAX_EXPENSE
 
+  @@schema("public")
   @@map("account_ifrs_section")
 }
 
@@ -473,6 +502,7 @@ enum JournalEntrySource {
   ASSISTANT
   MANUAL
 
+  @@schema("public")
   @@map("journal_entry_source")
 }
 
@@ -509,6 +539,7 @@ model JournalEntry {
   @@index([date])
   @@index([createdById])
   @@index([conversationId])
+  @@schema("public")
   @@map("journal_entries")
 }
 
@@ -516,6 +547,8 @@ enum JournalEntryStatus {
   DRAFT
   POSTED
   VOIDED
+
+  @@schema("public")
 }
 
 model JournalEntryLine {
@@ -534,6 +567,7 @@ model JournalEntryLine {
 
   @@index([journalEntryId])
   @@index([tenantId])
+  @@schema("public")
   @@map("journal_entry_lines")
 }
 
@@ -554,12 +588,15 @@ model FiscalPeriod {
   stepCompletions     AccountingStepCompletion[]
 
   @@index([tenantId])
+  @@schema("public")
   @@map("fiscal_periods")
 }
 
 enum FiscalPeriodStatus {
   OPEN
   CLOSED
+
+  @@schema("public")
 }
 
 /// Paso del proceso contable configurable por organización
@@ -578,6 +615,7 @@ model AccountingProcessStep {
   completions AccountingStepCompletion[]
 
   @@index([tenantId])
+  @@schema("public")
   @@map("accounting_process_steps")
 }
 
@@ -603,6 +641,7 @@ model AccountingStepCompletion {
   @@unique([stepId, fiscalPeriodId])
   @@index([fiscalPeriodId])
   @@index([tenantId])
+  @@schema("public")
   @@map("accounting_step_completions")
 }
 
@@ -611,6 +650,8 @@ enum StepStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
+
+  @@schema("public")
 }
 
 // ─── Documents ────────────────────────────────────────────
@@ -626,6 +667,8 @@ enum DocumentCategory {
   COMPROBANTE
   REMUNERACION
   OTRO
+
+  @@schema("public")
 }
 
 /// Documento adjunto: almacenado en S3, asociado a conversacion y asientos
@@ -655,6 +698,7 @@ model Document {
 
   @@index([tenantId])
   @@index([conversationId])
+  @@schema("public")
   @@map("documents")
 }
 
@@ -672,6 +716,7 @@ model DocumentJournalEntry {
 
   @@unique([documentId, journalEntryId])
   @@index([tenantId])
+  @@schema("public")
   @@map("document_journal_entries")
 }
 
@@ -698,6 +743,7 @@ model AgentSkill {
 
   @@unique([tenantId, repoUrl])
   @@index([tenantId])
+  @@schema("public")
   @@map("agent_skills")
 }
 
@@ -716,6 +762,7 @@ model AgentSkillFile {
   @@unique([skillId, path])
   @@index([skillId])
   @@index([tenantId])
+  @@schema("public")
   @@map("agent_skill_files")
 }
 
@@ -736,6 +783,7 @@ model ApiKey {
   updatedAt   DateTime  @updatedAt
 
   @@index([keyHash])
+  @@schema("public")
   @@map("api_keys")
 }
 
@@ -750,6 +798,7 @@ model LoginCode {
   createdAt DateTime  @default(now())
 
   @@index([email])
+  @@schema("public")
   @@map("login_codes")
 }
 
@@ -760,6 +809,7 @@ model WaitlistEntry {
   deletedAt DateTime?
   createdAt DateTime @default(now())
 
+  @@schema("public")
   @@map("waitlist_entries")
 }
 
@@ -770,6 +820,7 @@ model FeatureRequest {
   ip        String?
   createdAt DateTime @default(now())
 
+  @@schema("public")
   @@map("feature_requests")
 }
 
@@ -798,6 +849,7 @@ model LinkedInConnection {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("linkedin_connections")
 }
 
@@ -842,6 +894,7 @@ model LinkedInPost {
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([status, scheduledAt])
+  @@schema("public")
   @@map("linkedin_posts")
 }
 
@@ -861,6 +914,7 @@ model LinkedInPostVersion {
 
   @@index([postId])
   @@index([tenantId])
+  @@schema("public")
   @@map("linkedin_post_versions")
 }
 
@@ -884,6 +938,7 @@ model LinkedInImageVersion {
 
   @@index([postId])
   @@index([tenantId])
+  @@schema("public")
   @@map("linkedin_image_versions")
 }
 
@@ -906,6 +961,7 @@ model LinkedInAgentConfig {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@schema("public")
   @@map("linkedin_agent_configs")
 }
 
@@ -916,6 +972,7 @@ enum PersonStatus {
   INACTIVE
   VACANT
 
+  @@schema("public")
   @@map("person_status")
 }
 
@@ -925,6 +982,7 @@ enum PersonSource {
   AI_CONFIRMED
   CSV_IMPORT
 
+  @@schema("public")
   @@map("person_source")
 }
 
@@ -950,6 +1008,7 @@ model Department {
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@schema("public")
   @@map("departments")
 }
 
@@ -995,6 +1054,7 @@ model PersonProfile {
   @@index([tenantId, reportsToId])
   @@index([tenantId, departmentId])
   @@unique([userId, tenantId])
+  @@schema("public")
   @@map("person_profiles")
 }
 
@@ -1006,6 +1066,7 @@ enum OrgSuggestionType {
   SET_REPORTS_TO
   DELETE_PERSON
 
+  @@schema("public")
   @@map("org_suggestion_type")
 }
 
@@ -1015,6 +1076,7 @@ enum OrgSuggestionStatus {
   APPROVED_MODIFIED
   REJECTED
 
+  @@schema("public")
   @@map("org_suggestion_status")
 }
 
@@ -1043,6 +1105,7 @@ model OrgSuggestion {
 
   @@index([tenantId, status])
   @@index([tenantId, personId])
+  @@schema("public")
   @@map("org_suggestions")
 }
 
@@ -1054,6 +1117,7 @@ enum OrgProjectStatus {
   COMPLETED
   ARCHIVED
 
+  @@schema("public")
   @@map("org_project_status")
 }
 
@@ -1063,6 +1127,7 @@ enum TranscriptionStatus {
   COMPLETED
   FAILED
 
+  @@schema("public")
   @@map("transcription_status")
 }
 
@@ -1070,6 +1135,7 @@ enum TranscriptionProvider {
   DEEPGRAM
   OPENAI
 
+  @@schema("public")
   @@map("transcription_provider")
 }
 
@@ -1084,6 +1150,7 @@ enum OrgEntityType {
   PROBLEM
   IMPROVEMENT
 
+  @@schema("public")
   @@map("org_entity_type")
 }
 
@@ -1100,6 +1167,7 @@ enum OrgRelationType {
   INPUTS
   OUTPUTS
 
+  @@schema("public")
   @@map("org_relation_type")
 }
 
@@ -1109,6 +1177,7 @@ enum ProblemSeverity {
   MEDIUM
   LOW
 
+  @@schema("public")
   @@map("problem_severity")
 }
 
@@ -1117,6 +1186,7 @@ enum ConflictType {
   PERSPECTIVE
   SCOPE
 
+  @@schema("public")
   @@map("conflict_type")
 }
 
@@ -1127,6 +1197,7 @@ enum ConflictResolution {
   RESOLVED_MERGED
   DISMISSED
 
+  @@schema("public")
   @@map("conflict_resolution")
 }
 
@@ -1159,6 +1230,7 @@ model OrgProject {
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@schema("public")
   @@map("org_projects")
 }
 
@@ -1198,6 +1270,7 @@ model Interview {
   @@index([projectId])
   @@index([tenantId])
   @@index([tenantId, processingStatus])
+  @@schema("public")
   @@map("interviews")
 }
 
@@ -1217,6 +1290,7 @@ model InterviewAudioTrack {
 
   @@unique([interviewId, trackOrder])
   @@index([interviewId])
+  @@schema("public")
   @@map("interview_audio_tracks")
 }
 
@@ -1240,6 +1314,7 @@ model InterviewSpeaker {
   @@unique([interviewId, speakerLabel])
   @@index([interviewId])
   @@index([tenantId])
+  @@schema("public")
   @@map("interview_speakers")
 }
 
@@ -1271,6 +1346,7 @@ model InterviewChunk {
   @@index([interviewId])
   @@index([tenantId])
   @@index([tenantId, interviewId])
+  @@schema("public")
   @@map("interview_chunks")
 }
 
@@ -1308,6 +1384,7 @@ model OrgEntity {
   @@index([tenantId, projectId, type])
   @@index([tenantId, type, status])
   @@index([tenantId, projectId, type, validTo])
+  @@schema("public")
   @@map("org_entities")
 }
 
@@ -1343,6 +1420,7 @@ model OrgRelation {
   @@index([toEntityId])
   @@index([type])
   @@index([tenantId, type, validTo])
+  @@schema("public")
   @@map("org_relations")
 }
 
@@ -1371,6 +1449,7 @@ model Problem {
   @@index([tenantId, projectId])
   @@index([severity])
   @@index([tenantId, projectId, severity])
+  @@schema("public")
   @@map("problems")
 }
 
@@ -1390,6 +1469,7 @@ model ProblemLink {
   @@index([problemId])
   @@index([entityId])
   @@index([tenantId])
+  @@schema("public")
   @@map("problem_links")
 }
 
@@ -1416,6 +1496,7 @@ model Improvement {
 
   @@index([tenantId, projectId])
   @@index([problemId])
+  @@schema("public")
   @@map("improvements")
 }
 
@@ -1439,6 +1520,7 @@ model FactualClaim {
   @@index([tenantId, projectId])
   @@index([subject])
   @@index([tenantId, projectId, subject, predicate])
+  @@schema("public")
   @@map("factual_claims")
 }
 
@@ -1461,6 +1543,7 @@ model ConflictRecord {
 
   @@index([tenantId, projectId])
   @@index([tenantId, projectId, resolution])
+  @@schema("public")
   @@map("conflict_records")
 }
 
@@ -1484,6 +1567,7 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, createdAt])
+  @@schema("public")
   @@map("audit_logs")
 }
 
@@ -1494,6 +1578,8 @@ enum ChannelType {
   PRIVATE
   DM
   GROUP_DM
+
+  @@schema("public")
 }
 
 model Channel {
@@ -1521,6 +1607,7 @@ model Channel {
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, type])
+  @@schema("public")
   @@map("channels")
 }
 
@@ -1539,6 +1626,7 @@ model ChannelMember {
 
   @@unique([channelId, userId])
   @@index([userId])
+  @@schema("public")
   @@map("channel_members")
 }
 
@@ -1569,6 +1657,7 @@ model ChatMessage {
   @@index([channelId, sequence])
   @@index([channelId, createdAt])
   @@index([threadParentId])
+  @@schema("public")
   @@map("chat_messages")
 }
 
@@ -1584,6 +1673,7 @@ model ChatAttachment {
   message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
+  @@schema("public")
   @@map("chat_attachments")
 }
 
@@ -1598,6 +1688,7 @@ model ChatReaction {
   user   User @relation("ChatReactionUser", fields: [userId], references: [id])
 
   @@unique([messageId, userId, emoji])
+  @@schema("public")
   @@map("chat_reactions")
 }
 
@@ -1611,6 +1702,7 @@ model ChatMention {
   mentionedUser   User @relation("ChatMentionTarget", fields: [mentionedUserId], references: [id])
 
   @@index([mentionedUserId])
+  @@schema("public")
   @@map("chat_mentions")
 }
 
@@ -1636,6 +1728,7 @@ model Notification {
   @@index([recipientId, isRead, createdAt])
   @@index([recipientId, tenantId, createdAt])
   @@index([groupKey])
+  @@schema("public")
   @@map("notifications")
 }
 
@@ -1651,6 +1744,7 @@ model NotificationPreference {
   user   User @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventPattern])
+  @@schema("public")
   @@map("notification_preferences")
 }
 
@@ -1671,5 +1765,64 @@ model ResourceLock {
   @@unique([entityType, entityId, fieldName])
   @@index([socketId])
   @@index([expiresAt])
+  @@schema("public")
   @@map("resource_locks")
+}
+
+// ─── FileMaker Connector ─────────────────────────────────
+
+enum FmSyncStatus {
+  SYNCED
+  PENDING_TO_FM
+  PENDING_TO_ZERU
+  ERROR
+
+  @@schema("citolab_fm")
+}
+
+model FmSyncRecord {
+  id          String       @id @default(uuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  entityType  String
+  entityId    String
+
+  fmDatabase  String
+  fmLayout    String
+  fmRecordId  String
+  fmModId     String?
+
+  syncStatus  FmSyncStatus @default(SYNCED)
+  lastSyncAt  DateTime     @default(now())
+  syncError   String?
+  retryCount  Int          @default(0)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([tenantId, entityType, entityId])
+  @@unique([tenantId, fmDatabase, fmLayout, fmRecordId])
+  @@index([syncStatus])
+  @@schema("citolab_fm")
+  @@map("fm_sync_records")
+}
+
+model FmSyncLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  entityType  String
+  entityId    String?
+  fmRecordId  String?
+  action      String
+  direction   String
+  details     Json?
+  error       String?
+  duration    Int?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, action])
+  @@schema("citolab_fm")
+  @@map("fm_sync_logs")
 }
