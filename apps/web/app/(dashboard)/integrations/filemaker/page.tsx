@@ -71,11 +71,15 @@ function SearchFieldsPanel({
     return fields.filter((f) => f.name.toLowerCase().includes(q));
   }, [fields, fieldFilter]);
 
-  // Deduplicate fields by name (FM can have duplicates)
+  // Deduplicate and exclude unsearchable fields
+  // FM Data API can't search on fields with dots (interpreted as JSON path),
+  // related fields (::), or summary/calculation fields
   const uniqueFields = useMemo(() => {
     const seen = new Set<string>();
     return filteredFields.filter((f) => {
       if (seen.has(f.name)) return false;
+      if (f.name.includes(".") || f.name.includes("::")) return false;
+      if (f.type === "summary") return false;
       seen.add(f.name);
       return true;
     });
