@@ -152,7 +152,7 @@ export class FmApiService {
     });
   }
 
-  // ── Auto-paginated findAll ──
+  // ── Auto-paginated findAll (uses POST _find — requires non-empty query) ──
 
   async findAll(
     db: string,
@@ -166,6 +166,34 @@ export class FmApiService {
 
     while (true) {
       const response = await this.findRecords(db, layout, query, {
+        ...opts,
+        offset,
+        limit: batchSize,
+        dateformats: opts?.dateformats ?? 2,
+      });
+      all.push(...response.records);
+      if (all.length >= response.totalRecordCount || response.records.length < batchSize) {
+        break;
+      }
+      offset += batchSize;
+    }
+
+    return all;
+  }
+
+  // ── Auto-paginated getAllRecords (uses GET — fetches all records without query) ──
+
+  async getAllRecords(
+    db: string,
+    layout: string,
+    opts?: Omit<FmQueryOptions, 'offset' | 'limit'>,
+  ): Promise<FmRecord[]> {
+    const all: FmRecord[] = [];
+    const batchSize = 100;
+    let offset = 1;
+
+    while (true) {
+      const response = await this.getRecords(db, layout, {
         ...opts,
         offset,
         limit: batchSize,

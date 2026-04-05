@@ -68,11 +68,10 @@ export class FmImportService {
 
     this.logger.log('Starting Procedencias import...');
 
-    // 1. Fetch all FM records with portals
-    const fmRecords = await this.fmApi.findAll(
+    // 1. Fetch all FM records with portals (GET, no query needed)
+    const fmRecords = await this.fmApi.getAllRecords(
       this.transformer.database,
       this.transformer.layout,
-      [{}],
       {
         portals: ['CONTACTOS Cobranzas', 'CONTACTOS', 'conceptos de cobro procedencia'],
         dateformats: 2,
