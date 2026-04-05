@@ -227,9 +227,13 @@ export class FmImportService {
     let originId: string;
 
     if (existingOriginId) {
+      // Only update legalEntityId if we have a value (don't nullify existing links when LE was soft-deleted)
+      const updateData = legalEntityId
+        ? { ...originData, legalEntityId }
+        : originData;
       await this.prisma.labOrigin.update({
         where: { id: existingOriginId },
-        data: { ...originData, legalEntityId },
+        data: updateData,
       });
       originId = existingOriginId;
       result.labOriginsUpdated++;

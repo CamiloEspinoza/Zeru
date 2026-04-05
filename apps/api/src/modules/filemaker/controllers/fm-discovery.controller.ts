@@ -42,7 +42,9 @@ export class FmDiscoveryController {
     @Param('layout') layout: string,
     @Query('limit') limit?: string,
   ) {
-    return this.discovery.sampleRecords(database, layout, Math.min(limit ? parseInt(limit, 10) : 10, 100));
+    const parsed = parseInt(limit ?? '', 10);
+    const safeLimit = Math.min(Number.isNaN(parsed) || parsed < 1 ? 10 : parsed, 100);
+    return this.discovery.sampleRecords(database, layout, safeLimit);
   }
 
   @Post(':database/layouts/:layout/search')

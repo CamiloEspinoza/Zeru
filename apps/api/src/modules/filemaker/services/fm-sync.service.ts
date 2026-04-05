@@ -110,10 +110,7 @@ export class FmSyncService {
           : 'PENDING_TO_ZERU' as const;
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
-          data: {
-            syncStatus: retryStatus,
-            retryCount: { increment: 1 },
-          },
+          data: { syncStatus: retryStatus },
         });
       } catch (error) {
         this.logger.error(`Retry failed for ${record.id}: ${error}`);
@@ -312,11 +309,27 @@ export class FmSyncService {
     }
 
     try {
-      const fmRecord = await this.fmApi.getRecord(
-        record.fmDatabase,
-        record.fmLayout,
-        record.fmRecordId,
-      );
+      let fmRecord;
+      try {
+        fmRecord = await this.fmApi.getRecord(
+          record.fmDatabase,
+          record.fmLayout,
+          record.fmRecordId,
+        );
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('401') || msg.includes('not found') || msg.includes('error 101')) {
+          // FM record was deleted — clean up the unknown sync record
+          await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+          return;
+        }
+        throw error;
+      }
+
+      if (!fmRecord) {
+        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+        return;
+      }
 
       // Extract and create/update LegalEntity
       const leData = this.transformer.extractLegalEntity(fmRecord);
@@ -371,17 +384,33 @@ export class FmSyncService {
         originId = origin.id;
       }
 
-      // Update the unknown sync record to point to the LabOrigin
-      await this.prisma.fmSyncRecord.update({
-        where: { id: record.id },
-        data: {
+      // Check if a sync record already exists for this FM record + lab-origin (e.g., from concurrent import)
+      const existingSync = await this.prisma.fmSyncRecord.findFirst({
+        where: {
+          tenantId: record.tenantId,
+          fmDatabase: record.fmDatabase,
+          fmLayout: record.fmLayout,
+          fmRecordId: record.fmRecordId,
           entityType: 'lab-origin',
-          entityId: originId,
-          syncStatus: 'SYNCED',
-          lastSyncAt: new Date(),
-          syncError: null,
         },
       });
+
+      if (existingSync) {
+        // Import already created the sync record — delete the unknown one
+        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+      } else {
+        // Convert the unknown sync record to lab-origin
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: {
+            entityType: 'lab-origin',
+            entityId: originId,
+            syncStatus: 'SYNCED',
+            lastSyncAt: new Date(),
+            syncError: null,
+          },
+        });
+      }
 
       await this.logSync({
         tenantId: record.tenantId,
@@ -402,10 +431,17 @@ export class FmSyncService {
   }
 
   private async handleFmRecordDeleted(record: { id: string; entityType: string; entityId: string }) {
+    // Soft-delete (not hard delete) — consistent with the rest of the system
     if (record.entityType === 'lab-origin' && record.entityId) {
-      await this.prisma.labOrigin.delete({ where: { id: record.entityId } }).catch(() => {});
+      await this.prisma.labOrigin.update({
+        where: { id: record.entityId },
+        data: { deletedAt: new Date(), isActive: false },
+      }).catch(() => {});
     } else if (record.entityType === 'legal-entity' && record.entityId) {
-      await this.prisma.legalEntity.delete({ where: { id: record.entityId } }).catch(() => {});
+      await this.prisma.legalEntity.update({
+        where: { id: record.entityId },
+        data: { deletedAt: new Date(), isActive: false },
+      }).catch(() => {});
     }
     await this.prisma.fmSyncRecord.update({
       where: { id: record.id },
@@ -439,6 +475,9 @@ export class FmSyncService {
           data: { syncStatus: 'PENDING_TO_ZERU' },
         });
       }
+    } else if (data.action === 'delete') {
+      // Delete for a record we never imported — nothing to do
+      this.logger.log(`Ignoring delete webhook for untracked FM record ${data.recordId}`);
     } else {
       // New record in FM — create a sync record for future processing
       try {
