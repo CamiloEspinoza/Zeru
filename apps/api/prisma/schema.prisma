@@ -56,6 +56,26 @@ enum ReportDeliveryMethod {
   @@schema("public")
 }
 
+enum BillingAgreementStatus {
+  ACTIVE
+  EXPIRED
+  DRAFT
+
+  @@schema("public")
+}
+
+enum BillingModality {
+  MONTHLY_SETTLEMENT
+  FONASA_VOUCHER
+  ISAPRE_VOUCHER
+  CASH
+  CHECK
+  BANK_TRANSFER
+  OTHER
+
+  @@schema("public")
+}
+
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
@@ -99,6 +119,8 @@ model Tenant {
   fmSyncRecords        FmSyncRecord[]
   legalEntities        LegalEntity[]
   labOrigins           LabOrigin[]
+  billingAgreements    BillingAgreement[]
+  billingConcepts      BillingConcept[]
 
   @@schema("public")
   @@map("tenants")
@@ -1842,10 +1864,6 @@ model LegalEntity {
   phone             String?
   website           String?
 
-  paymentTerms      PaymentTerms @default(NET_30)
-  customPaymentDays Int?
-  billingDayOfMonth Int?
-
   isActive          Boolean      @default(true)
   deletedAt         DateTime?
   createdAt         DateTime     @default(now())
@@ -1857,6 +1875,7 @@ model LegalEntity {
   contacts          LegalEntityContact[]
   bankAccounts      LegalEntityBankAccount[]
   labOrigins        LabOrigin[]
+  billingAgreements BillingAgreement[]
 
   @@unique([tenantId, rut])
   @@index([tenantId])
@@ -1951,13 +1970,6 @@ model LabOrigin {
   criticalNotificationEmails String[]
   sendsQualityReports        Boolean             @default(false)
 
-  contractDate               DateTime?
-  contractActive             Boolean             @default(false)
-  incorporationDate          DateTime?
-  agreementDate              DateTime?
-  lastAddendumNumber         String?
-  lastAddendumDate           DateTime?
-  lastAddendumDetail         String?
   receptionDays              String?
   receptionSchedule          String?
   notes                      String?
@@ -1966,42 +1978,141 @@ model LabOrigin {
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
 
+  billingAgreementId         String?
+  billingAgreement           BillingAgreement?   @relation(fields: [billingAgreementId], references: [id], onDelete: SetNull)
+
   tenantId                   String
   tenant                     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  pricing                    LabOriginPricing[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, category])
   @@index([tenantId, isActive])
   @@index([legalEntityId])
+  @@index([billingAgreementId])
   @@schema("public")
   @@map("lab_origins")
 }
 
-model LabOriginPricing {
-  id              String   @id @default(uuid())
-  billingConcept  String
-  description     String?
-  basePrice       Decimal  @db.Decimal(18, 2)
-  referencePrice  Decimal? @db.Decimal(18, 2)
-  multiplier      Decimal  @default(1) @db.Decimal(8, 4)
-  currency        String   @default("CLP")
-  isActive        Boolean  @default(true)
-  deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+// ─── Billing ────────────────────────────────────────────
 
-  labOriginId     String
-  labOrigin       LabOrigin @relation(fields: [labOriginId], references: [id], onDelete: Cascade)
-  tenantId        String
+model BillingConcept {
+  id               String   @id @default(uuid())
+  code             String
+  name             String
+  description      String?
+  referencePrice   Decimal  @db.Decimal(18, 2)
+  currency         String   @default("CLP")
 
-  @@unique([labOriginId, billingConcept])
-  @@index([labOriginId])
+  isActive         Boolean  @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  agreementLines   BillingAgreementLine[]
+
+  @@unique([tenantId, code])
   @@index([tenantId])
   @@schema("public")
-  @@map("lab_origin_pricing")
+  @@map("billing_concepts")
+}
+
+model BillingAgreement {
+  id                     String                  @id @default(uuid())
+  code                   String
+  name                   String
+
+  legalEntityId          String
+  legalEntity            LegalEntity             @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+
+  status                 BillingAgreementStatus  @default(ACTIVE)
+  contractDate           DateTime?
+  effectiveFrom          DateTime?
+  effectiveTo            DateTime?
+
+  paymentTerms           PaymentTerms            @default(NET_30)
+  customPaymentDays      Int?
+  billingDayOfMonth      Int?
+  isMonthlySettlement    Boolean                 @default(false)
+  billingModalities      BillingModality[]
+
+  examTypes              String[]
+  operationalFlags       Json?
+
+  notes                  String?
+  isActive               Boolean                 @default(true)
+  deletedAt              DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  tenantId               String
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  lines                  BillingAgreementLine[]
+  contacts               BillingContact[]
+  labOrigins             LabOrigin[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@schema("public")
+  @@map("billing_agreements")
+}
+
+model BillingAgreementLine {
+  id                  String           @id @default(uuid())
+
+  billingAgreementId  String
+  billingAgreement    BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+
+  billingConceptId    String
+  billingConcept      BillingConcept   @relation(fields: [billingConceptId], references: [id], onDelete: Restrict)
+
+  factor              Decimal          @default(1) @db.Decimal(8, 4)
+  negotiatedPrice     Decimal          @db.Decimal(18, 2)
+  referencePrice      Decimal?         @db.Decimal(18, 2)
+  currency            String           @default("CLP")
+
+  isActive            Boolean          @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  tenantId            String
+
+  @@unique([billingAgreementId, billingConceptId])
+  @@index([billingAgreementId])
+  @@index([billingConceptId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("billing_agreement_lines")
+}
+
+model BillingContact {
+  id                    String           @id @default(uuid())
+  name                  String
+  role                  String?
+  email                 String?
+  phone                 String?
+  mobile                String?
+  isPrimary             Boolean          @default(false)
+  notes                 String?
+  isActive              Boolean          @default(true)
+  deletedAt             DateTime?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  billingAgreementId    String
+  billingAgreement      BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+  tenantId              String
+
+  @@index([billingAgreementId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("billing_contacts")
 }
 
 // ─── FileMaker Connector ─────────────────────────────────
