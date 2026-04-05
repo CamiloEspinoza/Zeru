@@ -62,21 +62,21 @@ const DEFAULT_ROLES: {
   {
     slug: 'owner',
     name: 'Propietario',
-    description: 'Acceso completo a todos los modulos',
+    description: 'Acceso completo a todos los módulos',
     isDefault: false,
     moduleAccess: allModulesAt('MANAGE' as AccessLevel),
   },
   {
     slug: 'admin',
     name: 'Administrador',
-    description: 'Administracion completa de la organizacion',
+    description: 'Administración completa de la organización',
     isDefault: false,
     moduleAccess: allModulesAt('MANAGE' as AccessLevel),
   },
   {
     slug: 'finance-manager',
     name: 'Gerente de Finanzas',
-    description: 'Gestion financiera y contable',
+    description: 'Gestión financiera y contable',
     isDefault: false,
     moduleAccess: [
       { moduleKey: 'dashboard', accessLevel: 'VIEW' as AccessLevel },
@@ -132,7 +132,7 @@ const DEFAULT_ROLES: {
   {
     slug: 'viewer',
     name: 'Observador',
-    description: 'Solo lectura en todos los modulos',
+    description: 'Solo lectura en todos los módulos',
     isDefault: true,
     moduleAccess: allModulesAt('VIEW' as AccessLevel),
   },

@@ -231,7 +231,7 @@ export function OrgChartCanvas() {
       <div className="space-y-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold">Organigrama</h1>
-          <HelpTooltip text="Visualiza la estructura jerarquica de tu organizacion. Cada persona aparece como un nodo conectado a su jefatura directa." />
+          <HelpTooltip text="Visualiza la estructura jerárquica de tu organización. Cada persona aparece como un nodo conectado a su jefatura directa." />
         </div>
         <EducationalEmptyState
           icon={
@@ -253,12 +253,12 @@ export function OrgChartCanvas() {
               <line x1="12" y1="12" x2="12" y2="16" />
             </svg>
           }
-          title="Construye el organigrama de tu organizacion"
+          title="Construye el organigrama de tu organización"
           description={
             <>
               <p>
-                El organigrama muestra la estructura jerarquica de tu equipo.
-                Para empezar, necesitas definir quien reporta a quien.
+                El organigrama muestra la estructura jerárquica de tu equipo.
+                Para empezar, necesitas definir quién reporta a quién.
               </p>
               <p className="mt-2">
                 Ve al{" "}
@@ -268,9 +268,9 @@ export function OrgChartCanvas() {
                 >
                   Directorio de Personas
                 </a>{" "}
-                y asigna la relacion &ldquo;Reporta a&rdquo; en cada perfil. Una vez
-                que existan relaciones jerarquicas, el organigrama se generara
-                automaticamente.
+                y asigna la relación &ldquo;Reporta a&rdquo; en cada perfil. Una vez
+                que existan relaciones jerárquicas, el organigrama se generará
+                automáticamente.
               </p>
             </>
           }
@@ -280,14 +280,14 @@ export function OrgChartCanvas() {
               window.location.href = "/personas/directorio";
             },
           }}
-          tip='Tip: Comienza por registrar al lider de la organizacion (ej: Gerente General). Luego agrega sus reportes directos y asigna la relacion "Reporta a".'
+          tip='Tip: Comienza por registrar al líder de la organización (ej: Gerente General). Luego agrega sus reportes directos y asigna la relación "Reporta a".'
         />
         {stats && stats.totalPersons > 0 && (
           <div className="rounded-lg border bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
             Hay {stats.totalPersons} persona
             {stats.totalPersons !== 1 ? "s" : ""} registrada
             {stats.totalPersons !== 1 ? "s" : ""} en el directorio, pero
-            ninguna tiene una relacion jerarquica (&ldquo;reporta a&rdquo;)
+            ninguna tiene una relación jerárquica (&ldquo;reporta a&rdquo;)
             definida.
           </div>
         )}

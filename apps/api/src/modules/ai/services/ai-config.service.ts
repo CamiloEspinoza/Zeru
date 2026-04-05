@@ -124,7 +124,7 @@ export class AiConfigService {
 
   async disable(tenantId: string) {
     const config = await this.prisma.aiProviderConfig.findUnique({ where: { tenantId } });
-    if (!config) throw new NotFoundException('Configuracion de IA no encontrada');
+    if (!config) throw new NotFoundException('Configuración de IA no encontrada');
 
     return this.prisma.aiProviderConfig.update({
       where: { tenantId },

@@ -270,10 +270,10 @@ function ExplorerTab() {
       );
       setConnection(status);
       toast.success(
-        status.connected ? "Conexion exitosa" : "Conexion fallida",
+        status.connected ? "Conexión exitosa" : "Conexión fallida",
       );
     } catch {
-      toast.error("Error al probar conexion");
+      toast.error("Error al probar conexión");
     } finally {
       setTestingConnection(false);
     }
@@ -356,7 +356,7 @@ function ExplorerTab() {
         Object.entries(searchFields).filter(([, v]) => v.trim() !== ""),
       );
       if (Object.keys(activeFields).length === 0) {
-        toast.error("Ingresa al menos un criterio de busqueda");
+        toast.error("Ingresa al menos un criterio de búsqueda");
         return;
       }
       setSearching(true);
@@ -372,7 +372,7 @@ function ExplorerTab() {
         setSearchResults(res?.records ?? []);
         setSearchTotal(res.totalRecordCount ?? 0);
       } catch {
-        toast.error("Error en la busqueda");
+        toast.error("Error en la búsqueda");
         setSearchResults([]);
       } finally {
         setSearching(false);
@@ -386,7 +386,7 @@ function ExplorerTab() {
       {/* Connection + DB Selector */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Conexion a FileMaker</CardTitle>
+          <CardTitle className="text-sm">Conexión a FileMaker</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center gap-3">
           <Select value={selectedDb} onValueChange={handleDbChange}>
@@ -411,7 +411,7 @@ function ExplorerTab() {
             {testingConnection ? (
               <Spinner size="sm" />
             ) : (
-              "Probar conexion"
+              "Probar conexión"
             )}
           </Button>
 
@@ -663,7 +663,7 @@ function ExplorerTab() {
                         Anterior
                       </Button>
                       <span className="text-xs text-muted-foreground">
-                        Pagina {searchPage} de {Math.ceil(searchTotal / 20)}
+                        Página {searchPage} de {Math.ceil(searchTotal / 20)}
                       </span>
                       <Button
                         variant="outline"
@@ -824,13 +824,13 @@ function ImportPanel({ onComplete }: { onComplete: () => void }) {
         </div>
         {importing && (
           <p className="text-xs text-muted-foreground">
-            El import se ejecuta en background. Los stats se actualizan automaticamente.
+            El import se ejecuta en background. Los stats se actualizan automáticamente.
           </p>
         )}
         {result && (
           <div className="grid gap-2 rounded-md border p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <span className="text-muted-foreground">Personas juridicas: </span>
+              <span className="text-muted-foreground">Personas jurídicas: </span>
               <span className="font-medium">{result.legalEntitiesCreated} creadas, {result.legalEntitiesUpdated} actualizadas</span>
             </div>
             <div>
@@ -878,7 +878,7 @@ function SyncStatusTab() {
       setErrors(errorsRes);
       setLogs(logsRes);
     } catch {
-      toast.error("Error al cargar estado de sincronizacion");
+      toast.error("Error al cargar estado de sincronización");
     } finally {
       setLoading(false);
     }
@@ -907,7 +907,7 @@ function SyncStatusTab() {
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-8 text-muted-foreground">
-        <Spinner size="sm" /> Cargando estado de sincronizacion...
+        <Spinner size="sm" /> Cargando estado de sincronización...
       </div>
     );
   }
@@ -993,7 +993,7 @@ function SyncStatusTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Operacion</TableHead>
+                  <TableHead>Operación</TableHead>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Mensaje</TableHead>

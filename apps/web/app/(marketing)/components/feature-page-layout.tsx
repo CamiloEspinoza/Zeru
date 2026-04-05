@@ -205,7 +205,7 @@ export function FeaturePageLayout({
                 </Link>
               </div>
               <p className="text-xs text-white/50 mt-6">
-                Sin tarjeta de credito. Configura en 5 minutos.
+                Sin tarjeta de crédito. Configura en 5 minutos.
               </p>
             </>
           )}

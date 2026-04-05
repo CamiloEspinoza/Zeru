@@ -63,7 +63,7 @@ export default function AiCostsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="7d">Ultimos 7 dias</SelectItem>
+            <SelectItem value="7d">Últimos 7 días</SelectItem>
             <SelectItem value="month">Mes actual</SelectItem>
             <SelectItem value="prev-month">Mes anterior</SelectItem>
           </SelectContent>

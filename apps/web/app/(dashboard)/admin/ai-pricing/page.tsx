@@ -154,7 +154,7 @@ export default function AiPricingPage() {
               <DialogTitle>Nuevo Precio</DialogTitle>
               <DialogDescription>
                 Agrega un nuevo precio para un modelo de IA. El precio anterior
-                se desactivara automaticamente.
+                se desactivará automáticamente.
               </DialogDescription>
             </DialogHeader>
 
@@ -259,7 +259,7 @@ export default function AiPricingPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Descripcion (opcional)</Label>
+                <Label htmlFor="description">Descripción (opcional)</Label>
                 <Input
                   id="description"
                   value={form.description}

@@ -28,7 +28,7 @@ export const listProjectsSchema = z.object({
 // --- Interview DTOs ---
 
 export const createInterviewSchema = z.object({
-  projectId: z.string().uuid('ID de proyecto invalido'),
+  projectId: z.string().uuid('ID de proyecto inválido'),
   title: z.string().max(200).optional(),
   interviewDate: z.string().datetime().optional(),
   objective: z.string().max(2000).optional(),
@@ -68,14 +68,14 @@ export const listInterviewsSchema = z.object({
 // --- Improvement DTOs ---
 
 export const createImprovementSchema = z.object({
-  title: z.string().min(1, 'El titulo es requerido').max(200),
-  description: z.string().min(1, 'La descripcion es requerida').max(5000),
+  title: z.string().min(1, 'El título es requerido').max(200),
+  description: z.string().min(1, 'La descripción es requerida').max(5000),
   type: z.string().max(100).optional(),
   effort: z.string().max(100).optional(),
   impact: z.string().max(100).optional(),
   priority: z.number().int().optional(),
-  projectId: z.string().uuid('ID de proyecto invalido'),
-  problemId: z.string().uuid('ID de problema invalido'),
+  projectId: z.string().uuid('ID de proyecto inválido'),
+  problemId: z.string().uuid('ID de problema inválido'),
 });
 
 export const updateImprovementSchema = z.object({

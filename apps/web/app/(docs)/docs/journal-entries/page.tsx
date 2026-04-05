@@ -76,7 +76,7 @@ export default function JournalEntriesPage() {
             type: "string (uuid)",
             required: true,
             location: "body",
-            description: "Periodo fiscal; debe existir y estar OPEN.",
+            description: "Período fiscal; debe existir y estar OPEN.",
           },
           {
             name: "entries[].lines",
