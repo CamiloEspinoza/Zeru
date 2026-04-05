@@ -744,6 +744,12 @@ interface ImportResult {
   legalEntitiesSkippedDeleted: number;
   contactsImported: number;
   pricingImported: number;
+  billingConceptsCreated: number;
+  billingConceptsUpdated: number;
+  billingAgreementsCreated: number;
+  billingAgreementsUpdated: number;
+  billingLinesImported: number;
+  billingContactsImported: number;
   errors: Array<{ fmRecordId: string; error: string }>;
 }
 
@@ -757,7 +763,7 @@ function ImportPanel({ onComplete }: { onComplete: () => void }) {
     setResult(null);
     try {
       const res = await api.post<{ started: boolean; message: string }>(
-        "/filemaker/import/procedencias",
+        "/filemaker/import/convenios",
         {},
       );
       if (!res.started) {
@@ -812,14 +818,14 @@ function ImportPanel({ onComplete }: { onComplete: () => void }) {
             {importing ? (
               <>
                 <Spinner size="sm" className="mr-2" />
-                Importando Procedencias...
+                Importando Convenios...
               </>
             ) : (
-              "Importar Procedencias"
+              "Importar Convenios"
             )}
           </Button>
           <span className="text-xs text-muted-foreground">
-            Base: BIOPSIAS | Layout: Procedencias*
+            Import integral: Conceptos, Convenios, Procedencias
           </span>
         </div>
         {importing && (
@@ -830,6 +836,14 @@ function ImportPanel({ onComplete }: { onComplete: () => void }) {
         {result && (
           <div className="grid gap-2 rounded-md border p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
             <div>
+              <span className="text-muted-foreground">Conceptos (CDC): </span>
+              <span className="font-medium">{result.billingConceptsCreated} creados, {result.billingConceptsUpdated} actualizados</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Convenios: </span>
+              <span className="font-medium">{result.billingAgreementsCreated} creados, {result.billingAgreementsUpdated} actualizados</span>
+            </div>
+            <div>
               <span className="text-muted-foreground">Personas jurídicas: </span>
               <span className="font-medium">{result.legalEntitiesCreated} creadas, {result.legalEntitiesUpdated} actualizadas</span>
             </div>
@@ -838,11 +852,19 @@ function ImportPanel({ onComplete }: { onComplete: () => void }) {
               <span className="font-medium">{result.labOriginsCreated} creadas, {result.labOriginsUpdated} actualizadas</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Contactos: </span>
+              <span className="text-muted-foreground">Líneas de precio: </span>
+              <span className="font-medium">{result.billingLinesImported}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Contactos cobranza: </span>
+              <span className="font-medium">{result.billingContactsImported}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Contactos LE: </span>
               <span className="font-medium">{result.contactsImported}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Precios: </span>
+              <span className="text-muted-foreground">Precios procedencia: </span>
               <span className="font-medium">{result.pricingImported}</span>
             </div>
             {result.errors.length > 0 && (
