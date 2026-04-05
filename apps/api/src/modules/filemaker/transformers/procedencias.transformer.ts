@@ -205,6 +205,21 @@ export class ProcedenciasTransformer {
       .filter((p): p is ExtractedPricing => p !== null);
   }
 
+  /** Extract pricing from a standalone CDC record (layout: conceptos de cobro procedencia) */
+  extractPricingFromRecord(record: FmRecord): ExtractedPricing | null {
+    const d = record.fieldData;
+    const concept = str(d['Concepto de cobro_fk']) || str(d['Código']);
+    if (!concept) return null;
+
+    return {
+      billingConcept: concept,
+      description: str(d['Descripción']) || null,
+      basePrice: parseNum(d['Valor']),
+      referencePrice: parseNum(d['Valor Referencia']) || null,
+      multiplier: str(d['Factor']) ? parseNum(d['Factor']) : 1,
+    };
+  }
+
   // ── Zeru → FM (write-back) ──
 
   legalEntityToFm(entity: {

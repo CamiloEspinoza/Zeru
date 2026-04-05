@@ -249,27 +249,42 @@ export class FmImportService {
       await this.ensureSyncRecord(tenantId, 'lab-origin', origin.id, record);
     }
 
-    // ── Pricing (upsert by billingConcept) ──
+    // ── Pricing (fetched separately via convenio FK) ──
 
-    const pricingItems = this.transformer.extractPricing(record);
-    for (const pricing of pricingItems) {
-      await this.prisma.labOriginPricing.upsert({
-        where: {
-          labOriginId_billingConcept: {
-            labOriginId: originId,
-            billingConcept: pricing.billingConcept,
-          },
-        },
-        create: { ...pricing, labOriginId: originId, tenantId, deletedAt: null },
-        update: {
-          description: pricing.description,
-          basePrice: pricing.basePrice,
-          referencePrice: pricing.referencePrice,
-          multiplier: pricing.multiplier,
-          deletedAt: null, // resurrect if previously soft-deleted
-        },
-      });
-      result.pricingImported++;
+    const convenioFk = String(record.fieldData['_fk_convenio'] ?? '').trim();
+    if (convenioFk) {
+      try {
+        const pricingRecords = await this.fmApi.findRecords(
+          this.transformer.database,
+          'conceptos de cobro procedencia',
+          [{ 'Convenio_fk': convenioFk }],
+          { dateformats: 2 },
+        );
+        for (const pr of pricingRecords.records) {
+          const pricing = this.transformer.extractPricingFromRecord(pr);
+          if (!pricing) continue;
+          await this.prisma.labOriginPricing.upsert({
+            where: {
+              labOriginId_billingConcept: {
+                labOriginId: originId,
+                billingConcept: pricing.billingConcept,
+              },
+            },
+            create: { ...pricing, labOriginId: originId, tenantId, deletedAt: null },
+            update: {
+              description: pricing.description,
+              basePrice: pricing.basePrice,
+              referencePrice: pricing.referencePrice,
+              multiplier: pricing.multiplier,
+              deletedAt: null,
+            },
+          });
+          result.pricingImported++;
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`Failed to import pricing for convenio ${convenioFk}: ${msg}`);
+      }
     }
 
     // ── Log ──
