@@ -68,14 +68,12 @@ export class FmImportService {
 
     this.logger.log('Starting Procedencias import...');
 
-    // 1. Fetch all FM records with portals (GET, no query needed)
+    // 1. Fetch all FM records (GET, no query needed)
+    // Portals are requested separately due to FM error 110 on some portal combinations
     const fmRecords = await this.fmApi.getAllRecords(
       this.transformer.database,
       this.transformer.layout,
-      {
-        portals: ['CONTACTOS Cobranzas', 'conceptos de cobro procedencia'],
-        dateformats: 2,
-      },
+      { dateformats: 2 },
     );
 
     this.logger.log(`Fetched ${fmRecords.length} FM records`);
