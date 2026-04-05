@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { validateRut } from '../utils/format-rut';
 
-const PAYMENT_TERMS = [
-  'IMMEDIATE', 'NET_15', 'NET_30', 'NET_45', 'NET_60', 'NET_90', 'CUSTOM',
-] as const;
-
 const BANK_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'VISTA', 'OTHER'] as const;
 
 export const createLegalEntitySchema = z.object({
@@ -25,9 +21,6 @@ export const createLegalEntitySchema = z.object({
   email: z.string().email().optional().nullable().or(z.literal('')),
   phone: z.string().optional(),
   website: z.string().optional(),
-  paymentTerms: z.enum(PAYMENT_TERMS).optional(),
-  customPaymentDays: z.number().int().min(1).optional(),
-  billingDayOfMonth: z.number().int().min(1).max(28).optional(),
 });
 
 export const updateLegalEntitySchema = createLegalEntitySchema.partial();

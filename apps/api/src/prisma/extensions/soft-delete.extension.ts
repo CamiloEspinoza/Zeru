@@ -27,7 +27,10 @@ const SOFT_DELETABLE_MODELS = new Set([
   'legalEntityContact',
   'legalEntityBankAccount',
   'labOrigin',
-  'labOriginPricing',
+  'billingAgreement',
+  'billingAgreementLine',
+  'billingContact',
+  'billingConcept',
 ]);
 
 const READ_OPS = new Set([

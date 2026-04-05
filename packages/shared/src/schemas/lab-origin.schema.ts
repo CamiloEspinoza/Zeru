@@ -30,13 +30,7 @@ export const createLabOriginSchema = z.object({
   deliveryDaysDefault: z.number().int().min(0).optional(),
   criticalNotificationEmails: z.array(z.string().email()).optional(),
   sendsQualityReports: z.boolean().optional(),
-  contractDate: z.string().date().optional(),
-  contractActive: z.boolean().optional(),
-  incorporationDate: z.string().date().optional(),
-  agreementDate: z.string().date().optional(),
-  lastAddendumNumber: z.string().optional(),
-  lastAddendumDate: z.string().date().optional(),
-  lastAddendumDetail: z.string().optional(),
+  billingAgreementId: z.string().uuid().nullable().optional(),
   receptionDays: z.string().optional(),
   receptionSchedule: z.string().optional(),
   notes: z.string().optional(),
@@ -44,15 +38,5 @@ export const createLabOriginSchema = z.object({
 
 export const updateLabOriginSchema = createLabOriginSchema.partial();
 
-export const createLabOriginPricingSchema = z.object({
-  billingConcept: z.string().min(1, 'Concepto requerido'),
-  description: z.string().optional(),
-  basePrice: z.number().min(0, 'Precio debe ser >= 0'),
-  referencePrice: z.number().min(0).optional(),
-  multiplier: z.number().min(0).optional(),
-  currency: z.string().length(3, 'Código ISO 4217 (ej: CLP, USD, UF)').optional(),
-});
-
 export type CreateLabOriginSchema = z.infer<typeof createLabOriginSchema>;
 export type UpdateLabOriginSchema = z.infer<typeof updateLabOriginSchema>;
-export type CreateLabOriginPricingSchema = z.infer<typeof createLabOriginPricingSchema>;
