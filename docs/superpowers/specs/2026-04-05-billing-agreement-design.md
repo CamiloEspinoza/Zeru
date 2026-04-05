@@ -377,34 +377,85 @@ export class ConvenioTransformer {
 - `extractLabOrigin` no incluye campos contractuales (migrados a BillingAgreement)
 - El campo `_fk_convenio` se usa para vincular `LabOrigin.billingAgreementId`
 
-## 6. Import
+## 6. Import unificado: "Importar Convenios"
 
-### 6.1 Orden de import (dependencias)
+El import ya no es solo "Importar Procedencias" — es un import integral que trae todos los datos relacionados desde FM. Un solo endpoint orquesta la carga completa.
 
-1. **BillingConcept** — catálogo maestro, sin dependencias. Layout: `Conceptos de cobro (CDC)*`
-2. **LegalEntity** — sin cambios, ya importado
-3. **BillingAgreement** — requiere LegalEntity (por RUT). Layout: `CONVENIOS Conceptos de cobro*`
-4. **BillingAgreementLine** — requiere BillingAgreement + BillingConcept. Portal `portal_cdc` del layout de convenios, o layout `conceptos de cobro procedencia`
-5. **BillingContact** — requiere BillingAgreement. Portal `CONTACTOS Cobranzas` del layout de convenios
-6. **LabOrigin** — requiere BillingAgreement (por `_fk_convenio`). Ya importado, se actualiza `billingAgreementId`
+### 6.1 Endpoint
 
-### 6.2 Deduplicación
+```
+POST /filemaker/import/convenios
+```
 
-- **BillingConcept**: por `[tenantId, code]` (el `code` es `Concepto` del FM, unique por nombre+tier)
-- **BillingAgreement**: por `[tenantId, code]` (el `code` es `Código` del FM)
-- **BillingAgreementLine**: por `[billingAgreementId, billingConceptId]`
+Retorna HTTP 202 (background). Reemplaza al anterior `POST /filemaker/import/procedencias`.
 
-### 6.3 Migración de datos existentes
+### 6.2 Orden de import (dependencias)
 
-Si ya hay datos importados con el modelo anterior:
+```
+Paso 1: BillingConcept (catálogo maestro, sin deps)
+  └── Layout: Conceptos de cobro (CDC)*
+  └── 181 registros, dedup por [tenantId, code]
 
-1. Crear BillingConcepts desde el catálogo FM
-2. Crear BillingAgreements desde convenios FM, vinculando a LegalEntity por RUT
-3. Crear BillingAgreementLines desde CDC FM
-4. Actualizar LabOrigins con `billingAgreementId`
-5. Migrar contactos de cobranzas de LegalEntityContact a BillingContact
-6. Eliminar LabOriginPricing (reemplazado por BillingAgreementLine)
-7. Remover campos obsoletos de LegalEntity y LabOrigin
+Paso 2: LegalEntity (personas jurídicas, sin deps)
+  └── Layout: Procedencias* (campos INSTITUCIONES::*)
+  └── Dedup por [tenantId, rut]
+
+Paso 3: BillingAgreement (convenios, requiere LegalEntity)
+  └── Layout: CONVENIOS Conceptos de cobro*
+  └── 770 registros, dedup por [tenantId, code]
+  └── Vincula a LegalEntity por RUT
+
+Paso 4: BillingAgreementLine (precios, requiere Agreement + Concept)
+  └── Portal portal_cdc del layout CONVENIOS Conceptos de cobro*
+  └── 3,647 registros, dedup por [billingAgreementId, billingConceptId]
+  └── FK mapping: Concepto de cobro_fk → BillingConcept (por FM recordId)
+
+Paso 5: BillingContact (contactos cobranzas, requiere Agreement)
+  └── Portal CONTACTOS Cobranzas del layout CONVENIOS Conceptos de cobro*
+
+Paso 6: LabOrigin (procedencias, requiere Agreement)
+  └── Layout: Procedencias*
+  └── 862 registros, dedup por [tenantId, code]
+  └── Vincula billingAgreementId via _fk_convenio → BillingAgreement.code
+```
+
+### 6.3 Deduplicación
+
+| Entidad | Clave unique | Estrategia |
+|---------|-------------|------------|
+| BillingConcept | `[tenantId, code]` | Upsert (code = `Concepto` de FM) |
+| LegalEntity | `[tenantId, rut]` | Merge (solo non-null) |
+| BillingAgreement | `[tenantId, code]` | Upsert |
+| BillingAgreementLine | `[billingAgreementId, billingConceptId]` | Upsert |
+| BillingContact | Delete + recreate por agreement | Replace |
+| LabOrigin | `[tenantId, code]` | Merge (solo non-null) |
+
+### 6.4 FK mapping entre FM recordIds y Zeru UUIDs
+
+Durante el import se necesitan 3 mapas de traducción:
+
+```
+fmConceptRecordId → billingConceptId (UUID)
+  Para: BillingAgreementLine.billingConceptId
+  Fuente: FM Concepto de cobro_fk → Zeru BillingConcept
+
+fmConvenioCode → billingAgreementId (UUID)  
+  Para: LabOrigin.billingAgreementId
+  Fuente: FM _fk_convenio → Zeru BillingAgreement
+
+rut → legalEntityId (UUID)
+  Para: BillingAgreement.legalEntityId
+  Fuente: FM Rut → Zeru LegalEntity
+```
+
+### 6.5 Migración de datos existentes
+
+Si ya hay datos importados con el modelo anterior (LabOriginPricing):
+
+1. Ejecutar el nuevo import unificado (crea BillingConcept, BillingAgreement, Lines, Contacts)
+2. La migración Prisma elimina LabOriginPricing y campos obsoletos
+3. Los LabOrigins existentes se actualizan con `billingAgreementId` durante el import
+4. LegalEntityContact de tipo cobranzas migra a BillingContact
 
 ## 7. Soft delete
 
@@ -416,9 +467,86 @@ Registrar en `SOFT_DELETABLE_MODELS`:
 
 ## 8. Webhook triggers
 
-Nuevos triggers en FM:
-- `CONVENIOS Conceptos de cobro*` → OnRecordCommit → webhook con layout `CONVENIOS Conceptos de cobro*`
-- Los cambios en el convenio actualizan BillingAgreement + BillingAgreementLine + BillingContact
+### 8.1 Mapa completo de layouts y triggers
+
+| Layout FM | Trigger | Acción webhook | Entidades afectadas en Zeru |
+|-----------|---------|--------|-----------------------------|
+| `Procedencias*` | OnRecordCommit | `create` / `update` | LegalEntity + LabOrigin |
+| `Procedencias*` | Antes de Delete | `delete` | LabOrigin (soft-delete) |
+| `FICHA INSTITUCION COBRANZAS` | OnRecordCommit | `update` | LegalEntity (campos directos) |
+| `CONVENIOS Conceptos de cobro*` | OnRecordCommit | `create` / `update` | BillingAgreement + BillingContact |
+| `CONVENIOS Conceptos de cobro*` | Antes de Delete | `delete` | BillingAgreement (soft-delete) |
+| `Conceptos de cobro (CDC)*` | OnRecordCommit | `create` / `update` | BillingConcept |
+| `conceptos de cobro procedencia` | OnRecordCommit | `create` / `update` | BillingAgreementLine |
+
+### 8.2 Scripts FM a crear/modificar
+
+| Script | Layout | Descripción |
+|--------|--------|-------------|
+| `Webhook - Notificar Zeru` | (base) | Script genérico que envía POST al webhook de Zeru |
+| `Webhook - Procedencias OnCommit` | `Procedencias*` | Ya existe — detecta create/update |
+| `Webhook - Instituciones OnCommit` | `FICHA INSTITUCION COBRANZAS` | Ya existe — actualiza LegalEntity |
+| `Webhook - Convenios OnCommit` | `CONVENIOS Conceptos de cobro*` | **NUEVO** — notifica cambios en convenios |
+| `Webhook - CDC OnCommit` | `Conceptos de cobro (CDC)*` | **NUEVO** — notifica cambios en catálogo |
+| `Webhook - Pricing OnCommit` | `conceptos de cobro procedencia` | **NUEVO** — notifica cambios en precios |
+
+### 8.3 Payload para cada layout
+
+Todos usan el mismo formato:
+```json
+{
+  "database": "BIOPSIAS",
+  "layout": "<nombre exacto del layout>",
+  "recordId": "<Get(RecordID)>",
+  "action": "create" | "update" | "delete"
+}
+```
+
+### 8.4 Procesamiento en Zeru por layout
+
+| Layout recibido | Handler en FmSyncService |
+|-----------------|--------------------------|
+| `Procedencias*` | `processUnknownRecord` (composite: LE + LabOrigin) |
+| `FICHA INSTITUCION COBRANZAS` | `processInstitutionWebhook` (actualiza LE por RUT) |
+| `CONVENIOS Conceptos de cobro*` | **NUEVO** `processConvenioWebhook` — lee convenio FM, upsert BillingAgreement + Lines + Contacts |
+| `Conceptos de cobro (CDC)*` | **NUEVO** `processBillingConceptWebhook` — lee CDC FM, upsert BillingConcept |
+| `conceptos de cobro procedencia` | **NUEVO** `processPricingLineWebhook` — lee pricing FM, upsert BillingAgreementLine |
+
+### 8.5 Checklist de configuración en FM
+
+**Triggers existentes (ya documentados):**
+- [ ] `Procedencias*` → OnRecordCommit → `Webhook - Procedencias OnCommit`
+- [ ] `FICHA INSTITUCION COBRANZAS` → OnRecordCommit → `Webhook - Instituciones OnCommit`
+- [ ] Scripts de eliminación de procedencias → webhook antes de Delete
+
+**Triggers nuevos (requieren configuración):**
+- [ ] Crear script `Webhook - Convenios OnCommit`
+- [ ] `CONVENIOS Conceptos de cobro*` → OnRecordCommit → `Webhook - Convenios OnCommit`
+- [ ] Crear script `Webhook - CDC OnCommit`
+- [ ] `Conceptos de cobro (CDC)*` → OnRecordCommit → `Webhook - CDC OnCommit`
+- [ ] Crear script `Webhook - Pricing OnCommit`
+- [ ] `conceptos de cobro procedencia` → OnRecordCommit → `Webhook - Pricing OnCommit`
+- [ ] Auditar scripts que eliminan convenios → agregar webhook antes de delete
+- [ ] Probar: editar convenio → verificar BillingAgreement actualizado en Zeru
+- [ ] Probar: agregar precio a convenio → verificar BillingAgreementLine creado en Zeru
+- [ ] Probar: modificar concepto maestro → verificar BillingConcept actualizado en Zeru
+
+### 8.6 Script FM genérico para nuevos triggers
+
+Todos los nuevos scripts siguen el mismo patrón del script base existente. Solo cambia el `$layout`:
+
+```filemaker
+# Webhook - Convenios OnCommit
+Set Variable [ $param ; Value:
+  JSONSetElement ( "{}" ;
+    [ "database" ; Get ( FileName ) ; JSONString ] ;
+    [ "layout" ; "CONVENIOS Conceptos de cobro*" ; JSONString ] ;
+    [ "recordId" ; Get ( RecordID ) ; JSONString ] ;
+    [ "action" ; If ( /* detect create vs update */ ; "create" ; "update" ) ; JSONString ]
+  )
+]
+Perform Script [ "Webhook - Notificar Zeru" ; Parameter: $param ]
+```
 
 ## 9. Fuera de alcance
 
