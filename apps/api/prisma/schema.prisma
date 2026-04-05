@@ -1979,6 +1979,7 @@ model LabOriginPricing {
   basePrice       Decimal  @db.Decimal(18, 2)
   referencePrice  Decimal? @db.Decimal(18, 2)
   multiplier      Decimal  @default(1) @db.Decimal(8, 4)
+  currency        String   @default("CLP")
   isActive        Boolean  @default(true)
   deletedAt       DateTime?
   createdAt       DateTime @default(now())

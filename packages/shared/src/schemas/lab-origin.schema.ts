@@ -42,6 +42,7 @@ export const createLabOriginPricingSchema = z.object({
   basePrice: z.number().min(0, 'Precio debe ser >= 0'),
   referencePrice: z.number().min(0).optional(),
   multiplier: z.number().min(0).optional(),
+  currency: z.string().length(3, 'Código ISO 4217 (ej: CLP, USD, UF)').optional(),
 });
 
 export type CreateLabOriginSchema = z.infer<typeof createLabOriginSchema>;
