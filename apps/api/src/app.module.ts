@@ -30,6 +30,7 @@ import { RolesModule } from './modules/roles/roles.module';
 import { FileMakerModule } from './modules/filemaker/filemaker.module';
 import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.module';
 import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
     FileMakerModule,
     LegalEntitiesModule,
     LabOriginsModule,
+    BillingModule,
   ],
 })
 export class AppModule implements NestModule {
