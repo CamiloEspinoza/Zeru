@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from './fm-api.service';
 import { FmSyncService } from './fm-sync.service';
@@ -10,6 +11,8 @@ export interface ImportResult {
   legalEntitiesUpdated: number;
   labOriginsCreated: number;
   labOriginsUpdated: number;
+  labOriginsSkippedDeleted: number;
+  legalEntitiesSkippedDeleted: number;
   contactsImported: number;
   pricingImported: number;
   errors: Array<{ fmRecordId: string; error: string }>;
@@ -57,6 +60,8 @@ export class FmImportService {
       legalEntitiesUpdated: 0,
       labOriginsCreated: 0,
       labOriginsUpdated: 0,
+      labOriginsSkippedDeleted: 0,
+      legalEntitiesSkippedDeleted: 0,
       contactsImported: 0,
       pricingImported: 0,
       errors: [],
@@ -77,7 +82,7 @@ export class FmImportService {
 
     this.logger.log(`Fetched ${fmRecords.length} FM records`);
 
-    // 2. Build caches: key → Zeru ID
+    // 2. Build caches: key → Zeru ID (active records)
     const existingEntities = await this.prisma.legalEntity.findMany({
       where: { tenantId },
       select: { id: true, rut: true },
@@ -96,10 +101,32 @@ export class FmImportService {
       codeCache.set(o.code, o.id);
     }
 
-    // 3. Process each FM record
+    // 3. Build soft-deleted sets (bypass soft-delete extension via _client)
+    const rawClient = (this.prisma as unknown as { _client: PrismaClient })._client;
+    const deletedOrigins = await rawClient.labOrigin.findMany({
+      where: { tenantId, deletedAt: { not: null } },
+      select: { code: true },
+    });
+    const deletedOriginCodes = new Set(deletedOrigins.map((o) => o.code));
+
+    const deletedEntities = await rawClient.legalEntity.findMany({
+      where: { tenantId, deletedAt: { not: null } },
+      select: { rut: true },
+    });
+    const deletedEntityRuts = new Set(deletedEntities.map((e) => e.rut));
+
+    this.logger.log(
+      `Caches: ${rutCache.size} LE, ${codeCache.size} origins, ` +
+      `${deletedOriginCodes.size} deleted origins, ${deletedEntityRuts.size} deleted LE`,
+    );
+
+    // 4. Process each FM record
     for (const record of fmRecords) {
       try {
-        await this.importSingleProcedencia(tenantId, record, rutCache, codeCache, result);
+        await this.importSingleProcedencia(
+          tenantId, record, rutCache, codeCache,
+          deletedOriginCodes, deletedEntityRuts, result,
+        );
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(`Error importing FM record ${record.recordId}: ${msg}`);
@@ -108,8 +135,8 @@ export class FmImportService {
     }
 
     this.logger.log(
-      `Import complete: LE ${result.legalEntitiesCreated} created / ${result.legalEntitiesUpdated} updated, ` +
-      `Origins ${result.labOriginsCreated} created / ${result.labOriginsUpdated} updated, ` +
+      `Import complete: LE ${result.legalEntitiesCreated} created / ${result.legalEntitiesUpdated} updated / ${result.legalEntitiesSkippedDeleted} skipped (deleted), ` +
+      `Origins ${result.labOriginsCreated} created / ${result.labOriginsUpdated} updated / ${result.labOriginsSkippedDeleted} skipped (deleted), ` +
       `${result.contactsImported} contacts, ${result.pricingImported} pricing, ` +
       `${result.errors.length} errors`,
     );
@@ -122,57 +149,68 @@ export class FmImportService {
     record: { recordId: string; modId?: string; fieldData: Record<string, unknown>; portalData?: Record<string, unknown[]> },
     rutCache: Map<string, string>,
     codeCache: Map<string, string>,
+    deletedOriginCodes: Set<string>,
+    deletedEntityRuts: Set<string>,
     result: ImportResult,
   ) {
+    // ── LabOrigin check first (if deleted in Zeru, skip entire record) ──
+
+    const originData = this.transformer.extractLabOrigin(record);
+
+    if (deletedOriginCodes.has(originData.code)) {
+      result.labOriginsSkippedDeleted++;
+      return;
+    }
+
     // ── LegalEntity (may be null for 31% without RUT) ──
 
     const leData = this.transformer.extractLegalEntity(record);
     let legalEntityId: string | null = null;
 
     if (leData) {
-      const existingLeId = rutCache.get(leData.rut);
-
-      if (existingLeId) {
-        // Update existing LegalEntity with fresh FM data
-        await this.prisma.legalEntity.update({
-          where: { id: existingLeId },
-          data: leData,
-        });
-        legalEntityId = existingLeId;
-        result.legalEntitiesUpdated++;
+      if (deletedEntityRuts.has(leData.rut)) {
+        // LegalEntity was soft-deleted in Zeru — respect that decision
+        result.legalEntitiesSkippedDeleted++;
       } else {
-        // Create new LegalEntity
-        const le = await this.prisma.legalEntity.create({
-          data: { ...leData, tenantId },
-        });
-        legalEntityId = le.id;
-        rutCache.set(leData.rut, le.id);
-        result.legalEntitiesCreated++;
+        const existingLeId = rutCache.get(leData.rut);
 
-        await this.ensureSyncRecord(tenantId, 'legal-entity', le.id, record);
-      }
+        if (existingLeId) {
+          await this.prisma.legalEntity.update({
+            where: { id: existingLeId },
+            data: leData,
+          });
+          legalEntityId = existingLeId;
+          result.legalEntitiesUpdated++;
+        } else {
+          const le = await this.prisma.legalEntity.create({
+            data: { ...leData, tenantId },
+          });
+          legalEntityId = le.id;
+          rutCache.set(leData.rut, le.id);
+          result.legalEntitiesCreated++;
+          await this.ensureSyncRecord(tenantId, 'legal-entity', le.id, record);
+        }
 
-      // Replace contacts: delete existing + reimport from FM
-      await this.prisma.legalEntityContact.deleteMany({
-        where: { legalEntityId, tenantId },
-      });
-      const contacts = this.transformer.extractContacts(record);
-      for (const contact of contacts) {
-        await this.prisma.legalEntityContact.create({
-          data: { ...contact, legalEntityId, tenantId },
+        // Replace contacts from FM
+        await this.prisma.legalEntityContact.deleteMany({
+          where: { legalEntityId, tenantId },
         });
-        result.contactsImported++;
+        const contacts = this.transformer.extractContacts(record);
+        for (const contact of contacts) {
+          await this.prisma.legalEntityContact.create({
+            data: { ...contact, legalEntityId, tenantId },
+          });
+          result.contactsImported++;
+        }
       }
     }
 
     // ── LabOrigin (upsert by code) ──
 
-    const originData = this.transformer.extractLabOrigin(record);
     const existingOriginId = codeCache.get(originData.code);
     let originId: string;
 
     if (existingOriginId) {
-      // Update existing LabOrigin with fresh FM data
       await this.prisma.labOrigin.update({
         where: { id: existingOriginId },
         data: { ...originData, legalEntityId },
@@ -180,14 +218,12 @@ export class FmImportService {
       originId = existingOriginId;
       result.labOriginsUpdated++;
     } else {
-      // Create new LabOrigin
       const origin = await this.prisma.labOrigin.create({
         data: { ...originData, legalEntityId, tenantId },
       });
       originId = origin.id;
       codeCache.set(originData.code, origin.id);
       result.labOriginsCreated++;
-
       await this.ensureSyncRecord(tenantId, 'lab-origin', origin.id, record);
     }
 
