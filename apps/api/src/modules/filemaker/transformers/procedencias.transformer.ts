@@ -90,10 +90,13 @@ export class ProcedenciasTransformer {
 
   extractLabOrigin(record: FmRecord): ExtractedLabOrigin {
     const d = record.fieldData;
+    const baseName = str(d['nombre_procedencia']) || 'Sin nombre';
+    const subName = str(d['nombre_subprocedencia']);
+    const name = subName ? `${baseName} - ${subName}` : baseName;
 
     return {
       code: str(d['codigo_unico']) || record.recordId,
-      name: str(d['nombre_procedencia']) || 'Sin nombre',
+      name,
       category: parseCategory(str(d['Categoria'])),
       street: str(d['calle']) || null,
       streetNumber: str(d['numero']) || null,
