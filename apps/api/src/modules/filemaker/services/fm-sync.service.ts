@@ -84,9 +84,6 @@ export class FmSyncService {
       where: { id: existing.id },
       data: { syncStatus: 'PENDING_TO_FM' },
     });
-
-    // TODO: In a future task, process the pending record
-    // (read Zeru entity, transform via transformer, write to FM)
   }
 
   @Cron('*/5 * * * *')
@@ -117,6 +114,89 @@ export class FmSyncService {
   }
 
   @Cron('*/30 * * * * *')
+  async processPendingToFm() {
+    const pending = await this.prisma.fmSyncRecord.findMany({
+      where: { syncStatus: 'PENDING_TO_FM' },
+      take: 10,
+    });
+
+    if (pending.length === 0) return;
+    this.logger.log(`Processing ${pending.length} PENDING_TO_FM records...`);
+
+    for (const record of pending) {
+      try {
+        if (!record.fmRecordId || record.fmRecordId.startsWith('pending-')) {
+          // No FM record to update (entity was created in Zeru only)
+          await this.prisma.fmSyncRecord.update({
+            where: { id: record.id },
+            data: { syncStatus: 'SYNCED', lastSyncAt: new Date() },
+          });
+          continue;
+        }
+
+        let fmFieldData: Record<string, unknown> | null = null;
+
+        if (record.entityType === 'lab-origin') {
+          const origin = await this.prisma.labOrigin.findUnique({
+            where: { id: record.entityId },
+          });
+          if (!origin) {
+            // Entity was deleted in Zeru — don't propagate delete to FM, just mark synced
+            await this.prisma.fmSyncRecord.update({
+              where: { id: record.id },
+              data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'Entity deleted in Zeru' },
+            });
+            continue;
+          }
+          fmFieldData = this.transformer.labOriginToFm(origin);
+        } else if (record.entityType === 'legal-entity') {
+          const entity = await this.prisma.legalEntity.findUnique({
+            where: { id: record.entityId },
+          });
+          if (!entity) {
+            await this.prisma.fmSyncRecord.update({
+              where: { id: record.id },
+              data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'Entity deleted in Zeru' },
+            });
+            continue;
+          }
+          fmFieldData = this.transformer.legalEntityToFm(entity);
+        }
+
+        if (fmFieldData) {
+          await this.fmApi.updateRecord(
+            record.fmDatabase,
+            record.fmLayout,
+            record.fmRecordId,
+            fmFieldData,
+          );
+        }
+
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: null },
+        });
+
+        await this.logSync({
+          tenantId: record.tenantId,
+          entityType: record.entityType,
+          entityId: record.entityId,
+          fmRecordId: record.fmRecordId,
+          action: 'sync:zeru-to-fm',
+          direction: 'zeru_to_fm',
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to sync record ${record.id} to FM: ${msg}`);
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: { syncStatus: 'ERROR', syncError: msg, retryCount: { increment: 1 } },
+        });
+      }
+    }
+  }
+
+  @Cron('*/30 * * * * *')
   async processPendingToZeru() {
     const pending = await this.prisma.fmSyncRecord.findMany({
       where: { syncStatus: 'PENDING_TO_ZERU' },
@@ -128,15 +208,30 @@ export class FmSyncService {
 
     for (const record of pending) {
       try {
-        // Read full FM record
-        const fmRecord = await this.fmApi.getRecord(
-          record.fmDatabase,
-          record.fmLayout,
-          record.fmRecordId,
-        );
+        // Handle unknown records (new records from webhook that need full import)
+        if (record.entityType === 'unknown') {
+          await this.processUnknownRecord(record);
+          continue;
+        }
+
+        // Read full FM record (getRecord throws on 404/missing)
+        let fmRecord;
+        try {
+          fmRecord = await this.fmApi.getRecord(
+            record.fmDatabase,
+            record.fmLayout,
+            record.fmRecordId,
+          );
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (msg.includes('401') || msg.includes('not found') || msg.includes('error 101')) {
+            await this.handleFmRecordDeleted(record);
+            continue;
+          }
+          throw error;
+        }
 
         if (!fmRecord) {
-          // FM record no longer exists — soft-delete Zeru entity
           await this.handleFmRecordDeleted(record);
           continue;
         }
@@ -170,6 +265,111 @@ export class FmSyncService {
           data: { syncStatus: 'ERROR', syncError: msg, retryCount: { increment: 1 } },
         });
       }
+    }
+  }
+
+  private async processUnknownRecord(record: {
+    id: string;
+    tenantId: string;
+    fmDatabase: string;
+    fmLayout: string;
+    fmRecordId: string;
+  }) {
+    if (record.fmLayout !== this.transformer.layout) {
+      await this.prisma.fmSyncRecord.update({
+        where: { id: record.id },
+        data: { syncStatus: 'ERROR', syncError: `No transformer for layout: ${record.fmLayout}` },
+      });
+      return;
+    }
+
+    try {
+      const fmRecord = await this.fmApi.getRecord(
+        record.fmDatabase,
+        record.fmLayout,
+        record.fmRecordId,
+      );
+
+      // Extract and create/update LegalEntity
+      const leData = this.transformer.extractLegalEntity(fmRecord);
+      let legalEntityId: string | null = null;
+      if (leData) {
+        const existingLe = await this.prisma.legalEntity.findFirst({
+          where: { tenantId: record.tenantId, rut: leData.rut },
+        });
+        if (existingLe) {
+          legalEntityId = existingLe.id;
+          await this.prisma.legalEntity.update({
+            where: { id: existingLe.id },
+            data: leData,
+          });
+        } else {
+          const le = await this.prisma.legalEntity.create({
+            data: { ...leData, tenantId: record.tenantId },
+          });
+          legalEntityId = le.id;
+          // Create LE sync record
+          await this.prisma.fmSyncRecord.create({
+            data: {
+              tenantId: record.tenantId,
+              entityType: 'legal-entity',
+              entityId: le.id,
+              fmDatabase: record.fmDatabase,
+              fmLayout: record.fmLayout,
+              fmRecordId: record.fmRecordId,
+              syncStatus: 'SYNCED',
+              lastSyncAt: new Date(),
+            },
+          }).catch(() => {}); // Ignore if already exists
+        }
+      }
+
+      // Extract and create/update LabOrigin
+      const originData = this.transformer.extractLabOrigin(fmRecord);
+      const existingOrigin = await this.prisma.labOrigin.findFirst({
+        where: { tenantId: record.tenantId, code: originData.code },
+      });
+      let originId: string;
+      if (existingOrigin) {
+        await this.prisma.labOrigin.update({
+          where: { id: existingOrigin.id },
+          data: { ...originData, legalEntityId },
+        });
+        originId = existingOrigin.id;
+      } else {
+        const origin = await this.prisma.labOrigin.create({
+          data: { ...originData, legalEntityId, tenantId: record.tenantId },
+        });
+        originId = origin.id;
+      }
+
+      // Update the unknown sync record to point to the LabOrigin
+      await this.prisma.fmSyncRecord.update({
+        where: { id: record.id },
+        data: {
+          entityType: 'lab-origin',
+          entityId: originId,
+          syncStatus: 'SYNCED',
+          lastSyncAt: new Date(),
+          syncError: null,
+        },
+      });
+
+      await this.logSync({
+        tenantId: record.tenantId,
+        entityType: 'lab-origin',
+        entityId: originId,
+        fmRecordId: record.fmRecordId,
+        action: 'webhook:create-processed',
+        direction: 'fm_to_zeru',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to process unknown record ${record.id}: ${msg}`);
+      await this.prisma.fmSyncRecord.update({
+        where: { id: record.id },
+        data: { syncStatus: 'ERROR', syncError: msg, retryCount: { increment: 1 } },
+      });
     }
   }
 
@@ -213,18 +413,31 @@ export class FmSyncService {
       }
     } else {
       // New record in FM — create a sync record for future processing
-      await this.prisma.fmSyncRecord.create({
-        data: {
-          tenantId,
-          entityType: 'unknown',
-          entityId: `pending-${randomUUID()}`,
-          fmDatabase: data.database,
-          fmLayout: data.layout,
-          fmRecordId: data.recordId,
-          syncStatus: 'PENDING_TO_ZERU',
-          lastSyncAt: new Date(),
-        },
-      });
+      try {
+        await this.prisma.fmSyncRecord.create({
+          data: {
+            tenantId,
+            entityType: 'unknown',
+            entityId: `pending-${randomUUID()}`,
+            fmDatabase: data.database,
+            fmLayout: data.layout,
+            fmRecordId: data.recordId,
+            syncStatus: 'PENDING_TO_ZERU',
+            lastSyncAt: new Date(),
+          },
+        });
+      } catch {
+        // Concurrent webhook — record already exists, just ensure it's pending
+        await this.prisma.fmSyncRecord.updateMany({
+          where: {
+            tenantId,
+            fmDatabase: data.database,
+            fmLayout: data.layout,
+            fmRecordId: data.recordId,
+          },
+          data: { syncStatus: 'PENDING_TO_ZERU' },
+        });
+      }
     }
 
     await this.logSync({
