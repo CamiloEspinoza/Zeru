@@ -73,7 +73,7 @@ export class FmImportService {
       this.transformer.database,
       this.transformer.layout,
       {
-        portals: ['CONTACTOS Cobranzas', 'CONTACTOS', 'conceptos de cobro procedencia'],
+        portals: ['CONTACTOS Cobranzas', 'conceptos de cobro procedencia'],
         dateformats: 2,
       },
     );
