@@ -1952,6 +1952,14 @@ model LabOrigin {
   sendsQualityReports        Boolean             @default(false)
 
   contractDate               DateTime?
+  contractActive             Boolean             @default(false)
+  incorporationDate          DateTime?
+  agreementDate              DateTime?
+  lastAddendumNumber         String?
+  lastAddendumDate           DateTime?
+  lastAddendumDetail         String?
+  receptionDays              String?
+  receptionSchedule          String?
   notes                      String?
   isActive                   Boolean             @default(true)
   deletedAt                  DateTime?

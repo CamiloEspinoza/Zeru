@@ -74,7 +74,7 @@ export class FmImportService {
       this.transformer.layout,
       [{}],
       {
-        portals: ['CONTACTOS Cobranzas', 'conceptos de cobro procedencia'],
+        portals: ['CONTACTOS Cobranzas', 'CONTACTOS', 'conceptos de cobro procedencia'],
         dateformats: 2,
       },
     );
@@ -203,6 +203,15 @@ export class FmImportService {
           });
           const contacts = this.transformer.extractContacts(record);
           for (const contact of contacts) {
+            await this.prisma.legalEntityContact.create({
+              data: { ...contact, legalEntityId, tenantId },
+            });
+            result.contactsImported++;
+          }
+
+          // Also import general contacts (from CONTACTOS portal)
+          const generalContacts = this.transformer.extractGeneralContacts(record);
+          for (const contact of generalContacts) {
             await this.prisma.legalEntityContact.create({
               data: { ...contact, legalEntityId, tenantId },
             });

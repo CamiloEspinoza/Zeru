@@ -40,6 +40,14 @@ export interface ExtractedLabOrigin {
   criticalNotificationEmails: string[];
   sendsQualityReports: boolean;
   contractDate: Date | null;
+  contractActive: boolean;
+  incorporationDate: Date | null;
+  agreementDate: Date | null;
+  lastAddendumNumber: string | null;
+  lastAddendumDate: Date | null;
+  lastAddendumDetail: string | null;
+  receptionDays: string | null;
+  receptionSchedule: string | null;
   notes: string | null;
   isActive: boolean;
 }
@@ -119,6 +127,14 @@ export class ProcedenciasTransformer {
       criticalNotificationEmails: collectEmails(d),
       sendsQualityReports: isYes(str(d['ENVÍO INFORMES CALIDAD'])),
       contractDate: parseDate(str(d['FECHA FIRMA CONTRATO'])),
+      contractActive: isYes(str(d['Contrato Vigente'])),
+      incorporationDate: parseDate(str(d['Fecha Incorporacion'])),
+      agreementDate: parseDate(str(d['Fecha acuerdo'])),
+      lastAddendumNumber: str(d['nº Ultimo Addendum']) || null,
+      lastAddendumDate: parseDate(str(d['Fecha Ultimo Addendum'])),
+      lastAddendumDetail: str(d['Detalle Ultimo Addendum']) || null,
+      receptionDays: str(d['días_recepcion']) || null,
+      receptionSchedule: str(d['horario_recepcion']) || null,
       notes: str(d['OBSERVACIONES']) || null,
       isActive: isYes(str(d['Activo'])),
     };
@@ -141,6 +157,26 @@ export class ProcedenciasTransformer {
           email: str(row['CONTACTOS Cobranzas::Email']) || null,
           phone: str(row['CONTACTOS Cobranzas::Tel Fijo']) || null,
           mobile: str(row['CONTACTOS Cobranzas::Tel Celular']) || null,
+        };
+      })
+      .filter((c): c is ExtractedContact => c !== null);
+  }
+
+  extractGeneralContacts(record: FmRecord): ExtractedContact[] {
+    const portalData = record.portalData?.['CONTACTOS'];
+    if (!portalData || !Array.isArray(portalData)) return [];
+
+    return portalData
+      .map((row: Record<string, unknown>) => {
+        const name = str(row['CONTACTOS::Nombre']);
+        if (!name) return null;
+
+        return {
+          name,
+          role: str(row['CONTACTOS::Cargo']) || null,
+          email: str(row['CONTACTOS::Email']) || null,
+          phone: str(row['CONTACTOS::Tel Fijo']) || null,
+          mobile: str(row['CONTACTOS::Tel Celular']) || null,
         };
       })
       .filter((c): c is ExtractedContact => c !== null);

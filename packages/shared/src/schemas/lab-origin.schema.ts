@@ -31,6 +31,14 @@ export const createLabOriginSchema = z.object({
   criticalNotificationEmails: z.array(z.string().email()).optional(),
   sendsQualityReports: z.boolean().optional(),
   contractDate: z.string().date().optional(),
+  contractActive: z.boolean().optional(),
+  incorporationDate: z.string().date().optional(),
+  agreementDate: z.string().date().optional(),
+  lastAddendumNumber: z.string().optional(),
+  lastAddendumDate: z.string().date().optional(),
+  lastAddendumDetail: z.string().optional(),
+  receptionDays: z.string().optional(),
+  receptionSchedule: z.string().optional(),
   notes: z.string().optional(),
 });
 
