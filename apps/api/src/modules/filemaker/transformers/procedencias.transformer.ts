@@ -39,13 +39,6 @@ export interface ExtractedLabOrigin {
   ftpPath: string | null;
   criticalNotificationEmails: string[];
   sendsQualityReports: boolean;
-  contractDate: Date | null;
-  contractActive: boolean;
-  incorporationDate: Date | null;
-  agreementDate: Date | null;
-  lastAddendumNumber: string | null;
-  lastAddendumDate: Date | null;
-  lastAddendumDetail: string | null;
   receptionDays: string | null;
   receptionSchedule: string | null;
   notes: string | null;
@@ -58,14 +51,6 @@ export interface ExtractedContact {
   email: string | null;
   phone: string | null;
   mobile: string | null;
-}
-
-export interface ExtractedPricing {
-  billingConcept: string;
-  description: string | null;
-  basePrice: number;
-  referencePrice: number | null;
-  multiplier: number;
 }
 
 @Injectable()
@@ -126,13 +111,6 @@ export class ProcedenciasTransformer {
       ftpPath: str(d['FTP Path']) || null,
       criticalNotificationEmails: collectEmails(d),
       sendsQualityReports: isYes(str(d['ENVÍO INFORMES CALIDAD'])),
-      contractDate: parseDate(str(d['FECHA FIRMA CONTRATO'])),
-      contractActive: isYes(str(d['Contrato Vigente'])),
-      incorporationDate: parseDate(str(d['Fecha Incorporacion'])),
-      agreementDate: parseDate(str(d['Fecha acuerdo'])),
-      lastAddendumNumber: str(d['nº Ultimo Addendum']) || null,
-      lastAddendumDate: parseDate(str(d['Fecha Ultimo Addendum'])),
-      lastAddendumDetail: str(d['Detalle Ultimo Addendum']) || null,
       receptionDays: str(d['días_recepcion']) || null,
       receptionSchedule: str(d['horario_recepcion']) || null,
       notes: str(d['OBSERVACIONES']) || null,
@@ -180,44 +158,6 @@ export class ProcedenciasTransformer {
         };
       })
       .filter((c): c is ExtractedContact => c !== null);
-  }
-
-  extractPricing(record: FmRecord): ExtractedPricing[] {
-    const portalData = record.portalData?.['conceptos de cobro procedencia'];
-    if (!portalData || !Array.isArray(portalData)) return [];
-
-    return portalData
-      .map((row: Record<string, unknown>) => {
-        const concept = str(row['conceptos de cobro procedencia::Concepto de cobro_fk'])
-          || str(row['conceptos de cobro procedencia::Código']);
-        if (!concept) return null;
-
-        return {
-          billingConcept: concept,
-          description: str(row['conceptos de cobro procedencia::Descripción']) || null,
-          basePrice: parseNum(row['conceptos de cobro procedencia::Valor']),
-          referencePrice: parseNum(row['conceptos de cobro procedencia::Valor Referencia']) || null,
-          multiplier: str(row['conceptos de cobro procedencia::Factor'])
-            ? parseNum(row['conceptos de cobro procedencia::Factor'])
-            : 1,
-        };
-      })
-      .filter((p): p is ExtractedPricing => p !== null);
-  }
-
-  /** Extract pricing from a standalone CDC record (layout: conceptos de cobro procedencia) */
-  extractPricingFromRecord(record: FmRecord): ExtractedPricing | null {
-    const d = record.fieldData;
-    const concept = str(d['Concepto de cobro_fk']) || str(d['Código']);
-    if (!concept) return null;
-
-    return {
-      billingConcept: concept,
-      description: str(d['Descripción']) || null,
-      basePrice: parseNum(d['Valor']),
-      referencePrice: parseNum(d['Valor Referencia']) || null,
-      multiplier: str(d['Factor']) ? parseNum(d['Factor']) : 1,
-    };
   }
 
   // ── Zeru → FM (write-back) ──
@@ -278,21 +218,8 @@ function safeParseInt(val: unknown): number | null {
   return isNaN(n) ? null : Math.round(n);
 }
 
-function parseNum(val: unknown): number {
-  const s = str(val);
-  if (!s) return 0;
-  const n = Number(s.replace(/[^0-9.-]/g, ''));
-  return isNaN(n) ? 0 : n;
-}
-
 function isYes(val: string): boolean {
   return /^s[iíÍ]/i.test(val);
-}
-
-function parseDate(val: string): Date | null {
-  if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
 }
 
 function parseCategory(val: string): ExtractedLabOrigin['category'] {
