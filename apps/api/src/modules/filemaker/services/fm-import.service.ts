@@ -7,11 +7,11 @@ import { ProcedenciasTransformer } from '../transformers/procedencias.transforme
 
 export interface ImportResult {
   legalEntitiesCreated: number;
-  legalEntitiesReused: number;
+  legalEntitiesUpdated: number;
   labOriginsCreated: number;
-  labOriginsSkipped: number;
-  contactsCreated: number;
-  pricingCreated: number;
+  labOriginsUpdated: number;
+  contactsImported: number;
+  pricingImported: number;
   errors: Array<{ fmRecordId: string; error: string }>;
 }
 
@@ -36,7 +36,6 @@ export class FmImportService {
 
     this.importing = true;
 
-    // Fire and forget — process in background
     this.importProcedencias(tenantId)
       .then((result) => {
         this.eventEmitter.emit('fm.import.done', { tenantId, result });
@@ -55,11 +54,11 @@ export class FmImportService {
   async importProcedencias(tenantId: string): Promise<ImportResult> {
     const result: ImportResult = {
       legalEntitiesCreated: 0,
-      legalEntitiesReused: 0,
+      legalEntitiesUpdated: 0,
       labOriginsCreated: 0,
-      labOriginsSkipped: 0,
-      contactsCreated: 0,
-      pricingCreated: 0,
+      labOriginsUpdated: 0,
+      contactsImported: 0,
+      pricingImported: 0,
       errors: [],
     };
 
@@ -78,7 +77,7 @@ export class FmImportService {
 
     this.logger.log(`Fetched ${fmRecords.length} FM records`);
 
-    // 2. Build caches for idempotency
+    // 2. Build caches: key → Zeru ID
     const existingEntities = await this.prisma.legalEntity.findMany({
       where: { tenantId },
       select: { id: true, rut: true },
@@ -109,10 +108,9 @@ export class FmImportService {
     }
 
     this.logger.log(
-      `Import complete: ${result.legalEntitiesCreated} LE created, ` +
-      `${result.legalEntitiesReused} LE reused, ${result.labOriginsCreated} origins created, ` +
-      `${result.labOriginsSkipped} origins skipped, ` +
-      `${result.contactsCreated} contacts, ${result.pricingCreated} pricing, ` +
+      `Import complete: LE ${result.legalEntitiesCreated} created / ${result.legalEntitiesUpdated} updated, ` +
+      `Origins ${result.labOriginsCreated} created / ${result.labOriginsUpdated} updated, ` +
+      `${result.contactsImported} contacts, ${result.pricingImported} pricing, ` +
       `${result.errors.length} errors`,
     );
 
@@ -130,94 +128,89 @@ export class FmImportService {
 
     const leData = this.transformer.extractLegalEntity(record);
     let legalEntityId: string | null = null;
-    let isNewLegalEntity = false;
 
     if (leData) {
-      const cached = rutCache.get(leData.rut);
-      if (cached) {
-        legalEntityId = cached;
-        result.legalEntitiesReused++;
+      const existingLeId = rutCache.get(leData.rut);
+
+      if (existingLeId) {
+        // Update existing LegalEntity with fresh FM data
+        await this.prisma.legalEntity.update({
+          where: { id: existingLeId },
+          data: leData,
+        });
+        legalEntityId = existingLeId;
+        result.legalEntitiesUpdated++;
       } else {
+        // Create new LegalEntity
         const le = await this.prisma.legalEntity.create({
           data: { ...leData, tenantId },
         });
         legalEntityId = le.id;
         rutCache.set(leData.rut, le.id);
         result.legalEntitiesCreated++;
-        isNewLegalEntity = true;
 
-        // Create sync record for LegalEntity
-        await this.prisma.fmSyncRecord.create({
-          data: {
-            tenantId,
-            entityType: 'legal-entity',
-            entityId: le.id,
-            fmDatabase: this.transformer.database,
-            fmLayout: this.transformer.layout,
-            fmRecordId: record.recordId,
-            fmModId: record.modId,
-            syncStatus: 'SYNCED',
-            lastSyncAt: new Date(),
-          },
-        });
+        await this.ensureSyncRecord(tenantId, 'legal-entity', le.id, record);
       }
 
-      // Only import contacts when creating a NEW LegalEntity (avoid duplicates on reuse)
-      if (isNewLegalEntity) {
-        const contacts = this.transformer.extractContacts(record);
-        for (const contact of contacts) {
-          await this.prisma.legalEntityContact.create({
-            data: { ...contact, legalEntityId, tenantId },
-          });
-          result.contactsCreated++;
-        }
+      // Replace contacts: delete existing + reimport from FM
+      await this.prisma.legalEntityContact.deleteMany({
+        where: { legalEntityId, tenantId },
+      });
+      const contacts = this.transformer.extractContacts(record);
+      for (const contact of contacts) {
+        await this.prisma.legalEntityContact.create({
+          data: { ...contact, legalEntityId, tenantId },
+        });
+        result.contactsImported++;
       }
     }
 
-    // ── LabOrigin (idempotent by code) ──
+    // ── LabOrigin (upsert by code) ──
 
     const originData = this.transformer.extractLabOrigin(record);
     const existingOriginId = codeCache.get(originData.code);
+    let originId: string;
 
     if (existingOriginId) {
-      // Already imported — skip
-      result.labOriginsSkipped++;
-      return;
+      // Update existing LabOrigin with fresh FM data
+      await this.prisma.labOrigin.update({
+        where: { id: existingOriginId },
+        data: { ...originData, legalEntityId },
+      });
+      originId = existingOriginId;
+      result.labOriginsUpdated++;
+    } else {
+      // Create new LabOrigin
+      const origin = await this.prisma.labOrigin.create({
+        data: { ...originData, legalEntityId, tenantId },
+      });
+      originId = origin.id;
+      codeCache.set(originData.code, origin.id);
+      result.labOriginsCreated++;
+
+      await this.ensureSyncRecord(tenantId, 'lab-origin', origin.id, record);
     }
 
-    const origin = await this.prisma.labOrigin.create({
-      data: {
-        ...originData,
-        legalEntityId,
-        tenantId,
-      },
-    });
-    codeCache.set(originData.code, origin.id);
-    result.labOriginsCreated++;
-
-    // Create sync record for LabOrigin
-    await this.prisma.fmSyncRecord.create({
-      data: {
-        tenantId,
-        entityType: 'lab-origin',
-        entityId: origin.id,
-        fmDatabase: this.transformer.database,
-        fmLayout: this.transformer.layout,
-        fmRecordId: record.recordId,
-        fmModId: record.modId,
-        syncStatus: 'SYNCED',
-        lastSyncAt: new Date(),
-      },
-    });
-
-    // ── Pricing ──
+    // ── Pricing (upsert by billingConcept) ──
 
     const pricingItems = this.transformer.extractPricing(record);
     for (const pricing of pricingItems) {
-      await this.prisma.labOriginPricing.create({
-        data: { ...pricing, labOriginId: origin.id, tenantId },
+      await this.prisma.labOriginPricing.upsert({
+        where: {
+          labOriginId_billingConcept: {
+            labOriginId: originId,
+            billingConcept: pricing.billingConcept,
+          },
+        },
+        create: { ...pricing, labOriginId: originId, tenantId },
+        update: {
+          description: pricing.description,
+          basePrice: pricing.basePrice,
+          referencePrice: pricing.referencePrice,
+          multiplier: pricing.multiplier,
+        },
       });
-      result.pricingCreated++;
+      result.pricingImported++;
     }
 
     // ── Log ──
@@ -225,10 +218,36 @@ export class FmImportService {
     await this.syncService.logSync({
       tenantId,
       entityType: 'lab-origin',
-      entityId: origin.id,
+      entityId: originId,
       fmRecordId: record.recordId,
-      action: 'import',
+      action: existingOriginId ? 'import:update' : 'import:create',
       direction: 'fm_to_zeru',
+    });
+  }
+
+  private async ensureSyncRecord(
+    tenantId: string,
+    entityType: string,
+    entityId: string,
+    record: { recordId: string; modId?: string },
+  ) {
+    const existing = await this.prisma.fmSyncRecord.findFirst({
+      where: { tenantId, entityType, entityId },
+    });
+    if (existing) return;
+
+    await this.prisma.fmSyncRecord.create({
+      data: {
+        tenantId,
+        entityType,
+        entityId,
+        fmDatabase: this.transformer.database,
+        fmLayout: this.transformer.layout,
+        fmRecordId: record.recordId,
+        fmModId: record.modId,
+        syncStatus: 'SYNCED',
+        lastSyncAt: new Date(),
+      },
     });
   }
 }
