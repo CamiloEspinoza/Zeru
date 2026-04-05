@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'crypto';
 import { FmSyncService } from '../services/fm-sync.service';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { fmWebhookSchema, type FmWebhookDto } from '../dto';
@@ -35,7 +36,9 @@ export class FmWebhookController {
     @Headers('x-fm-webhook-key') apiKey: string,
     @Body(new ZodValidationPipe(fmWebhookSchema)) body: FmWebhookDto,
   ) {
-    if (apiKey !== this.webhookKey) {
+    const keyBuffer = Buffer.from(apiKey ?? '');
+    const expectedBuffer = Buffer.from(this.webhookKey);
+    if (keyBuffer.length !== expectedBuffer.length || !timingSafeEqual(keyBuffer, expectedBuffer)) {
       this.logger.warn('Invalid webhook key received');
       throw new UnauthorizedException('Invalid webhook key');
     }

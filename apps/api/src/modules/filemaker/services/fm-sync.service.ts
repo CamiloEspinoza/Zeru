@@ -17,6 +17,8 @@ interface FmSyncEvent {
 @Injectable()
 export class FmSyncService {
   private readonly logger = new Logger(FmSyncService.name);
+  private processingToFm = false;
+  private processingToZeru = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -100,10 +102,16 @@ export class FmSyncService {
 
     for (const record of errors) {
       try {
+        // Determine retry direction from the error context:
+        // If syncError mentions 'zeru-to-fm' or entity was locally changed, retry as PENDING_TO_FM
+        // Otherwise default to PENDING_TO_ZERU (FM is source of truth)
+        const retryStatus = record.syncError?.includes('zeru-to-fm')
+          ? 'PENDING_TO_FM' as const
+          : 'PENDING_TO_ZERU' as const;
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
           data: {
-            syncStatus: 'PENDING_TO_ZERU',
+            syncStatus: retryStatus,
             retryCount: { increment: 1 },
           },
         });
@@ -115,6 +123,16 @@ export class FmSyncService {
 
   @Cron('*/30 * * * * *')
   async processPendingToFm() {
+    if (this.processingToFm) return;
+    this.processingToFm = true;
+    try {
+      await this.doPendingToFm();
+    } finally {
+      this.processingToFm = false;
+    }
+  }
+
+  private async doPendingToFm() {
     const pending = await this.prisma.fmSyncRecord.findMany({
       where: { syncStatus: 'PENDING_TO_FM' },
       take: 10,
@@ -190,7 +208,7 @@ export class FmSyncService {
         this.logger.error(`Failed to sync record ${record.id} to FM: ${msg}`);
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
-          data: { syncStatus: 'ERROR', syncError: msg, retryCount: { increment: 1 } },
+          data: { syncStatus: 'ERROR', syncError: `[zeru-to-fm] ${msg}`, retryCount: { increment: 1 } },
         });
       }
     }
@@ -198,6 +216,16 @@ export class FmSyncService {
 
   @Cron('*/30 * * * * *')
   async processPendingToZeru() {
+    if (this.processingToZeru) return;
+    this.processingToZeru = true;
+    try {
+      await this.doPendingToZeru();
+    } finally {
+      this.processingToZeru = false;
+    }
+  }
+
+  private async doPendingToZeru() {
     const pending = await this.prisma.fmSyncRecord.findMany({
       where: { syncStatus: 'PENDING_TO_ZERU' },
       take: 10,

@@ -40,10 +40,14 @@ export class LabOriginsService {
 
   async create(tenantId: string, data: CreateLabOriginSchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+    const { contractDate, incorporationDate, agreementDate, lastAddendumDate, ...rest } = data;
     const origin = await client.labOrigin.create({
       data: {
-        ...data,
-        contractDate: data.contractDate ? new Date(data.contractDate) : undefined,
+        ...rest,
+        contractDate: contractDate ? new Date(contractDate) : undefined,
+        incorporationDate: incorporationDate ? new Date(incorporationDate) : undefined,
+        agreementDate: agreementDate ? new Date(agreementDate) : undefined,
+        lastAddendumDate: lastAddendumDate ? new Date(lastAddendumDate) : undefined,
       },
     });
     this.eventEmitter.emit('fm.sync', {
@@ -59,14 +63,15 @@ export class LabOriginsService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const origin = await client.labOrigin.findUnique({ where: { id } });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
+    const { contractDate, incorporationDate, agreementDate, lastAddendumDate, ...rest } = data;
+    const dateFields: Record<string, Date | null | undefined> = {};
+    if (contractDate !== undefined) dateFields.contractDate = contractDate ? new Date(contractDate) : null;
+    if (incorporationDate !== undefined) dateFields.incorporationDate = incorporationDate ? new Date(incorporationDate) : null;
+    if (agreementDate !== undefined) dateFields.agreementDate = agreementDate ? new Date(agreementDate) : null;
+    if (lastAddendumDate !== undefined) dateFields.lastAddendumDate = lastAddendumDate ? new Date(lastAddendumDate) : null;
     const updated = await client.labOrigin.update({
       where: { id },
-      data: {
-        ...data,
-        ...(data.contractDate !== undefined && {
-          contractDate: data.contractDate ? new Date(data.contractDate) : null,
-        }),
-      },
+      data: { ...rest, ...dateFields },
     });
     this.eventEmitter.emit('fm.sync', {
       tenantId,

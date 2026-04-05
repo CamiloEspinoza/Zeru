@@ -1,12 +1,15 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { FmDiscoveryService } from '../services/fm-discovery.service';
 import { fmSearchSchema, type FmSearchDto } from '../dto';
 
 @Controller('filemaker/discovery')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@RequirePermission('settings', 'manage')
 export class FmDiscoveryController {
   constructor(private readonly discovery: FmDiscoveryService) {}
 
@@ -39,7 +42,7 @@ export class FmDiscoveryController {
     @Param('layout') layout: string,
     @Query('limit') limit?: string,
   ) {
-    return this.discovery.sampleRecords(database, layout, limit ? parseInt(limit, 10) : 10);
+    return this.discovery.sampleRecords(database, layout, Math.min(limit ? parseInt(limit, 10) : 10, 100));
   }
 
   @Post(':database/layouts/:layout/search')
