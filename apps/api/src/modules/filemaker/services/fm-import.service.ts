@@ -177,9 +177,13 @@ export class FmImportService {
         let isNewLegalEntity = false;
 
         if (existingLeId) {
+          // Merge strategy: only update non-null fields (don't overwrite good data with nulls)
+          const mergedLeData = Object.fromEntries(
+            Object.entries(leData).filter(([, v]) => v !== null && v !== undefined),
+          );
           await this.prisma.legalEntity.update({
             where: { id: existingLeId },
-            data: leData,
+            data: mergedLeData,
           });
           legalEntityId = existingLeId;
           result.legalEntitiesUpdated++;

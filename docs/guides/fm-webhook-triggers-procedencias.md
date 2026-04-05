@@ -2,7 +2,7 @@
 
 **Transformer:** `ProcedenciasTransformer`
 **Base de datos FM:** `BIOPSIAS`
-**Endpoint webhook:** `POST https://api.zeru.cl/filemaker/webhook`
+**Endpoint webhook:** `POST https://api.zeru.cl/api/filemaker/webhook`
 **Autenticación:** Header `X-FM-Webhook-Key: <FM_WEBHOOK_KEY>`
 
 ---
@@ -297,21 +297,10 @@ Además, modificar scripts existentes que usen `Delete Record/Request` en Proced
 
 ---
 
-## 9. TODO técnico para Zeru
+## 9. Estado técnico en Zeru
 
-Para soportar completamente los webhooks de Procedencias, el backend necesita:
+1. ~~**Procesamiento de PENDING_TO_ZERU**~~ — **IMPLEMENTADO**. `processPendingToZeru` cron cada 30s lee FM, ejecuta transformer, actualiza Zeru.
 
-1. **Procesamiento de PENDING_TO_ZERU** — El `FmSyncService` actualmente solo marca registros como pendientes. Falta implementar el procesador que:
-   - Lee el registro FM completo via `FmApiService`
-   - Ejecuta el `ProcedenciasTransformer` para extraer datos
-   - Actualiza/crea LegalEntity + LabOrigin en la base de datos
-   
-2. **Handler para layout FICHA INSTITUCION COBRANZAS** — El webhook actual solo busca FmSyncRecords por layout. Necesita lógica especial:
-   - Recibe webhook con layout `FICHA INSTITUCION COBRANZAS`
-   - Busca todas las procedencias FM vinculadas a esa institución
-   - Actualiza el LegalEntity correspondiente
+2. **Handler para layout FICHA INSTITUCION COBRANZAS** — **PENDIENTE**. El backend solo procesa webhooks del layout `Procedencias*`. Webhooks de `FICHA INSTITUCION COBRANZAS` se marcan como ERROR. **No configurar este trigger en FM hasta que se implemente.**
 
-3. **Manejo de create** — Cuando llega un webhook con `action: "create"` y no hay FmSyncRecord, debe:
-   - Leer el registro FM
-   - Ejecutar el transformer completo (crear LegalEntity + LabOrigin)
-   - Crear los FmSyncRecords correspondientes
+3. ~~**Manejo de create**~~ — **IMPLEMENTADO**. `processUnknownRecord` crea LegalEntity + LabOrigin desde webhooks de records nuevos.
