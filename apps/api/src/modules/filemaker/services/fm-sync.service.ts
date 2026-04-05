@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from './fm-api.service';
 import { ProcedenciasTransformer } from '../transformers/procedencias.transformer';
+import { ConvenioTransformer } from '../transformers/convenio.transformer';
 import { normalizeRut } from '@zeru/shared';
 import type { FmSyncStats } from '@zeru/shared';
 
@@ -25,6 +26,7 @@ export class FmSyncService {
     private readonly prisma: PrismaService,
     private readonly fmApi: FmApiService,
     private readonly transformer: ProcedenciasTransformer,
+    private readonly convenioTransformer: ConvenioTransformer,
   ) {}
 
   async getStats(tenantId: string): Promise<FmSyncStats> {
@@ -177,6 +179,17 @@ export class FmSyncService {
             continue;
           }
           fmFieldData = this.transformer.legalEntityToFm(entity);
+        } else if (
+          record.entityType === 'billing-agreement' ||
+          record.entityType === 'billing-concept' ||
+          record.entityType === 'billing-agreement-line'
+        ) {
+          // No toFm method for billing entities yet — mark as synced
+          await this.prisma.fmSyncRecord.update({
+            where: { id: record.id },
+            data: { syncStatus: 'SYNCED', lastSyncAt: new Date() },
+          });
+          continue;
         }
 
         if (fmFieldData) {
@@ -506,32 +519,12 @@ export class FmSyncService {
     }
 
     // Build update data from institution fields (non-null only)
-    const parsePaymentTerms = (val: string) => {
-      const n = Number(val?.replace(/[^0-9]/g, ''));
-      if (isNaN(n) || !val) return undefined;
-      if (n <= 0) return 'IMMEDIATE' as const;
-      if (n <= 15) return 'NET_15' as const;
-      if (n <= 30) return 'NET_30' as const;
-      if (n <= 45) return 'NET_45' as const;
-      if (n <= 60) return 'NET_60' as const;
-      if (n <= 90) return 'NET_90' as const;
-      return 'CUSTOM' as const;
-    };
-
-    const parseBillingDay = (val: string): number | undefined => {
-      if (!val) return undefined;
-      const n = Number(val.replace(/[^0-9]/g, ''));
-      if (!n || isNaN(n) || n < 1 || n > 28) return undefined;
-      return n;
-    };
-
+    // Note: paymentTerms and billingDayOfMonth now live on BillingAgreement, not LegalEntity
     const legalName = String(d['Razón Social'] ?? '').trim() || undefined;
     const email = String(d['Contacto Facturación EMAIL'] ?? '').trim() || undefined;
-    const paymentTerms = parsePaymentTerms(String(d['PlazoPago'] ?? '').trim());
-    const billingDayOfMonth = parseBillingDay(String(d['Día de Facturación'] ?? '').trim());
 
     const updateData = Object.fromEntries(
-      Object.entries({ legalName, email, paymentTerms, billingDayOfMonth })
+      Object.entries({ legalName, email })
         .filter(([, v]) => v !== undefined),
     );
 
@@ -579,6 +572,245 @@ export class FmSyncService {
     });
   }
 
+  private async processConvenioWebhook(tenantId: string, fmRecordId: string, action: string) {
+    if (action === 'delete') {
+      // Find agreement sync record and soft-delete
+      const syncRecord = await this.prisma.fmSyncRecord.findFirst({
+        where: { tenantId, fmRecordId, entityType: 'billing-agreement' },
+      });
+      if (syncRecord?.entityId) {
+        await this.prisma.billingAgreement.update({
+          where: { id: syncRecord.entityId },
+          data: { deletedAt: new Date(), isActive: false },
+        }).catch(() => {});
+        await this.prisma.fmSyncRecord.update({
+          where: { id: syncRecord.id },
+          data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'FM record deleted' },
+        });
+      }
+      return;
+    }
+
+    this.logger.log(`Processing convenio webhook for FM record ${fmRecordId}`);
+
+    let fmRecord;
+    try {
+      fmRecord = await this.fmApi.getRecord(
+        this.convenioTransformer.database,
+        this.convenioTransformer.agreementLayout,
+        fmRecordId,
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to read convenio record ${fmRecordId}: ${msg}`);
+      return;
+    }
+    if (!fmRecord) return;
+
+    const data = this.convenioTransformer.extractBillingAgreement(fmRecord);
+
+    // Find LegalEntity by RUT
+    let legalEntityId: string | null = null;
+    if (data.rut && data.rut.length >= 3) {
+      const le = await this.prisma.legalEntity.findFirst({
+        where: { tenantId, rut: data.rut },
+      });
+      if (le) legalEntityId = le.id;
+    }
+
+    if (!legalEntityId) {
+      this.logger.warn(`No LegalEntity found for convenio RUT ${data.rut}, skipping`);
+      return;
+    }
+
+    // Upsert BillingAgreement
+    const { rut: _rut, ...agreementData } = data;
+    const mergedData = Object.fromEntries(
+      Object.entries(agreementData).filter(([, v]) => v !== null && v !== undefined),
+    );
+
+    const existing = await this.prisma.billingAgreement.findFirst({
+      where: { tenantId, code: data.code },
+    });
+
+    let agreementId: string;
+    if (existing) {
+      await this.prisma.billingAgreement.update({
+        where: { id: existing.id },
+        data: mergedData,
+      });
+      agreementId = existing.id;
+    } else {
+      const created = await this.prisma.billingAgreement.create({
+        data: { ...agreementData, legalEntityId, tenantId },
+      });
+      agreementId = created.id;
+    }
+
+    // Replace contacts
+    const contacts = this.convenioTransformer.extractContacts(fmRecord);
+    if (contacts.length > 0) {
+      await this.prisma.billingContact.deleteMany({
+        where: { billingAgreementId: agreementId, tenantId },
+      });
+      for (const contact of contacts) {
+        await this.prisma.billingContact.create({
+          data: { ...contact, billingAgreementId: agreementId, tenantId },
+        });
+      }
+    }
+
+    // Skip pricing line updates on webhooks — they come through the dedicated pricing handler
+
+    await this.logSync({
+      tenantId,
+      entityType: 'billing-agreement',
+      entityId: agreementId,
+      fmRecordId,
+      action: `webhook:convenio:${action}`,
+      direction: 'fm_to_zeru',
+    });
+  }
+
+  private async processBillingConceptWebhook(tenantId: string, fmRecordId: string) {
+    this.logger.log(`Processing billing concept webhook for FM record ${fmRecordId}`);
+
+    let fmRecord;
+    try {
+      fmRecord = await this.fmApi.getRecord(
+        this.convenioTransformer.database,
+        this.convenioTransformer.conceptLayout,
+        fmRecordId,
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to read CDC record ${fmRecordId}: ${msg}`);
+      return;
+    }
+    if (!fmRecord) return;
+
+    const data = this.convenioTransformer.extractBillingConcept(fmRecord);
+
+    const existing = await this.prisma.billingConcept.findFirst({
+      where: { tenantId, code: data.code },
+    });
+
+    let conceptId: string;
+    if (existing) {
+      await this.prisma.billingConcept.update({
+        where: { id: existing.id },
+        data: { name: data.name, description: data.description, referencePrice: data.referencePrice, deletedAt: null },
+      });
+      conceptId = existing.id;
+    } else {
+      const created = await this.prisma.billingConcept.create({
+        data: { ...data, tenantId },
+      });
+      conceptId = created.id;
+    }
+
+    await this.logSync({
+      tenantId,
+      entityType: 'billing-concept',
+      entityId: conceptId,
+      fmRecordId,
+      action: 'webhook:cdc:update',
+      direction: 'fm_to_zeru',
+    });
+  }
+
+  private async processPricingLineWebhook(tenantId: string, fmRecordId: string) {
+    this.logger.log(`Processing pricing line webhook for FM record ${fmRecordId}`);
+
+    let fmRecord;
+    try {
+      fmRecord = await this.fmApi.getRecord(
+        this.convenioTransformer.database,
+        this.convenioTransformer.pricingLayout,
+        fmRecordId,
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to read pricing record ${fmRecordId}: ${msg}`);
+      return;
+    }
+    if (!fmRecord) return;
+
+    const lineData = this.convenioTransformer.extractPricingLineFromRecord(fmRecord);
+    if (!lineData) return;
+
+    const convenioFk = this.convenioTransformer.extractConvenioFk(fmRecord);
+    if (!convenioFk) {
+      this.logger.warn(`No Convenio_fk on pricing record ${fmRecordId}`);
+      return;
+    }
+
+    // Find BillingAgreement by code (convenioFk is __pk_convenio which we stored as code during import)
+    const agreement = await this.prisma.billingAgreement.findFirst({
+      where: { tenantId, code: convenioFk },
+    });
+    if (!agreement) {
+      this.logger.warn(`No BillingAgreement found for convenio ${convenioFk}`);
+      return;
+    }
+
+    // Resolve BillingConcept by reading the FM CDC record referenced by the pricing line
+    let billingConceptId: string | null = null;
+    try {
+      const cdcRecord = await this.fmApi.getRecord(
+        this.convenioTransformer.database,
+        this.convenioTransformer.conceptLayout,
+        lineData.fmConceptRecordId,
+      );
+      if (cdcRecord) {
+        const cdcData = this.convenioTransformer.extractBillingConcept(cdcRecord);
+        const existingConcept = await this.prisma.billingConcept.findFirst({
+          where: { tenantId, code: cdcData.code },
+        });
+        if (existingConcept) billingConceptId = existingConcept.id;
+      }
+    } catch {
+      this.logger.warn(`Failed to resolve BillingConcept for FM CDC ${lineData.fmConceptRecordId}`);
+    }
+
+    if (!billingConceptId) {
+      this.logger.warn(`Cannot resolve BillingConcept for pricing line ${fmRecordId}, skipping`);
+      return;
+    }
+
+    await this.prisma.billingAgreementLine.upsert({
+      where: {
+        billingAgreementId_billingConceptId: {
+          billingAgreementId: agreement.id,
+          billingConceptId,
+        },
+      },
+      create: {
+        billingAgreementId: agreement.id,
+        billingConceptId,
+        factor: lineData.factor,
+        negotiatedPrice: lineData.negotiatedPrice,
+        referencePrice: lineData.referencePrice,
+        tenantId,
+        deletedAt: null,
+      },
+      update: {
+        factor: lineData.factor,
+        negotiatedPrice: lineData.negotiatedPrice,
+        referencePrice: lineData.referencePrice,
+        deletedAt: null,
+      },
+    });
+
+    await this.logSync({
+      tenantId,
+      entityType: 'billing-agreement-line',
+      fmRecordId,
+      action: 'webhook:pricing:update',
+      direction: 'fm_to_zeru',
+    });
+  }
+
   async handleWebhook(tenantId: string, data: {
     database: string;
     layout: string;
@@ -586,6 +818,27 @@ export class FmSyncService {
     action: 'create' | 'update' | 'delete';
   }) {
     this.logger.log(`FM webhook: ${data.action} ${data.database}/${data.layout}/${data.recordId}`);
+
+    // Convenio layout
+    if (data.layout === this.convenioTransformer.agreementLayout) {
+      await this.processConvenioWebhook(tenantId, data.recordId, data.action);
+      await this.logSync({ tenantId, entityType: 'billing-agreement', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
+      return;
+    }
+
+    // CDC catalog layout
+    if (data.layout === this.convenioTransformer.conceptLayout) {
+      await this.processBillingConceptWebhook(tenantId, data.recordId);
+      await this.logSync({ tenantId, entityType: 'billing-concept', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
+      return;
+    }
+
+    // Pricing line layout
+    if (data.layout === this.convenioTransformer.pricingLayout) {
+      await this.processPricingLineWebhook(tenantId, data.recordId);
+      await this.logSync({ tenantId, entityType: 'billing-agreement-line', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
+      return;
+    }
 
     // Institution layout: directly update LegalEntity by RUT (no sync records needed)
     if (data.layout === FmSyncService.INSTITUTION_LAYOUT) {
