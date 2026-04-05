@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateLabOriginSchema, UpdateLabOriginSchema } from '@zeru/shared';
 
 @Injectable()
 export class LabOriginsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async findAll(tenantId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
@@ -36,19 +40,26 @@ export class LabOriginsService {
 
   async create(tenantId: string, data: CreateLabOriginSchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-    return client.labOrigin.create({
+    const origin = await client.labOrigin.create({
       data: {
         ...data,
         contractDate: data.contractDate ? new Date(data.contractDate) : undefined,
       },
     });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'lab-origin',
+      entityId: origin.id,
+      action: 'create',
+    });
+    return origin;
   }
 
   async update(id: string, tenantId: string, data: UpdateLabOriginSchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const origin = await client.labOrigin.findUnique({ where: { id } });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
-    return client.labOrigin.update({
+    const updated = await client.labOrigin.update({
       where: { id },
       data: {
         ...data,
@@ -57,6 +68,13 @@ export class LabOriginsService {
         }),
       },
     });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'lab-origin',
+      entityId: id,
+      action: 'update',
+    });
+    return updated;
   }
 
   async delete(id: string, tenantId: string) {
@@ -64,5 +82,11 @@ export class LabOriginsService {
     const origin = await client.labOrigin.findUnique({ where: { id } });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
     await client.labOrigin.delete({ where: { id } });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'lab-origin',
+      entityId: id,
+      action: 'delete',
+    });
   }
 }

@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeRut } from '@zeru/shared';
 import type { CreateLegalEntitySchema, UpdateLegalEntitySchema } from '@zeru/shared';
 
 @Injectable()
 export class LegalEntitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async findAll(tenantId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
@@ -32,7 +36,7 @@ export class LegalEntitiesService {
 
   async create(tenantId: string, data: CreateLegalEntitySchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-    return client.legalEntity.create({
+    const entity = await client.legalEntity.create({
       data: {
         ...data,
         rut: normalizeRut(data.rut),
@@ -40,19 +44,33 @@ export class LegalEntitiesService {
         isSupplier: data.isSupplier ?? false,
       },
     });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'legal-entity',
+      entityId: entity.id,
+      action: 'create',
+    });
+    return entity;
   }
 
   async update(id: string, tenantId: string, data: UpdateLegalEntitySchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const entity = await client.legalEntity.findUnique({ where: { id } });
     if (!entity) throw new NotFoundException(`LegalEntity ${id} not found`);
-    return client.legalEntity.update({
+    const updated = await client.legalEntity.update({
       where: { id },
       data: {
         ...data,
         ...(data.rut && { rut: normalizeRut(data.rut) }),
       },
     });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'legal-entity',
+      entityId: id,
+      action: 'update',
+    });
+    return updated;
   }
 
   async delete(id: string, tenantId: string) {
@@ -60,5 +78,11 @@ export class LegalEntitiesService {
     const entity = await client.legalEntity.findUnique({ where: { id } });
     if (!entity) throw new NotFoundException(`LegalEntity ${id} not found`);
     await client.legalEntity.delete({ where: { id } });
+    this.eventEmitter.emit('fm.sync', {
+      tenantId,
+      entityType: 'legal-entity',
+      entityId: id,
+      action: 'delete',
+    });
   }
 }

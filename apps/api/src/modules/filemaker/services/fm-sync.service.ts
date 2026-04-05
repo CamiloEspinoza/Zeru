@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { OnEvent } from '@nestjs/event-emitter';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from './fm-api.service';
+import { ProcedenciasTransformer } from '../transformers/procedencias.transformer';
 import type { FmSyncStats } from '@zeru/shared';
 
 interface FmSyncEvent {
@@ -19,6 +21,7 @@ export class FmSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fmApi: FmApiService,
+    private readonly transformer: ProcedenciasTransformer,
   ) {}
 
   async getStats(tenantId: string): Promise<FmSyncStats> {
@@ -100,19 +103,86 @@ export class FmSyncService {
 
     for (const record of errors) {
       try {
-        // Mark as pending for retry
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
           data: {
-            syncStatus: 'PENDING_TO_FM',
+            syncStatus: 'PENDING_TO_ZERU',
             retryCount: { increment: 1 },
           },
         });
-        // TODO: Process the pending record via transformer
       } catch (error) {
         this.logger.error(`Retry failed for ${record.id}: ${error}`);
       }
     }
+  }
+
+  @Cron('*/30 * * * * *')
+  async processPendingToZeru() {
+    const pending = await this.prisma.fmSyncRecord.findMany({
+      where: { syncStatus: 'PENDING_TO_ZERU' },
+      take: 10,
+    });
+
+    if (pending.length === 0) return;
+    this.logger.log(`Processing ${pending.length} PENDING_TO_ZERU records...`);
+
+    for (const record of pending) {
+      try {
+        // Read full FM record
+        const fmRecord = await this.fmApi.getRecord(
+          record.fmDatabase,
+          record.fmLayout,
+          record.fmRecordId,
+        );
+
+        if (!fmRecord) {
+          // FM record no longer exists — soft-delete Zeru entity
+          await this.handleFmRecordDeleted(record);
+          continue;
+        }
+
+        // Process based on entity type
+        if (record.entityType === 'lab-origin' && record.entityId) {
+          const originData = this.transformer.extractLabOrigin(fmRecord);
+          await this.prisma.labOrigin.update({
+            where: { id: record.entityId },
+            data: originData,
+          });
+        } else if (record.entityType === 'legal-entity' && record.entityId) {
+          const leData = this.transformer.extractLegalEntity(fmRecord);
+          if (leData) {
+            await this.prisma.legalEntity.update({
+              where: { id: record.entityId },
+              data: leData,
+            });
+          }
+        }
+        // Mark as synced
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: null },
+        });
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Failed to process sync record ${record.id}: ${msg}`);
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: { syncStatus: 'ERROR', syncError: msg, retryCount: { increment: 1 } },
+        });
+      }
+    }
+  }
+
+  private async handleFmRecordDeleted(record: { id: string; entityType: string; entityId: string }) {
+    if (record.entityType === 'lab-origin' && record.entityId) {
+      await this.prisma.labOrigin.delete({ where: { id: record.entityId } }).catch(() => {});
+    } else if (record.entityType === 'legal-entity' && record.entityId) {
+      await this.prisma.legalEntity.delete({ where: { id: record.entityId } }).catch(() => {});
+    }
+    await this.prisma.fmSyncRecord.update({
+      where: { id: record.id },
+      data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'FM record deleted' },
+    });
   }
 
   async handleWebhook(tenantId: string, data: {
@@ -147,7 +217,7 @@ export class FmSyncService {
         data: {
           tenantId,
           entityType: 'unknown',
-          entityId: '',
+          entityId: `pending-${randomUUID()}`,
           fmDatabase: data.database,
           fmLayout: data.layout,
           fmRecordId: data.recordId,

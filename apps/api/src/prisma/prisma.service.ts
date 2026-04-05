@@ -8,16 +8,19 @@ type ExtendedClient = ReturnType<PrismaClient['$extends']>;
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly _client: ExtendedClient;
+  /** Raw PrismaClient without soft-delete extension. Use for queries that need to see deleted records. */
+  readonly rawClient: PrismaClient;
 
   constructor() {
     const base = new PrismaClient();
+    this.rawClient = base;
     this._client = base.$extends(
       createSoftDeleteExtension(base),
     ) as ExtendedClient;
 
     return new Proxy(this, {
       get(target, prop: string | symbol) {
-        if (typeof prop === 'string' && (prop in target || ['forTenant', 'onModuleInit', 'onModuleDestroy', '_client'].includes(prop))) {
+        if (typeof prop === 'string' && (prop in target || ['forTenant', 'onModuleInit', 'onModuleDestroy', '_client', 'rawClient'].includes(prop))) {
           return (target as Record<string | symbol, unknown>)[prop];
         }
         const client = (target as PrismaService)._client;
@@ -70,6 +73,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
             'groupBy',
           ];
           const mutateOps = ['update', 'updateMany', 'delete', 'deleteMany'];
+
+          if (operation === 'upsert') {
+            if (args.where && typeof args.where === 'object') {
+              (args.where as Record<string, unknown>).tenantId = tenantId;
+            }
+            if (args.create && typeof args.create === 'object') {
+              (args.create as Record<string, unknown>).tenantId = tenantId;
+            }
+            if (args.update && typeof args.update === 'object') {
+              (args.update as Record<string, unknown>).tenantId = tenantId;
+            }
+            return query(args);
+          }
 
           if (writeOps.includes(operation)) {
             if ('data' in args) {

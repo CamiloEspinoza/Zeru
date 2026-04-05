@@ -4,9 +4,11 @@ import {
   Body,
   Headers,
   UnauthorizedException,
+  UseGuards,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { FmSyncService } from '../services/fm-sync.service';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { fmWebhookSchema, type FmWebhookDto } from '../dto';
@@ -27,6 +29,8 @@ export class FmWebhookController {
   }
 
   @Post()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   async handleWebhook(
     @Headers('x-fm-webhook-key') apiKey: string,
     @Body(new ZodValidationPipe(fmWebhookSchema)) body: FmWebhookDto,

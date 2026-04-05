@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from './fm-api.service';
 import { FmSyncService } from './fm-sync.service';
@@ -21,7 +20,7 @@ export interface ImportResult {
 @Injectable()
 export class FmImportService {
   private readonly logger = new Logger(FmImportService.name);
-  private importing = false;
+  private importing = new Map<string, boolean>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -33,11 +32,11 @@ export class FmImportService {
 
   /** Starts import in background, returns immediately. Listen for 'fm.import.done' event. */
   startImportProcedencias(tenantId: string): { started: boolean; message: string } {
-    if (this.importing) {
-      return { started: false, message: 'Import already in progress' };
+    if (this.importing.get(tenantId)) {
+      return { started: false, message: 'Import already in progress for this tenant' };
     }
 
-    this.importing = true;
+    this.importing.set(tenantId, true);
 
     this.importProcedencias(tenantId)
       .then((result) => {
@@ -48,7 +47,7 @@ export class FmImportService {
         this.eventEmitter.emit('fm.import.done', { tenantId, error: String(error) });
       })
       .finally(() => {
-        this.importing = false;
+        this.importing.delete(tenantId);
       });
 
     return { started: true, message: 'Import started in background' };
@@ -101,8 +100,8 @@ export class FmImportService {
       codeCache.set(o.code, o.id);
     }
 
-    // 3. Build soft-deleted sets (bypass soft-delete extension via _client)
-    const rawClient = (this.prisma as unknown as { _client: PrismaClient })._client;
+    // 3. Build soft-deleted sets (bypass soft-delete extension via rawClient)
+    const rawClient = this.prisma.rawClient;
     const deletedOrigins = await rawClient.labOrigin.findMany({
       where: { tenantId, deletedAt: { not: null } },
       select: { code: true },
@@ -121,11 +120,12 @@ export class FmImportService {
     );
 
     // 4. Process each FM record
+    const contactsImportedForRut = new Set<string>();
     for (const record of fmRecords) {
       try {
         await this.importSingleProcedencia(
           tenantId, record, rutCache, codeCache,
-          deletedOriginCodes, deletedEntityRuts, result,
+          deletedOriginCodes, deletedEntityRuts, contactsImportedForRut, result,
         );
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -151,6 +151,7 @@ export class FmImportService {
     codeCache: Map<string, string>,
     deletedOriginCodes: Set<string>,
     deletedEntityRuts: Set<string>,
+    contactsImportedForRut: Set<string>,
     result: ImportResult,
   ) {
     // ── LabOrigin check first (if deleted in Zeru, skip entire record) ──
@@ -173,6 +174,7 @@ export class FmImportService {
         result.legalEntitiesSkippedDeleted++;
       } else {
         const existingLeId = rutCache.get(leData.rut);
+        let isNewLegalEntity = false;
 
         if (existingLeId) {
           await this.prisma.legalEntity.update({
@@ -181,6 +183,7 @@ export class FmImportService {
           });
           legalEntityId = existingLeId;
           result.legalEntitiesUpdated++;
+          await this.ensureSyncRecord(tenantId, 'legal-entity', existingLeId, record);
         } else {
           const le = await this.prisma.legalEntity.create({
             data: { ...leData, tenantId },
@@ -188,19 +191,23 @@ export class FmImportService {
           legalEntityId = le.id;
           rutCache.set(leData.rut, le.id);
           result.legalEntitiesCreated++;
+          isNewLegalEntity = true;
           await this.ensureSyncRecord(tenantId, 'legal-entity', le.id, record);
         }
 
-        // Replace contacts from FM
-        await this.prisma.legalEntityContact.deleteMany({
-          where: { legalEntityId, tenantId },
-        });
-        const contacts = this.transformer.extractContacts(record);
-        for (const contact of contacts) {
-          await this.prisma.legalEntityContact.create({
-            data: { ...contact, legalEntityId, tenantId },
+        // Only import contacts on first encounter of this RUT (avoid last-writer-wins)
+        if (isNewLegalEntity || !contactsImportedForRut.has(leData.rut)) {
+          contactsImportedForRut.add(leData.rut);
+          await this.prisma.legalEntityContact.deleteMany({
+            where: { legalEntityId, tenantId },
           });
-          result.contactsImported++;
+          const contacts = this.transformer.extractContacts(record);
+          for (const contact of contacts) {
+            await this.prisma.legalEntityContact.create({
+              data: { ...contact, legalEntityId, tenantId },
+            });
+            result.contactsImported++;
+          }
         }
       }
     }
@@ -217,6 +224,7 @@ export class FmImportService {
       });
       originId = existingOriginId;
       result.labOriginsUpdated++;
+      await this.ensureSyncRecord(tenantId, 'lab-origin', existingOriginId, record);
     } else {
       const origin = await this.prisma.labOrigin.create({
         data: { ...originData, legalEntityId, tenantId },
@@ -238,12 +246,13 @@ export class FmImportService {
             billingConcept: pricing.billingConcept,
           },
         },
-        create: { ...pricing, labOriginId: originId, tenantId },
+        create: { ...pricing, labOriginId: originId, tenantId, deletedAt: null },
         update: {
           description: pricing.description,
           basePrice: pricing.basePrice,
           referencePrice: pricing.referencePrice,
           multiplier: pricing.multiplier,
+          deletedAt: null, // resurrect if previously soft-deleted
         },
       });
       result.pricingImported++;
