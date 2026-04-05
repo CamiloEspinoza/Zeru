@@ -17,8 +17,9 @@ export class LabOriginsService {
       orderBy: { name: 'asc' },
       include: {
         legalEntity: { select: { id: true, rut: true, legalName: true } },
+        billingAgreement: { select: { id: true, code: true, name: true, status: true } },
         parent: { select: { id: true, code: true, name: true } },
-        _count: { select: { children: true, pricing: true } },
+        _count: { select: { children: true } },
       },
     });
   }
@@ -29,9 +30,9 @@ export class LabOriginsService {
       where: { id },
       include: {
         legalEntity: { select: { id: true, rut: true, legalName: true } },
+        billingAgreement: { select: { id: true, code: true, name: true, status: true } },
         parent: { select: { id: true, code: true, name: true } },
         children: { where: { isActive: true }, select: { id: true, code: true, name: true, category: true } },
-        pricing: { where: { isActive: true }, orderBy: { billingConcept: 'asc' } },
       },
     });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
@@ -40,15 +41,8 @@ export class LabOriginsService {
 
   async create(tenantId: string, data: CreateLabOriginSchema) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-    const { contractDate, incorporationDate, agreementDate, lastAddendumDate, ...rest } = data;
     const origin = await client.labOrigin.create({
-      data: {
-        ...rest,
-        contractDate: contractDate ? new Date(contractDate) : undefined,
-        incorporationDate: incorporationDate ? new Date(incorporationDate) : undefined,
-        agreementDate: agreementDate ? new Date(agreementDate) : undefined,
-        lastAddendumDate: lastAddendumDate ? new Date(lastAddendumDate) : undefined,
-      },
+      data,
     });
     this.eventEmitter.emit('fm.sync', {
       tenantId,
@@ -63,15 +57,9 @@ export class LabOriginsService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const origin = await client.labOrigin.findUnique({ where: { id } });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
-    const { contractDate, incorporationDate, agreementDate, lastAddendumDate, ...rest } = data;
-    const dateFields: Record<string, Date | null | undefined> = {};
-    if (contractDate !== undefined) dateFields.contractDate = contractDate ? new Date(contractDate) : null;
-    if (incorporationDate !== undefined) dateFields.incorporationDate = incorporationDate ? new Date(incorporationDate) : null;
-    if (agreementDate !== undefined) dateFields.agreementDate = agreementDate ? new Date(agreementDate) : null;
-    if (lastAddendumDate !== undefined) dateFields.lastAddendumDate = lastAddendumDate ? new Date(lastAddendumDate) : null;
     const updated = await client.labOrigin.update({
       where: { id },
-      data: { ...rest, ...dateFields },
+      data,
     });
     this.eventEmitter.emit('fm.sync', {
       tenantId,

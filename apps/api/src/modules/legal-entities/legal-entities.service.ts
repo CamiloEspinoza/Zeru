@@ -28,6 +28,7 @@ export class LegalEntitiesService {
         contacts: { where: { isActive: true } },
         bankAccounts: { where: { isActive: true } },
         labOrigins: { where: { isActive: true }, select: { id: true, code: true, name: true, category: true } },
+        billingAgreements: { where: { isActive: true }, select: { id: true, code: true, name: true, status: true } },
       },
     });
     if (!entity) throw new NotFoundException(`LegalEntity ${id} not found`);
