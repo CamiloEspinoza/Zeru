@@ -9,9 +9,16 @@ import { FmImportService } from '../services/fm-import.service';
 export class FmImportController {
   constructor(private readonly importService: FmImportService) {}
 
+  @Post('convenios')
+  @HttpCode(HttpStatus.ACCEPTED)
+  importConvenios(@CurrentTenant() tenantId: string) {
+    return this.importService.startImportConvenios(tenantId);
+  }
+
+  /** Backwards-compatible alias — delegates to importConvenios */
   @Post('procedencias')
   @HttpCode(HttpStatus.ACCEPTED)
   importProcedencias(@CurrentTenant() tenantId: string) {
-    return this.importService.startImportProcedencias(tenantId);
+    return this.importService.startImportConvenios(tenantId);
   }
 }
