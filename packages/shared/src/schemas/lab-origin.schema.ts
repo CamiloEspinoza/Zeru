@@ -20,7 +20,7 @@ export const createLabOriginSchema = z.object({
   commune: z.string().optional(),
   city: z.string().optional(),
   phone: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.string().email().optional().nullable().or(z.literal('')),
   sampleReceptionMode: z.enum(SAMPLE_RECEPTION_MODES).optional(),
   reportDeliveryMethods: z.array(z.enum(REPORT_DELIVERY_METHODS)).optional(),
   deliveryDaysBiopsy: z.number().int().min(0).optional(),

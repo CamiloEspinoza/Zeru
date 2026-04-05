@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateRut } from '../utils/format-rut';
 
 const PAYMENT_TERMS = [
   'IMMEDIATE', 'NET_15', 'NET_30', 'NET_45', 'NET_60', 'NET_90', 'CUSTOM',
@@ -7,7 +8,10 @@ const PAYMENT_TERMS = [
 const BANK_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'VISTA', 'OTHER'] as const;
 
 export const createLegalEntitySchema = z.object({
-  rut: z.string().min(3, 'RUT requerido'),
+  rut: z
+    .string()
+    .min(3, 'RUT requerido')
+    .refine((val) => validateRut(val), { message: 'RUT inválido' }),
   legalName: z.string().min(1, 'Razón social requerida'),
   tradeName: z.string().optional(),
   businessActivity: z.string().optional(),
@@ -18,7 +22,7 @@ export const createLegalEntitySchema = z.object({
   unit: z.string().optional(),
   commune: z.string().optional(),
   city: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.string().email().optional().nullable().or(z.literal('')),
   phone: z.string().optional(),
   website: z.string().optional(),
   paymentTerms: z.enum(PAYMENT_TERMS).optional(),
@@ -31,7 +35,7 @@ export const updateLegalEntitySchema = createLegalEntitySchema.partial();
 export const createLegalEntityContactSchema = z.object({
   name: z.string().min(1, 'Nombre requerido'),
   role: z.string().optional(),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.string().email().optional().nullable().or(z.literal('')),
   phone: z.string().optional(),
   mobile: z.string().optional(),
   isPrimary: z.boolean().optional(),

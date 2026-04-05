@@ -116,11 +116,7 @@ export class ProcedenciasTransformer {
       encryptedFtpUser: this.encryptIfPresent(str(d['FTP Usuario'])),
       encryptedFtpPassword: this.encryptIfPresent(str(d['FTP Constraseña'])),
       ftpPath: str(d['FTP Path']) || null,
-      criticalNotificationEmails: collectEmails(d, [
-        'email_receptor_critico_1', 'email_receptor_critico_2',
-        'email_receptor_critico_3', 'email_receptor_critico_4',
-        'email_receptor_critico_5', 'email_receptor_critico_6',
-      ]),
+      criticalNotificationEmails: collectEmails(d),
       sendsQualityReports: isYes(str(d['ENVÍO INFORMES CALIDAD'])),
       contractDate: parseDate(str(d['FECHA FIRMA CONTRATO'])),
       notes: str(d['OBSERVACIONES']) || null,
@@ -165,7 +161,9 @@ export class ProcedenciasTransformer {
           description: str(row['conceptos de cobro procedencia::Descripción']) || null,
           basePrice: parseNum(row['conceptos de cobro procedencia::Valor']),
           referencePrice: parseNum(row['conceptos de cobro procedencia::Valor Referencia']) || null,
-          multiplier: parseNum(row['conceptos de cobro procedencia::Factor']) || 1,
+          multiplier: str(row['conceptos de cobro procedencia::Factor'])
+            ? parseNum(row['conceptos de cobro procedencia::Factor'])
+            : 1,
         };
       })
       .filter((p): p is ExtractedPricing => p !== null);
@@ -187,6 +185,7 @@ export class ProcedenciasTransformer {
     name: string;
     street?: string | null;
     streetNumber?: string | null;
+    unit?: string | null;
     commune?: string | null;
     city?: string | null;
     phone?: string | null;
@@ -197,6 +196,7 @@ export class ProcedenciasTransformer {
       nombre_procedencia: origin.name,
       calle: origin.street ?? '',
       numero: origin.streetNumber ?? '',
+      oficina: origin.unit ?? '',
       comuna: origin.commune ?? '',
       ciudad: origin.city ?? '',
       telefono: origin.phone ?? '',
@@ -235,7 +235,7 @@ function parseNum(val: unknown): number {
 }
 
 function isYes(val: string): boolean {
-  return /^s[ií]/i.test(val);
+  return /^s[iíÍ]/i.test(val);
 }
 
 function parseDate(val: string): Date | null {
@@ -245,11 +245,17 @@ function parseDate(val: string): Date | null {
 }
 
 function parseCategory(val: string): ExtractedLabOrigin['category'] {
-  const lower = val.toLowerCase();
-  if (lower.includes('consulta')) return 'CONSULTA';
-  if (lower.includes('centro') && lower.includes('méd')) return 'CENTRO_MEDICO';
-  if (lower.includes('clínica') || lower.includes('hospital')) return 'CLINICA_HOSPITAL';
-  if (lower.includes('laboratorio')) return 'LABORATORIO';
+  // Normalize: remove accents for robust matching
+  const normalized = val
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (normalized.includes('consulta')) return 'CONSULTA';
+  if (normalized.includes('centro') && normalized.includes('med'))
+    return 'CENTRO_MEDICO';
+  if (normalized.includes('clinica') || normalized.includes('hospital'))
+    return 'CLINICA_HOSPITAL';
+  if (normalized.includes('laboratorio')) return 'LABORATORIO';
   return 'OTRO';
 }
 
@@ -272,8 +278,9 @@ function parseDeliveryMethods(val: string): ExtractedLabOrigin['reportDeliveryMe
 }
 
 function parsePaymentTerms(val: string): ExtractedLegalEntity['paymentTerms'] {
-  const n = Number(val?.replace(/[^0-9]/g, ''));
-  if (!n || isNaN(n)) return 'NET_30';
+  if (!val) return 'NET_30';
+  const n = Number(val.replace(/[^0-9]/g, ''));
+  if (isNaN(n)) return 'NET_30';
   if (n <= 0) return 'IMMEDIATE';
   if (n <= 15) return 'NET_15';
   if (n <= 30) return 'NET_30';
@@ -296,11 +303,20 @@ function parseBillingDay(val: string): number | null {
   return n;
 }
 
-function collectEmails(data: Record<string, unknown>, fields: string[]): string[] {
+function collectEmails(data: Record<string, unknown>): string[] {
   const emails: string[] = [];
-  for (const field of fields) {
-    const val = str(data[field]);
-    if (val && val.includes('@')) emails.push(val);
+  for (const [key, val] of Object.entries(data)) {
+    const keyLower = key.toLowerCase();
+    // Only collect from critical notification email fields
+    if (!keyLower.includes('receptor_critico') && !keyLower.includes('criticos'))
+      continue;
+    if (!keyLower.includes('email')) continue;
+    const s = str(val);
+    if (!s || !s.includes('@')) continue;
+    for (const part of s.split(/[,;]\s*/)) {
+      const trimmed = part.trim();
+      if (trimmed.includes('@')) emails.push(trimmed);
+    }
   }
-  return emails;
+  return [...new Set(emails)];
 }
