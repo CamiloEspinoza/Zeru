@@ -262,19 +262,25 @@ export class FmSyncService {
           continue;
         }
 
-        // Process based on entity type
+        // Process based on entity type (merge strategy: only update non-null fields)
         if (record.entityType === 'lab-origin' && record.entityId) {
           const originData = this.transformer.extractLabOrigin(fmRecord);
+          const mergedOriginData = Object.fromEntries(
+            Object.entries(originData).filter(([, v]) => v !== null && v !== undefined),
+          );
           await this.prisma.labOrigin.update({
             where: { id: record.entityId },
-            data: originData,
+            data: mergedOriginData,
           });
         } else if (record.entityType === 'legal-entity' && record.entityId) {
           const leData = this.transformer.extractLegalEntity(fmRecord);
           if (leData) {
+            const mergedLeData = Object.fromEntries(
+              Object.entries(leData).filter(([, v]) => v !== null && v !== undefined),
+            );
             await this.prisma.legalEntity.update({
               where: { id: record.entityId },
-              data: leData,
+              data: mergedLeData,
             });
           }
         }
@@ -341,9 +347,12 @@ export class FmSyncService {
         });
         if (existingLe) {
           legalEntityId = existingLe.id;
+          const mergedLeData = Object.fromEntries(
+            Object.entries(leData).filter(([, v]) => v !== null && v !== undefined),
+          );
           await this.prisma.legalEntity.update({
             where: { id: existingLe.id },
-            data: leData,
+            data: mergedLeData,
           });
         } else {
           const le = await this.prisma.legalEntity.create({
@@ -373,9 +382,15 @@ export class FmSyncService {
       });
       let originId: string;
       if (existingOrigin) {
+        const mergedOriginData = Object.fromEntries(
+          Object.entries(originData).filter(([, v]) => v !== null && v !== undefined),
+        );
+        const updateData = legalEntityId
+          ? { ...mergedOriginData, legalEntityId }
+          : mergedOriginData;
         await this.prisma.labOrigin.update({
           where: { id: existingOrigin.id },
-          data: { ...originData, legalEntityId },
+          data: updateData,
         });
         originId = existingOrigin.id;
       } else {

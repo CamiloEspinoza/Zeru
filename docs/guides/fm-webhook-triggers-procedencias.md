@@ -50,7 +50,7 @@ Set Variable [ $payload ; Value:
 ]
 
 # URL del webhook de Zeru
-Set Variable [ $url ; Value: "https://api.zeru.cl/filemaker/webhook" ]
+Set Variable [ $url ; Value: "https://api.zeru.cl/api/filemaker/webhook" ]
 
 # Clave de autenticación
 Set Variable [ $webhookKey ; Value: "TU_FM_WEBHOOK_KEY_AQUI" ]
@@ -231,7 +231,7 @@ Perform Script [ "Webhook - Notificar Zeru" ; Parameter: $param ]
 3. Agregar trigger: **OnRecordCommit**
 4. Script: **Webhook - Instituciones OnCommit**
 
-> **Nota para Zeru:** El backend deberá manejar webhooks con layout `FICHA INSTITUCION COBRANZAS` de forma especial — buscar todas las procedencias vinculadas a esa institución y actualizar los LegalEntity correspondientes. Esto requiere un handler adicional en `FmSyncService` que aún no existe y debe ser implementado.
+> **Nota:** El backend maneja este layout via `processInstitutionWebhook` en `FmSyncService` — busca LegalEntity por RUT, actualiza campos (razón social, email, plazo, día facturación) y reemplaza contactos de cobranzas desde el portal.
 
 ---
 
