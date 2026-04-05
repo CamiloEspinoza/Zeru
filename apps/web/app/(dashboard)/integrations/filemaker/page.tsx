@@ -733,6 +733,132 @@ function RecordTable({ records }: { records: FmRecord[] }) {
 
 // ── Sync Status Tab ──
 
+// ── Import Panel ──
+
+interface ImportResult {
+  legalEntitiesCreated: number;
+  legalEntitiesUpdated: number;
+  labOriginsCreated: number;
+  labOriginsUpdated: number;
+  labOriginsSkippedDeleted: number;
+  legalEntitiesSkippedDeleted: number;
+  contactsImported: number;
+  pricingImported: number;
+  errors: Array<{ fmRecordId: string; error: string }>;
+}
+
+function ImportPanel({ onComplete }: { onComplete: () => void }) {
+  const [importing, setImporting] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  const startImport = useCallback(async () => {
+    setImporting(true);
+    setResult(null);
+    try {
+      const res = await api.post<{ started: boolean; message: string }>(
+        "/filemaker/import/procedencias",
+        {},
+      );
+      if (!res.started) {
+        toast.error(res.message);
+        setImporting(false);
+        return;
+      }
+      toast.success("Import iniciado en background");
+      setPolling(true);
+    } catch {
+      toast.error("Error al iniciar import");
+      setImporting(false);
+    }
+  }, []);
+
+  // Poll sync stats to detect completion
+  useEffect(() => {
+    if (!polling) return;
+    const interval = setInterval(async () => {
+      try {
+        const stats = await api.get<FmSyncStats>("/filemaker/sync/stats");
+        // When no more pending records and total > 0, import likely done
+        if (stats.total > 0 && stats.pendingToZeru === 0 && stats.pendingToFm === 0) {
+          // Fetch latest logs to check for import completion
+          const logs = await api.get<FmSyncLog[]>("/filemaker/sync/logs?limit=1");
+          if (logs.length > 0 && logs[0].operation?.includes("import")) {
+            setPolling(false);
+            setImporting(false);
+            onComplete();
+            toast.success("Import completado");
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [polling, onComplete]);
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-sm">Importar desde FileMaker</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={startImport}
+            disabled={importing}
+            size="sm"
+          >
+            {importing ? (
+              <>
+                <Spinner size="sm" className="mr-2" />
+                Importando Procedencias...
+              </>
+            ) : (
+              "Importar Procedencias"
+            )}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Base: BIOPSIAS | Layout: Procedencias*
+          </span>
+        </div>
+        {importing && (
+          <p className="text-xs text-muted-foreground">
+            El import se ejecuta en background. Los stats se actualizan automaticamente.
+          </p>
+        )}
+        {result && (
+          <div className="grid gap-2 rounded-md border p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <span className="text-muted-foreground">Personas juridicas: </span>
+              <span className="font-medium">{result.legalEntitiesCreated} creadas, {result.legalEntitiesUpdated} actualizadas</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Procedencias: </span>
+              <span className="font-medium">{result.labOriginsCreated} creadas, {result.labOriginsUpdated} actualizadas</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Contactos: </span>
+              <span className="font-medium">{result.contactsImported}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Precios: </span>
+              <span className="font-medium">{result.pricingImported}</span>
+            </div>
+            {result.errors.length > 0 && (
+              <div className="col-span-full">
+                <span className="text-destructive font-medium">{result.errors.length} errores</span>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Sync Status Tab ──
+
 function SyncStatusTab() {
   const [stats, setStats] = useState<FmSyncStats | null>(null);
   const [errors, setErrors] = useState<FmSyncRecordInfo[]>([]);
@@ -788,6 +914,9 @@ function SyncStatusTab() {
 
   return (
     <div className="space-y-4">
+      {/* Import Panel */}
+      <ImportPanel onComplete={fetchData} />
+
       {/* Stats Counters */}
       {stats && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
