@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from './fm-api.service';
 import { ProcedenciasTransformer } from '../transformers/procedencias.transformer';
+import { normalizeRut } from '@zeru/shared';
 import type { FmSyncStats } from '@zeru/shared';
 
 interface FmSyncEvent {
@@ -449,6 +450,120 @@ export class FmSyncService {
     });
   }
 
+  private static readonly INSTITUTION_LAYOUT = 'FICHA INSTITUCION COBRANZAS';
+
+  private async processInstitutionWebhook(tenantId: string, fmRecordId: string) {
+    this.logger.log(`Processing institution webhook for FM record ${fmRecordId}`);
+
+    let fmRecord;
+    try {
+      fmRecord = await this.fmApi.getRecord(
+        this.transformer.database,
+        FmSyncService.INSTITUTION_LAYOUT,
+        fmRecordId,
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to read institution record ${fmRecordId}: ${msg}`);
+      return;
+    }
+
+    if (!fmRecord) return;
+
+    const d = fmRecord.fieldData;
+    const rawRut = String(d['Rut'] ?? '').trim();
+    if (!rawRut) {
+      this.logger.warn(`Institution record ${fmRecordId} has no RUT, skipping`);
+      return;
+    }
+
+    const rut = normalizeRut(rawRut);
+    if (rut.length < 3) return;
+
+    // Find LegalEntity by RUT
+    const le = await this.prisma.legalEntity.findFirst({
+      where: { tenantId, rut },
+    });
+
+    if (!le) {
+      this.logger.warn(`No LegalEntity found for RUT ${rut} from institution webhook`);
+      return;
+    }
+
+    // Build update data from institution fields (non-null only)
+    const parsePaymentTerms = (val: string) => {
+      const n = Number(val?.replace(/[^0-9]/g, ''));
+      if (isNaN(n) || !val) return undefined;
+      if (n <= 0) return 'IMMEDIATE' as const;
+      if (n <= 15) return 'NET_15' as const;
+      if (n <= 30) return 'NET_30' as const;
+      if (n <= 45) return 'NET_45' as const;
+      if (n <= 60) return 'NET_60' as const;
+      if (n <= 90) return 'NET_90' as const;
+      return 'CUSTOM' as const;
+    };
+
+    const parseBillingDay = (val: string): number | undefined => {
+      if (!val) return undefined;
+      const n = Number(val.replace(/[^0-9]/g, ''));
+      if (!n || isNaN(n) || n < 1 || n > 28) return undefined;
+      return n;
+    };
+
+    const legalName = String(d['Razón Social'] ?? '').trim() || undefined;
+    const email = String(d['Contacto Facturación EMAIL'] ?? '').trim() || undefined;
+    const paymentTerms = parsePaymentTerms(String(d['PlazoPago'] ?? '').trim());
+    const billingDayOfMonth = parseBillingDay(String(d['Día de Facturación'] ?? '').trim());
+
+    const updateData = Object.fromEntries(
+      Object.entries({ legalName, email, paymentTerms, billingDayOfMonth })
+        .filter(([, v]) => v !== undefined),
+    );
+
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.legalEntity.update({
+        where: { id: le.id },
+        data: updateData,
+      });
+      this.logger.log(`Updated LegalEntity ${le.id} (RUT ${rut}) from institution webhook`);
+    }
+
+    // Also update contacts from the institution's CONTACTOS Cobranzas portal
+    const portalData = fmRecord.portalData?.['CONTACTOS Cobranzas'];
+    if (portalData && Array.isArray(portalData) && portalData.length > 0) {
+      await this.prisma.legalEntityContact.deleteMany({
+        where: { legalEntityId: le.id, tenantId },
+      });
+      for (const row of portalData) {
+        const firstName = String(row['CONTACTOS Cobranzas::Nombre'] ?? '').trim();
+        const lastName = String(row['CONTACTOS Cobranzas::Apellido'] ?? '').trim();
+        const name = [firstName, lastName].filter(Boolean).join(' ');
+        if (!name) continue;
+        await this.prisma.legalEntityContact.create({
+          data: {
+            name,
+            role: String(row['CONTACTOS Cobranzas::Cargo'] ?? '').trim() || null,
+            email: String(row['CONTACTOS Cobranzas::Email'] ?? '').trim() || null,
+            phone: String(row['CONTACTOS Cobranzas::Tel Fijo'] ?? '').trim() || null,
+            mobile: String(row['CONTACTOS Cobranzas::Tel Celular'] ?? '').trim() || null,
+            legalEntityId: le.id,
+            tenantId,
+          },
+        });
+      }
+      this.logger.log(`Replaced contacts for LegalEntity ${le.id} from institution webhook`);
+    }
+
+    await this.logSync({
+      tenantId,
+      entityType: 'legal-entity',
+      entityId: le.id,
+      fmRecordId,
+      action: 'webhook:institution-update',
+      direction: 'fm_to_zeru',
+    });
+  }
+
   async handleWebhook(tenantId: string, data: {
     database: string;
     layout: string;
@@ -456,6 +571,23 @@ export class FmSyncService {
     action: 'create' | 'update' | 'delete';
   }) {
     this.logger.log(`FM webhook: ${data.action} ${data.database}/${data.layout}/${data.recordId}`);
+
+    // Institution layout: directly update LegalEntity by RUT (no sync records needed)
+    if (data.layout === FmSyncService.INSTITUTION_LAYOUT) {
+      if (data.action === 'delete') {
+        this.logger.log(`Ignoring delete webhook for institution record ${data.recordId}`);
+      } else {
+        await this.processInstitutionWebhook(tenantId, data.recordId);
+      }
+      await this.logSync({
+        tenantId,
+        entityType: 'legal-entity',
+        fmRecordId: data.recordId,
+        action: `webhook:institution:${data.action}`,
+        direction: 'fm_to_zeru',
+      });
+      return;
+    }
 
     // Find all sync records for this FM record (may be multiple for composite transformers)
     const existing = await this.prisma.fmSyncRecord.findMany({

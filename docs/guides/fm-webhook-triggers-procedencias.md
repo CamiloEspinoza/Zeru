@@ -301,6 +301,6 @@ Además, modificar scripts existentes que usen `Delete Record/Request` en Proced
 
 1. ~~**Procesamiento de PENDING_TO_ZERU**~~ — **IMPLEMENTADO**. `processPendingToZeru` cron cada 30s lee FM, ejecuta transformer, actualiza Zeru.
 
-2. **Handler para layout FICHA INSTITUCION COBRANZAS** — **PENDIENTE**. El backend solo procesa webhooks del layout `Procedencias*`. Webhooks de `FICHA INSTITUCION COBRANZAS` se marcan como ERROR. **No configurar este trigger en FM hasta que se implemente.**
+2. ~~**Handler para layout FICHA INSTITUCION COBRANZAS**~~ — **IMPLEMENTADO**. `processInstitutionWebhook` lee el registro FM, busca LegalEntity por RUT, actualiza campos (razón social, email, plazo, día facturación) y reemplaza contactos de cobranzas.
 
 3. ~~**Manejo de create**~~ — **IMPLEMENTADO**. `processUnknownRecord` crea LegalEntity + LabOrigin desde webhooks de records nuevos.
