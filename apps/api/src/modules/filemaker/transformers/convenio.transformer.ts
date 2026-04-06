@@ -91,20 +91,22 @@ export class ConvenioTransformer {
     const portalData = record.portalData?.['portal_cdc'];
     if (!portalData || !Array.isArray(portalData)) return [];
 
+    // Portal field names use the Table Occurrence prefix, not the portal object name
+    const TO = 'Conceptos de cobro_procedencia';
     return portalData
       .map((row: Record<string, unknown>) => {
-        const conceptFk = str(row['portal_cdc::Concepto de cobro_fk'] || row['Concepto de cobro_fk']);
+        const conceptFk = str(row[`${TO}::Concepto de cobro_fk`]);
         if (!conceptFk) return null;
 
-        const rawFactor = str(row['portal_cdc::Factor'] || row['Factor']);
+        const rawFactor = str(row[`${TO}::Factor`]);
         return {
           fmConceptRecordId: conceptFk,
-          factor: rawFactor ? parseNum(row['portal_cdc::Factor'] || row['Factor']) : 1,
-          negotiatedPrice: parseNum(row['portal_cdc::Valor'] || row['Valor']),
-          referencePrice: str(row['portal_cdc::Valor Referencia'] || row['Valor Referencia'])
-            ? parseNum(row['portal_cdc::Valor Referencia'] || row['Valor Referencia'])
+          factor: rawFactor ? parseNum(row[`${TO}::Factor`]) : 1,
+          negotiatedPrice: parseNum(row[`${TO}::Valor`]),
+          referencePrice: str(row[`${TO}::Valor Referencia`])
+            ? parseNum(row[`${TO}::Valor Referencia`])
             : null,
-          description: str(row['portal_cdc::Descripción'] || row['Descripción']) || null,
+          description: str(row[`${TO}::Descripción`]) || null,
         };
       })
       .filter((l): l is ExtractedBillingLine => l !== null);
