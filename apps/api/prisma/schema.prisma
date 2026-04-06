@@ -76,6 +76,57 @@ enum BillingModality {
   @@schema("public")
 }
 
+// ─── Projects & Tasks Enums ─────────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+
+  @@schema("public")
+  @@map("project_status")
+}
+
+enum ProjectVisibility {
+  PUBLIC
+  PRIVATE
+
+  @@schema("public")
+  @@map("project_visibility")
+}
+
+enum ProjectMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+
+  @@schema("public")
+  @@map("project_member_role")
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+
+  @@schema("public")
+  @@map("task_priority")
+}
+
+enum TaskViewType {
+  BOARD
+  LIST
+  CALENDAR
+  TIMELINE
+
+  @@schema("public")
+  @@map("task_view_type")
+}
+
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
@@ -121,6 +172,7 @@ model Tenant {
   labOrigins           LabOrigin[]
   billingAgreements    BillingAgreement[]
   billingConcepts      BillingConcept[]
+  projects             Project[]
 
   @@schema("public")
   @@map("tenants")
@@ -164,6 +216,16 @@ model User {
   notifications           Notification[]           @relation("NotificationRecipient")
   notificationPreferences NotificationPreference[] @relation("NotificationPref")
   personProfiles          PersonProfile[]
+  projectsCreated         Project[]             @relation("ProjectsCreated")
+  projectMemberships      ProjectMember[]       @relation("ProjectMemberships")
+  tasksCreated            Task[]                @relation("TasksCreated")
+  taskAssignments         TaskAssignee[]        @relation("TaskAssignments")
+  taskSubscriptions       TaskSubscriber[]      @relation("TaskSubscriptions")
+  taskComments            TaskComment[]         @relation("TaskComments")
+  taskCommentReactions    TaskCommentReaction[] @relation("TaskCommentReactions")
+  taskActivities          TaskActivity[]        @relation("TaskActivities")
+  taskAttachments         TaskAttachment[]      @relation("TaskAttachments")
+  taskViewsCreated        TaskView[]            @relation("TaskViewsCreated")
 
   @@schema("public")
   @@map("users")
@@ -2113,6 +2175,378 @@ model BillingContact {
   @@index([tenantId])
   @@schema("public")
   @@map("billing_contacts")
+}
+
+// ─── Projects & Tasks ────────────────────────────────────
+
+model Project {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  key         String
+  icon        String?
+  color       String?
+  status      ProjectStatus     @default(ACTIVE)
+  visibility  ProjectVisibility @default(PUBLIC)
+  startDate   DateTime?
+  dueDate     DateTime?
+  sortOrder   Int               @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User    @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
+
+  members       ProjectMember[]
+  tasks         Task[]
+  taskViews     TaskView[]
+  labels        Label[]
+  taskStatuses  TaskStatusConfig[]
+  sections      ProjectSection[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@schema("public")
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid())
+  role      ProjectMemberRole @default(MEMBER)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User    @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId  String
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("project_members")
+}
+
+model ProjectSection {
+  id        String    @id @default(uuid())
+  name      String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks     Task[]
+
+  tenantId  String
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("project_sections")
+}
+
+model TaskStatusConfig {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String
+  color     String?
+  category  String    @default("active")
+  sortOrder Int       @default(0)
+  isDefault Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks     Task[]
+
+  tenantId  String
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_status_configs")
+}
+
+model Task {
+  id              String       @id @default(uuid())
+  number          Int
+  title           String
+  description     String?
+  descriptionJson Json?
+  priority        TaskPriority @default(NONE)
+  position        String
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  estimate        Decimal?     @db.Decimal(10, 2)
+  estimateUnit    String?
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  statusId    String
+  status      TaskStatusConfig @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  sectionId   String?
+  section     ProjectSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  parentId    String?
+  parent      Task?            @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks    Task[]           @relation("TaskHierarchy")
+
+  createdById String
+  createdBy   User             @relation("TasksCreated", fields: [createdById], references: [id], onDelete: Restrict)
+
+  tenantId    String
+
+  assignees     TaskAssignee[]
+  labels        TaskLabel[]
+  comments      TaskComment[]
+  attachments   TaskAttachment[]
+  dependencies  TaskDependency[] @relation("DependentTask")
+  dependents    TaskDependency[] @relation("DependencyOf")
+  subscribers   TaskSubscriber[]
+  activities    TaskActivity[]
+
+  @@unique([projectId, number])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([projectId, statusId])
+  @@index([parentId])
+  @@index([tenantId, dueDate])
+  @@schema("public")
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User   @relation("TaskAssignments", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId  String
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_assignees")
+}
+
+model TaskSubscriber {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User   @relation("TaskSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId  String
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_subscribers")
+}
+
+model TaskDependency {
+  id             String   @id @default(uuid())
+  dependencyType String   @default("BLOCKS")
+  createdAt      DateTime @default(now())
+
+  taskId         String
+  task           Task   @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+
+  dependsOnId    String
+  dependsOn      Task   @relation("DependencyOf", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  tenantId       String
+
+  @@unique([taskId, dependsOnId])
+  @@index([dependsOnId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_dependencies")
+}
+
+model Label {
+  id        String    @id @default(uuid())
+  name      String
+  color     String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks     TaskLabel[]
+
+  tenantId  String
+
+  @@unique([projectId, name])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("labels")
+}
+
+model TaskLabel {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  labelId   String
+  label     Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  tenantId  String
+
+  @@unique([taskId, labelId])
+  @@index([labelId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_labels")
+}
+
+model TaskComment {
+  id          String    @id @default(uuid())
+  content     String
+  contentJson Json?
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  taskId      String
+  task        Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  authorId    String
+  author      User    @relation("TaskComments", fields: [authorId], references: [id], onDelete: Restrict)
+
+  parentId    String?
+  parent      TaskComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     TaskComment[] @relation("CommentThread")
+
+  reactions   TaskCommentReaction[]
+
+  tenantId    String
+
+  @@index([taskId, createdAt])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_comments")
+}
+
+model TaskCommentReaction {
+  id        String @id @default(uuid())
+  emoji     String
+
+  commentId String
+  comment   TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User   @relation("TaskCommentReactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@schema("public")
+  @@map("task_comment_reactions")
+}
+
+model TaskActivity {
+  id        String   @id @default(uuid())
+  action    String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  taskId    String
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  actorId   String?
+  actor     User?  @relation("TaskActivities", fields: [actorId], references: [id], onDelete: SetNull)
+
+  tenantId  String
+
+  @@index([taskId, createdAt])
+  @@index([tenantId, createdAt])
+  @@schema("public")
+  @@map("task_activities")
+}
+
+model TaskAttachment {
+  id          String   @id @default(uuid())
+  name        String
+  s3Key       String
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  taskId      String
+  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("TaskAttachments", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  tenantId    String
+
+  @@index([taskId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_attachments")
+}
+
+model TaskView {
+  id        String       @id @default(uuid())
+  name      String
+  type      TaskViewType
+  config    Json         @default("{}")
+  filters   Json         @default("{}")
+  isDefault Boolean      @default(false)
+  icon      String?
+  sortOrder Int          @default(0)
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("TaskViewsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  tenantId    String
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@schema("public")
+  @@map("task_views")
 }
 
 // ─── FileMaker Connector ─────────────────────────────────
