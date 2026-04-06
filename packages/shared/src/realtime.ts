@@ -90,6 +90,8 @@ export interface ClientToServerEvents {
   'chat:delete': (data: { messageId: string }) => void;
   'channel:join': (data: { channelId: string }) => void;
   'channel:leave': (data: { channelId: string }) => void;
+  'project:join': (data: { projectId: string }) => void;
+  'project:leave': (data: { projectId: string }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -118,4 +120,10 @@ export interface ServerToClientEvents {
   'chat:reacted': (data: ChatReactedEvent) => void;
   'chat:edited': (data: ChatEditedEvent) => void;
   'chat:deleted': (data: ChatDeletedEvent) => void;
+  'task:created': (data: { projectId: string; task: Record<string, unknown>; sectionId: string | null; position: string }) => void;
+  'task:changed': (data: { projectId: string; taskId: string; changes: Record<string, { from: unknown; to: unknown }>; version: number; updatedBy: PresenceUser }) => void;
+  'task:moved': (data: { projectId: string; taskId: string; fromSectionId: string | null; toSectionId: string | null; position: string; movedBy: PresenceUser }) => void;
+  'task:removed': (data: { projectId: string; taskId: string }) => void;
+  'task:comment:new': (data: { projectId: string; taskId: string; comment: Record<string, unknown> }) => void;
+  'section:changed': (data: { projectId: string; sectionId: string; changes: Record<string, unknown> }) => void;
 }
