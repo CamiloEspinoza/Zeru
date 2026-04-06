@@ -105,6 +105,10 @@ export const updateViewSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
+export const reorderStatusesSchema = z.object({
+  statusIds: z.array(z.string().uuid()).min(1),
+});
+
 // ─── Type Inference ──────────────────────────────────────
 
 export type CreateProjectDto = z.infer<typeof createProjectSchema>;
@@ -120,3 +124,5 @@ export type CreateLabelDto = z.infer<typeof createLabelSchema>;
 export type UpdateLabelDto = z.infer<typeof updateLabelSchema>;
 export type CreateViewDto = z.infer<typeof createViewSchema>;
 export type UpdateViewDto = z.infer<typeof updateViewSchema>;
+export type ReorderSectionsDto = z.infer<typeof reorderSectionsSchema>;
+export type ReorderStatusesDto = z.infer<typeof reorderStatusesSchema>;
