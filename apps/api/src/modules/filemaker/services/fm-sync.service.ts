@@ -588,6 +588,14 @@ export class FmSyncService {
           data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'FM record deleted' },
         });
       }
+      await this.logSync({
+        tenantId,
+        entityType: 'billing-agreement',
+        entityId: syncRecord?.entityId,
+        fmRecordId,
+        action: 'webhook:convenio:delete',
+        direction: 'fm_to_zeru',
+      });
       return;
     }
 
@@ -854,13 +862,6 @@ export class FmSyncService {
       } else {
         await this.processInstitutionWebhook(tenantId, data.recordId);
       }
-      await this.logSync({
-        tenantId,
-        entityType: 'legal-entity',
-        fmRecordId: data.recordId,
-        action: `webhook:institution:${data.action}`,
-        direction: 'fm_to_zeru',
-      });
       return;
     }
 

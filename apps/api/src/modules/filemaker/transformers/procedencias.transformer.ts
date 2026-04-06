@@ -9,9 +9,6 @@ export interface ExtractedLegalEntity {
   rut: string;
   legalName: string;
   email: string | null;
-  paymentTerms: 'IMMEDIATE' | 'NET_15' | 'NET_30' | 'NET_45' | 'NET_60' | 'NET_90' | 'CUSTOM';
-  customPaymentDays: number | null;
-  billingDayOfMonth: number | null;
   isClient: boolean;
 }
 
@@ -74,9 +71,6 @@ export class ProcedenciasTransformer {
       rut,
       legalName: str(d['INSTITUCIONES::Razón Social']) || `Sin razón social (${rut})`,
       email: str(d['INSTITUCIONES::Email encargado cuentas médicas']) || null,
-      paymentTerms: parsePaymentTerms(str(d['INSTITUCIONES::PlazoPago'])),
-      customPaymentDays: parseCustomPaymentDays(str(d['INSTITUCIONES::PlazoPago'])),
-      billingDayOfMonth: parseBillingDay(str(d['INSTITUCIONES::Día de Facturación'])),
       isClient: true,
     };
   }
@@ -253,32 +247,6 @@ function parseDeliveryMethods(val: string): ExtractedLabOrigin['reportDeliveryMe
   if (upper.includes('IMPRES') || upper.includes('PAPEL')) methods.push('IMPRESO');
   if (upper.includes('EMAIL') || upper.includes('MAIL') || upper.includes('CORREO')) methods.push('EMAIL');
   return methods;
-}
-
-function parsePaymentTerms(val: string): ExtractedLegalEntity['paymentTerms'] {
-  if (!val) return 'NET_30';
-  const n = Number(val.replace(/[^0-9]/g, ''));
-  if (isNaN(n)) return 'NET_30';
-  if (n <= 0) return 'IMMEDIATE';
-  if (n <= 15) return 'NET_15';
-  if (n <= 30) return 'NET_30';
-  if (n <= 45) return 'NET_45';
-  if (n <= 60) return 'NET_60';
-  if (n <= 90) return 'NET_90';
-  return 'CUSTOM';
-}
-
-function parseCustomPaymentDays(val: string): number | null {
-  const n = Number(val?.replace(/[^0-9]/g, ''));
-  if (!n || isNaN(n) || n <= 90) return null;
-  return n;
-}
-
-function parseBillingDay(val: string): number | null {
-  if (!val) return null;
-  const n = Number(val.replace(/[^0-9]/g, ''));
-  if (!n || isNaN(n) || n < 1 || n > 28) return null;
-  return n;
 }
 
 function collectEmails(data: Record<string, unknown>): string[] {

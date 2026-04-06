@@ -101,7 +101,9 @@ export class ConvenioTransformer {
           fmConceptRecordId: conceptFk,
           factor: rawFactor ? parseNum(row['portal_cdc::Factor'] || row['Factor']) : 1,
           negotiatedPrice: parseNum(row['portal_cdc::Valor'] || row['Valor']),
-          referencePrice: parseNum(row['portal_cdc::Valor Referencia'] || row['Valor Referencia']) || null,
+          referencePrice: str(row['portal_cdc::Valor Referencia'] || row['Valor Referencia'])
+            ? parseNum(row['portal_cdc::Valor Referencia'] || row['Valor Referencia'])
+            : null,
           description: str(row['portal_cdc::Descripción'] || row['Descripción']) || null,
         };
       })
@@ -118,7 +120,7 @@ export class ConvenioTransformer {
       fmConceptRecordId: conceptFk,
       factor: rawFactor ? parseNum(d['Factor']) : 1,
       negotiatedPrice: parseNum(d['Valor']),
-      referencePrice: parseNum(d['Valor Referencia']) || null,
+      referencePrice: str(d['Valor Referencia']) ? parseNum(d['Valor Referencia']) : null,
       description: str(d['Descripción']) || null,
     };
   }
