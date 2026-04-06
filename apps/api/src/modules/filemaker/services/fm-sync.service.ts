@@ -672,7 +672,12 @@ export class FmSyncService {
     });
   }
 
-  private async processBillingConceptWebhook(tenantId: string, fmRecordId: string) {
+  private async processBillingConceptWebhook(tenantId: string, fmRecordId: string, action: string) {
+    if (action === 'delete') {
+      this.logger.log(`Ignoring delete webhook for billing concept ${fmRecordId} (soft-delete on next import)`);
+      return;
+    }
+
     this.logger.log(`Processing billing concept webhook for FM record ${fmRecordId}`);
 
     let fmRecord;
@@ -719,7 +724,12 @@ export class FmSyncService {
     });
   }
 
-  private async processPricingLineWebhook(tenantId: string, fmRecordId: string) {
+  private async processPricingLineWebhook(tenantId: string, fmRecordId: string, action: string) {
+    if (action === 'delete') {
+      this.logger.log(`Ignoring delete webhook for pricing line ${fmRecordId}`);
+      return;
+    }
+
     this.logger.log(`Processing pricing line webhook for FM record ${fmRecordId}`);
 
     let fmRecord;
@@ -822,21 +832,18 @@ export class FmSyncService {
     // Convenio layout
     if (data.layout === this.convenioTransformer.agreementLayout) {
       await this.processConvenioWebhook(tenantId, data.recordId, data.action);
-      await this.logSync({ tenantId, entityType: 'billing-agreement', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
       return;
     }
 
     // CDC catalog layout
     if (data.layout === this.convenioTransformer.conceptLayout) {
-      await this.processBillingConceptWebhook(tenantId, data.recordId);
-      await this.logSync({ tenantId, entityType: 'billing-concept', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
+      await this.processBillingConceptWebhook(tenantId, data.recordId, data.action);
       return;
     }
 
     // Pricing line layout
     if (data.layout === this.convenioTransformer.pricingLayout) {
-      await this.processPricingLineWebhook(tenantId, data.recordId);
-      await this.logSync({ tenantId, entityType: 'billing-agreement-line', fmRecordId: data.recordId, action: `webhook:${data.action}`, direction: 'fm_to_zeru' });
+      await this.processPricingLineWebhook(tenantId, data.recordId, data.action);
       return;
     }
 

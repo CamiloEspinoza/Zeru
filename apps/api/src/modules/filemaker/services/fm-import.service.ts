@@ -255,7 +255,6 @@ export class FmImportService {
     // ═══════════════════════════════════════════════════
 
     const convenioMap = new Map<string, string>(); // FM __pk_convenio → Zeru UUID
-    const fmConvenioCodeToId = new Map<string, string>(); // agreement code → Zeru UUID
 
     // We keep the raw FM agreement records for Steps 4 and 5
     let agreementFmRecords: FmRecord[] = [];
@@ -345,7 +344,6 @@ export class FmImportService {
           if (fmPk) {
             convenioMap.set(fmPk, agreementId);
           }
-          fmConvenioCodeToId.set(data.code, agreementId);
 
           await this.ensureSyncRecord(tenantId, 'billing-agreement', agreementId, record);
         } catch (error) {
