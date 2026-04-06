@@ -239,6 +239,66 @@ export class RealtimeGateway
     }
   }
 
+  // ─── Project Rooms ───────────────────────────────────────
+
+  @SubscribeMessage('project:join')
+  async handleProjectJoin(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const room = `project:${client.data.tenantId}:${data.projectId}`;
+    await client.join(room);
+  }
+
+  @SubscribeMessage('project:leave')
+  async handleProjectLeave(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { projectId: string },
+  ) {
+    if (!client.data?.userId) return;
+    const room = `project:${client.data.tenantId}:${data.projectId}`;
+    await client.leave(room);
+  }
+
+  // ─── Task Event Broadcasting ─────────────────────────────
+
+  @OnEvent('task.created')
+  handleTaskCreated(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:created', payload);
+  }
+
+  @OnEvent('task.updated')
+  handleTaskUpdated(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:changed', payload);
+  }
+
+  @OnEvent('task.moved')
+  handleTaskMoved(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:moved', payload);
+  }
+
+  @OnEvent('task.deleted')
+  handleTaskDeleted(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:removed', payload);
+  }
+
+  @OnEvent('task.comment.created')
+  handleTaskComment(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:comment:new', payload);
+  }
+
+  @OnEvent('section.changed')
+  handleSectionChanged(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'section:changed', payload);
+  }
+
   // ─── Chat event handlers ──────────────────────────────────
 
   @SubscribeMessage('channel:join')
