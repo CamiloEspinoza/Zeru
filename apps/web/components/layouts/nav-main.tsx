@@ -96,6 +96,7 @@ const appNavSections: NavSection[] = [
         icon: MoneyReceive01Icon,
         moduleKey: "collections",
         items: [
+          { title: "Convenios", href: "/collections/agreements" },
           { title: "Liquidaciones", href: "/collections/liquidations" },
           { title: "Seguimiento", href: "/collections/tracking" },
         ],
@@ -148,6 +149,7 @@ const appNavSections: NavSection[] = [
       { title: "Procesamiento", href: "/laboratory/processing", icon: MicroscopeIcon, moduleKey: "lab-processing" },
       { title: "Informes", href: "/laboratory/reports", icon: MedicalFileIcon, moduleKey: "lab-reports" },
       { title: "Codificación", href: "/laboratory/coding", icon: BarCode01Icon, moduleKey: "lab-coding" },
+      { title: "Procedencias", href: "/laboratory/origins", icon: Building03Icon, moduleKey: "lab-origins" },
     ],
   },
   {
@@ -198,6 +200,7 @@ const settingsNav: NavItem[] = [
   { title: "LinkedIn", href: "/settings/linkedin", icon: Linkedin01Icon },
   { title: "Almacenamiento y Email", href: "/settings/storage", icon: HardDriveIcon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
+  { title: "Catálogo CDC", href: "/settings/billing-concepts", icon: Dollar02Icon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },
   { title: "Documentación API", href: "/docs", icon: BookOpen01Icon },
 ];

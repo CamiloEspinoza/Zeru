@@ -57,6 +57,9 @@ const LABELS: Record<string, string> = {
   reception: "Recepción",
   processing: "Procesamiento",
   coding: "Codificación",
+  origins: "Procedencias",
+  agreements: "Convenios",
+  "billing-concepts": "Catálogo CDC",
   integrations: "Integraciones",
 };
 
@@ -87,6 +90,18 @@ async function resolveUuid(
       case "journal": {
         const res = await api.get(`/accounting/journal-entries/${uuid}`);
         return res.description ? `#${res.number}` : null;
+      }
+      case "clients": {
+        const res = await api.get<{ legalName: string }>(`/legal-entities/${uuid}`);
+        return res.legalName ?? null;
+      }
+      case "origins": {
+        const res = await api.get<{ name: string }>(`/lab-origins/${uuid}`);
+        return res.name ?? null;
+      }
+      case "agreements": {
+        const res = await api.get<{ name: string }>(`/billing-agreements/${uuid}`);
+        return res.name ?? null;
       }
       default:
         return null;
