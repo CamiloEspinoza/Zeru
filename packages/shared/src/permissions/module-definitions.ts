@@ -246,6 +246,12 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
       },
     ],
   },
+  {
+    key: 'lab-origins',
+    label: 'Procedencias',
+    section: 'laboratory',
+    granularPermissions: [],
+  },
 
   // ── Marketing ──
   {
@@ -321,6 +327,7 @@ export const ROUTE_MODULE_MAP: Record<string, string> = {
   '/laboratory/processing': 'lab-processing',
   '/laboratory/reports': 'lab-reports',
   '/laboratory/coding': 'lab-coding',
+  '/laboratory/origins': 'lab-origins',
   '/linkedin': 'linkedin',
   '/integrations': 'integrations',
   '/reports': 'reports',
