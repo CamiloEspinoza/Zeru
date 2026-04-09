@@ -261,6 +261,49 @@ export class RealtimeGateway
     await client.leave(room);
   }
 
+  @SubscribeMessage('task:comment:typing')
+  async handleCommentTyping(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { taskId: string; projectId: string },
+  ) {
+    const { userId, tenantId, userName } = client.data;
+    if (!userId || !tenantId) return;
+
+    const room = `project:${tenantId}:${data.projectId}`;
+    this.server.to(room).except(client.id).emit(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'task:comment:typing' as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {
+        projectId: data.projectId,
+        taskId: data.taskId,
+        userId,
+        userName,
+      } as any,
+    );
+  }
+
+  @SubscribeMessage('task:comment:typing:stop')
+  async handleCommentTypingStop(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { taskId: string; projectId: string },
+  ) {
+    const { userId, tenantId } = client.data;
+    if (!userId || !tenantId) return;
+
+    const room = `project:${tenantId}:${data.projectId}`;
+    this.server.to(room).except(client.id).emit(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      'task:comment:typing:stop' as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      {
+        projectId: data.projectId,
+        taskId: data.taskId,
+        userId,
+      } as any,
+    );
+  }
+
   // ─── Task Event Broadcasting ─────────────────────────────
 
   @OnEvent('task.created')
