@@ -6,6 +6,7 @@ import { ProjectHeader } from "@/components/projects/project-header";
 import { ViewSwitcher } from "@/components/projects/view-switcher";
 import { TaskDetailSheet } from "@/components/projects/detail/task-detail-sheet";
 import { ProjectRealtimeSync } from "@/components/projects/project-realtime-sync";
+import { LockSync } from "@/components/realtime/lock-sync";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectLayout({
@@ -44,6 +45,7 @@ export default function ProjectLayout({
       <ViewSwitcher projectId={projectId} />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       <ProjectRealtimeSync projectId={projectId} />
+      <LockSync />
       <TaskDetailSheet projectKey={project.key} />
     </div>
   );
