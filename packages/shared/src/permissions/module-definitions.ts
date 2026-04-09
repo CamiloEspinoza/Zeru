@@ -48,6 +48,16 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     section: 'core',
     granularPermissions: [],
   },
+  {
+    key: 'projects',
+    label: 'Proyectos',
+    section: 'core',
+    granularPermissions: [
+      { key: 'create', label: 'Crear proyectos', minLevel: 'EDIT' },
+      { key: 'delete', label: 'Eliminar proyectos', minLevel: 'MANAGE' },
+      { key: 'manage-members', label: 'Gestionar miembros', minLevel: 'MANAGE' },
+    ],
+  },
 
   // ── Negocio ──
   {
@@ -316,6 +326,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
 ];
 
 export const ROUTE_MODULE_MAP: Record<string, string> = {
+  '/projects': 'projects',
   '/clients': 'clients',
   '/collections': 'collections',
   '/invoicing': 'invoicing',

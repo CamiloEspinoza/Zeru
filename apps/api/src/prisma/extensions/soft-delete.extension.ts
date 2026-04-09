@@ -31,6 +31,13 @@ const SOFT_DELETABLE_MODELS = new Set([
   'billingAgreementLine',
   'billingContact',
   'billingConcept',
+  'project',
+  'projectSection',
+  'taskStatusConfig',
+  'task',
+  'taskComment',
+  'label',
+  'taskView',
 ]);
 
 const READ_OPS = new Set([

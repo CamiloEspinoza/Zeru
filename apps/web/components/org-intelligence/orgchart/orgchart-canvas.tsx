@@ -323,7 +323,7 @@ export function OrgChartCanvas() {
           onPaneClick={onPaneClick}
           onConnectEnd={onConnectEnd}
           onMoveEnd={onMoveEnd}
-          onInit={handleInit}
+          onInit={handleInit as never}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitViewOptions={{ padding: 0.2 }}

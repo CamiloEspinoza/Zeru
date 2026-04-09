@@ -31,6 +31,8 @@ import { FileMakerModule } from './modules/filemaker/filemaker.module';
 import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.module';
 import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { TasksModule } from './modules/tasks/tasks.module';
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { BillingModule } from './modules/billing/billing.module';
     LegalEntitiesModule,
     LabOriginsModule,
     BillingModule,
+    ProjectsModule,
+    TasksModule,
   ],
 })
 export class AppModule implements NestModule {
