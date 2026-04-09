@@ -10,6 +10,8 @@ import { TaskStatusBadge } from "@/components/projects/task-status-badge";
 import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
 import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
 import { TaskComments } from "./task-comments";
+import { TaskDetailTitle } from "./task-detail-title";
+import { TaskDetailDescription } from "./task-detail-description";
 import { useTaskPresence } from "@/hooks/use-task-presence";
 import { TaskPresenceAvatars } from "@/components/projects/task-presence-avatars";
 
@@ -61,20 +63,17 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                 {displayTask.status && <TaskStatusBadge status={displayTask.status} />}
                 <TaskPriorityBadge priority={displayTask.priority} />
               </div>
-              <SheetTitle className="text-xl">{displayTask.title}</SheetTitle>
+              <SheetTitle className="sr-only">{displayTask.title}</SheetTitle>
+              <TaskDetailTitle taskId={displayTask.id} initialTitle={displayTask.title} />
               {displayTask?.projectId && taskId && (
                 <TaskPresenceAvatars projectId={displayTask.projectId} taskId={taskId} />
               )}
             </SheetHeader>
             <div className="mt-6 space-y-6">
-              {displayTask.description && (
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Descripción</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {displayTask.description}
-                  </p>
-                </div>
-              )}
+              <TaskDetailDescription
+                taskId={displayTask.id}
+                initialDescription={displayTask.description}
+              />
               {displayTask.assignees && displayTask.assignees.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-medium">Asignados</h3>
