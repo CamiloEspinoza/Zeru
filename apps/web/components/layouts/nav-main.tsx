@@ -32,6 +32,7 @@ import {
   BarCode01Icon,
   Plug01Icon,
   ChartColumnIcon,
+  TaskDone01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -83,6 +84,7 @@ const appNavSections: NavSection[] = [
       { title: "Inicio", href: "/dashboard", icon: DashboardSquare01Icon, moduleKey: "dashboard" },
       { title: "Asistente", href: "/assistant/new", icon: AiChat02Icon, moduleKey: "assistant" },
       { title: "Calendario", href: "/calendar", icon: Calendar02Icon, moduleKey: "calendar" },
+      { title: "Proyectos", href: "/projects", icon: TaskDone01Icon, moduleKey: "projects" },
       { title: "Documentos", href: "/documents", icon: File02Icon, moduleKey: "documents" },
     ],
   },
