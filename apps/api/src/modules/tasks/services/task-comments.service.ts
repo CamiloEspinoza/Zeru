@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { CreateCommentDto, UpdateCommentDto } from '../dto';
 
@@ -85,7 +85,9 @@ export class TaskCommentsService {
       taskId,
       commentId: comment.id,
       projectId: task.projectId,
+      actorId: userId,
       userId,
+      comment,
     });
 
     // Handle mentions
@@ -173,9 +175,22 @@ export class TaskCommentsService {
       throw new NotFoundException('Comentario no encontrado');
     }
 
-    return (client as any).taskCommentReaction.create({
-      data: { commentId, userId, emoji },
-    });
+    try {
+      return await client.taskCommentReaction.create({
+        data: { commentId, userId, emoji },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        // Reaction already exists — return idempotently
+        return client.taskCommentReaction.findUnique({
+          where: { commentId_userId_emoji: { commentId, userId, emoji } },
+        });
+      }
+      throw e;
+    }
   }
 
   async removeReaction(
@@ -186,7 +201,7 @@ export class TaskCommentsService {
   ) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    await (client as any).taskCommentReaction.deleteMany({
+    await client.taskCommentReaction.deleteMany({
       where: { commentId, userId, emoji },
     });
 
