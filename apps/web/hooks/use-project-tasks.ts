@@ -1,12 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { tasksApi } from "@/lib/api/tasks";
 import { useProjectStore } from "@/stores/project-store";
 
 export function useProjectTasks(projectId: string | null) {
   const setTasks = useProjectStore((s) => s.setTasks);
-  const tasks = useProjectStore((s) => (projectId ? s.getTasks(projectId) : []));
+  const taskMap = useProjectStore((s) =>
+    projectId ? s.tasksByProject.get(projectId) : undefined,
+  );
+
+  const tasks = useMemo(() => {
+    if (!taskMap) return [];
+    return Array.from(taskMap.values()).sort((a, b) =>
+      a.position < b.position ? -1 : a.position > b.position ? 1 : 0,
+    );
+  }, [taskMap]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

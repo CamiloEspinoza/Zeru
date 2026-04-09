@@ -52,16 +52,20 @@ export function KanbanBoard({ projectId, projectKey, statuses, tasks, onRefetch 
 
     if (!targetStatusId) return;
 
-    const columnTasks = tasksByStatus.get(targetStatusId) ?? [];
-    const overIndex = over.data.current?.type === "task"
-      ? columnTasks.findIndex((t) => t.id === over.id)
-      : columnTasks.length;
+    const columnTasks = (tasksByStatus.get(targetStatusId) ?? []).filter(
+      (t) => t.id !== taskId,
+    );
+    const overIndex =
+      over.data.current?.type === "task"
+        ? columnTasks.findIndex((t) => t.id === over.id)
+        : columnTasks.length;
 
     const beforeTask = overIndex > 0 ? columnTasks[overIndex - 1] : null;
-    const afterTask = overIndex >= 0 && overIndex < columnTasks.length ? columnTasks[overIndex] : null;
+    const afterTask =
+      overIndex >= 0 && overIndex < columnTasks.length ? columnTasks[overIndex] : null;
 
-    // Skip if dropped on itself in same position
-    if (beforeTask?.id === taskId || afterTask?.id === taskId) return;
+    // Skip if target position would be the same (dragged onto itself with no neighbor change)
+    if (!beforeTask && !afterTask && targetStatusId === task.statusId) return;
 
     const newPosition = positionBetween(
       beforeTask?.position ?? null,
