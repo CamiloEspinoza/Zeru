@@ -396,7 +396,10 @@ export class TasksService {
 
     const task = await client.task.update({
       where: { id: taskId },
-      data,
+      data: {
+        ...data,
+        version: { increment: 1 },
+      },
     });
 
     // Track changes
@@ -418,6 +421,7 @@ export class TasksService {
       actorId: userId,
       userId,
       changes,
+      version: task.version,
       task,
     });
 
@@ -470,7 +474,10 @@ export class TasksService {
 
     const task = await client.task.update({
       where: { id: taskId },
-      data,
+      data: {
+        ...data,
+        version: { increment: 1 },
+      },
     });
 
     this.eventEmitter.emit('task.moved', {
@@ -482,6 +489,7 @@ export class TasksService {
       fromSectionId: existing.sectionId,
       toSectionId: dto.sectionId ?? existing.sectionId,
       position: dto.position,
+      version: task.version,
       task,
     });
 
@@ -508,7 +516,7 @@ export class TasksService {
     }
 
     const updatedTasks = await this.prisma.$transaction(async (tx: any) => {
-      const updated: Array<{ id: string; projectId: string }> = [];
+      const updated: Array<{ id: string; projectId: string; version: number }> = [];
 
       for (const taskId of dto.taskIds) {
         const data: Record<string, unknown> = {};
@@ -539,9 +547,16 @@ export class TasksService {
         if (Object.keys(data).length > 0) {
           const task = await tx.task.update({
             where: { id: taskId, tenantId },
-            data,
+            data: {
+              ...data,
+              version: { increment: 1 },
+            },
           });
-          updated.push({ id: task.id, projectId: task.projectId });
+          updated.push({
+            id: task.id,
+            projectId: task.projectId,
+            version: task.version,
+          });
         }
       }
 
@@ -559,6 +574,7 @@ export class TasksService {
         actorId: userId,
         userId,
         changes: dto.update,
+        version: task.version,
         bulk: true,
       });
     }
