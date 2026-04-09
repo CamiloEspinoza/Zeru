@@ -1,16 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSocket } from "@/hooks/use-socket";
+import { useProjectStore } from "@/stores/project-store";
 import { tasksApi } from "@/lib/api/tasks";
-import type { TaskComment } from "@/types/projects";
+import { TaskCommentTyping } from "./task-comment-typing";
 
 interface TaskCommentsProps {
   taskId: string;
+  projectId: string;
 }
 
 function initials(firstName: string, lastName: string): string {
@@ -28,23 +31,28 @@ function timeAgo(iso: string): string {
   return `hace ${days}d`;
 }
 
-export function TaskComments({ taskId }: TaskCommentsProps) {
-  const [comments, setComments] = useState<TaskComment[]>([]);
+export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
+  const socket = useSocket();
+  const setComments = useProjectStore((s) => s.setComments);
+  const comments = useProjectStore((s) => s.commentsByTask.get(taskId) ?? []);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [content, setContent] = useState("");
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTypingRef = useRef(false);
 
   const fetchComments = useCallback(async () => {
     setLoading(true);
     try {
       const data = await tasksApi.listComments(taskId);
-      setComments(data);
+      setComments(taskId, data);
     } catch (err) {
       console.error("Error loading comments:", err);
     } finally {
       setLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, setComments]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +61,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       .listComments(taskId)
       .then((data) => {
         if (cancelled) return;
-        setComments(data);
+        setComments(taskId, data);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -66,7 +74,25 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
     return () => {
       cancelled = true;
     };
-  }, [taskId]);
+  }, [taskId, setComments]);
+
+  function emitTyping() {
+    if (!socket) return;
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      socket.emit("task:comment:typing", { taskId, projectId });
+    }
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      socket.emit("task:comment:typing:stop", { taskId, projectId });
+    }, 2500);
+  }
+
+  function handleContentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setContent(e.target.value);
+    emitTyping();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,6 +101,10 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
     try {
       await tasksApi.createComment(taskId, content.trim());
       setContent("");
+      if (socket && isTypingRef.current) {
+        isTypingRef.current = false;
+        socket.emit("task:comment:typing:stop", { taskId, projectId });
+      }
       await fetchComments();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al publicar comentario");
@@ -82,6 +112,15 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (socket && isTypingRef.current) {
+        socket.emit("task:comment:typing:stop", { taskId, projectId });
+      }
+    };
+  }, [socket, taskId, projectId]);
 
   return (
     <div className="space-y-4">
@@ -117,10 +156,11 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
           ))}
         </div>
       )}
+      <TaskCommentTyping taskId={taskId} />
       <form onSubmit={handleSubmit} className="space-y-2">
         <Textarea
           value={content}
-          onChange={(e) => setContent(e.target.value)}
+          onChange={handleContentChange}
           placeholder="Escribe un comentario..."
           rows={3}
           maxLength={10000}

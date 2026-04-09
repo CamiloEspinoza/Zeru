@@ -81,9 +81,9 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                   <TaskAssigneeAvatars assignees={displayTask.assignees} max={10} size="md" />
                 </div>
               )}
-              {displayTask.id && (
+              {displayTask.id && displayTask.projectId && (
                 <div className="border-t pt-6">
-                  <TaskComments taskId={displayTask.id} />
+                  <TaskComments taskId={displayTask.id} projectId={displayTask.projectId} />
                 </div>
               )}
               {displayTask.id && (

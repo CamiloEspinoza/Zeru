@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
-import type { Task } from "@/types/projects";
+import type { Task, TaskComment } from "@/types/projects";
 
 interface ProjectRealtimeSyncProps {
   projectId: string;
@@ -64,11 +64,102 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       removeTask(projectId, data.taskId);
     };
 
+    const handleCommentNew = (data: {
+      projectId: string;
+      taskId: string;
+      comment?: TaskComment;
+    }) => {
+      if (data.projectId !== projectId || !data.comment) return;
+      useProjectStore.getState().addComment(data.taskId, data.comment);
+    };
+
+    const handleCommentUpdated = (data: {
+      projectId: string;
+      taskId: string;
+      commentId: string;
+      comment: Partial<TaskComment>;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore.getState().updateComment(data.taskId, data.commentId, data.comment);
+    };
+
+    const handleCommentDeleted = (data: {
+      projectId: string;
+      taskId: string;
+      commentId: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore.getState().removeComment(data.taskId, data.commentId);
+    };
+
+    const handleReactionAdded = (data: {
+      projectId: string;
+      taskId: string;
+      commentId: string;
+      emoji: string;
+      userId: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore
+        .getState()
+        .addCommentReaction(data.taskId, data.commentId, data.emoji, data.userId);
+    };
+
+    const handleReactionRemoved = (data: {
+      projectId: string;
+      taskId: string;
+      commentId: string;
+      emoji: string;
+      userId: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore
+        .getState()
+        .removeCommentReaction(data.taskId, data.commentId, data.emoji, data.userId);
+    };
+
+    const handleCommentTyping = (data: {
+      projectId: string;
+      taskId: string;
+      userId: string;
+      userName: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore.getState().setTypingUser(data.taskId, {
+        userId: data.userId,
+        userName: data.userName,
+        startedAt: Date.now(),
+      });
+      // Auto-clear after 3 seconds if no new typing event
+      setTimeout(() => {
+        const current = useProjectStore.getState().typingByTask.get(data.taskId)?.get(data.userId);
+        if (current && Date.now() - current.startedAt >= 2900) {
+          useProjectStore.getState().clearTypingUser(data.taskId, data.userId);
+        }
+      }, 3000);
+    };
+
+    const handleCommentTypingStop = (data: {
+      projectId: string;
+      taskId: string;
+      userId: string;
+    }) => {
+      if (data.projectId !== projectId) return;
+      useProjectStore.getState().clearTypingUser(data.taskId, data.userId);
+    };
+
     socket.on("connect", handleConnect);
     socket.on("task:created", handleCreated);
     socket.on("task:changed", handleChanged);
     socket.on("task:moved", handleMoved);
     socket.on("task:removed", handleRemoved);
+    socket.on("task:comment:new", handleCommentNew as (data: unknown) => void);
+    socket.on("task:comment:updated", handleCommentUpdated as (data: unknown) => void);
+    socket.on("task:comment:deleted", handleCommentDeleted as (data: unknown) => void);
+    socket.on("task:comment:reaction:added", handleReactionAdded as (data: unknown) => void);
+    socket.on("task:comment:reaction:removed", handleReactionRemoved as (data: unknown) => void);
+    socket.on("task:comment:typing", handleCommentTyping as (data: unknown) => void);
+    socket.on("task:comment:typing:stop", handleCommentTypingStop as (data: unknown) => void);
 
     return () => {
       socket.emit("project:leave", { projectId });
@@ -77,6 +168,13 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       socket.off("task:changed", handleChanged);
       socket.off("task:moved", handleMoved);
       socket.off("task:removed", handleRemoved);
+      socket.off("task:comment:new", handleCommentNew as (data: unknown) => void);
+      socket.off("task:comment:updated", handleCommentUpdated as (data: unknown) => void);
+      socket.off("task:comment:deleted", handleCommentDeleted as (data: unknown) => void);
+      socket.off("task:comment:reaction:added", handleReactionAdded as (data: unknown) => void);
+      socket.off("task:comment:reaction:removed", handleReactionRemoved as (data: unknown) => void);
+      socket.off("task:comment:typing", handleCommentTyping as (data: unknown) => void);
+      socket.off("task:comment:typing:stop", handleCommentTypingStop as (data: unknown) => void);
     };
   }, [socket, projectId, upsertTask, removeTask, patchTask]);
 
