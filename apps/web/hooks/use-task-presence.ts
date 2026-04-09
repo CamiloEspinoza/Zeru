@@ -15,6 +15,11 @@ export function useTaskPresence(projectId: string | null, taskId: string | null)
     const viewPath = `/projects/${projectId}/task/${taskId}`;
     socket.emit("presence:join", { viewPath });
 
+    const handleConnect = () => {
+      socket.emit("presence:join", { viewPath });
+    };
+    socket.on("connect", handleConnect);
+
     const handleSnapshot = (data: PresenceSnapshot) => {
       if (data.viewPath === viewPath) setViewUsers(viewPath, data.users);
     };
@@ -27,6 +32,7 @@ export function useTaskPresence(projectId: string | null, taskId: string | null)
 
     return () => {
       socket.emit("presence:leave", { viewPath });
+      socket.off("connect", handleConnect);
       socket.off("presence:snapshot", handleSnapshot);
       socket.off("presence:update", handleUpdate);
     };

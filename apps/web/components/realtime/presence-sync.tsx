@@ -33,6 +33,11 @@ export function PresenceSync() {
 
     socket.emit("presence:join", { viewPath: pathname });
 
+    const handleConnect = () => {
+      socket.emit("presence:join", { viewPath: pathname });
+    };
+    socket.on("connect", handleConnect);
+
     const handleSnapshot = (data: PresenceSnapshot) => {
       if (data.viewPath === pathname) {
         setViewUsers(pathname, data.users);
@@ -50,6 +55,7 @@ export function PresenceSync() {
 
     return () => {
       socket.emit("presence:leave", { viewPath: pathname });
+      socket.off("connect", handleConnect);
       socket.off("presence:snapshot", handleSnapshot);
       socket.off("presence:update", handleUpdate);
     };
