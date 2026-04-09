@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useTaskDetail } from "@/hooks/use-task-detail";
+import { useProjectStore } from "@/stores/project-store";
 import { TaskStatusBadge } from "@/components/projects/task-status-badge";
 import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
 import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
@@ -21,6 +22,14 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
   const taskId = searchParams.get("task");
   const { task, loading } = useTaskDetail(taskId);
 
+  const projectId = task?.projectId ?? null;
+  const storeTask = useProjectStore((s) =>
+    projectId && taskId ? s.getTask(projectId, taskId) : null,
+  );
+
+  // Merge: store fields win (they're fresh from realtime), but fall back to full-detail fields
+  const displayTask = task ? { ...task, ...(storeTask ?? {}) } : null;
+
   function handleClose(open: boolean) {
     if (open) return;
     const params = new URLSearchParams(searchParams);
@@ -32,42 +41,42 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
   return (
     <Sheet open={!!taskId} onOpenChange={handleClose}>
       <SheetContent side="right" className="w-full sm:max-w-[600px] overflow-y-auto">
-        {loading && !task ? (
+        {loading && !displayTask ? (
           <div className="space-y-3 py-4">
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-20 w-full" />
           </div>
-        ) : task ? (
+        ) : displayTask ? (
           <>
             <SheetHeader className="space-y-3">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline" className="font-mono">
-                  {projectKey}-{task.number}
+                  {projectKey}-{displayTask.number}
                 </Badge>
-                {task.status && <TaskStatusBadge status={task.status} />}
-                <TaskPriorityBadge priority={task.priority} />
+                {displayTask.status && <TaskStatusBadge status={displayTask.status} />}
+                <TaskPriorityBadge priority={displayTask.priority} />
               </div>
-              <SheetTitle className="text-xl">{task.title}</SheetTitle>
+              <SheetTitle className="text-xl">{displayTask.title}</SheetTitle>
             </SheetHeader>
             <div className="mt-6 space-y-6">
-              {task.description && (
+              {displayTask.description && (
                 <div>
                   <h3 className="mb-2 text-sm font-medium">Descripción</h3>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {task.description}
+                    {displayTask.description}
                   </p>
                 </div>
               )}
-              {task.assignees && task.assignees.length > 0 && (
+              {displayTask.assignees && displayTask.assignees.length > 0 && (
                 <div>
                   <h3 className="mb-2 text-sm font-medium">Asignados</h3>
-                  <TaskAssigneeAvatars assignees={task.assignees} max={10} size="md" />
+                  <TaskAssigneeAvatars assignees={displayTask.assignees} max={10} size="md" />
                 </div>
               )}
-              {task.id && (
+              {displayTask.id && (
                 <div className="border-t pt-6">
-                  <TaskComments taskId={task.id} />
+                  <TaskComments taskId={displayTask.id} />
                 </div>
               )}
             </div>

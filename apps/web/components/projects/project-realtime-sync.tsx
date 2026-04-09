@@ -18,7 +18,13 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
   useEffect(() => {
     if (!socket || !projectId) return;
 
+    // Initial join
     socket.emit("project:join", { projectId });
+
+    // Re-join on reconnect
+    const handleConnect = () => {
+      socket.emit("project:join", { projectId });
+    };
 
     const handleCreated = (data: { projectId: string; task?: Task }) => {
       if (data.projectId !== projectId || !data.task) return;
@@ -46,11 +52,11 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       statusId?: string;
     }) => {
       if (data.projectId !== projectId) return;
-      patchTask(projectId, data.taskId, {
-        sectionId: data.toSectionId ?? undefined,
-        position: data.position,
-        statusId: data.statusId,
-      } as Partial<Task>);
+      const patch: Partial<Task> = {};
+      if (data.toSectionId !== undefined) patch.sectionId = data.toSectionId;
+      if (data.position !== undefined) patch.position = data.position;
+      if (data.statusId !== undefined) patch.statusId = data.statusId;
+      if (Object.keys(patch).length > 0) patchTask(projectId, data.taskId, patch);
     };
 
     const handleRemoved = (data: { projectId: string; taskId: string }) => {
@@ -58,6 +64,7 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       removeTask(projectId, data.taskId);
     };
 
+    socket.on("connect", handleConnect);
     socket.on("task:created", handleCreated);
     socket.on("task:changed", handleChanged);
     socket.on("task:moved", handleMoved);
@@ -65,6 +72,7 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
 
     return () => {
       socket.emit("project:leave", { projectId });
+      socket.off("connect", handleConnect);
       socket.off("task:created", handleCreated);
       socket.off("task:changed", handleChanged);
       socket.off("task:moved", handleMoved);
