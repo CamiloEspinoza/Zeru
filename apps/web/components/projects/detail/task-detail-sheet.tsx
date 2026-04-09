@@ -10,6 +10,8 @@ import { TaskStatusBadge } from "@/components/projects/task-status-badge";
 import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
 import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
 import { TaskComments } from "./task-comments";
+import { useTaskPresence } from "@/hooks/use-task-presence";
+import { TaskPresenceAvatars } from "@/components/projects/task-presence-avatars";
 
 interface TaskDetailSheetProps {
   projectKey: string;
@@ -26,6 +28,8 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
   const storeTask = useProjectStore((s) =>
     projectId && taskId ? s.getTask(projectId, taskId) : null,
   );
+
+  useTaskPresence(task?.projectId ?? null, taskId);
 
   // Merge: store fields win (they're fresh from realtime), but fall back to full-detail fields
   const displayTask = task ? { ...task, ...(storeTask ?? {}) } : null;
@@ -58,6 +62,9 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                 <TaskPriorityBadge priority={displayTask.priority} />
               </div>
               <SheetTitle className="text-xl">{displayTask.title}</SheetTitle>
+              {displayTask?.projectId && taskId && (
+                <TaskPresenceAvatars projectId={displayTask.projectId} taskId={taskId} />
+              )}
             </SheetHeader>
             <div className="mt-6 space-y-6">
               {displayTask.description && (
