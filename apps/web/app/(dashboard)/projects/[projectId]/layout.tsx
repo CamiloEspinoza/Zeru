@@ -4,6 +4,7 @@ import { use } from "react";
 import { useProject } from "@/hooks/use-project";
 import { ProjectHeader } from "@/components/projects/project-header";
 import { ViewSwitcher } from "@/components/projects/view-switcher";
+import { TaskDetailSheet } from "@/components/projects/detail/task-detail-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectLayout({
@@ -41,6 +42,7 @@ export default function ProjectLayout({
       <ProjectHeader project={project} />
       <ViewSwitcher projectId={projectId} />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      <TaskDetailSheet projectKey={project.key} />
     </div>
   );
 }
