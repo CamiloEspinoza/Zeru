@@ -8,6 +8,7 @@ import { useTaskDetail } from "@/hooks/use-task-detail";
 import { TaskStatusBadge } from "@/components/projects/task-status-badge";
 import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
 import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
+import { TaskComments } from "./task-comments";
 
 interface TaskDetailSheetProps {
   projectKey: string;
@@ -62,6 +63,11 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                 <div>
                   <h3 className="mb-2 text-sm font-medium">Asignados</h3>
                   <TaskAssigneeAvatars assignees={task.assignees} max={10} size="md" />
+                </div>
+              )}
+              {task.id && (
+                <div className="border-t pt-6">
+                  <TaskComments taskId={task.id} />
                 </div>
               )}
             </div>
