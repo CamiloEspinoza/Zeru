@@ -389,6 +389,7 @@ export default function InterviewDetailPage({
   }, [interview?.speakers, speakerAvatarUrls]);
 
   const handleProcess = async () => {
+    if (!interview) return;
     try {
       setProcessing(true);
       const isMergeReview = interview.processingStatus === "MERGE_REVIEW";

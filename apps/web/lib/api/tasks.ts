@@ -66,10 +66,21 @@ function buildQuery(params: Record<string, unknown>): string {
 
 export const tasksApi = {
   list: (query: ListTasksQuery = {}) =>
-    api.get<PaginatedResponse<Task>>(`/tasks${buildQuery(query)}`),
+    api.get<PaginatedResponse<Task>>(
+      `/tasks${buildQuery(query as Record<string, unknown>)}`,
+    ),
 
-  myTasks: (query: { status?: string; dueWithinDays?: number; page?: number; perPage?: number } = {}) =>
-    api.get<PaginatedResponse<Task>>(`/tasks/my${buildQuery(query)}`),
+  myTasks: (
+    query: {
+      status?: string;
+      dueWithinDays?: number;
+      page?: number;
+      perPage?: number;
+    } = {},
+  ) =>
+    api.get<PaginatedResponse<Task>>(
+      `/tasks/my${buildQuery(query as Record<string, unknown>)}`,
+    ),
 
   getById: (id: string) => api.get<Task>(`/tasks/${id}`),
 

@@ -54,7 +54,9 @@ function buildQuery(params: Record<string, unknown>): string {
 
 export const projectsApi = {
   list: (query: ListProjectsQuery = {}) =>
-    api.get<PaginatedResponse<Project>>(`/projects${buildQuery(query)}`),
+    api.get<PaginatedResponse<Project>>(
+      `/projects${buildQuery(query as Record<string, unknown>)}`,
+    ),
 
   getById: (id: string) => api.get<Project>(`/projects/${id}`),
 

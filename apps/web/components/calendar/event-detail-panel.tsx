@@ -66,7 +66,7 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
           })}
         </p>
 
-        {event.source === "linkedin" && meta.content && (
+        {event.source === "linkedin" && Boolean(meta.content) && (
           <div className="rounded-md border p-3">
             <p className="text-sm whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
               {String(meta.content).slice(0, 500)}
@@ -76,7 +76,7 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
 
         {event.source === "interviews" && (
           <div className="space-y-2">
-            {meta.projectName && (
+            {Boolean(meta.projectName) && (
               <p className="text-sm">
                 <span className="text-muted-foreground">Proyecto:</span>{" "}
                 {String(meta.projectName)}
@@ -97,7 +97,7 @@ export function EventDetailPanel({ event, onClose }: EventDetailPanelProps) {
           </div>
         )}
 
-        {event.source === "accounting" && meta.periodName && (
+        {event.source === "accounting" && Boolean(meta.periodName) && (
           <p className="text-sm">
             <span className="text-muted-foreground">Periodo:</span>{" "}
             {String(meta.periodName)}
