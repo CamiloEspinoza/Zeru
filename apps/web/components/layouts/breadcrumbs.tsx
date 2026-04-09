@@ -76,19 +76,21 @@ async function resolveUuid(
   try {
     switch (parentSegment) {
       case "projects": {
-        const res = await api.get(`/org-intelligence/projects/${uuid}`);
+        const res = await api.get<{ name: string }>(`/org-intelligence/projects/${uuid}`);
         return res.name ?? null;
       }
       case "interviews": {
-        const res = await api.get(`/org-intelligence/interviews/${uuid}`);
+        const res = await api.get<{ title: string }>(`/org-intelligence/interviews/${uuid}`);
         return res.title ?? null;
       }
       case "assistant": {
-        const res = await api.get(`/ai/conversations/${uuid}`);
+        const res = await api.get<{ title: string }>(`/ai/conversations/${uuid}`);
         return res.title ?? null;
       }
       case "journal": {
-        const res = await api.get(`/accounting/journal-entries/${uuid}`);
+        const res = await api.get<{ description: string | null; number: number }>(
+          `/accounting/journal-entries/${uuid}`,
+        );
         return res.description ? `#${res.number}` : null;
       }
       case "clients": {
