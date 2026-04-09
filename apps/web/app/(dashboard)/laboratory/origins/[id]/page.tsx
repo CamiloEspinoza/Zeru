@@ -357,29 +357,31 @@ export default function OriginDetailPage({
         <CardHeader>
           <CardTitle>Notificaciones críticas</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div>
-            <dt className="text-muted-foreground">Emails</dt>
-            <dd>
-              {origin.criticalNotificationEmails?.length ? (
-                <ul className="mt-1 space-y-0.5">
-                  {origin.criticalNotificationEmails.map((e) => (
-                    <li key={e}>
-                      <a href={`mailto:${e}`} className="text-primary hover:underline">
-                        {e}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Recibe reportes de calidad</dt>
-            <dd>{origin.sendsQualityReports ? "Sí" : "No"}</dd>
-          </div>
+        <CardContent>
+          <dl className="space-y-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Emails</dt>
+              <dd>
+                {origin.criticalNotificationEmails?.length ? (
+                  <ul className="mt-1 space-y-0.5">
+                    {origin.criticalNotificationEmails.map((e) => (
+                      <li key={e}>
+                        <a href={`mailto:${e}`} className="text-primary hover:underline">
+                          {e}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Recibe reportes de calidad</dt>
+              <dd>{origin.sendsQualityReports ? "Sí" : "No"}</dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
 
