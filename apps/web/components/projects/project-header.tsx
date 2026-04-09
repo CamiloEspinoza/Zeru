@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { ProjectPresenceAvatars } from "@/components/projects/project-presence-avatars";
 import type { Project } from "@/types/projects";
 
 interface ProjectHeaderProps {
@@ -32,6 +33,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
           </p>
         )}
       </div>
+      <ProjectPresenceAvatars projectId={project.id} />
     </div>
   );
 }
