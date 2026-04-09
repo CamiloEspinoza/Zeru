@@ -94,19 +94,7 @@ export class LabOriginsService {
       },
     });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
-
-    const {
-      encryptedFtpHost,
-      encryptedFtpUser,
-      encryptedFtpPassword,
-      ...rest
-    } = origin;
-    return {
-      ...rest,
-      hasFtpHost: encryptedFtpHost !== null && encryptedFtpHost !== '',
-      hasFtpUser: encryptedFtpUser !== null && encryptedFtpUser !== '',
-      hasFtpPassword: encryptedFtpPassword !== null && encryptedFtpPassword !== '',
-    };
+    return this.maskFtp(origin);
   }
 
   async create(tenantId: string, data: CreateLabOriginSchema) {
@@ -120,7 +108,7 @@ export class LabOriginsService {
       entityId: origin.id,
       action: 'create',
     });
-    return origin;
+    return this.maskFtp(origin);
   }
 
   async update(id: string, tenantId: string, data: UpdateLabOriginSchema) {
@@ -137,7 +125,7 @@ export class LabOriginsService {
       entityId: id,
       action: 'update',
     });
-    return updated;
+    return this.maskFtp(updated);
   }
 
   async delete(id: string, tenantId: string) {
@@ -151,5 +139,21 @@ export class LabOriginsService {
       entityId: id,
       action: 'delete',
     });
+  }
+
+  private maskFtp<
+    T extends {
+      encryptedFtpHost?: string | null;
+      encryptedFtpUser?: string | null;
+      encryptedFtpPassword?: string | null;
+    },
+  >(origin: T) {
+    const { encryptedFtpHost, encryptedFtpUser, encryptedFtpPassword, ...rest } = origin;
+    return {
+      ...rest,
+      hasFtpHost: !!encryptedFtpHost,
+      hasFtpUser: !!encryptedFtpUser,
+      hasFtpPassword: !!encryptedFtpPassword,
+    };
   }
 }
