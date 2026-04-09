@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
+import { TaskAccessGuard } from '../../../common/guards/task-access.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { RequireProjectRole } from '../../../common/decorators/project-role.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { TaskCommentsService } from '../services/task-comments.service';
 import {
@@ -22,7 +24,7 @@ import {
 } from '../dto';
 
 @Controller('tasks/:taskId/comments')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, TaskAccessGuard)
 export class TaskCommentsController {
   constructor(private readonly commentsService: TaskCommentsService) {}
 
@@ -35,6 +37,7 @@ export class TaskCommentsController {
   }
 
   @Post()
+  @RequireProjectRole('MEMBER')
   async create(
     @Param('taskId') taskId: string,
     @Body(new ZodValidationPipe(createCommentSchema)) dto: CreateCommentDto,
@@ -45,6 +48,7 @@ export class TaskCommentsController {
   }
 
   @Patch(':id')
+  @RequireProjectRole('MEMBER')
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateCommentSchema)) dto: UpdateCommentDto,
@@ -55,6 +59,7 @@ export class TaskCommentsController {
   }
 
   @Delete(':id')
+  @RequireProjectRole('MEMBER')
   async remove(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
@@ -64,6 +69,7 @@ export class TaskCommentsController {
   }
 
   @Post(':id/reactions')
+  @RequireProjectRole('MEMBER')
   async addReaction(
     @Param('id') id: string,
     @Body('emoji') emoji: string,
@@ -74,6 +80,7 @@ export class TaskCommentsController {
   }
 
   @Delete(':id/reactions/:emoji')
+  @RequireProjectRole('MEMBER')
   async removeReaction(
     @Param('id') id: string,
     @Param('emoji') emoji: string,

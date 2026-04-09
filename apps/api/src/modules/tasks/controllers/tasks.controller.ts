@@ -11,8 +11,11 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
+import { TaskAccessGuard } from '../../../common/guards/task-access.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { RequireProjectRole } from '../../../common/decorators/project-role.decorator';
+import { SkipTaskAccessGuard } from '../../../common/decorators/skip-task-access.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { TasksService } from '../services/tasks.service';
 import {
@@ -33,11 +36,12 @@ import {
 } from '../dto';
 
 @Controller('tasks')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, TaskAccessGuard)
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Post()
+  @RequireProjectRole('MEMBER')
   async create(
     @Body(new ZodValidationPipe(createTaskSchema)) dto: CreateTaskDto,
     @CurrentTenant() tenantId: string,
@@ -47,20 +51,33 @@ export class TasksController {
   }
 
   @Get()
+  @SkipTaskAccessGuard()
   async findAll(
     @Query(new ZodValidationPipe(listTasksSchema)) query: ListTasksDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.tasksService.findAll(tenantId, query);
+    return this.tasksService.findAll(tenantId, userId, query);
   }
 
   @Get('my')
+  @SkipTaskAccessGuard()
   async findMyTasks(
     @Query(new ZodValidationPipe(myTasksSchema)) query: MyTasksDto,
     @CurrentTenant() tenantId: string,
     @CurrentUser('userId') userId: string,
   ) {
     return this.tasksService.findMyTasks(tenantId, userId, query);
+  }
+
+  @Post('bulk-update')
+  @RequireProjectRole('MEMBER')
+  async bulkUpdate(
+    @Body(new ZodValidationPipe(bulkUpdateTasksSchema)) dto: BulkUpdateTasksDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.tasksService.bulkUpdate(tenantId, userId, dto);
   }
 
   @Get(':id')
@@ -72,6 +89,7 @@ export class TasksController {
   }
 
   @Patch(':id')
+  @RequireProjectRole('MEMBER')
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateTaskSchema)) dto: UpdateTaskDto,
@@ -82,6 +100,7 @@ export class TasksController {
   }
 
   @Delete(':id')
+  @RequireProjectRole('MEMBER')
   async remove(
     @Param('id') id: string,
     @CurrentTenant() tenantId: string,
@@ -91,6 +110,7 @@ export class TasksController {
   }
 
   @Post(':id/move')
+  @RequireProjectRole('MEMBER')
   async move(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(moveTaskSchema)) dto: MoveTaskDto,
@@ -100,18 +120,10 @@ export class TasksController {
     return this.tasksService.move(tenantId, id, userId, dto);
   }
 
-  @Post('bulk-update')
-  async bulkUpdate(
-    @Body(new ZodValidationPipe(bulkUpdateTasksSchema)) dto: BulkUpdateTasksDto,
-    @CurrentTenant() tenantId: string,
-    @CurrentUser('userId') userId: string,
-  ) {
-    return this.tasksService.bulkUpdate(tenantId, userId, dto);
-  }
-
   // ─── Assignees ───────────────────────────────────────────
 
   @Post(':id/assignees')
+  @RequireProjectRole('MEMBER')
   async addAssignee(
     @Param('id') id: string,
     @Body('userId') assigneeId: string,
@@ -122,6 +134,7 @@ export class TasksController {
   }
 
   @Delete(':id/assignees/:userId')
+  @RequireProjectRole('MEMBER')
   async removeAssignee(
     @Param('id') id: string,
     @Param('userId') assigneeId: string,
@@ -154,6 +167,7 @@ export class TasksController {
   // ─── Labels ──────────────────────────────────────────────
 
   @Post(':id/labels')
+  @RequireProjectRole('MEMBER')
   async addLabel(
     @Param('id') id: string,
     @Body('labelId') labelId: string,
@@ -163,6 +177,7 @@ export class TasksController {
   }
 
   @Delete(':id/labels/:labelId')
+  @RequireProjectRole('MEMBER')
   async removeLabel(
     @Param('id') id: string,
     @Param('labelId') labelId: string,
@@ -174,6 +189,7 @@ export class TasksController {
   // ─── Dependencies ────────────────────────────────────────
 
   @Post(':id/dependencies')
+  @RequireProjectRole('MEMBER')
   async addDependency(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createDependencySchema)) dto: CreateDependencyDto,
@@ -188,6 +204,7 @@ export class TasksController {
   }
 
   @Delete(':id/dependencies/:depId')
+  @RequireProjectRole('MEMBER')
   async removeDependency(
     @Param('id') id: string,
     @Param('depId') depId: string,
