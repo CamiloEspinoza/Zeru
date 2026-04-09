@@ -8,6 +8,7 @@ import { TaskCommentsService } from './services/task-comments.service';
 import { TaskActivityService } from './services/task-activity.service';
 import { TaskNotificationListener } from './services/task-notification.listener';
 import { TaskCronService } from './services/task-cron.service';
+import { TaskDeltaSyncService } from './services/task-delta-sync.service';
 
 @Module({
   imports: [NotificationModule],
@@ -18,6 +19,7 @@ import { TaskCronService } from './services/task-cron.service';
     TaskActivityService,
     TaskNotificationListener,
     TaskCronService,
+    TaskDeltaSyncService,
   ],
   exports: [TasksService],
 })

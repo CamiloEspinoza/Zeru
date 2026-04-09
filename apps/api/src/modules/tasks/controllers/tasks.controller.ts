@@ -18,6 +18,7 @@ import { RequireProjectRole } from '../../../common/decorators/project-role.deco
 import { SkipTaskAccessGuard } from '../../../common/decorators/skip-task-access.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { TasksService } from '../services/tasks.service';
+import { TaskDeltaSyncService } from '../services/task-delta-sync.service';
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -26,6 +27,7 @@ import {
   moveTaskSchema,
   bulkUpdateTasksSchema,
   createDependencySchema,
+  deltaSyncSchema,
   type CreateTaskDto,
   type UpdateTaskDto,
   type ListTasksDto,
@@ -33,12 +35,16 @@ import {
   type MoveTaskDto,
   type BulkUpdateTasksDto,
   type CreateDependencyDto,
+  type DeltaSyncDto,
 } from '../dto';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, TenantGuard, TaskAccessGuard)
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly taskDeltaSyncService: TaskDeltaSyncService,
+  ) {}
 
   @Post()
   @RequireProjectRole('MEMBER')
@@ -78,6 +84,16 @@ export class TasksController {
     @CurrentUser('userId') userId: string,
   ) {
     return this.tasksService.bulkUpdate(tenantId, userId, dto);
+  }
+
+  @Post('sync')
+  @SkipTaskAccessGuard()
+  async sync(
+    @Body(new ZodValidationPipe(deltaSyncSchema)) dto: DeltaSyncDto,
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.taskDeltaSyncService.sync(tenantId, userId, dto);
   }
 
   @Get(':id')

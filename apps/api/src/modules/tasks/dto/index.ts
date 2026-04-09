@@ -91,6 +91,11 @@ export const activityQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
+export const deltaSyncSchema = z.object({
+  projectId: z.string().uuid(),
+  versions: z.record(z.string().uuid(), z.number().int().nonnegative()),
+});
+
 // Type inference
 export type CreateTaskDto = z.infer<typeof createTaskSchema>;
 export type UpdateTaskDto = z.infer<typeof updateTaskSchema>;
@@ -102,3 +107,4 @@ export type CreateCommentDto = z.infer<typeof createCommentSchema>;
 export type UpdateCommentDto = z.infer<typeof updateCommentSchema>;
 export type CreateDependencyDto = z.infer<typeof createDependencySchema>;
 export type ActivityQueryDto = z.infer<typeof activityQuerySchema>;
+export type DeltaSyncDto = z.infer<typeof deltaSyncSchema>;
