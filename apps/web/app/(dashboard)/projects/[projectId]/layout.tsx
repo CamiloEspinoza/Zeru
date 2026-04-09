@@ -17,7 +17,7 @@ export default function ProjectLayout({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = use(params);
-  const { project, loading, error } = useProject(projectId);
+  const { project, loading, error, refetch } = useProject(projectId);
 
   if (loading) {
     return (
@@ -44,7 +44,7 @@ export default function ProjectLayout({
       <ProjectHeader project={project} />
       <ViewSwitcher projectId={projectId} />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-      <ProjectRealtimeSync projectId={projectId} />
+      <ProjectRealtimeSync projectId={projectId} onSectionChanged={refetch} />
       <LockSync />
       <TaskDetailSheet projectKey={project.key} />
     </div>

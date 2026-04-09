@@ -7,9 +7,13 @@ import type { Task, TaskComment } from "@/types/projects";
 
 interface ProjectRealtimeSyncProps {
   projectId: string;
+  onSectionChanged?: () => void;
 }
 
-export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
+export function ProjectRealtimeSync({
+  projectId,
+  onSectionChanged,
+}: ProjectRealtimeSyncProps) {
   const socket = useSocket();
   const upsertTask = useProjectStore((s) => s.upsertTask);
   const removeTask = useProjectStore((s) => s.removeTask);
@@ -148,6 +152,11 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       useProjectStore.getState().clearTypingUser(data.taskId, data.userId);
     };
 
+    const handleSectionChanged = (data: { projectId: string }) => {
+      if (data.projectId !== projectId) return;
+      onSectionChanged?.();
+    };
+
     socket.on("connect", handleConnect);
     socket.on("task:created", handleCreated);
     socket.on("task:changed", handleChanged);
@@ -160,6 +169,7 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
     socket.on("task:comment:reaction:removed", handleReactionRemoved as (data: unknown) => void);
     socket.on("task:comment:typing", handleCommentTyping as (data: unknown) => void);
     socket.on("task:comment:typing:stop", handleCommentTypingStop as (data: unknown) => void);
+    socket.on("section:changed", handleSectionChanged as (data: unknown) => void);
 
     return () => {
       socket.emit("project:leave", { projectId });
@@ -175,8 +185,9 @@ export function ProjectRealtimeSync({ projectId }: ProjectRealtimeSyncProps) {
       socket.off("task:comment:reaction:removed", handleReactionRemoved as (data: unknown) => void);
       socket.off("task:comment:typing", handleCommentTyping as (data: unknown) => void);
       socket.off("task:comment:typing:stop", handleCommentTypingStop as (data: unknown) => void);
+      socket.off("section:changed", handleSectionChanged as (data: unknown) => void);
     };
-  }, [socket, projectId, upsertTask, removeTask, patchTask]);
+  }, [socket, projectId, upsertTask, removeTask, patchTask, onSectionChanged]);
 
   return null;
 }
