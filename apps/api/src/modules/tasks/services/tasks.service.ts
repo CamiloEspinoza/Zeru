@@ -1,10 +1,11 @@
 import {
-  ForbiddenException,
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type {
   CreateTaskDto,
@@ -153,8 +154,12 @@ export class TasksService {
     this.eventEmitter.emit('task.created', {
       tenantId,
       taskId: task.id,
-      projectId: dto.projectId,
+      projectId: task.projectId,
+      sectionId: task.sectionId,
+      position: task.position,
+      actorId: userId,
       userId,
+      task,
     });
 
     return task;
@@ -162,11 +167,23 @@ export class TasksService {
 
   // ─── Find All ────────────────────────────────────────────
 
-  async findAll(tenantId: string, dto: ListTasksDto) {
+  async findAll(tenantId: string, userId: string, dto: ListTasksDto) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    // Restrict visible projects: PUBLIC OR user is member.
+    const projectVisibilityClause = {
+      project: {
+        deletedAt: null,
+        OR: [
+          { visibility: 'PUBLIC' },
+          { members: { some: { userId } } },
+        ],
+      },
+    };
 
     const where: Record<string, unknown> = {
       deletedAt: null,
+      ...projectVisibilityClause,
       ...(dto.projectId ? { projectId: dto.projectId } : {}),
       ...(dto.statusId ? { statusId: dto.statusId } : {}),
       ...(dto.priority ? { priority: dto.priority } : {}),
@@ -398,8 +415,10 @@ export class TasksService {
       tenantId,
       taskId: task.id,
       projectId: existing.projectId,
+      actorId: userId,
       userId,
       changes,
+      task,
     });
 
     if (dto.statusId && dto.statusId !== existing.statusId) {
@@ -458,10 +477,12 @@ export class TasksService {
       tenantId,
       taskId: task.id,
       projectId: existing.projectId,
+      actorId: userId,
       userId,
       fromSectionId: existing.sectionId,
       toSectionId: dto.sectionId ?? existing.sectionId,
       position: dto.position,
+      task,
     });
 
     return task;
@@ -470,8 +491,24 @@ export class TasksService {
   // ─── Bulk Update ─────────────────────────────────────────
 
   async bulkUpdate(tenantId: string, userId: string, dto: BulkUpdateTasksDto) {
-    const results = await this.prisma.$transaction(async (tx: any) => {
-      const updated: unknown[] = [];
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    // Pre-load tasks: we need projectId for events and to validate that
+    // every requested task exists for the tenant. The TaskAccessGuard
+    // already enforces project membership for all distinct projectIds,
+    // so by the time we get here we know the user is allowed to mutate
+    // tasks in those projects.
+    const existingTasks = await client.task.findMany({
+      where: { id: { in: dto.taskIds }, deletedAt: null },
+      select: { id: true, projectId: true },
+    });
+
+    if (existingTasks.length !== dto.taskIds.length) {
+      throw new NotFoundException('Una o más tareas no existen');
+    }
+
+    const updatedTasks = await this.prisma.$transaction(async (tx: any) => {
+      const updated: Array<{ id: string; projectId: string }> = [];
 
       for (const taskId of dto.taskIds) {
         const data: Record<string, unknown> = {};
@@ -504,24 +541,29 @@ export class TasksService {
             where: { id: taskId, tenantId },
             data,
           });
-          updated.push(task);
+          updated.push({ id: task.id, projectId: task.projectId });
         }
       }
 
       return updated;
     });
 
-    for (const taskId of dto.taskIds) {
+    // Emit events only for tasks that were actually updated, with the
+    // correct projectId so the realtime gateway can broadcast to the
+    // matching project room.
+    for (const task of updatedTasks) {
       this.eventEmitter.emit('task.updated', {
         tenantId,
-        taskId,
+        taskId: task.id,
+        projectId: task.projectId,
+        actorId: userId,
         userId,
         changes: dto.update,
         bulk: true,
       });
     }
 
-    return { updated: results.length };
+    return { updated: updatedTasks.length };
   }
 
   // ─── Remove ──────────────────────────────────────────────
@@ -540,6 +582,7 @@ export class TasksService {
       tenantId,
       taskId,
       projectId: existing.projectId,
+      actorId: userId,
       userId,
     });
 
@@ -554,18 +597,33 @@ export class TasksService {
     userId: string,
     assigneeId: string,
   ) {
-    await this.findOne(tenantId, taskId);
+    const existing = await this.findOne(tenantId, taskId);
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    const assignee = await client.taskAssignee.create({
-      data: { taskId, userId: assigneeId, tenantId },
-    });
+    let assignee;
+    try {
+      assignee = await client.taskAssignee.create({
+        data: { taskId, userId: assigneeId, tenantId },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'El usuario ya está asignado a esta tarea',
+        );
+      }
+      throw e;
+    }
 
     this.eventEmitter.emit('task.assigned', {
       tenantId,
       taskId,
+      projectId: existing.projectId,
       userId,
+      actorId: userId,
       assigneeId,
     });
 
@@ -600,9 +658,21 @@ export class TasksService {
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.taskSubscriber.create({
-      data: { taskId, userId: subscriberId, tenantId },
-    });
+    try {
+      return await client.taskSubscriber.create({
+        data: { taskId, userId: subscriberId, tenantId },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'El usuario ya está suscrito a esta tarea',
+        );
+      }
+      throw e;
+    }
   }
 
   async removeSubscriber(
@@ -628,9 +698,21 @@ export class TasksService {
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.taskLabel.create({
-      data: { taskId, labelId, tenantId },
-    });
+    try {
+      return await client.taskLabel.create({
+        data: { taskId, labelId, tenantId },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'La etiqueta ya está aplicada a esta tarea',
+        );
+      }
+      throw e;
+    }
   }
 
   async removeLabel(tenantId: string, taskId: string, labelId: string) {
@@ -655,17 +737,71 @@ export class TasksService {
   ) {
     // Prevent self-dependency
     if (taskId === dependsOnId) {
-      throw new ForbiddenException('Una tarea no puede depender de si misma');
+      throw new BadRequestException('Una tarea no puede depender de si misma');
     }
-
-    await this.findOne(tenantId, taskId);
-    await this.findOne(tenantId, dependsOnId);
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.taskDependency.create({
-      data: { taskId, dependsOnId, dependencyType, tenantId },
-    });
+    // Verify both tasks exist (cheap exists check; full findOne is overkill)
+    const [taskExists, dependsOnExists] = await Promise.all([
+      client.task.findFirst({
+        where: { id: taskId, deletedAt: null },
+        select: { id: true },
+      }),
+      client.task.findFirst({
+        where: { id: dependsOnId, deletedAt: null },
+        select: { id: true },
+      }),
+    ]);
+    if (!taskExists) {
+      throw new NotFoundException(`Tarea con id ${taskId} no encontrada`);
+    }
+    if (!dependsOnExists) {
+      throw new NotFoundException(
+        `Tarea con id ${dependsOnId} no encontrada`,
+      );
+    }
+
+    // Cycle detection: walk forward from dependsOnId through existing
+    // dependencies. If we reach `taskId`, adding (taskId → dependsOnId)
+    // would create a cycle.
+    const visited = new Set<string>();
+    const queue: string[] = [dependsOnId];
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      if (visited.has(current)) continue;
+      visited.add(current);
+
+      if (current === taskId) {
+        throw new BadRequestException(
+          'Esta dependencia crearía un ciclo',
+        );
+      }
+
+      const next = await client.taskDependency.findMany({
+        where: { taskId: current },
+        select: { dependsOnId: true },
+      });
+      for (const edge of next as Array<{ dependsOnId: string }>) {
+        if (!visited.has(edge.dependsOnId)) {
+          queue.push(edge.dependsOnId);
+        }
+      }
+    }
+
+    try {
+      return await client.taskDependency.create({
+        data: { taskId, dependsOnId, dependencyType, tenantId },
+      });
+    } catch (e) {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException('Esta dependencia ya existe');
+      }
+      throw e;
+    }
   }
 
   async removeDependency(tenantId: string, taskId: string, depId: string) {
