@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
+import { tasksApi } from "@/lib/api/tasks";
 import type { Task, TaskComment } from "@/types/projects";
 
 interface ProjectRealtimeSyncProps {
@@ -25,9 +26,30 @@ export function ProjectRealtimeSync({
     // Initial join
     socket.emit("project:join", { projectId });
 
-    // Re-join on reconnect
+    // Re-join on reconnect + delta sync
     const handleConnect = () => {
       socket.emit("project:join", { projectId });
+
+      // Delta sync: send current task versions, receive updates
+      const state = useProjectStore.getState();
+      const taskMap = state.tasksByProject.get(projectId);
+      if (!taskMap || taskMap.size === 0) return;
+
+      const versions: Record<string, number> = {};
+      for (const [id, t] of taskMap) {
+        versions[id] = t.version ?? 1;
+      }
+
+      tasksApi
+        .syncDelta(projectId, versions)
+        .then((delta) => {
+          for (const added of delta.added) upsertTask(projectId, added);
+          for (const updated of delta.updated) upsertTask(projectId, updated);
+          for (const deleted of delta.deleted) removeTask(projectId, deleted);
+        })
+        .catch((err) => {
+          console.error("Delta sync failed:", err);
+        });
     };
 
     const handleCreated = (data: { projectId: string; task?: Task }) => {

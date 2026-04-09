@@ -139,4 +139,11 @@ export const tasksApi = {
     api.get<{ data: TaskActivity[]; nextCursor: string | null }>(
       `/tasks/${taskId}/activity${buildQuery({ cursor, limit })}`,
     ),
+
+  // Delta sync
+  syncDelta: (projectId: string, versions: Record<string, number>) =>
+    api.post<{ updated: Task[]; deleted: string[]; added: Task[] }>("/tasks/sync", {
+      projectId,
+      versions,
+    }),
 };

@@ -90,6 +90,7 @@ export interface Task {
   completedAt: string | null;
   estimate: number | null;
   estimateUnit: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
   projectId: string;
