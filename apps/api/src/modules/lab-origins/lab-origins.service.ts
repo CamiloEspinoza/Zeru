@@ -15,7 +15,27 @@ export class LabOriginsService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     return client.labOrigin.findMany({
       orderBy: { name: 'asc' },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        category: true,
+        commune: true,
+        city: true,
+        phone: true,
+        email: true,
+        isActive: true,
+        deletedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        legalEntityId: true,
+        billingAgreementId: true,
+        parentId: true,
+        sampleReceptionMode: true,
+        reportDeliveryMethods: true,
+        deliveryDaysBiopsy: true,
+        deliveryDaysPap: true,
+        sendsQualityReports: true,
         legalEntity: { select: { id: true, rut: true, legalName: true } },
         billingAgreement: { select: { id: true, code: true, name: true, status: true } },
         parent: { select: { id: true, code: true, name: true } },
@@ -28,15 +48,65 @@ export class LabOriginsService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const origin = await client.labOrigin.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        category: true,
+        legalEntityId: true,
+        parentId: true,
+        billingAgreementId: true,
+        street: true,
+        streetNumber: true,
+        unit: true,
+        commune: true,
+        city: true,
+        phone: true,
+        email: true,
+        sampleReceptionMode: true,
+        reportDeliveryMethods: true,
+        deliveryDaysBiopsy: true,
+        deliveryDaysPap: true,
+        deliveryDaysCytology: true,
+        deliveryDaysIhc: true,
+        deliveryDaysDefault: true,
+        ftpPath: true,
+        encryptedFtpHost: true,
+        encryptedFtpUser: true,
+        encryptedFtpPassword: true,
+        criticalNotificationEmails: true,
+        sendsQualityReports: true,
+        receptionDays: true,
+        receptionSchedule: true,
+        notes: true,
+        isActive: true,
+        deletedAt: true,
+        createdAt: true,
+        updatedAt: true,
         legalEntity: { select: { id: true, rut: true, legalName: true } },
         billingAgreement: { select: { id: true, code: true, name: true, status: true } },
         parent: { select: { id: true, code: true, name: true } },
-        children: { where: { isActive: true }, select: { id: true, code: true, name: true, category: true } },
+        children: {
+          where: { isActive: true },
+          orderBy: { code: 'asc' },
+          select: { id: true, code: true, name: true, category: true },
+        },
       },
     });
     if (!origin) throw new NotFoundException(`LabOrigin ${id} not found`);
-    return origin;
+
+    const {
+      encryptedFtpHost,
+      encryptedFtpUser,
+      encryptedFtpPassword,
+      ...rest
+    } = origin;
+    return {
+      ...rest,
+      hasFtpHost: encryptedFtpHost !== null && encryptedFtpHost !== '',
+      hasFtpUser: encryptedFtpUser !== null && encryptedFtpUser !== '',
+      hasFtpPassword: encryptedFtpPassword !== null && encryptedFtpPassword !== '',
+    };
   }
 
   async create(tenantId: string, data: CreateLabOriginSchema) {

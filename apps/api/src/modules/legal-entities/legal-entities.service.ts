@@ -16,7 +16,9 @@ export class LegalEntitiesService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     return client.legalEntity.findMany({
       orderBy: { legalName: 'asc' },
-      include: { _count: { select: { labOrigins: true } } },
+      include: {
+        _count: { select: { labOrigins: true, billingAgreements: true } },
+      },
     });
   }
 
@@ -25,10 +27,58 @@ export class LegalEntitiesService {
     const entity = await client.legalEntity.findUnique({
       where: { id },
       include: {
-        contacts: { where: { isActive: true } },
+        contacts: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
+        },
         bankAccounts: { where: { isActive: true } },
-        labOrigins: { where: { isActive: true }, select: { id: true, code: true, name: true, category: true } },
-        billingAgreements: { where: { isActive: true }, select: { id: true, code: true, name: true, status: true } },
+        labOrigins: {
+          where: { isActive: true },
+          orderBy: { code: 'asc' },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            category: true,
+            commune: true,
+            city: true,
+          },
+        },
+        billingAgreements: {
+          where: { isActive: true },
+          orderBy: { code: 'asc' },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            paymentTerms: true,
+            customPaymentDays: true,
+            billingDayOfMonth: true,
+            billingModalities: true,
+            isMonthlySettlement: true,
+            effectiveFrom: true,
+            effectiveTo: true,
+            contractDate: true,
+            _count: { select: { lines: true, contacts: true, labOrigins: true } },
+            lines: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+              select: {
+                id: true,
+                factor: true,
+                negotiatedPrice: true,
+                referencePrice: true,
+                currency: true,
+                billingConcept: { select: { id: true, code: true, name: true } },
+              },
+            },
+            contacts: {
+              where: { isActive: true },
+              orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }],
+            },
+          },
+        },
       },
     });
     if (!entity) throw new NotFoundException(`LegalEntity ${id} not found`);

@@ -20,7 +20,23 @@ export class BillingAgreementsService {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     return client.billingAgreement.findMany({
       orderBy: { code: 'asc' },
-      include: {
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        status: true,
+        paymentTerms: true,
+        customPaymentDays: true,
+        billingDayOfMonth: true,
+        isMonthlySettlement: true,
+        billingModalities: true,
+        contractDate: true,
+        effectiveFrom: true,
+        effectiveTo: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        legalEntityId: true,
         legalEntity: { select: { id: true, rut: true, legalName: true } },
         _count: { select: { lines: true, contacts: true, labOrigins: true } },
       },
