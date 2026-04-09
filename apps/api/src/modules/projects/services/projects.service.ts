@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type {
   CreateProjectDto,
@@ -65,7 +65,9 @@ export class ProjectsService {
       );
     }
 
-    const project = await this.prisma.$transaction(async (tx: any) => {
+    let project;
+    try {
+      project = await this.prisma.$transaction(async (tx: any) => {
       // Create project
       const created = await tx.project.create({
         data: {
@@ -134,6 +136,18 @@ export class ProjectsService {
 
       return created;
     });
+    } catch (e) {
+      // Race-safe duplicate-key handling for project.key (unique per tenant)
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `Ya existe un proyecto con la clave "${dto.key}"`,
+        );
+      }
+      throw e;
+    }
 
     this.eventEmitter.emit('project.created', {
       tenantId,
@@ -144,20 +158,33 @@ export class ProjectsService {
     return project;
   }
 
-  async findAll(tenantId: string, dto: ListProjectsDto) {
+  async findAll(tenantId: string, userId: string, dto: ListProjectsDto) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    // Visibility filter: users can see PUBLIC projects or projects they
+    // are a member of. We compose this with any text search the caller
+    // requested by AND-ing two top-level OR groups.
+    const visibilityClause = {
+      OR: [
+        { visibility: 'PUBLIC' },
+        { members: { some: { userId } } },
+      ],
+    };
+
+    const filterClauses: Record<string, unknown>[] = [visibilityClause];
+    if (dto.search) {
+      filterClauses.push({
+        OR: [
+          { name: { contains: dto.search, mode: 'insensitive' } },
+          { key: { contains: dto.search, mode: 'insensitive' } },
+        ],
+      });
+    }
 
     const where: Record<string, unknown> = {
       deletedAt: null,
+      AND: filterClauses,
       ...(dto.status ? { status: dto.status } : {}),
-      ...(dto.search
-        ? {
-            OR: [
-              { name: { contains: dto.search, mode: 'insensitive' } },
-              { key: { contains: dto.search, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
     };
 
     const [data, total] = await Promise.all([
@@ -435,7 +462,7 @@ export class ProjectsService {
       _max: { sortOrder: true },
     });
 
-    return client.projectSection.create({
+    const section = await client.projectSection.create({
       data: {
         name: dto.name,
         sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
@@ -443,6 +470,16 @@ export class ProjectsService {
         tenantId,
       },
     });
+
+    this.eventEmitter.emit('section.changed', {
+      tenantId,
+      projectId,
+      sectionId: section.id,
+      action: 'created',
+      changes: { name: section.name, sortOrder: section.sortOrder },
+    });
+
+    return section;
   }
 
   async updateSection(
@@ -460,13 +497,23 @@ export class ProjectsService {
       throw new NotFoundException('Seccion no encontrada');
     }
 
-    return client.projectSection.update({
+    const updated = await client.projectSection.update({
       where: { id: sectionId },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.sortOrder !== undefined && { sortOrder: dto.sortOrder }),
       },
     });
+
+    this.eventEmitter.emit('section.changed', {
+      tenantId,
+      projectId,
+      sectionId,
+      action: 'updated',
+      changes: dto,
+    });
+
+    return updated;
   }
 
   async deleteSection(tenantId: string, projectId: string, sectionId: string) {
@@ -492,6 +539,14 @@ export class ProjectsService {
       });
     });
 
+    this.eventEmitter.emit('section.changed', {
+      tenantId,
+      projectId,
+      sectionId,
+      action: 'deleted',
+      changes: {},
+    });
+
     return { message: 'Seccion eliminada' };
   }
 
@@ -511,6 +566,14 @@ export class ProjectsService {
           data: { sortOrder: i },
         });
       }
+    });
+
+    this.eventEmitter.emit('section.changed', {
+      tenantId,
+      projectId,
+      sectionId: null,
+      action: 'reordered',
+      changes: { sectionIds: dto.sectionIds },
     });
 
     return this.findSections(tenantId, projectId);

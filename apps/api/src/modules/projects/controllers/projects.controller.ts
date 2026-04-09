@@ -48,8 +48,9 @@ export class ProjectsController {
   async findAll(
     @Query(new ZodValidationPipe(listProjectsSchema)) query: ListProjectsDto,
     @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
   ) {
-    return this.projectsService.findAll(tenantId, query);
+    return this.projectsService.findAll(tenantId, userId, query);
   }
 
   @Get(':id')
