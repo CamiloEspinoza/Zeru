@@ -293,6 +293,57 @@ export class RealtimeGateway
     this.emitToRoom(room, 'task:comment:new', payload);
   }
 
+  @OnEvent('task.comment.updated')
+  handleTaskCommentUpdated(payload: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    comment: Record<string, unknown>;
+    actorId?: string;
+  }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:comment:updated', payload);
+  }
+
+  @OnEvent('task.comment.deleted')
+  handleTaskCommentDeleted(payload: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    actorId?: string;
+  }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:comment:deleted', payload);
+  }
+
+  @OnEvent('task.comment.reaction.added')
+  handleTaskCommentReactionAdded(payload: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    emoji: string;
+    userId: string;
+  }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:comment:reaction:added', payload);
+  }
+
+  @OnEvent('task.comment.reaction.removed')
+  handleTaskCommentReactionRemoved(payload: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    emoji: string;
+    userId: string;
+  }) {
+    const room = `project:${payload.tenantId}:${payload.projectId}`;
+    this.emitToRoom(room, 'task:comment:reaction:removed', payload);
+  }
+
   @OnEvent('section.changed')
   handleSectionChanged(payload: { tenantId: string; projectId: string; [key: string]: unknown }) {
     const room = `project:${payload.tenantId}:${payload.projectId}`;

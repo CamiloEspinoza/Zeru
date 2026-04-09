@@ -125,7 +125,12 @@ export class TaskCommentsService {
       throw new ForbiddenException('Solo el autor puede editar este comentario');
     }
 
-    return client.taskComment.update({
+    const task = await client.task.findUnique({
+      where: { id: comment.taskId },
+      select: { projectId: true },
+    });
+
+    const updated = await client.taskComment.update({
       where: { id: commentId },
       data: {
         content: dto.content,
@@ -137,6 +142,19 @@ export class TaskCommentsService {
         },
       },
     });
+
+    if (task) {
+      this.eventEmitter.emit('task.comment.updated', {
+        tenantId,
+        taskId: comment.taskId,
+        projectId: task.projectId,
+        commentId: comment.id,
+        comment: updated,
+        actorId: userId,
+      });
+    }
+
+    return updated;
   }
 
   async remove(tenantId: string, commentId: string, userId: string) {
@@ -152,10 +170,25 @@ export class TaskCommentsService {
       throw new ForbiddenException('Solo el autor puede eliminar este comentario');
     }
 
+    const task = await client.task.findUnique({
+      where: { id: comment.taskId },
+      select: { projectId: true },
+    });
+
     await client.taskComment.update({
       where: { id: commentId },
       data: { deletedAt: new Date() },
     });
+
+    if (task) {
+      this.eventEmitter.emit('task.comment.deleted', {
+        tenantId,
+        taskId: comment.taskId,
+        projectId: task.projectId,
+        commentId: comment.id,
+        actorId: userId,
+      });
+    }
 
     return { message: 'Comentario eliminado' };
   }
@@ -175,8 +208,14 @@ export class TaskCommentsService {
       throw new NotFoundException('Comentario no encontrado');
     }
 
+    const task = await client.task.findUnique({
+      where: { id: comment.taskId },
+      select: { projectId: true },
+    });
+
+    let reaction;
     try {
-      return await client.taskCommentReaction.create({
+      reaction = await client.taskCommentReaction.create({
         data: { commentId, userId, emoji },
       });
     } catch (e) {
@@ -185,12 +224,26 @@ export class TaskCommentsService {
         e.code === 'P2002'
       ) {
         // Reaction already exists — return idempotently
-        return client.taskCommentReaction.findUnique({
+        reaction = await client.taskCommentReaction.findUnique({
           where: { commentId_userId_emoji: { commentId, userId, emoji } },
         });
+      } else {
+        throw e;
       }
-      throw e;
     }
+
+    if (task) {
+      this.eventEmitter.emit('task.comment.reaction.added', {
+        tenantId,
+        taskId: comment.taskId,
+        projectId: task.projectId,
+        commentId: comment.id,
+        emoji,
+        userId,
+      });
+    }
+
+    return reaction;
   }
 
   async removeReaction(
@@ -201,9 +254,32 @@ export class TaskCommentsService {
   ) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    const comment = await client.taskComment.findFirst({
+      where: { id: commentId, deletedAt: null },
+      select: { id: true, taskId: true },
+    });
+
     await client.taskCommentReaction.deleteMany({
       where: { commentId, userId, emoji },
     });
+
+    if (comment) {
+      const task = await client.task.findUnique({
+        where: { id: comment.taskId },
+        select: { projectId: true },
+      });
+
+      if (task) {
+        this.eventEmitter.emit('task.comment.reaction.removed', {
+          tenantId,
+          taskId: comment.taskId,
+          projectId: task.projectId,
+          commentId: comment.id,
+          emoji,
+          userId,
+        });
+      }
+    }
 
     return { message: 'Reaccion removida' };
   }

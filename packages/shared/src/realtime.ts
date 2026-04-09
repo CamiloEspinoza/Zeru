@@ -92,6 +92,8 @@ export interface ClientToServerEvents {
   'channel:leave': (data: { channelId: string }) => void;
   'project:join': (data: { projectId: string }) => void;
   'project:leave': (data: { projectId: string }) => void;
+  'task:comment:typing': (data: { taskId: string; projectId: string }) => void;
+  'task:comment:typing:stop': (data: { taskId: string; projectId: string }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -156,6 +158,44 @@ export interface ServerToClientEvents {
     commentId?: string;
     actorId?: string;
   } & Record<string, unknown>) => void;
+  'task:comment:updated': (data: {
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    comment: Record<string, unknown>;
+    actorId?: string;
+  }) => void;
+  'task:comment:deleted': (data: {
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    actorId?: string;
+  }) => void;
+  'task:comment:reaction:added': (data: {
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    emoji: string;
+    userId: string;
+  }) => void;
+  'task:comment:reaction:removed': (data: {
+    projectId: string;
+    taskId: string;
+    commentId: string;
+    emoji: string;
+    userId: string;
+  }) => void;
+  'task:comment:typing': (data: {
+    projectId: string;
+    taskId: string;
+    userId: string;
+    userName: string;
+  }) => void;
+  'task:comment:typing:stop': (data: {
+    projectId: string;
+    taskId: string;
+    userId: string;
+  }) => void;
   'section:changed': (data: {
     projectId: string;
     sectionId: string | null;
