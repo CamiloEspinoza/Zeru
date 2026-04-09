@@ -84,16 +84,16 @@ enum ProjectStatus {
   COMPLETED
   ARCHIVED
 
-  @@schema("public")
   @@map("project_status")
+  @@schema("public")
 }
 
 enum ProjectVisibility {
   PUBLIC
   PRIVATE
 
-  @@schema("public")
   @@map("project_visibility")
+  @@schema("public")
 }
 
 enum ProjectMemberRole {
@@ -102,8 +102,8 @@ enum ProjectMemberRole {
   MEMBER
   VIEWER
 
-  @@schema("public")
   @@map("project_member_role")
+  @@schema("public")
 }
 
 enum TaskPriority {
@@ -113,8 +113,8 @@ enum TaskPriority {
   LOW
   NONE
 
-  @@schema("public")
   @@map("task_priority")
+  @@schema("public")
 }
 
 enum TaskViewType {
@@ -123,81 +123,81 @@ enum TaskViewType {
   CALENDAR
   TIMELINE
 
-  @@schema("public")
   @@map("task_view_type")
+  @@schema("public")
 }
 
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  rut       String?
-  address   String?
-  phone     String?
+  id                    String    @id @default(uuid())
+  name                  String
+  slug                  String    @unique
+  rut                   String?
+  address               String?
+  phone                 String?
   isActive              Boolean   @default(true)
   onboardingCompletedAt DateTime?
   deletedAt             DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  memberships          UserTenant[]
-  aiUsageLogs          AiUsageLog[]
-  aiConfig             AiProviderConfig?
-  geminiConfig         GeminiConfig?
-  storageConfig        StorageConfig?
-  emailConfig          EmailConfig?
-  conversations        Conversation[]
-  accounts             Account[]
-  journalEntries       JournalEntry[]
-  fiscalPeriods        FiscalPeriod[]
-  documents            Document[]
-  accountingSteps      AccountingProcessStep[]
-  memories             Memory[]
-  agentSkills          AgentSkill[]
-  apiKeys              ApiKey[]
-  linkedInConnection   LinkedInConnection?
-  linkedInPosts        LinkedInPost[]
-  linkedInAgentConfig  LinkedInAgentConfig?
-  orgProjects          OrgProject[]
-  departments          Department[]
-  personProfiles       PersonProfile[]
-  orgSuggestions       OrgSuggestion[]
-  channels             Channel[]
-  notifications        Notification[]
-  roles                Role[]
-  fmSyncRecords        FmSyncRecord[]
-  legalEntities        LegalEntity[]
-  labOrigins           LabOrigin[]
-  billingAgreements    BillingAgreement[]
-  billingConcepts      BillingConcept[]
-  projects             Project[]
+  memberships         UserTenant[]
+  aiUsageLogs         AiUsageLog[]
+  aiConfig            AiProviderConfig?
+  geminiConfig        GeminiConfig?
+  storageConfig       StorageConfig?
+  emailConfig         EmailConfig?
+  conversations       Conversation[]
+  accounts            Account[]
+  journalEntries      JournalEntry[]
+  fiscalPeriods       FiscalPeriod[]
+  documents           Document[]
+  accountingSteps     AccountingProcessStep[]
+  memories            Memory[]
+  agentSkills         AgentSkill[]
+  apiKeys             ApiKey[]
+  linkedInConnection  LinkedInConnection?
+  linkedInPosts       LinkedInPost[]
+  linkedInAgentConfig LinkedInAgentConfig?
+  orgProjects         OrgProject[]
+  departments         Department[]
+  personProfiles      PersonProfile[]
+  orgSuggestions      OrgSuggestion[]
+  channels            Channel[]
+  notifications       Notification[]
+  roles               Role[]
+  fmSyncRecords       FmSyncRecord[]
+  legalEntities       LegalEntity[]
+  labOrigins          LabOrigin[]
+  billingAgreements   BillingAgreement[]
+  billingConcepts     BillingConcept[]
+  projects            Project[]
 
-  @@schema("public")
   @@map("tenants")
+  @@schema("public")
 }
 
 enum UserType {
   HUMAN
   SERVICE
 
-  @@schema("public")
   @@map("user_type")
+  @@schema("public")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String?
-  firstName String
-  lastName  String
-  isActive   Boolean  @default(true)
-  superAdmin Boolean  @default(false)
-  type       UserType @default(HUMAN)
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String?
+  firstName  String
+  lastName   String
+  isActive   Boolean   @default(true)
+  superAdmin Boolean   @default(false)
+  type       UserType  @default(HUMAN)
   deletedAt  DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   memberships             UserTenant[]
   conversations           Conversation[]
@@ -206,54 +206,54 @@ model User {
   memories                Memory[]
   journalEntriesCreated   JournalEntry[]
   apiKeys                 ApiKey[]
-  orgProjectsCreated      OrgProject[] @relation("OrgProjectsCreated")
+  orgProjectsCreated      OrgProject[]               @relation("OrgProjectsCreated")
   aiUsageLogs             AiUsageLog[]
-  channelsCreated         Channel[]       @relation("ChannelCreator")
+  channelsCreated         Channel[]                  @relation("ChannelCreator")
   channelMemberships      ChannelMember[]
-  chatMessages            ChatMessage[]   @relation("ChatMessageAuthor")
-  chatReactions           ChatReaction[]  @relation("ChatReactionUser")
-  chatMentionsOf          ChatMention[]   @relation("ChatMentionTarget")
-  notifications           Notification[]           @relation("NotificationRecipient")
-  notificationPreferences NotificationPreference[] @relation("NotificationPref")
+  chatMessages            ChatMessage[]              @relation("ChatMessageAuthor")
+  chatReactions           ChatReaction[]             @relation("ChatReactionUser")
+  chatMentionsOf          ChatMention[]              @relation("ChatMentionTarget")
+  notifications           Notification[]             @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[]   @relation("NotificationPref")
   personProfiles          PersonProfile[]
-  projectsCreated         Project[]             @relation("ProjectsCreated")
-  projectMemberships      ProjectMember[]       @relation("ProjectMemberships")
-  tasksCreated            Task[]                @relation("TasksCreated")
-  taskAssignments         TaskAssignee[]        @relation("TaskAssignments")
-  taskSubscriptions       TaskSubscriber[]      @relation("TaskSubscriptions")
-  taskComments            TaskComment[]         @relation("TaskComments")
-  taskCommentReactions    TaskCommentReaction[] @relation("TaskCommentReactions")
-  taskActivities          TaskActivity[]        @relation("TaskActivities")
-  taskAttachments         TaskAttachment[]      @relation("TaskAttachments")
-  taskViewsCreated        TaskView[]            @relation("TaskViewsCreated")
+  projectsCreated         Project[]                  @relation("ProjectsCreated")
+  projectMemberships      ProjectMember[]            @relation("ProjectMemberships")
+  tasksCreated            Task[]                     @relation("TasksCreated")
+  taskAssignments         TaskAssignee[]             @relation("TaskAssignments")
+  taskSubscriptions       TaskSubscriber[]           @relation("TaskSubscriptions")
+  taskComments            TaskComment[]              @relation("TaskComments")
+  taskCommentReactions    TaskCommentReaction[]      @relation("TaskCommentReactions")
+  taskActivities          TaskActivity[]             @relation("TaskActivities")
+  taskAttachments         TaskAttachment[]           @relation("TaskAttachments")
+  taskViewsCreated        TaskView[]                 @relation("TaskViewsCreated")
 
-  @@schema("public")
   @@map("users")
+  @@schema("public")
 }
 
 /// Membresía: un usuario puede pertenecer a múltiples tenants con roles distintos
 model UserTenant {
-  id        String     @id @default(uuid())
-  role      UserRole   @default(OWNER)
-  isActive  Boolean    @default(true)
+  id        String    @id @default(uuid())
+  role      UserRole  @default(OWNER)
+  isActive  Boolean   @default(true)
   deletedAt DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  roleId   String?
-  roleRef  Role?  @relation(fields: [roleId], references: [id])
+  roleId  String?
+  roleRef Role?   @relation(fields: [roleId], references: [id])
 
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
-  @@schema("public")
   @@map("user_tenants")
+  @@schema("public")
 }
 
 enum UserRole {
@@ -278,25 +278,25 @@ enum AccessLevel {
 }
 
 model Role {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   slug        String
   description String?
-  isSystem    Boolean   @default(false)
-  isDefault   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isSystem    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  moduleAccess  RoleModuleAccess[]
-  overrides     RolePermissionOverride[]
-  members       UserTenant[]
+  moduleAccess RoleModuleAccess[]
+  overrides    RolePermissionOverride[]
+  members      UserTenant[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
-  @@schema("public")
   @@map("roles")
+  @@schema("public")
 }
 
 model RoleModuleAccess {
@@ -308,8 +308,8 @@ model RoleModuleAccess {
 
   @@unique([roleId, moduleKey])
   @@index([roleId])
-  @@schema("public")
   @@map("role_module_access")
+  @@schema("public")
 }
 
 model RolePermissionOverride {
@@ -321,8 +321,8 @@ model RolePermissionOverride {
 
   @@unique([roleId, permission])
   @@index([roleId])
-  @@schema("public")
   @@map("role_permission_overrides")
+  @@schema("public")
 }
 
 // ─── AI ──────────────────────────────────────────────────
@@ -330,20 +330,20 @@ model RolePermissionOverride {
 enum AiProvider {
   OPENAI
 
-  @@schema("public")
   @@map("ai_provider")
+  @@schema("public")
 }
 
 /// Registro detallado de cada interacción con modelos de IA para análisis de costos
 model AiUsageLog {
-  id             String   @id @default(uuid())
-  provider       String   // OPENAI, GEMINI, etc.
-  model          String   // gpt-5.4, text-embedding-3-small, etc.
-  feature        String   // chat, embedding, title-generation, image-generation
-  inputTokens    Int      @default(0)
-  outputTokens   Int      @default(0)
-  totalTokens    Int      @default(0)
-  cachedTokens   Int      @default(0)
+  id              String   @id @default(uuid())
+  provider        String // OPENAI, GEMINI, etc.
+  model           String // gpt-5.4, text-embedding-3-small, etc.
+  feature         String // chat, embedding, title-generation, image-generation
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  totalTokens     Int      @default(0)
+  cachedTokens    Int      @default(0)
   /// Whether compaction was triggered during this interaction
   compacted       Boolean  @default(false)
   costUsd         Decimal  @default(0)
@@ -365,8 +365,8 @@ model AiUsageLog {
   @@index([tenantId, createdAt])
   @@index([conversationId])
   @@index([tenantId, userId, createdAt])
-  @@schema("public")
   @@map("ai_usage_logs")
+  @@schema("public")
 }
 
 model AiModelPricing {
@@ -374,7 +374,7 @@ model AiModelPricing {
   provider             String
   model                String
   contextTier          String    @default("DEFAULT")
-  pricingUnit          String    // PER_1M_TOKENS, PER_1K_CHARS, PER_HOUR, PER_MINUTE, PER_IMAGE, PER_GENERATION
+  pricingUnit          String // PER_1M_TOKENS, PER_1K_CHARS, PER_HOUR, PER_MINUTE, PER_IMAGE, PER_GENERATION
   inputPrice           Decimal   @default(0)
   outputPrice          Decimal   @default(0)
   cachedPrice          Decimal   @default(0)
@@ -387,98 +387,98 @@ model AiModelPricing {
 
   @@unique([provider, model, contextTier, validFrom])
   @@index([provider, model])
-  @@schema("public")
   @@map("ai_model_pricing")
+  @@schema("public")
 }
 
 /// Configuracion de proveedor de IA por tenant
 model AiProviderConfig {
-  id              String      @id @default(uuid())
-  provider        AiProvider  @default(OPENAI)
+  id              String     @id @default(uuid())
+  provider        AiProvider @default(OPENAI)
   encryptedApiKey String
-  model           String      @default("gpt-5.4")
-  reasoningEffort String      @default("medium")
-  isActive        Boolean     @default(true)
+  model           String     @default("gpt-5.4")
+  reasoningEffort String     @default("medium")
+  isActive        Boolean    @default(true)
   deletedAt       DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("ai_provider_configs")
+  @@schema("public")
 }
 
 /// API key de Google Gemini por tenant (para generación de imágenes)
 model GeminiConfig {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   encryptedApiKey String
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("gemini_configs")
+  @@schema("public")
 }
 
 /// Configuracion de almacenamiento S3 por tenant
 model StorageConfig {
-  id                   String   @id @default(uuid())
-  region               String   @default("us-east-1")
+  id                   String    @id @default(uuid())
+  region               String    @default("us-east-1")
   encryptedAccessKeyId String
   encryptedSecretKey   String
   encryptedBucket      String
-  isActive             Boolean  @default(true)
+  isActive             Boolean   @default(true)
   deletedAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("storage_configs")
+  @@schema("public")
 }
 
 /// Configuración de AWS SES para envío de correos por tenant
 model EmailConfig {
-  id                   String   @id @default(uuid())
-  region               String   @default("us-east-1")
+  id                   String    @id @default(uuid())
+  region               String    @default("us-east-1")
   encryptedAccessKeyId String
   encryptedSecretKey   String
   encryptedFromEmail   String
-  isActive             Boolean  @default(true)
+  isActive             Boolean   @default(true)
   deletedAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("email_configs")
+  @@schema("public")
 }
 
 /// Sesion de chat entre un usuario y el asistente IA
 model Conversation {
-  id                  String  @id @default(uuid())
-  title               String  @default("Nueva conversación")
+  id                 String    @id @default(uuid())
+  title              String    @default("Nueva conversación")
   /// GENERAL | LINKEDIN
-  agentType           String  @default("GENERAL")
-  lastResponseId      String?
+  agentType          String    @default("GENERAL")
+  lastResponseId     String?
   /// The previous_response_id that was used when the last response was generated (used for manual context reconstruction)
-  parentResponseId    String?
+  parentResponseId   String?
   /// Full response.output array from the last OpenAI response (needed for manual context on tool answer)
-  lastResponseOutput  Json?
-  pendingToolOutputs  Json?
+  lastResponseOutput Json?
+  pendingToolOutputs Json?
   deletedAt          DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -486,17 +486,17 @@ model Conversation {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  messages        Message[]
-  documents       Document[]
-  journalEntries  JournalEntry[]
-  linkedInPosts   LinkedInPost[]
-  aiUsageLogs     AiUsageLog[]
+  messages       Message[]
+  documents      Document[]
+  journalEntries JournalEntry[]
+  linkedInPosts  LinkedInPost[]
+  aiUsageLogs    AiUsageLog[]
 
   @@index([userId])
   @@index([tenantId])
   @@index([tenantId, agentType])
-  @@schema("public")
   @@map("conversations")
+  @@schema("public")
 }
 
 enum MessageRole {
@@ -505,20 +505,20 @@ enum MessageRole {
   tool
   question
 
-  @@schema("public")
   @@map("message_role")
+  @@schema("public")
 }
 
 /// Mensaje individual dentro de una conversacion
 model Message {
-  id          String      @id @default(uuid())
-  role        MessageRole
-  content     Json
-  toolName    String?
-  toolArgs    Json?
-  toolResult  Json?
-  deletedAt   DateTime?
-  createdAt   DateTime    @default(now())
+  id         String      @id @default(uuid())
+  role       MessageRole
+  content    Json
+  toolName   String?
+  toolArgs   Json?
+  toolResult Json?
+  deletedAt  DateTime?
+  createdAt  DateTime    @default(now())
 
   tenantId       String?
   conversationId String
@@ -526,8 +526,8 @@ model Message {
 
   @@index([conversationId])
   @@index([tenantId])
-  @@schema("public")
   @@map("messages")
+  @@schema("public")
 }
 
 // ─── Memory ──────────────────────────────────────────────
@@ -539,30 +539,30 @@ enum MemoryCategory {
   DECISION
   CONTEXT
 
-  @@schema("public")
   @@map("memory_category")
+  @@schema("public")
 }
 
 /// Memoria persistente del asistente por tenant/usuario
 model Memory {
-  id         String         @id @default(uuid())
+  id         String                       @id @default(uuid())
   content    String
-  category   MemoryCategory @default(CONTEXT)
+  category   MemoryCategory               @default(CONTEXT)
   /// Relevancia 1-10; el modelo asigna la importancia al guardar
-  importance Int            @default(5)
+  importance Int                          @default(5)
   /// Embedding pgvector(1536) para búsqueda semántica — gestionado via raw SQL
   embedding  Unsupported("vector(1536)")?
-  isActive   Boolean        @default(true)
+  isActive   Boolean                      @default(true)
   deletedAt  DateTime?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   /// null = memoria de la organización; userId presente = memoria del usuario
   userId String?
-  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Documento de origen (si la memoria fue extraída de un documento)
   documentId String?
@@ -571,23 +571,23 @@ model Memory {
   @@index([tenantId])
   @@index([userId, tenantId])
   @@index([documentId])
-  @@schema("public")
   @@map("memories")
+  @@schema("public")
 }
 
 // ─── Accounting ──────────────────────────────────────────
 
 model Account {
-  id           String               @id @default(uuid())
-  code         String
-  name         String
-  type         AccountType
+  id          String              @id @default(uuid())
+  code        String
+  name        String
+  type        AccountType
   /// Sección IFRS IAS 1 (solo en cuentas REVENUE/EXPENSE). Se hereda del ancestro raíz.
-  ifrsSection  AccountIFRSSection?
-  isActive     Boolean              @default(true)
+  ifrsSection AccountIFRSSection?
+  isActive    Boolean             @default(true)
   deletedAt   DateTime?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   parentId String?
   parent   Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
@@ -600,8 +600,8 @@ model Account {
 
   @@unique([code, tenantId])
   @@index([tenantId])
-  @@schema("public")
   @@map("accounts")
+  @@schema("public")
 }
 
 enum AccountType {
@@ -627,8 +627,8 @@ enum AccountIFRSSection {
   FINANCE_COST
   TAX_EXPENSE
 
-  @@schema("public")
   @@map("account_ifrs_section")
+  @@schema("public")
 }
 
 /// Origen del asiento: asistente IA o manual (formulario)
@@ -636,8 +636,8 @@ enum JournalEntrySource {
   ASSISTANT
   MANUAL
 
-  @@schema("public")
   @@map("journal_entry_source")
+  @@schema("public")
 }
 
 model JournalEntry {
@@ -651,13 +651,13 @@ model JournalEntry {
   updatedAt   DateTime           @updatedAt
 
   /// Usuario que creó el asiento (manual o quien confirmó en el asistente)
-  createdById  String?
-  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
   /// Origen: asistente o manual
-  createdVia   JournalEntrySource?
+  createdVia     JournalEntrySource?
   /// Conversación del asistente donde se creó (solo si createdVia = ASSISTANT)
   conversationId String?
-  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   fiscalPeriodId String
   fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
@@ -673,8 +673,8 @@ model JournalEntry {
   @@index([date])
   @@index([createdById])
   @@index([conversationId])
-  @@schema("public")
   @@map("journal_entries")
+  @@schema("public")
 }
 
 enum JournalEntryStatus {
@@ -686,9 +686,9 @@ enum JournalEntryStatus {
 }
 
 model JournalEntryLine {
-  id          String  @id @default(uuid())
-  debit       Decimal @default(0) @db.Decimal(18, 2)
-  credit      Decimal @default(0) @db.Decimal(18, 2)
+  id          String    @id @default(uuid())
+  debit       Decimal   @default(0) @db.Decimal(18, 2)
+  credit      Decimal   @default(0) @db.Decimal(18, 2)
   description String?
   deletedAt   DateTime?
 
@@ -701,8 +701,8 @@ model JournalEntryLine {
 
   @@index([journalEntryId])
   @@index([tenantId])
-  @@schema("public")
   @@map("journal_entry_lines")
+  @@schema("public")
 }
 
 model FiscalPeriod {
@@ -718,12 +718,12 @@ model FiscalPeriod {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  journalEntries      JournalEntry[]
-  stepCompletions     AccountingStepCompletion[]
+  journalEntries  JournalEntry[]
+  stepCompletions AccountingStepCompletion[]
 
   @@index([tenantId])
-  @@schema("public")
   @@map("fiscal_periods")
+  @@schema("public")
 }
 
 enum FiscalPeriodStatus {
@@ -735,13 +735,13 @@ enum FiscalPeriodStatus {
 
 /// Paso del proceso contable configurable por organización
 model AccountingProcessStep {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
   order       Int
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -749,8 +749,8 @@ model AccountingProcessStep {
   completions AccountingStepCompletion[]
 
   @@index([tenantId])
-  @@schema("public")
   @@map("accounting_process_steps")
+  @@schema("public")
 }
 
 /// Estado de completitud de un paso de proceso para un período fiscal
@@ -762,21 +762,21 @@ model AccountingStepCompletion {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  tenantId       String?
-  stepId String
-  step   AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  tenantId String?
+  stepId   String
+  step     AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   fiscalPeriodId String
   fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id], onDelete: Cascade)
 
   completedById String?
-  completedBy   User?  @relation(fields: [completedById], references: [id], onDelete: SetNull)
+  completedBy   User?   @relation(fields: [completedById], references: [id], onDelete: SetNull)
 
   @@unique([stepId, fiscalPeriodId])
   @@index([fiscalPeriodId])
   @@index([tenantId])
-  @@schema("public")
   @@map("accounting_step_completions")
+  @@schema("public")
 }
 
 enum StepStatus {
@@ -807,16 +807,16 @@ enum DocumentCategory {
 
 /// Documento adjunto: almacenado en S3, asociado a conversacion y asientos
 model Document {
-  id         String            @id @default(uuid())
-  name       String
-  s3Key      String
-  mimeType   String
-  sizeBytes  Int
-  category   DocumentCategory  @default(OTRO)
-  tags       String[]
-  deletedAt  DateTime?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String           @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  category  DocumentCategory @default(OTRO)
+  tags      String[]
+  deletedAt DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -832,8 +832,8 @@ model Document {
 
   @@index([tenantId])
   @@index([conversationId])
-  @@schema("public")
   @@map("documents")
+  @@schema("public")
 }
 
 /// Relacion muchos-a-muchos entre documentos y asientos contables
@@ -841,7 +841,7 @@ model DocumentJournalEntry {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  tenantId       String?
+  tenantId   String?
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -850,25 +850,25 @@ model DocumentJournalEntry {
 
   @@unique([documentId, journalEntryId])
   @@index([tenantId])
-  @@schema("public")
   @@map("document_journal_entries")
+  @@schema("public")
 }
 
 // ─── Agent Skills ─────────────────────────────────────────
 
 /// Skill instalado por un tenant para extender las capacidades del agente de IA
 model AgentSkill {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
   repoUrl     String
   /// Contenido del SKILL.md (body sin frontmatter)
   content     String
   version     String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean   @default(true)
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -877,16 +877,16 @@ model AgentSkill {
 
   @@unique([tenantId, repoUrl])
   @@index([tenantId])
-  @@schema("public")
   @@map("agent_skills")
+  @@schema("public")
 }
 
 /// Archivo de referencia o script perteneciente a un AgentSkill
 model AgentSkillFile {
-  id      String @id @default(uuid())
+  id        String    @id @default(uuid())
   /// Ruta relativa dentro del skill, ej: "references/api_docs.md"
-  path    String
-  content String
+  path      String
+  content   String
   deletedAt DateTime?
 
   tenantId String?
@@ -896,8 +896,8 @@ model AgentSkillFile {
   @@unique([skillId, path])
   @@index([skillId])
   @@index([tenantId])
-  @@schema("public")
   @@map("agent_skill_files")
+  @@schema("public")
 }
 
 model ApiKey {
@@ -917,8 +917,8 @@ model ApiKey {
   updatedAt   DateTime  @updatedAt
 
   @@index([keyHash])
-  @@schema("public")
   @@map("api_keys")
+  @@schema("public")
 }
 
 /// Código de login passwordless (6 dígitos enviados por email)
@@ -932,19 +932,19 @@ model LoginCode {
   createdAt DateTime  @default(now())
 
   @@index([email])
-  @@schema("public")
   @@map("login_codes")
+  @@schema("public")
 }
 
 /// Registro de emails en lista de espera
 model WaitlistEntry {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String    @id @default(uuid())
+  email     String    @unique
   deletedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  @@schema("public")
   @@map("waitlist_entries")
+  @@schema("public")
 }
 
 model FeatureRequest {
@@ -954,37 +954,37 @@ model FeatureRequest {
   ip        String?
   createdAt DateTime @default(now())
 
-  @@schema("public")
   @@map("feature_requests")
+  @@schema("public")
 }
 
 // ─── LinkedIn ─────────────────────────────────────────────
 
 /// Conexión OAuth de LinkedIn por tenant (1 por tenant)
 model LinkedInConnection {
-  id            String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   /// Access token encriptado con ENCRYPTION_KEY
-  accessToken   String
+  accessToken           String
   /// Refresh token encriptado (LinkedIn emite refresh tokens de larga duración)
-  refreshToken  String?
-  expiresAt     DateTime
+  refreshToken          String?
+  expiresAt             DateTime
   /// urn:li:person:xxx
-  personUrn     String
-  profileName   String?
-  profileImage  String?
+  personUrn             String
+  profileName           String?
+  profileImage          String?
   /// Token de la app Community Management (r_organization_followers) — encriptado
   communityAccessToken  String?
   communityRefreshToken String?
   communityExpiresAt    DateTime?
-  deletedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  deletedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("linkedin_connections")
+  @@schema("public")
 }
 
 /// Post de LinkedIn creado o programado por el agente
@@ -1022,19 +1022,19 @@ model LinkedInPost {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
-  versions       LinkedInPostVersion[]
-  imageVersions  LinkedInImageVersion[]
+  versions      LinkedInPostVersion[]
+  imageVersions LinkedInImageVersion[]
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([status, scheduledAt])
-  @@schema("public")
   @@map("linkedin_posts")
+  @@schema("public")
 }
 
 /// Versión del contenido de texto de un post (para historial de regeneraciones)
 model LinkedInPostVersion {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   postId        String
   post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   /// Contenido del post en esta versión
@@ -1044,17 +1044,17 @@ model LinkedInPostVersion {
   /// Instrucciones de regeneración que produjeron esta versión (null para la versión original)
   instructions  String?
   tenantId      String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime     @default(now())
 
   @@index([postId])
   @@index([tenantId])
-  @@schema("public")
   @@map("linkedin_post_versions")
+  @@schema("public")
 }
 
 /// Versión de imagen generada para un post
 model LinkedInImageVersion {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   postId        String
   post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   /// Prompt usado para generar la imagen
@@ -1066,37 +1066,37 @@ model LinkedInImageVersion {
   /// Número de versión (1, 2, 3...)
   versionNumber Int
   /// Si esta versión es la seleccionada actualmente
-  isSelected    Boolean  @default(false)
+  isSelected    Boolean      @default(false)
   tenantId      String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime     @default(now())
 
   @@index([postId])
   @@index([tenantId])
-  @@schema("public")
   @@map("linkedin_image_versions")
+  @@schema("public")
 }
 
 /// Configuración del agente de LinkedIn por tenant
 model LinkedInAgentConfig {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   /// Si true, los posts se publican directamente sin aprobación
-  autoPublish       Boolean  @default(false)
-  defaultVisibility String   @default("PUBLIC")
+  autoPublish       Boolean   @default(false)
+  defaultVisibility String    @default("PUBLIC")
   /// Pilares de contenido configurados: ["thought-leadership", "tips", ...]
   contentPillars    Json?
   /// URN de la organización para People Typeahead API — urn:li:organization:xxx
   organizationUrn   String?
   deletedAt         DateTime?
   /// Idioma preferido para los prompts de generación de imágenes (ej: "es", "en", "pt")
-  preferredLanguage String   @default("es")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  preferredLanguage String    @default("es")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@schema("public")
   @@map("linkedin_agent_configs")
+  @@schema("public")
 }
 
 // ─── Person Profiles ─────────────────────────────────────
@@ -1106,8 +1106,8 @@ enum PersonStatus {
   INACTIVE
   VACANT
 
-  @@schema("public")
   @@map("person_status")
+  @@schema("public")
 }
 
 enum PersonSource {
@@ -1116,8 +1116,8 @@ enum PersonSource {
   AI_CONFIRMED
   CSV_IMPORT
 
-  @@schema("public")
   @@map("person_source")
+  @@schema("public")
 }
 
 /// Departamento organizacional
@@ -1127,38 +1127,38 @@ model Department {
   description String?
   color       String?
 
-  parentId    String?
-  parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Department[] @relation("DepartmentHierarchy")
+  parentId String?
+  parent   Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentHierarchy")
 
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  persons   PersonProfile[]
+  persons PersonProfile[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
-  @@schema("public")
   @@map("departments")
+  @@schema("public")
 }
 
 /// Perfil de persona para inteligencia organizacional (participantes de entrevistas)
 model PersonProfile {
-  id          String  @id @default(uuid())
-  name        String
-  role        String?
+  id           String      @id @default(uuid())
+  name         String
+  role         String?
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  personType  String    @default("INTERNAL") // INTERNAL, EXTERNAL, CONTRACTOR
-  company     String?   // Empresa externa (solo para externos/contratistas)
-  email       String?
-  phone       String?
-  avatarS3Key String?
-  notes       String?
+  personType   String      @default("INTERNAL") // INTERNAL, EXTERNAL, CONTRACTOR
+  company      String? // Empresa externa (solo para externos/contratistas)
+  email        String?
+  phone        String?
+  avatarS3Key  String?
+  notes        String?
 
   // ─── Jerarquia organizacional ───
   reportsToId   String?
@@ -1175,21 +1175,21 @@ model PersonProfile {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   orgSuggestions OrgSuggestion[]
 
+  @@unique([userId, tenantId])
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, reportsToId])
   @@index([tenantId, departmentId])
-  @@unique([userId, tenantId])
-  @@schema("public")
   @@map("person_profiles")
+  @@schema("public")
 }
 
 // ─── Org Suggestions ─────────────────────────────────────
@@ -1200,8 +1200,8 @@ enum OrgSuggestionType {
   SET_REPORTS_TO
   DELETE_PERSON
 
-  @@schema("public")
   @@map("org_suggestion_type")
+  @@schema("public")
 }
 
 enum OrgSuggestionStatus {
@@ -1210,8 +1210,8 @@ enum OrgSuggestionStatus {
   APPROVED_MODIFIED
   REJECTED
 
-  @@schema("public")
   @@map("org_suggestion_status")
+  @@schema("public")
 }
 
 model OrgSuggestion {
@@ -1226,21 +1226,21 @@ model OrgSuggestion {
   resolvedAt      DateTime?
   rejectReason    String?
 
-  personId    String?
-  person      PersonProfile? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  personId String?
+  person   PersonProfile? @relation(fields: [personId], references: [id], onDelete: SetNull)
 
   interviewId String?
 
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
   @@index([tenantId, personId])
-  @@schema("public")
   @@map("org_suggestions")
+  @@schema("public")
 }
 
 // ─── Org Intelligence ────────────────────────────────────
@@ -1251,8 +1251,8 @@ enum OrgProjectStatus {
   COMPLETED
   ARCHIVED
 
-  @@schema("public")
   @@map("org_project_status")
+  @@schema("public")
 }
 
 enum TranscriptionStatus {
@@ -1261,16 +1261,16 @@ enum TranscriptionStatus {
   COMPLETED
   FAILED
 
-  @@schema("public")
   @@map("transcription_status")
+  @@schema("public")
 }
 
 enum TranscriptionProvider {
   DEEPGRAM
   OPENAI
 
-  @@schema("public")
   @@map("transcription_provider")
+  @@schema("public")
 }
 
 enum OrgEntityType {
@@ -1284,8 +1284,8 @@ enum OrgEntityType {
   PROBLEM
   IMPROVEMENT
 
-  @@schema("public")
   @@map("org_entity_type")
+  @@schema("public")
 }
 
 enum OrgRelationType {
@@ -1301,8 +1301,8 @@ enum OrgRelationType {
   INPUTS
   OUTPUTS
 
-  @@schema("public")
   @@map("org_relation_type")
+  @@schema("public")
 }
 
 enum ProblemSeverity {
@@ -1311,8 +1311,8 @@ enum ProblemSeverity {
   MEDIUM
   LOW
 
-  @@schema("public")
   @@map("problem_severity")
+  @@schema("public")
 }
 
 enum ConflictType {
@@ -1320,8 +1320,8 @@ enum ConflictType {
   PERSPECTIVE
   SCOPE
 
-  @@schema("public")
   @@map("conflict_type")
+  @@schema("public")
 }
 
 enum ConflictResolution {
@@ -1331,8 +1331,8 @@ enum ConflictResolution {
   RESOLVED_MERGED
   DISMISSED
 
-  @@schema("public")
   @@map("conflict_resolution")
+  @@schema("public")
 }
 
 /// Proyecto de inteligencia organizacional
@@ -1352,7 +1352,7 @@ model OrgProject {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdById String?
-  createdBy   User?  @relation("OrgProjectsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?   @relation("OrgProjectsCreated", fields: [createdById], references: [id], onDelete: SetNull)
 
   interviews      Interview[]
   orgEntities     OrgEntity[]
@@ -1364,24 +1364,24 @@ model OrgProject {
 
   @@index([tenantId])
   @@index([tenantId, status])
-  @@schema("public")
   @@map("org_projects")
+  @@schema("public")
 }
 
 /// Entrevista de diagnóstico organizacional
 model Interview {
-  id                    String                @id @default(uuid())
+  id                    String                 @id @default(uuid())
   title                 String?
   audioS3Key            String?
   audioMimeType         String?
   audioDurationMs       Int?
   transcriptionText     String?
   transcriptionJson     Json?
-  transcriptionStatus   TranscriptionStatus   @default(PENDING)
+  transcriptionStatus   TranscriptionStatus    @default(PENDING)
   transcriptionProvider TranscriptionProvider?
   interviewDate         DateTime?
   extractionResult      Json?
-  processingStatus      String                @default("PENDING")
+  processingStatus      String                 @default("PENDING")
   processingError       String?
   processingLog         Json?
   objective             String?
@@ -1389,8 +1389,8 @@ model Interview {
   generatedQuestions    Json?
   questionsGeneratedAt  DateTime?
   deletedAt             DateTime?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   projectId String
   project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1404,38 +1404,38 @@ model Interview {
   @@index([projectId])
   @@index([tenantId])
   @@index([tenantId, processingStatus])
-  @@schema("public")
   @@map("interviews")
+  @@schema("public")
 }
 
 /// Pista de audio individual dentro de una entrevista multi-audio
 model InterviewAudioTrack {
-  id            String   @id @default(uuid())
-  interviewId   String
-  interview     Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
-  trackOrder    Int
-  s3Key         String
-  mimeType      String   @default("audio/mpeg")
-  durationMs    Int?
-  sourceLabel   String?
-  originalName  String?
-  createdAt     DateTime @default(now())
-  tenantId      String
+  id           String    @id @default(uuid())
+  interviewId  String
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  trackOrder   Int
+  s3Key        String
+  mimeType     String    @default("audio/mpeg")
+  durationMs   Int?
+  sourceLabel  String?
+  originalName String?
+  createdAt    DateTime  @default(now())
+  tenantId     String
 
   @@unique([interviewId, trackOrder])
   @@index([interviewId])
-  @@schema("public")
   @@map("interview_audio_tracks")
+  @@schema("public")
 }
 
 /// Hablante identificado en una entrevista
 model InterviewSpeaker {
-  id             String  @id @default(uuid())
-  speakerLabel   String
-  name           String?
-  role           String?
-  department     String?
-  isInterviewer  Boolean @default(false)
+  id            String  @id @default(uuid())
+  speakerLabel  String
+  name          String?
+  role          String?
+  department    String?
+  isInterviewer Boolean @default(false)
 
   tenantId    String?
   interviewId String
@@ -1448,8 +1448,8 @@ model InterviewSpeaker {
   @@unique([interviewId, speakerLabel])
   @@index([interviewId])
   @@index([tenantId])
-  @@schema("public")
   @@map("interview_speakers")
+  @@schema("public")
 }
 
 /// Fragmento de transcripción con embedding para búsqueda semántica
@@ -1480,8 +1480,8 @@ model InterviewChunk {
   @@index([interviewId])
   @@index([tenantId])
   @@index([tenantId, interviewId])
-  @@schema("public")
   @@map("interview_chunks")
+  @@schema("public")
 }
 
 /// Entidad del grafo organizacional (departamento, rol, proceso, etc.)
@@ -1518,8 +1518,8 @@ model OrgEntity {
   @@index([tenantId, projectId, type])
   @@index([tenantId, type, status])
   @@index([tenantId, projectId, type, validTo])
-  @@schema("public")
   @@map("org_entities")
+  @@schema("public")
 }
 
 /// Relación entre dos entidades organizacionales
@@ -1536,9 +1536,9 @@ model OrgRelation {
   toEntityId String
   toEntity   OrgEntity @relation("ToEntity", fields: [toEntityId], references: [id], onDelete: Cascade)
 
-  validFrom         DateTime @default(now())
+  validFrom         DateTime  @default(now())
   validTo           DateTime?
-  confidence        Float    @default(0.5)
+  confidence        Float     @default(0.5)
   sourceInterviewId String?
   sourceChunkId     String?
 
@@ -1554,8 +1554,8 @@ model OrgRelation {
   @@index([toEntityId])
   @@index([type])
   @@index([tenantId, type, validTo])
-  @@schema("public")
   @@map("org_relations")
+  @@schema("public")
 }
 
 /// Problema detectado en el diagnóstico organizacional
@@ -1583,13 +1583,13 @@ model Problem {
   @@index([tenantId, projectId])
   @@index([severity])
   @@index([tenantId, projectId, severity])
-  @@schema("public")
   @@map("problems")
+  @@schema("public")
 }
 
 /// Vínculo entre problema y entidad afectada
 model ProblemLink {
-  id                String @id @default(uuid())
+  id                String  @id @default(uuid())
   impactDescription String?
 
   tenantId  String?
@@ -1603,23 +1603,23 @@ model ProblemLink {
   @@index([problemId])
   @@index([entityId])
   @@index([tenantId])
-  @@schema("public")
   @@map("problem_links")
+  @@schema("public")
 }
 
 /// Mejora propuesta vinculada a un problema
 model Improvement {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   title       String
   description String
   type        String?
   effort      String?
   impact      String?
   priority    Int?
-  status      String   @default("PROPOSED")
+  status      String    @default("PROPOSED")
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenantId  String
   projectId String
@@ -1630,18 +1630,18 @@ model Improvement {
 
   @@index([tenantId, projectId])
   @@index([problemId])
-  @@schema("public")
   @@map("improvements")
+  @@schema("public")
 }
 
 /// Claim factual extraído de entrevistas (inmutable)
 model FactualClaim {
-  id                String @id @default(uuid())
+  id                String   @id @default(uuid())
   subject           String
   predicate         String
   object            String
   claimType         String
-  confidence        Float  @default(0.5)
+  confidence        Float    @default(0.5)
   evidence          String?
   sourceInterviewId String?
   sourceChunkId     String?
@@ -1654,8 +1654,8 @@ model FactualClaim {
   @@index([tenantId, projectId])
   @@index([subject])
   @@index([tenantId, projectId, subject, predicate])
-  @@schema("public")
   @@map("factual_claims")
+  @@schema("public")
 }
 
 /// Registro de conflicto entre claims o perspectivas
@@ -1677,8 +1677,8 @@ model ConflictRecord {
 
   @@index([tenantId, projectId])
   @@index([tenantId, projectId, resolution])
-  @@schema("public")
   @@map("conflict_records")
+  @@schema("public")
 }
 
 model AuditLog {
@@ -1701,8 +1701,8 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, createdAt])
-  @@schema("public")
   @@map("audit_logs")
+  @@schema("public")
 }
 
 // ─── Team Chat ────────────────────────────────────────────
@@ -1729,8 +1729,8 @@ model Channel {
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   User   @relation("ChannelCreator", fields: [createdById], references: [id])
@@ -1741,8 +1741,8 @@ model Channel {
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, type])
-  @@schema("public")
   @@map("channels")
+  @@schema("public")
 }
 
 model ChannelMember {
@@ -1756,12 +1756,12 @@ model ChannelMember {
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([channelId, userId])
   @@index([userId])
-  @@schema("public")
   @@map("channel_members")
+  @@schema("public")
 }
 
 model ChatMessage {
@@ -1776,7 +1776,7 @@ model ChatMessage {
   channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
   authorId String
-  author   User @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+  author   User   @relation("ChatMessageAuthor", fields: [authorId], references: [id])
 
   threadParentId    String?
   threadParent      ChatMessage?  @relation("Thread", fields: [threadParentId], references: [id])
@@ -1791,12 +1791,12 @@ model ChatMessage {
   @@index([channelId, sequence])
   @@index([channelId, createdAt])
   @@index([threadParentId])
-  @@schema("public")
   @@map("chat_messages")
+  @@schema("public")
 }
 
 model ChatAttachment {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
   name      String
   s3Key     String
   mimeType  String
@@ -1807,8 +1807,8 @@ model ChatAttachment {
   message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
-  @@schema("public")
   @@map("chat_attachments")
+  @@schema("public")
 }
 
 model ChatReaction {
@@ -1819,51 +1819,51 @@ model ChatReaction {
   message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   userId String
-  user   User @relation("ChatReactionUser", fields: [userId], references: [id])
+  user   User   @relation("ChatReactionUser", fields: [userId], references: [id])
 
   @@unique([messageId, userId, emoji])
-  @@schema("public")
   @@map("chat_reactions")
+  @@schema("public")
 }
 
 model ChatMention {
   id String @id @default(uuid())
 
-  messageId       String
-  message         ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   mentionedUserId String
-  mentionedUser   User @relation("ChatMentionTarget", fields: [mentionedUserId], references: [id])
+  mentionedUser   User   @relation("ChatMentionTarget", fields: [mentionedUserId], references: [id])
 
   @@index([mentionedUserId])
-  @@schema("public")
   @@map("chat_mentions")
+  @@schema("public")
 }
 
 // ─── Notifications ────────────────────────────────────────
 
 model Notification {
-  id          String    @id @default(uuid())
-  type        String
-  title       String
-  body        String?
-  data        Json
-  isRead      Boolean   @default(false)
-  readAt      DateTime?
-  groupKey    String?
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(uuid())
+  type      String
+  title     String
+  body      String?
+  data      Json
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  groupKey  String?
+  createdAt DateTime  @default(now())
 
   recipientId String
-  recipient   User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([recipientId, isRead, createdAt])
   @@index([recipientId, tenantId, createdAt])
   @@index([groupKey])
-  @@schema("public")
   @@map("notifications")
+  @@schema("public")
 }
 
 model NotificationPreference {
@@ -1875,11 +1875,11 @@ model NotificationPreference {
   emailFrequency String  @default("INSTANT")
 
   userId String
-  user   User @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventPattern])
-  @@schema("public")
   @@map("notification_preferences")
+  @@schema("public")
 }
 
 // ─── Resource Locks ───────────────────────────────────────
@@ -1899,40 +1899,40 @@ model ResourceLock {
   @@unique([entityType, entityId, fieldName])
   @@index([socketId])
   @@index([expiresAt])
-  @@schema("public")
   @@map("resource_locks")
+  @@schema("public")
 }
 
 // ─── Legal Entity & Lab Origin ───────────────────────────
 
 model LegalEntity {
-  id                String       @id @default(uuid())
+  id String @id @default(uuid())
 
-  rut               String
-  legalName         String
-  tradeName         String?
-  businessActivity  String?
+  rut              String
+  legalName        String
+  tradeName        String?
+  businessActivity String?
 
-  isClient          Boolean      @default(false)
-  isSupplier        Boolean      @default(false)
+  isClient   Boolean @default(false)
+  isSupplier Boolean @default(false)
 
-  street            String?
-  streetNumber      String?
-  unit              String?
-  commune           String?
-  city              String?
+  street       String?
+  streetNumber String?
+  unit         String?
+  commune      String?
+  city         String?
 
-  email             String?
-  phone             String?
-  website           String?
+  email   String?
+  phone   String?
+  website String?
 
-  isActive          Boolean      @default(true)
-  deletedAt         DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  tenantId          String
-  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contacts          LegalEntityContact[]
   bankAccounts      LegalEntityBankAccount[]
@@ -1943,108 +1943,108 @@ model LegalEntity {
   @@index([tenantId])
   @@index([tenantId, isClient])
   @@index([tenantId, isSupplier])
-  @@schema("public")
   @@map("legal_entities")
+  @@schema("public")
 }
 
 model LegalEntityContact {
-  id              String   @id @default(uuid())
-  name            String
-  role            String?
-  email           String?
-  phone           String?
-  mobile          String?
-  isPrimary       Boolean  @default(false)
-  notes           String?
-  isActive        Boolean  @default(true)
-  deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String    @id @default(uuid())
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  mobile    String?
+  isPrimary Boolean   @default(false)
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  legalEntityId   String
-  legalEntity     LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
-  tenantId        String
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId      String
 
   @@index([legalEntityId])
   @@index([tenantId])
-  @@schema("public")
   @@map("legal_entity_contacts")
+  @@schema("public")
 }
 
 model LegalEntityBankAccount {
-  id              String          @id @default(uuid())
-  bankName        String
-  accountType     BankAccountType
-  accountNumber   String
-  holderName      String
-  holderRut       String?
-  isPrimary       Boolean         @default(false)
-  isActive        Boolean         @default(true)
-  deletedAt       DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id            String          @id @default(uuid())
+  bankName      String
+  accountType   BankAccountType
+  accountNumber String
+  holderName    String
+  holderRut     String?
+  isPrimary     Boolean         @default(false)
+  isActive      Boolean         @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
-  legalEntityId   String
-  legalEntity     LegalEntity     @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
-  tenantId        String
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId      String
 
   @@index([legalEntityId])
   @@index([tenantId])
-  @@schema("public")
   @@map("legal_entity_bank_accounts")
+  @@schema("public")
 }
 
 model LabOrigin {
-  id                         String              @id @default(uuid())
-  code                       String
-  name                       String
-  category                   LabOriginCategory   @default(OTRO)
+  id       String            @id @default(uuid())
+  code     String
+  name     String
+  category LabOriginCategory @default(OTRO)
 
-  legalEntityId              String?
-  legalEntity                LegalEntity?        @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+  legalEntityId String?
+  legalEntity   LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
 
-  parentId                   String?
-  parent                     LabOrigin?          @relation("LabOriginHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children                   LabOrigin[]         @relation("LabOriginHierarchy")
+  parentId String?
+  parent   LabOrigin?  @relation("LabOriginHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children LabOrigin[] @relation("LabOriginHierarchy")
 
-  street                     String?
-  streetNumber               String?
-  unit                       String?
-  commune                    String?
-  city                       String?
-  phone                      String?
-  email                      String?
+  street       String?
+  streetNumber String?
+  unit         String?
+  commune      String?
+  city         String?
+  phone        String?
+  email        String?
 
-  sampleReceptionMode        SampleReceptionMode @default(PRESENCIAL)
-  reportDeliveryMethods      ReportDeliveryMethod[]
+  sampleReceptionMode   SampleReceptionMode    @default(PRESENCIAL)
+  reportDeliveryMethods ReportDeliveryMethod[]
 
-  deliveryDaysBiopsy         Int?
-  deliveryDaysPap            Int?
-  deliveryDaysCytology       Int?
-  deliveryDaysIhc            Int?
-  deliveryDaysDefault        Int?
+  deliveryDaysBiopsy   Int?
+  deliveryDaysPap      Int?
+  deliveryDaysCytology Int?
+  deliveryDaysIhc      Int?
+  deliveryDaysDefault  Int?
 
-  encryptedFtpHost           String?
-  encryptedFtpUser           String?
-  encryptedFtpPassword       String?
-  ftpPath                    String?
+  encryptedFtpHost     String?
+  encryptedFtpUser     String?
+  encryptedFtpPassword String?
+  ftpPath              String?
 
   criticalNotificationEmails String[]
-  sendsQualityReports        Boolean             @default(false)
+  sendsQualityReports        Boolean  @default(false)
 
-  receptionDays              String?
-  receptionSchedule          String?
-  notes                      String?
-  isActive                   Boolean             @default(true)
-  deletedAt                  DateTime?
-  createdAt                  DateTime            @default(now())
-  updatedAt                  DateTime            @updatedAt
+  receptionDays     String?
+  receptionSchedule String?
+  notes             String?
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  billingAgreementId         String?
-  billingAgreement           BillingAgreement?   @relation(fields: [billingAgreementId], references: [id], onDelete: SetNull)
+  billingAgreementId String?
+  billingAgreement   BillingAgreement? @relation(fields: [billingAgreementId], references: [id], onDelete: SetNull)
 
-  tenantId                   String
-  tenant                     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2052,129 +2052,129 @@ model LabOrigin {
   @@index([tenantId, isActive])
   @@index([legalEntityId])
   @@index([billingAgreementId])
-  @@schema("public")
   @@map("lab_origins")
+  @@schema("public")
 }
 
 // ─── Billing ────────────────────────────────────────────
 
 model BillingConcept {
-  id               String   @id @default(uuid())
-  code             String
-  name             String
-  description      String?
-  referencePrice   Decimal  @db.Decimal(18, 2)
-  currency         String   @default("CLP")
+  id             String  @id @default(uuid())
+  code           String
+  name           String
+  description    String?
+  referencePrice Decimal @db.Decimal(18, 2)
+  currency       String  @default("CLP")
 
-  isActive         Boolean  @default(true)
-  deletedAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  agreementLines   BillingAgreementLine[]
+  agreementLines BillingAgreementLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
-  @@schema("public")
   @@map("billing_concepts")
+  @@schema("public")
 }
 
 model BillingAgreement {
-  id                     String                  @id @default(uuid())
-  code                   String
-  name                   String
+  id   String @id @default(uuid())
+  code String
+  name String
 
-  legalEntityId          String
-  legalEntity            LegalEntity             @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
 
-  status                 BillingAgreementStatus  @default(ACTIVE)
-  contractDate           DateTime?
-  effectiveFrom          DateTime?
-  effectiveTo            DateTime?
+  status        BillingAgreementStatus @default(ACTIVE)
+  contractDate  DateTime?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
 
-  paymentTerms           PaymentTerms            @default(NET_30)
-  customPaymentDays      Int?
-  billingDayOfMonth      Int?
-  isMonthlySettlement    Boolean                 @default(false)
-  billingModalities      BillingModality[]
+  paymentTerms        PaymentTerms      @default(NET_30)
+  customPaymentDays   Int?
+  billingDayOfMonth   Int?
+  isMonthlySettlement Boolean           @default(false)
+  billingModalities   BillingModality[]
 
-  examTypes              String[]
-  operationalFlags       Json?
+  examTypes        String[]
+  operationalFlags Json?
 
-  notes                  String?
-  isActive               Boolean                 @default(true)
-  deletedAt              DateTime?
-  createdAt              DateTime                @default(now())
-  updatedAt              DateTime                @updatedAt
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  tenantId               String
-  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  lines                  BillingAgreementLine[]
-  contacts               BillingContact[]
-  labOrigins             LabOrigin[]
+  lines      BillingAgreementLine[]
+  contacts   BillingContact[]
+  labOrigins LabOrigin[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([legalEntityId])
-  @@schema("public")
   @@map("billing_agreements")
+  @@schema("public")
 }
 
 model BillingAgreementLine {
-  id                  String           @id @default(uuid())
+  id String @id @default(uuid())
 
-  billingAgreementId  String
-  billingAgreement    BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+  billingAgreementId String
+  billingAgreement   BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
 
-  billingConceptId    String
-  billingConcept      BillingConcept   @relation(fields: [billingConceptId], references: [id], onDelete: Restrict)
+  billingConceptId String
+  billingConcept   BillingConcept @relation(fields: [billingConceptId], references: [id], onDelete: Restrict)
 
-  factor              Decimal          @default(1) @db.Decimal(8, 4)
-  negotiatedPrice     Decimal          @db.Decimal(18, 2)
-  referencePrice      Decimal?         @db.Decimal(18, 2)
-  currency            String           @default("CLP")
+  factor          Decimal  @default(1) @db.Decimal(8, 4)
+  negotiatedPrice Decimal  @db.Decimal(18, 2)
+  referencePrice  Decimal? @db.Decimal(18, 2)
+  currency        String   @default("CLP")
 
-  isActive            Boolean          @default(true)
-  deletedAt           DateTime?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  tenantId            String
+  tenantId String
 
   @@unique([billingAgreementId, billingConceptId])
   @@index([billingAgreementId])
   @@index([billingConceptId])
   @@index([tenantId])
-  @@schema("public")
   @@map("billing_agreement_lines")
+  @@schema("public")
 }
 
 model BillingContact {
-  id                    String           @id @default(uuid())
-  name                  String
-  role                  String?
-  email                 String?
-  phone                 String?
-  mobile                String?
-  isPrimary             Boolean          @default(false)
-  notes                 String?
-  isActive              Boolean          @default(true)
-  deletedAt             DateTime?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  id        String    @id @default(uuid())
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  mobile    String?
+  isPrimary Boolean   @default(false)
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  billingAgreementId    String
-  billingAgreement      BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
-  tenantId              String
+  billingAgreementId String
+  billingAgreement   BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+  tenantId           String
 
   @@index([billingAgreementId])
   @@index([tenantId])
-  @@schema("public")
   @@map("billing_contacts")
+  @@schema("public")
 }
 
 // ─── Projects & Tasks ────────────────────────────────────
@@ -2195,24 +2195,24 @@ model Project {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  tenantId    String
-  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdById String
-  createdBy   User    @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy   User   @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
 
-  members       ProjectMember[]
-  tasks         Task[]
-  taskViews     TaskView[]
-  labels        Label[]
-  taskStatuses  TaskStatusConfig[]
-  sections      ProjectSection[]
+  members      ProjectMember[]
+  tasks        Task[]
+  taskViews    TaskView[]
+  labels       Label[]
+  taskStatuses TaskStatusConfig[]
+  sections     ProjectSection[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
   @@index([tenantId, status])
-  @@schema("public")
   @@map("projects")
+  @@schema("public")
 }
 
 model ProjectMember {
@@ -2224,16 +2224,16 @@ model ProjectMember {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  userId    String
-  user      User    @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
 
-  tenantId  String
+  tenantId String
 
   @@unique([projectId, userId])
   @@index([userId])
   @@index([tenantId])
-  @@schema("public")
   @@map("project_members")
+  @@schema("public")
 }
 
 model ProjectSection {
@@ -2247,14 +2247,14 @@ model ProjectSection {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  tasks     Task[]
+  tasks Task[]
 
-  tenantId  String
+  tenantId String
 
   @@index([projectId])
   @@index([tenantId])
-  @@schema("public")
   @@map("project_sections")
+  @@schema("public")
 }
 
 model TaskStatusConfig {
@@ -2272,15 +2272,15 @@ model TaskStatusConfig {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  tasks     Task[]
+  tasks Task[]
 
-  tenantId  String
+  tenantId String
 
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_status_configs")
+  @@schema("public")
 }
 
 model Task {
@@ -2300,32 +2300,32 @@ model Task {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  projectId   String
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  statusId    String
-  status      TaskStatusConfig @relation(fields: [statusId], references: [id], onDelete: Restrict)
+  statusId String
+  status   TaskStatusConfig @relation(fields: [statusId], references: [id], onDelete: Restrict)
 
-  sectionId   String?
-  section     ProjectSection?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  sectionId String?
+  section   ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
 
-  parentId    String?
-  parent      Task?            @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  subtasks    Task[]           @relation("TaskHierarchy")
+  parentId String?
+  parent   Task?   @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks Task[]  @relation("TaskHierarchy")
 
   createdById String
-  createdBy   User             @relation("TasksCreated", fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy   User   @relation("TasksCreated", fields: [createdById], references: [id], onDelete: Restrict)
 
-  tenantId    String
+  tenantId String
 
-  assignees     TaskAssignee[]
-  labels        TaskLabel[]
-  comments      TaskComment[]
-  attachments   TaskAttachment[]
-  dependencies  TaskDependency[] @relation("DependentTask")
-  dependents    TaskDependency[] @relation("DependencyOf")
-  subscribers   TaskSubscriber[]
-  activities    TaskActivity[]
+  assignees    TaskAssignee[]
+  labels       TaskLabel[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+  dependencies TaskDependency[] @relation("DependentTask")
+  dependents   TaskDependency[] @relation("DependencyOf")
+  subscribers  TaskSubscriber[]
+  activities   TaskActivity[]
 
   @@unique([projectId, number])
   @@index([tenantId])
@@ -2333,46 +2333,46 @@ model Task {
   @@index([projectId, statusId])
   @@index([parentId])
   @@index([tenantId, dueDate])
-  @@schema("public")
   @@map("tasks")
+  @@schema("public")
 }
 
 model TaskAssignee {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  taskId    String
-  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  userId    String
-  user      User   @relation("TaskAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("TaskAssignments", fields: [userId], references: [id], onDelete: Cascade)
 
-  tenantId  String
+  tenantId String
 
   @@unique([taskId, userId])
   @@index([userId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_assignees")
+  @@schema("public")
 }
 
 model TaskSubscriber {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  taskId    String
-  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  userId    String
-  user      User   @relation("TaskSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("TaskSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
 
-  tenantId  String
+  tenantId String
 
   @@unique([taskId, userId])
   @@index([userId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_subscribers")
+  @@schema("public")
 }
 
 model TaskDependency {
@@ -2380,19 +2380,19 @@ model TaskDependency {
   dependencyType String   @default("BLOCKS")
   createdAt      DateTime @default(now())
 
-  taskId         String
-  task           Task   @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
 
-  dependsOnId    String
-  dependsOn      Task   @relation("DependencyOf", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  dependsOnId String
+  dependsOn   Task   @relation("DependencyOf", fields: [dependsOnId], references: [id], onDelete: Cascade)
 
-  tenantId       String
+  tenantId String
 
   @@unique([taskId, dependsOnId])
   @@index([dependsOnId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_dependencies")
+  @@schema("public")
 }
 
 model Label {
@@ -2407,33 +2407,33 @@ model Label {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  tasks     TaskLabel[]
+  tasks TaskLabel[]
 
-  tenantId  String
+  tenantId String
 
   @@unique([projectId, name])
   @@index([tenantId])
-  @@schema("public")
   @@map("labels")
+  @@schema("public")
 }
 
 model TaskLabel {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
-  taskId    String
-  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  labelId   String
-  label     Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
-  tenantId  String
+  tenantId String
 
   @@unique([taskId, labelId])
   @@index([labelId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_labels")
+  @@schema("public")
 }
 
 model TaskComment {
@@ -2445,39 +2445,42 @@ model TaskComment {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  taskId      String
-  task        Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  authorId    String
-  author      User    @relation("TaskComments", fields: [authorId], references: [id], onDelete: Restrict)
+  authorId String
+  author   User   @relation("TaskComments", fields: [authorId], references: [id], onDelete: Restrict)
 
-  parentId    String?
-  parent      TaskComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
-  replies     TaskComment[] @relation("CommentThread")
+  parentId String?
+  parent   TaskComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  TaskComment[] @relation("CommentThread")
 
-  reactions   TaskCommentReaction[]
+  reactions TaskCommentReaction[]
 
-  tenantId    String
+  tenantId String
 
   @@index([taskId, createdAt])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_comments")
+  @@schema("public")
 }
 
 model TaskCommentReaction {
-  id        String @id @default(uuid())
-  emoji     String
+  id    String @id @default(uuid())
+  emoji String
 
   commentId String
   comment   TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
-  userId    String
-  user      User   @relation("TaskCommentReactions", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("TaskCommentReactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
 
   @@unique([commentId, userId, emoji])
-  @@schema("public")
+  @@index([tenantId])
   @@map("task_comment_reactions")
+  @@schema("public")
 }
 
 model TaskActivity {
@@ -2486,40 +2489,40 @@ model TaskActivity {
   data      Json?
   createdAt DateTime @default(now())
 
-  taskId    String
-  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  actorId   String?
-  actor     User?  @relation("TaskActivities", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+  actor   User?   @relation("TaskActivities", fields: [actorId], references: [id], onDelete: SetNull)
 
-  tenantId  String
+  tenantId String
 
   @@index([taskId, createdAt])
   @@index([tenantId, createdAt])
-  @@schema("public")
   @@map("task_activities")
+  @@schema("public")
 }
 
 model TaskAttachment {
-  id          String   @id @default(uuid())
-  name        String
-  s3Key       String
-  mimeType    String
-  sizeBytes   Int
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
 
-  taskId      String
-  task        Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   uploadedById String
   uploadedBy   User   @relation("TaskAttachments", fields: [uploadedById], references: [id], onDelete: Restrict)
 
-  tenantId    String
+  tenantId String
 
   @@index([taskId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_attachments")
+  @@schema("public")
 }
 
 model TaskView {
@@ -2535,18 +2538,18 @@ model TaskView {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  projectId   String
-  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   createdById String?
   createdBy   User?   @relation("TaskViewsCreated", fields: [createdById], references: [id], onDelete: SetNull)
 
-  tenantId    String
+  tenantId String
 
   @@index([projectId])
   @@index([tenantId])
-  @@schema("public")
   @@map("task_views")
+  @@schema("public")
 }
 
 // ─── FileMaker Connector ─────────────────────────────────
@@ -2561,48 +2564,48 @@ enum FmSyncStatus {
 }
 
 model FmSyncRecord {
-  id          String       @id @default(uuid())
-  tenantId    String
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  entityType  String
-  entityId    String
+  entityType String
+  entityId   String
 
-  fmDatabase  String
-  fmLayout    String
-  fmRecordId  String
-  fmModId     String?
+  fmDatabase String
+  fmLayout   String
+  fmRecordId String
+  fmModId    String?
 
-  syncStatus  FmSyncStatus @default(SYNCED)
-  lastSyncAt  DateTime     @default(now())
-  syncError   String?
-  retryCount  Int          @default(0)
+  syncStatus FmSyncStatus @default(SYNCED)
+  lastSyncAt DateTime     @default(now())
+  syncError  String?
+  retryCount Int          @default(0)
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tenantId, entityType, entityId])
   @@unique([tenantId, fmDatabase, fmLayout, fmRecordId, entityType])
   @@index([syncStatus])
-  @@schema("citolab_fm")
   @@map("fm_sync_records")
+  @@schema("citolab_fm")
 }
 
 model FmSyncLog {
-  id          String   @id @default(uuid())
-  tenantId    String
-  entityType  String
-  entityId    String?
-  fmRecordId  String?
-  action      String
-  direction   String
-  details     Json?
-  error       String?
-  duration    Int?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  tenantId   String
+  entityType String
+  entityId   String?
+  fmRecordId String?
+  action     String
+  direction  String
+  details    Json?
+  error      String?
+  duration   Int?
+  createdAt  DateTime @default(now())
 
   @@index([tenantId, createdAt])
   @@index([entityType, action])
-  @@schema("citolab_fm")
   @@map("fm_sync_logs")
+  @@schema("citolab_fm")
 }
