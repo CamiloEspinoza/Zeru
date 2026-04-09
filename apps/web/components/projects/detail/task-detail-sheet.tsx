@@ -12,6 +12,7 @@ import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars
 import { TaskComments } from "./task-comments";
 import { TaskDetailTitle } from "./task-detail-title";
 import { TaskDetailDescription } from "./task-detail-description";
+import { TaskActivityFeed } from "./task-activity-feed";
 import { useTaskPresence } from "@/hooks/use-task-presence";
 import { TaskPresenceAvatars } from "@/components/projects/task-presence-avatars";
 
@@ -83,6 +84,11 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
               {displayTask.id && (
                 <div className="border-t pt-6">
                   <TaskComments taskId={displayTask.id} />
+                </div>
+              )}
+              {displayTask.id && (
+                <div className="border-t pt-6">
+                  <TaskActivityFeed taskId={displayTask.id} />
                 </div>
               )}
             </div>
