@@ -110,7 +110,7 @@ export function OrgChartCanvas() {
   const { savedViewport, onMoveEnd } = useViewportPersistence();
 
   /* ----- Enrich nodes with expand/collapse data ----- */
-  const enrichedNodes = useMemo(() => {
+  const enrichedNodes = useMemo<OrgNode[]>(() => {
     return styledNodes.map((node) => ({
       ...node,
       data: {
@@ -142,7 +142,7 @@ export function OrgChartCanvas() {
 
   /* ----- onInit: restore viewport or fit view ----- */
   const handleInit = useCallback(
-    (instance: ReactFlowInstance) => {
+    (instance: ReactFlowInstance<OrgNode>) => {
       if (savedViewport) {
         instance.setViewport(savedViewport);
       } else {
