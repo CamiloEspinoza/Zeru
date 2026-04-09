@@ -47,8 +47,26 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
   }, [taskId]);
 
   useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    let cancelled = false;
+    setLoading(true);
+    tasksApi
+      .listComments(taskId)
+      .then((data) => {
+        if (cancelled) return;
+        setComments(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Error loading comments:", err);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

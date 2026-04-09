@@ -28,8 +28,32 @@ export function useTaskDetail(taskId: string | null) {
   }, [taskId]);
 
   useEffect(() => {
-    refetch();
-  }, [refetch]);
+    let cancelled = false;
+    if (!taskId) {
+      setTask(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    tasksApi
+      .getById(taskId)
+      .then((data) => {
+        if (cancelled) return;
+        setTask(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Error al cargar tarea");
+        setTask(null);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   return { task, loading, error, refetch };
 }
