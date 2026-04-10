@@ -5,7 +5,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  schemas  = ["public", "citolab_fm"]
+  schemas  = ["public", "citolab_fm", "mod_lab"]
 }
 
 enum PaymentTerms {
@@ -2609,4 +2609,794 @@ model FmSyncLog {
   @@index([entityType, action])
   @@map("fm_sync_logs")
   @@schema("citolab_fm")
+}
+
+// ─── mod_lab Enums ──────────────────────────────────────
+
+enum FmSource {
+  BIOPSIAS
+  BIOPSIASRESPALDO
+  PAPANICOLAOU
+  PAPANICOLAOUHISTORICO
+
+  @@schema("mod_lab")
+}
+
+enum ExamCategory {
+  BIOPSY
+  PAP
+  CYTOLOGY
+  IMMUNOHISTOCHEMISTRY
+  MOLECULAR
+  OTHER_EXAM
+
+  @@schema("mod_lab")
+}
+
+enum Priority {
+  ROUTINE
+  URGENT
+  ASAP
+
+  @@schema("mod_lab")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER_GENDER
+  UNKNOWN
+
+  @@schema("mod_lab")
+}
+
+enum PractitionerRole {
+  PATHOLOGIST
+  MEDICAL_TECH
+  CYTOTECHNOLOGIST
+  REQUESTING_PHYSICIAN
+  RECEPTION
+  LAB_TECHNICIAN
+  SECRETARY
+  COURIER
+  OTHER_ROLE
+
+  @@schema("mod_lab")
+}
+
+enum SigningRole {
+  PRIMARY_PATHOLOGIST
+  CO_PATHOLOGIST
+  SUPERVISING_PATHOLOGIST
+  EXTERNAL_CONSULTANT
+  SCREENING_TECH
+  SUPERVISING_TECH
+  VISTO_BUENO_TECH
+  VALIDATION_CORRECTION
+  QC_REVIEWER
+  OTHER_SIGNING
+
+  @@schema("mod_lab")
+}
+
+enum SpecimenStatus {
+  RECEIVED_SPECIMEN
+  PROCESSING_SPECIMEN
+  EMBEDDED
+  CUT
+  STAINED
+  ARCHIVED
+  DISCARDED
+
+  @@schema("mod_lab")
+}
+
+enum DiagnosticReportStatus {
+  REGISTERED
+  IN_TRANSIT
+  RECEIVED_STATUS
+  PROCESSING_STATUS
+  REPORTING
+  PRE_VALIDATED
+  VALIDATED_REPORT
+  SIGNED
+  DELIVERED
+  DOWNLOADED
+  CANCELLED_REPORT
+  AMENDED
+
+  @@schema("mod_lab")
+}
+
+enum WorkflowEventType {
+  ORIGIN_INTAKE
+  ORIGIN_HANDOFF_TO_COURIER
+  TRANSPORT
+  RECEIVED_AT_LAB
+  MACROSCOPY
+  EMBEDDING
+  CUTTING_STAINING
+  HISTOLOGY_REPORTING
+  VALIDATION
+  APPROVAL
+  DELIVERY
+  INTAKE
+  PROCESSING_EVENT
+  DIAGNOSIS_TRANSCRIPTION
+  PRE_VALIDATION
+  SECRETARY_VALIDATION
+  PATHOLOGIST_APPROVAL_WEB
+  WEB_VALIDATION
+  PDF_GENERATED
+  WEB_DELIVERY
+  WEB_TRANSPORT
+  WEB_RECEPTION
+  WEB_EXAM_CYTOLOGY
+  WEB_DOWNLOAD
+  WEB_ACKNOWLEDGMENT
+  CLIENT_NOTIFIED
+  CASE_CORRECTION
+  AMENDMENT
+  CRITICAL_NOTIFICATION
+  OTHER_EVENT
+
+  @@schema("mod_lab")
+}
+
+enum ObservationCategory {
+  DIAGNOSIS
+  DIFFERENTIAL
+  FINDING
+  MARKER
+  RECOMMENDATION
+
+  @@schema("mod_lab")
+}
+
+enum CommunicationCategory {
+  SAMPLE_QUALITY_ISSUE
+  ADDITIONAL_INFO_REQUEST
+  INTERNAL_QC
+  CRITICAL_RESULT
+  CLIENT_INQUIRY
+  CORRECTION_REQUEST
+  OTHER_COMM
+
+  @@schema("mod_lab")
+}
+
+enum AttachmentCategory {
+  REPORT_PDF
+  CRITICAL_NOTIFICATION_PDF
+  MACRO_PHOTO
+  MICRO_PHOTO
+  ENCAPSULATION_PHOTO
+  MACRO_DICTATION
+  DIAGNOSIS_MODIFICATION
+  SCANNER_CARTON
+  REQUEST_DOCUMENT
+  MOLECULAR_CONTAINER
+  ADVERSE_EVENT_PHOTO
+  OTHER_ATTACHMENT
+
+  @@schema("mod_lab")
+}
+
+enum AttachmentMigrationStatus {
+  PENDING_MIGRATION
+  DOWNLOADING
+  UPLOADED
+  FAILED_MIGRATION
+  SKIPPED
+
+  @@schema("mod_lab")
+}
+
+enum LabExamChargeSource {
+  BIOPSIAS_INGRESOS
+  PAP_INGRESOS
+
+  @@schema("mod_lab")
+}
+
+enum LabPaymentMethod {
+  LAB_CASH
+  LAB_BANK_TRANSFER
+  LAB_CHECK
+  LAB_VOUCHER
+  LAB_CREDIT_CARD
+  LAB_DEBIT_CARD
+  LAB_AGREEMENT
+  LAB_PENDING_PAYMENT
+  OTHER_PAYMENT
+
+  @@schema("mod_lab")
+}
+
+enum LabChargeStatus {
+  REGISTERED_CHARGE
+  VALIDATED_CHARGE
+  INVOICED_CHARGE
+  PAID_CHARGE
+  CANCELLED_CHARGE
+  REVERSED
+
+  @@schema("mod_lab")
+}
+
+enum LiquidationStatus {
+  DRAFT_LIQ
+  CONFIRMED
+  INVOICED_LIQ
+  PARTIALLY_PAID
+  PAID_LIQ
+  OVERDUE
+  CANCELLED_LIQ
+
+  @@schema("mod_lab")
+}
+
+enum RendicionType {
+  BIOPSY_DIRECT
+  PAP_DIRECT
+  MIXED
+
+  @@schema("mod_lab")
+}
+
+enum DirectPaymentStatus {
+  OPEN_DPB
+  RENDIDA
+  RECONCILED
+  CANCELLED_DPB
+
+  @@schema("mod_lab")
+}
+
+enum AdverseSeverity {
+  MINOR_SEV
+  MODERATE_SEV
+  MAJOR_SEV
+  CRITICAL_SEV
+
+  @@schema("mod_lab")
+}
+
+enum AdverseStatus {
+  OPEN_ADV
+  INVESTIGATING
+  RESOLVED
+  CLOSED_ADV
+
+  @@schema("mod_lab")
+}
+
+// ─── mod_lab Models ─────────────────────────────────────
+
+model LabPatient {
+  id               String    @id @default(uuid())
+  tenantId         String
+  rut              String?
+  firstName        String
+  paternalLastName String
+  maternalLastName String?
+  birthDate        DateTime?
+  gender           Gender?
+  email            String?
+  phone            String?
+  address          String?
+  commune          String?
+  city             String?
+  needsMerge       Boolean   @default(false)
+  mergedIntoId     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  serviceRequests LabServiceRequest[]
+
+  @@unique([tenantId, rut])
+  @@index([tenantId, paternalLastName, firstName])
+  @@index([tenantId, needsMerge])
+  @@map("lab_patients")
+  @@schema("mod_lab")
+}
+
+model LabPractitioner {
+  id               String             @id @default(uuid())
+  tenantId         String
+  rut              String?
+  firstName        String
+  paternalLastName String
+  maternalLastName String?
+  roles            PractitionerRole[]
+  isInternal       Boolean            @default(false)
+  code             String?
+  licenseNumber    String?
+  specialty        String?
+  email            String?
+  phone            String?
+  institutionId    String?
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([tenantId, rut])
+  @@unique([tenantId, code])
+  @@index([tenantId, paternalLastName, firstName])
+  @@map("lab_practitioners")
+  @@schema("mod_lab")
+}
+
+model LabServiceRequest {
+  id                      String       @id @default(uuid())
+  tenantId                String
+  fmInformeNumber         Int
+  fmSource                FmSource
+  subjectFirstName        String
+  subjectPaternalLastName String
+  subjectMaternalLastName String?
+  subjectRut              String?
+  subjectAge              Int?
+  subjectId               String?
+  patient                 LabPatient?  @relation(fields: [subjectId], references: [id])
+  category                ExamCategory
+  subcategory             String?
+  priority                Priority     @default(ROUTINE)
+  requestingPhysicianName String?
+  requestingPhysicianId   String?
+  labOriginId             String
+  labOriginCodeSnapshot   String
+  sampleCollectedAt       DateTime?
+  receivedAt              DateTime?
+  requestedAt             DateTime?
+  clinicalHistory         String?      @db.Text
+  muestraDe               String?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  deletedAt               DateTime?
+
+  specimens         LabSpecimen[]
+  diagnosticReports LabDiagnosticReport[]
+
+  @@unique([tenantId, fmSource, fmInformeNumber])
+  @@index([tenantId, labOriginId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, category, receivedAt])
+  @@index([tenantId, subjectRut])
+  @@map("lab_service_requests")
+  @@schema("mod_lab")
+}
+
+model LabSpecimen {
+  id               String            @id @default(uuid())
+  tenantId         String
+  serviceRequestId String
+  serviceRequest   LabServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  containerLabel   String?
+  sequenceNumber   Int
+  anatomicalSite   String?
+  muestraDeText    String?
+  collectedAt      DateTime?
+  receivedAt       DateTime?
+  status           SpecimenStatus    @default(RECEIVED_SPECIMEN)
+  tacoCode         String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  slides LabSlide[]
+
+  @@index([tenantId, serviceRequestId])
+  @@map("lab_specimens")
+  @@schema("mod_lab")
+}
+
+model LabSlide {
+  id         String      @id @default(uuid())
+  tenantId   String
+  specimenId String
+  specimen   LabSpecimen @relation(fields: [specimenId], references: [id])
+  placaCode  String?
+  stain      String?
+  level      Int?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([tenantId, specimenId])
+  @@map("lab_slides")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReport {
+  id                        String                 @id @default(uuid())
+  tenantId                  String
+  serviceRequestId          String
+  serviceRequest            LabServiceRequest      @relation(fields: [serviceRequestId], references: [id])
+  fmInformeNumber           Int
+  fmSource                  FmSource
+  status                    DiagnosticReportStatus
+  currentStageOwnerId       String?
+  primarySignerId           String?
+  primarySignerCodeSnapshot String?
+  conclusion                String?                @db.Text
+  fullText                  String?                @db.Text
+  microscopicDescription    String?                @db.Text
+  macroscopicDescription    String?                @db.Text
+  clinicalComments          String?                @db.Text
+  isUrgent                  Boolean                @default(false)
+  isAlteredOrCritical       Boolean                @default(false)
+  criticalNotified          Boolean                @default(false)
+  validatedAt               DateTime?
+  issuedAt                  DateTime?
+  deliveredAt               DateTime?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  deletedAt                 DateTime?
+
+  signers               LabDiagnosticReportSigner[]
+  observations          LabObservation[]
+  workflowEvents        LabExamWorkflowEvent[]
+  communications        LabCommunication[]
+  adverseEvents         LabAdverseEvent[]
+  technicalObservations LabTechnicalObservation[]
+  attachments           LabDiagnosticReportAttachment[]
+  examCharges           LabExamCharge[]
+
+  @@unique([tenantId, fmSource, fmInformeNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, validatedAt])
+  @@index([tenantId, primarySignerId])
+  @@index([tenantId, isUrgent, isAlteredOrCritical])
+  @@map("lab_diagnostic_reports")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReportSigner {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  diagnosticReportId String
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  practitionerId     String?
+  codeSnapshot       String
+  nameSnapshot       String
+  roleSnapshot       String?
+  role               SigningRole
+  signatureOrder     Int
+  signedAt           DateTime
+  isActive           Boolean             @default(true)
+  supersededBy       String?
+  correctionReason   String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, practitionerId])
+  @@index([tenantId, role])
+  @@map("lab_diagnostic_report_signers")
+  @@schema("mod_lab")
+}
+
+model LabObservation {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  diagnosticReportId String
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  code               String
+  codeSystem         String
+  display            String
+  category           ObservationCategory
+  severity           String?
+  interpretation     String?
+  specimenId         String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, code])
+  @@map("lab_observations")
+  @@schema("mod_lab")
+}
+
+model LabExamWorkflowEvent {
+  id                      String              @id @default(uuid())
+  tenantId                String
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  eventType               WorkflowEventType
+  sequenceOrder           Int?
+  occurredAt              DateTime
+  performedById           String?
+  performedByNameSnapshot String
+  location                String?
+  notes                   String?
+  sourceField             String
+  createdAt               DateTime            @default(now())
+
+  @@index([tenantId, diagnosticReportId, occurredAt])
+  @@index([tenantId, eventType, occurredAt])
+  @@map("lab_exam_workflow_events")
+  @@schema("mod_lab")
+}
+
+model LabCommunication {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id])
+  subjectPatientId        String?
+  reason                  String?
+  content                 String                 @db.Text
+  response                String?                @db.Text
+  loggedAt                DateTime
+  loggedById              String?
+  loggedByNameSnapshot    String
+  respondedAt             DateTime?
+  respondedById           String?
+  respondedByNameSnapshot String?
+  category                CommunicationCategory?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  deletedAt               DateTime?
+
+  @@index([tenantId, diagnosticReportId, loggedAt])
+  @@index([tenantId, category])
+  @@map("lab_communications")
+  @@schema("mod_lab")
+}
+
+model LabAdverseEvent {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String?
+  diagnosticReport       LabDiagnosticReport? @relation(fields: [diagnosticReportId], references: [id])
+  eventType              String
+  severity               AdverseSeverity
+  description            String               @db.Text
+  occurredAt             DateTime
+  detectedAt             DateTime?
+  reportedAt             DateTime?
+  reportedByNameSnapshot String
+  reportedById           String?
+  correctiveAction       String?              @db.Text
+  resolvedAt             DateTime?
+  resolvedById           String?
+  status                 AdverseStatus        @default(OPEN_ADV)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  deletedAt              DateTime?
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, severity, status])
+  @@map("lab_adverse_events")
+  @@schema("mod_lab")
+}
+
+model LabTechnicalObservation {
+  id                     String              @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String
+  diagnosticReport       LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  workflowStage          WorkflowEventType?
+  description            String              @db.Text
+  observedAt             DateTime
+  observedByNameSnapshot String
+  observedById           String?
+  createdAt              DateTime            @default(now())
+
+  @@index([tenantId, diagnosticReportId])
+  @@map("lab_technical_observations")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReportAttachment {
+  id                     String                    @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String
+  diagnosticReport       LabDiagnosticReport       @relation(fields: [diagnosticReportId], references: [id])
+  category               AttachmentCategory
+  label                  String?
+  sequenceOrder          Int?
+  s3Bucket               String
+  s3Key                  String
+  contentType            String
+  sizeBytes              Int?
+  checksum               String?
+  fmSourceField          String
+  fmContainerUrlOriginal String?
+  citolabS3KeyOriginal   String?
+  migrationStatus        AttachmentMigrationStatus @default(PENDING_MIGRATION)
+  migrationError         String?
+  migrationAttempts      Int                       @default(0)
+  migratedAt             DateTime?
+  adverseEventId         String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([migrationStatus])
+  @@map("lab_diagnostic_report_attachments")
+  @@schema("mod_lab")
+}
+
+model LabExamCharge {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  fmSource                LabExamChargeSource
+  fmRecordPk              Int
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id])
+  billingConceptId        String?
+  feeCodesText            String?
+  feeCodes                String[]
+  paymentMethod           LabPaymentMethod
+  amount                  Decimal                @db.Decimal(14, 4)
+  currency                String                 @default("CLP")
+  status                  LabChargeStatus
+  labOriginId             String
+  labOriginCodeSnapshot   String
+  legalEntityId           String?
+  liquidationId           String?
+  liquidation             LabLiquidation?        @relation(fields: [liquidationId], references: [id])
+  directPaymentBatchId    String?
+  directPaymentBatch      LabDirectPaymentBatch? @relation(fields: [directPaymentBatchId], references: [id])
+  enteredAt               DateTime
+  enteredByNameSnapshot   String
+  enteredById             String?
+  pointOfEntry            String?
+  validatedAt             DateTime?
+  validatedByNameSnapshot String?
+  validatedById           String?
+  cancelledAt             DateTime?
+  cancelledByNameSnapshot String?
+  cancelReason            String?
+  notes                   String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  deletedAt               DateTime?
+
+  @@unique([tenantId, fmSource, fmRecordPk])
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, liquidationId])
+  @@index([tenantId, directPaymentBatchId])
+  @@index([tenantId, status])
+  @@index([tenantId, labOriginId, enteredAt])
+  @@index([tenantId, legalEntityId, enteredAt])
+  @@map("lab_exam_charges")
+  @@schema("mod_lab")
+}
+
+model LabLiquidation {
+  id                      String            @id @default(uuid())
+  tenantId                String
+  fmRecordId              String
+  fmPk                    Int?
+  legalEntityId           String
+  billingAgreementId      String?
+  period                  DateTime
+  periodLabel             String
+  totalAmount             Decimal           @db.Decimal(14, 2)
+  biopsyAmount            Decimal           @db.Decimal(14, 2)
+  papAmount               Decimal           @db.Decimal(14, 2)
+  cytologyAmount          Decimal           @db.Decimal(14, 2)
+  immunoAmount            Decimal           @db.Decimal(14, 2)
+  biopsyCount             Int
+  papCount                Int
+  cytologyCount           Int
+  immunoCount             Int
+  previousDebt            Decimal           @default(0) @db.Decimal(14, 2)
+  creditBalance           Decimal           @default(0) @db.Decimal(14, 2)
+  status                  LiquidationStatus
+  confirmedAt             DateTime?
+  confirmedByNameSnapshot String?
+  invoiceNumber           String?
+  invoiceType             String?
+  invoiceDate             DateTime?
+  paymentAmount           Decimal?          @db.Decimal(14, 2)
+  paymentDate             DateTime?
+  paymentMethodText       String?
+  liquidationPdfKey       String?
+  invoicePdfKey           String?
+  notes                   String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  deletedAt               DateTime?
+
+  charges LabExamCharge[]
+
+  @@unique([tenantId, fmRecordId])
+  @@index([tenantId, legalEntityId, period])
+  @@index([tenantId, status])
+  @@index([tenantId, period])
+  @@map("lab_liquidations")
+  @@schema("mod_lab")
+}
+
+model LabDirectPaymentBatch {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  fmRecordId            String?
+  fmPk                  Int?
+  period                DateTime
+  periodFrom            DateTime?
+  periodTo              DateTime?
+  legalEntityId         String?
+  rendicionType         RendicionType
+  totalAmount           Decimal             @db.Decimal(14, 2)
+  chargeCount           Int
+  rendidoByNameSnapshot String?
+  rendidoById           String?
+  rendidoAt             DateTime?
+  status                DirectPaymentStatus
+  receiptNumber         String?
+  receiptDate           DateTime?
+  receiptPdfKey         String?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+
+  charges LabExamCharge[]
+
+  @@unique([tenantId, fmRecordId])
+  @@index([tenantId, period, rendicionType])
+  @@index([tenantId, legalEntityId])
+  @@map("lab_direct_payment_batches")
+  @@schema("mod_lab")
+}
+
+model LabImportRun {
+  id               String     @id @default(uuid())
+  tenantId         String
+  sources          FmSource[]
+  dateFrom         DateTime?
+  dateTo           DateTime?
+  batchSize        Int        @default(100)
+  status           String     @default("PENDING")
+  phase            String?
+  totalBatches     Int        @default(0)
+  completedBatches Int        @default(0)
+  failedBatches    Int        @default(0)
+  totalRecords     Int        @default(0)
+  processedRecords Int        @default(0)
+  errorRecords     Int        @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  batches LabImportBatch[]
+
+  @@index([tenantId, status])
+  @@map("lab_import_runs")
+  @@schema("mod_lab")
+}
+
+model LabImportBatch {
+  id             String       @id @default(uuid())
+  runId          String
+  run            LabImportRun @relation(fields: [runId], references: [id])
+  phase          String
+  fmSource       FmSource
+  batchIndex     Int
+  offset         Int
+  limit          Int
+  status         String       @default("PENDING")
+  recordCount    Int          @default(0)
+  processedCount Int          @default(0)
+  errorCount     Int          @default(0)
+  errors         Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([runId, status])
+  @@map("lab_import_batches")
+  @@schema("mod_lab")
 }
