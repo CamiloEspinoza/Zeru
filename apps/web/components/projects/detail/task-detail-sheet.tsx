@@ -18,6 +18,7 @@ import { TaskPrioritySelect } from "./task-priority-select";
 import { TaskAssigneeSelect } from "./task-assignee-select";
 import { TaskDueDatePicker } from "./task-due-date-picker";
 import { TaskLabelSelect } from "./task-label-select";
+import { TaskCustomProperties } from "@/components/projects/properties/task-custom-properties";
 import { useTaskPresence } from "@/hooks/use-task-presence";
 import { useMemo, useCallback } from "react";
 
@@ -135,6 +136,16 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                   onUpdated={handleRefetch}
                 />
               </TaskPropertyRow>
+
+              {/* Custom Properties */}
+              {displayTask.projectId && (
+                <div className="mt-2 border-t border-border/50 pt-2">
+                  <TaskCustomProperties
+                    taskId={displayTask.id}
+                    projectId={displayTask.projectId}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Content */}

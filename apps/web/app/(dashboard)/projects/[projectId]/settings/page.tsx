@@ -36,6 +36,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import type { TaskStatusConfig, ProjectMember, Label } from "@/types/projects";
+import { PropertyDefinitionList } from "@/components/projects/properties/property-definition-list";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
 
@@ -709,6 +710,19 @@ export default function ProjectSettingsPage({
               ))
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Custom Properties */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Propiedades personalizadas</CardTitle>
+          <CardDescription>
+            Campos adicionales tipo Notion para las tareas de este tablero
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PropertyDefinitionList projectId={projectId} />
         </CardContent>
       </Card>
 
