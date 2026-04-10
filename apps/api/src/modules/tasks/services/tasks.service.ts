@@ -489,6 +489,7 @@ export class TasksService {
       userId,
       fromSectionId: existing.sectionId,
       toSectionId: dto.sectionId ?? existing.sectionId,
+      statusId: dto.statusId,
       position: dto.position,
       version: task.version,
       task,
