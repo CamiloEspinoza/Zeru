@@ -63,8 +63,20 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
       }),
     }),
     BullModule.registerQueue(
-      { name: LAB_IMPORT_QUEUE },
-      { name: ATTACHMENT_MIGRATION_QUEUE },
+      {
+        name: LAB_IMPORT_QUEUE,
+        defaultJobOptions: {
+          attempts: 5,
+          backoff: { type: 'exponential', delay: 2000 },
+        },
+      },
+      {
+        name: ATTACHMENT_MIGRATION_QUEUE,
+        defaultJobOptions: {
+          attempts: 10,
+          backoff: { type: 'exponential', delay: 5000 },
+        },
+      },
     ),
   ],
   controllers: [

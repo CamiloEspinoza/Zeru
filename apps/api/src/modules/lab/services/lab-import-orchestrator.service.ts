@@ -47,6 +47,11 @@ export class LabImportOrchestratorService {
     private readonly attachmentQueue: Queue,
   ) {}
 
+  // TODO: Add Phase 0 for practitioners import. Currently, LabPractitioner records
+  // are NOT populated during import. Practitioners referenced by signers (via codeSnapshot)
+  // and requesting physicians (via name) are not resolved to LabPractitioner records.
+  // A dedicated phase or on-the-fly upsert in exams-batch.handler should be added.
+
   /**
    * Start a new import run. Creates LabImportRun, queries FM for counts,
    * partitions into batches, enqueues Phase 1 (exams) jobs.
@@ -173,13 +178,20 @@ export class LabImportOrchestratorService {
     const run = await this.prisma.labImportRun.findUnique({
       where: { id: runId },
     });
-    if (!run) return;
+    if (!run || run.status !== 'RUNNING') return;
 
     const pendingBatches = await this.prisma.labImportBatch.count({
       where: { runId, phase: run.phase, status: { in: ['PENDING', 'RUNNING'] } },
     });
 
     if (pendingBatches > 0) return; // Not all jobs done yet
+
+    // Atomic compare-and-swap: only the first worker to reach this point advances the phase
+    const result = await this.prisma.labImportRun.updateMany({
+      where: { id: runId, status: 'RUNNING', phase: run.phase },
+      data: { updatedAt: new Date() },
+    });
+    if (result.count === 0) return; // Another worker already advanced
 
     const currentPhase = run.phase;
     this.logger.log(`Phase ${currentPhase} complete for run ${runId}. Advancing...`);
@@ -470,9 +482,9 @@ export class LabImportOrchestratorService {
   /**
    * Get run status with batch summary.
    */
-  async getRunStatus(runId: string) {
-    return this.prisma.labImportRun.findUnique({
-      where: { id: runId },
+  async getRunStatus(runId: string, tenantId?: string) {
+    return this.prisma.labImportRun.findFirst({
+      where: { id: runId, ...(tenantId ? { tenantId } : {}) },
       include: {
         batches: {
           select: {

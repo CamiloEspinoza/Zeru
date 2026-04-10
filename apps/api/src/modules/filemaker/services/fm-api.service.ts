@@ -40,6 +40,7 @@ export class FmApiService {
         Authorization: `Bearer ${token}`,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: AbortSignal.timeout(30000),
     });
 
     // Auto-refresh on 401

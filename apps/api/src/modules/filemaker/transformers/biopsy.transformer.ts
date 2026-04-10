@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path } from './helpers';
+import { str, parseNum, parseDate, encodeS3Path, isYes } from './helpers';
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -107,7 +107,7 @@ export class BiopsyTransformer {
       fullText: str(d['TEXTO BIOPSIAS::TEXTO']) || null,
       microscopicDescription: null,
       macroscopicDescription: null,
-      isAlteredOrCritical: !!str(d['Alterado o Crítico']),
+      isAlteredOrCritical: isYes(str(d['Alterado o Crítico'])),
       validatedAt,
       issuedAt: validatedAt,
 

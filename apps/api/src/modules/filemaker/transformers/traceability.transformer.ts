@@ -42,7 +42,7 @@ export class TraceabilityTransformer {
   }): Record<string, unknown> {
     return {
       'Trazabilidad::Responsable_Macroscopía': data.performedByNameSnapshot,
-      'Trazabilidad::Fecha_Macroscopia': formatFmDate(data.occurredAt),
+      'Trazabilidad::Fecha_Macroscopía': formatFmDate(data.occurredAt),
     };
   }
 

@@ -3,6 +3,7 @@ import { AttachmentDownloadProcessor } from './attachment-download.processor';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
+import { FmAuthService } from '../../filemaker/services/fm-auth.service';
 
 describe('AttachmentDownloadProcessor', () => {
   let processor: AttachmentDownloadProcessor;
@@ -37,6 +38,7 @@ describe('AttachmentDownloadProcessor', () => {
           },
         },
         { provide: FmApiService, useValue: {} },
+        { provide: FmAuthService, useValue: { getToken: jest.fn().mockResolvedValue('mock-token') } },
         {
           provide: 'CITOLAB_S3_CONFIG',
           useValue: { bucket: 'archivos-citolab-virginia', region: 'us-east-1' },
@@ -181,6 +183,18 @@ describe('AttachmentDownloadProcessor', () => {
   });
 
   it('downloads from FM container when fmContainerUrl is provided', async () => {
+    // Mock the additional findUnique call for resolving fmSource
+    prisma.labDiagnosticReportAttachment.findUnique.mockResolvedValue({
+      id: 'att-1',
+      tenantId: 'tenant-1',
+      s3Key: 'photos/photo1.jpg',
+      fmContainerUrlOriginal: 'https://fm.example.com/Streaming_SSL/photo1.jpg',
+      citolabS3KeyOriginal: null,
+      migrationStatus: 'PENDING_MIGRATION',
+      migrationAttempts: 0,
+      diagnosticReport: { fmSource: 'BIOPSIAS' },
+    });
+
     jest.spyOn(processor, 'downloadFromFmContainer').mockResolvedValue({
       buffer: Buffer.from('fake-image'),
       contentType: 'image/jpeg',
@@ -201,6 +215,7 @@ describe('AttachmentDownloadProcessor', () => {
 
     expect(processor.downloadFromFmContainer).toHaveBeenCalledWith(
       'https://fm.example.com/Streaming_SSL/photo1.jpg',
+      'BIOPSIAS',
     );
     expect(s3Service.upload).toHaveBeenCalledWith(
       'tenant-1',

@@ -14,9 +14,11 @@ describe('LabLiquidationService', () => {
       labLiquidation: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
 
@@ -120,13 +122,14 @@ describe('LabLiquidationService', () => {
       id: 'liq-1',
       status: 'DRAFT_LIQ',
     });
-    prisma.labLiquidation.update.mockResolvedValue({ id: 'liq-1' });
+    prisma.labLiquidation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.labLiquidation.findUniqueOrThrow.mockResolvedValue({ id: 'liq-1' });
 
     await service.confirm('liq-1', 'tenant-1', {
       confirmedByNameSnapshot: 'Admin',
     });
 
-    expect(prisma.labLiquidation.update).toHaveBeenCalledWith(
+    expect(prisma.labLiquidation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'CONFIRMED' }),
       }),
@@ -154,14 +157,15 @@ describe('LabLiquidationService', () => {
       id: 'liq-1',
       status: 'CONFIRMED',
     });
-    prisma.labLiquidation.update.mockResolvedValue({ id: 'liq-1' });
+    prisma.labLiquidation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.labLiquidation.findUniqueOrThrow.mockResolvedValue({ id: 'liq-1' });
 
     await service.invoice('liq-1', 'tenant-1', {
       invoiceNumber: 'FAC-001',
       invoiceDate: '2026-03-20T00:00:00.000Z',
     });
 
-    expect(prisma.labLiquidation.update).toHaveBeenCalledWith(
+    expect(prisma.labLiquidation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'INVOICED_LIQ' }),
       }),
@@ -191,7 +195,8 @@ describe('LabLiquidationService', () => {
       totalAmount: '500000',
       paymentAmount: null,
     });
-    prisma.labLiquidation.update.mockResolvedValue({ id: 'liq-1' });
+    prisma.labLiquidation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.labLiquidation.findUniqueOrThrow.mockResolvedValue({ id: 'liq-1' });
 
     await service.registerPayment('liq-1', 'tenant-1', {
       paymentAmount: 500000,
@@ -199,7 +204,7 @@ describe('LabLiquidationService', () => {
       paymentMethodText: 'Transferencia',
     });
 
-    expect(prisma.labLiquidation.update).toHaveBeenCalledWith(
+    expect(prisma.labLiquidation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PAID_LIQ' }),
       }),
@@ -213,7 +218,8 @@ describe('LabLiquidationService', () => {
       totalAmount: '500000',
       paymentAmount: null,
     });
-    prisma.labLiquidation.update.mockResolvedValue({ id: 'liq-1' });
+    prisma.labLiquidation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.labLiquidation.findUniqueOrThrow.mockResolvedValue({ id: 'liq-1' });
 
     await service.registerPayment('liq-1', 'tenant-1', {
       paymentAmount: 250000,
@@ -221,7 +227,7 @@ describe('LabLiquidationService', () => {
       paymentMethodText: 'Transferencia',
     });
 
-    expect(prisma.labLiquidation.update).toHaveBeenCalledWith(
+    expect(prisma.labLiquidation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PARTIALLY_PAID' }),
       }),
@@ -250,11 +256,12 @@ describe('LabLiquidationService', () => {
       id: 'liq-1',
       status: 'DRAFT_LIQ',
     });
-    prisma.labLiquidation.update.mockResolvedValue({ id: 'liq-1' });
+    prisma.labLiquidation.updateMany.mockResolvedValue({ count: 1 });
+    prisma.labLiquidation.findUniqueOrThrow.mockResolvedValue({ id: 'liq-1' });
 
     await service.cancel('liq-1', 'tenant-1');
 
-    expect(prisma.labLiquidation.update).toHaveBeenCalledWith(
+    expect(prisma.labLiquidation.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'CANCELLED_LIQ' }),
       }),

@@ -41,6 +41,16 @@ export class LabDiagnosticReportController {
     return this.service.search(tenantId, query);
   }
 
+  @Post('macro-signer')
+  @RequirePermission('lab', 'write')
+  registerMacroSigner(
+    @CurrentTenant() tenantId: string,
+    @Body(new ZodValidationPipe(registerMacroSignerSchema))
+    body: RegisterMacroSignerSchema,
+  ) {
+    return this.service.registerMacroSigner(tenantId, body);
+  }
+
   @Get(':id')
   @RequirePermission('lab', 'read')
   findById(
@@ -70,15 +80,5 @@ export class LabDiagnosticReportController {
     body: CompleteMacroscopySchema,
   ) {
     return this.service.completeMacroscopy(id, tenantId, body);
-  }
-
-  @Post('macro-signer')
-  @RequirePermission('lab', 'write')
-  registerMacroSigner(
-    @CurrentTenant() tenantId: string,
-    @Body(new ZodValidationPipe(registerMacroSignerSchema))
-    body: RegisterMacroSignerSchema,
-  ) {
-    return this.service.registerMacroSigner(tenantId, body);
   }
 }

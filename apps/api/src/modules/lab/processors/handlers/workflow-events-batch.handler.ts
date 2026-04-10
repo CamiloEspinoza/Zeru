@@ -35,7 +35,7 @@ export class WorkflowEventsBatchHandler {
   ) {}
 
   async handle(data: WorkflowBatchJobData): Promise<void> {
-    const { runId, tenantId, fmSource, offset, limit, batchId } = data;
+    const { runId, tenantId, fmSource, offset, limit, batchId, dateFrom, dateTo } = data;
     const config = TRAZA_CONFIG[fmSource];
     if (!config) {
       this.logger.warn(`No traceability config for source ${fmSource}, skipping`);
@@ -48,11 +48,24 @@ export class WorkflowEventsBatchHandler {
         data: { status: 'RUNNING', startedAt: new Date() },
       });
 
-      const response = await this.fmApi.getRecords(config.database, config.layout, {
-        offset,
-        limit,
-        dateformats: 2,
-      });
+      let response;
+      if (dateFrom && dateTo) {
+        const from = new Date(dateFrom);
+        const to = new Date(dateTo);
+        const rangeStr = `${this.fmDate(from)}...${this.fmDate(to)}`;
+        response = await this.fmApi.findRecords(
+          config.database,
+          config.layout,
+          [{ 'Trazabilidad::Fecha_Macroscopía': rangeStr }],
+          { offset, limit, dateformats: 2 },
+        );
+      } else {
+        response = await this.fmApi.getRecords(config.database, config.layout, {
+          offset,
+          limit,
+          dateformats: 2,
+        });
+      }
 
       let processedCount = 0;
       let errorCount = 0;
@@ -77,22 +90,23 @@ export class WorkflowEventsBatchHandler {
             continue;
           }
 
-          // Replace workflow events for this DR (idempotent)
-          await this.prisma.labExamWorkflowEvent.deleteMany({
-            where: { tenantId, diagnosticReportId: dr.id },
-          });
-
-          await this.prisma.labExamWorkflowEvent.createMany({
-            data: result.events.map((e) => ({
-              tenantId,
-              diagnosticReportId: dr.id,
-              eventType: toWorkflowEventType(e.eventType),
-              sequenceOrder: e.sequenceOrder,
-              occurredAt: e.occurredAt,
-              performedByNameSnapshot: e.performedByNameSnapshot,
-              sourceField: e.sourceField,
-            })),
-          });
+          // Replace workflow events for this DR (atomic delete + recreate)
+          await this.prisma.$transaction([
+            this.prisma.labExamWorkflowEvent.deleteMany({
+              where: { tenantId, diagnosticReportId: dr.id },
+            }),
+            this.prisma.labExamWorkflowEvent.createMany({
+              data: result.events.map((e) => ({
+                tenantId,
+                diagnosticReportId: dr.id,
+                eventType: toWorkflowEventType(e.eventType),
+                sequenceOrder: e.sequenceOrder,
+                occurredAt: e.occurredAt,
+                performedByNameSnapshot: e.performedByNameSnapshot,
+                sourceField: e.sourceField,
+              })),
+            }),
+          ]);
 
           processedCount++;
         } catch (error) {
@@ -135,5 +149,9 @@ export class WorkflowEventsBatchHandler {
 
       throw error;
     }
+  }
+
+  private fmDate(d: Date): string {
+    return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
   }
 }

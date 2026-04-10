@@ -335,10 +335,8 @@ export class FmLabSyncService {
     for (const record of pending) {
       try {
         if (!record.fmRecordId || record.fmRecordId.startsWith('pending-')) {
-          await this.prisma.fmSyncRecord.update({
-            where: { id: record.id },
-            data: { syncStatus: 'SYNCED', lastSyncAt: new Date() },
-          });
+          // Re-attempt create instead of marking SYNCED
+          await this.retryCreate(record);
           continue;
         }
 
@@ -443,6 +441,70 @@ export class FmLabSyncService {
           },
         });
       }
+    }
+  }
+
+  private async retryCreate(record: {
+    id: string;
+    tenantId: string;
+    entityType: string;
+    entityId: string;
+    fmDatabase: string;
+    fmLayout: string;
+  }) {
+    try {
+      const event: FmLabSyncEvent = {
+        tenantId: record.tenantId,
+        entityType: record.entityType as FmLabSyncEvent['entityType'],
+        entityId: record.entityId,
+        action: 'create',
+      };
+
+      const result = await this.createInFm(event);
+      if (result) {
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: {
+            fmRecordId: result.recordId,
+            fmDatabase: result.database,
+            fmLayout: result.layout,
+            syncStatus: 'SYNCED',
+            lastSyncAt: new Date(),
+            syncError: null,
+          },
+        });
+        await this.logSync({
+          tenantId: record.tenantId,
+          entityType: record.entityType,
+          entityId: record.entityId,
+          fmRecordId: result.recordId,
+          action: 'lab-sync:retry-create',
+          direction: 'zeru_to_fm',
+        });
+      } else {
+        // No handler for this entity type — mark synced to avoid infinite retry
+        await this.prisma.fmSyncRecord.update({
+          where: { id: record.id },
+          data: {
+            syncStatus: 'SYNCED',
+            lastSyncAt: new Date(),
+            syncError: 'No create handler for entity type',
+          },
+        });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Retry create failed for ${record.entityType}/${record.entityId}: ${msg}`,
+      );
+      await this.prisma.fmSyncRecord.update({
+        where: { id: record.id },
+        data: {
+          syncStatus: 'ERROR',
+          syncError: `[zeru-to-fm] retry-create: ${msg}`,
+          retryCount: { increment: 1 },
+        },
+      });
     }
   }
 

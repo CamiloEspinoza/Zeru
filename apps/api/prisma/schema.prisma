@@ -1938,6 +1938,10 @@ model LegalEntity {
   bankAccounts      LegalEntityBankAccount[]
   labOrigins        LabOrigin[]
   billingAgreements BillingAgreement[]
+  practitioners     LabPractitioner[]        @relation("PractitionerInstitution")
+  labLiquidations   LabLiquidation[]         @relation("LiquidationLegalEntity")
+  labExamCharges    LabExamCharge[]          @relation("ExamChargeLegalEntity")
+  labDirectPaymentBatches LabDirectPaymentBatch[] @relation("DpbLegalEntity")
 
   @@unique([tenantId, rut])
   @@index([tenantId])
@@ -2043,6 +2047,8 @@ model LabOrigin {
   billingAgreementId String?
   billingAgreement   BillingAgreement? @relation(fields: [billingAgreementId], references: [id], onDelete: SetNull)
 
+  labExamCharges LabExamCharge[] @relation("ExamChargeLabOrigin")
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2075,6 +2081,7 @@ model BillingConcept {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   agreementLines BillingAgreementLine[]
+  labExamCharges LabExamCharge[]       @relation("ExamChargeBillingConcept")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2113,9 +2120,10 @@ model BillingAgreement {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  lines      BillingAgreementLine[]
-  contacts   BillingContact[]
-  labOrigins LabOrigin[]
+  lines           BillingAgreementLine[]
+  contacts        BillingContact[]
+  labOrigins      LabOrigin[]
+  labLiquidations LabLiquidation[] @relation("LiquidationBillingAgreement")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2887,10 +2895,12 @@ model LabPatient {
   address          String?
   commune          String?
   city             String?
-  needsMerge       Boolean   @default(false)
+  needsMerge       Boolean      @default(false)
   mergedIntoId     String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  mergedInto       LabPatient?  @relation("PatientMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom       LabPatient[] @relation("PatientMerge")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   deletedAt        DateTime?
 
   serviceRequests LabServiceRequest[]
@@ -2917,6 +2927,7 @@ model LabPractitioner {
   email            String?
   phone            String?
   institutionId    String?
+  institution      LegalEntity?       @relation("PractitionerInstitution", fields: [institutionId], references: [id], onDelete: SetNull)
   isActive         Boolean            @default(true)
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -2940,7 +2951,7 @@ model LabServiceRequest {
   subjectRut              String?
   subjectAge              Int?
   subjectId               String?
-  patient                 LabPatient?  @relation(fields: [subjectId], references: [id])
+  patient                 LabPatient?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
   category                ExamCategory
   subcategory             String?
   priority                Priority     @default(ROUTINE)
@@ -2973,7 +2984,7 @@ model LabSpecimen {
   id               String            @id @default(uuid())
   tenantId         String
   serviceRequestId String
-  serviceRequest   LabServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  serviceRequest   LabServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
   containerLabel   String?
   sequenceNumber   Int
   anatomicalSite   String?
@@ -2997,7 +3008,7 @@ model LabSlide {
   id         String      @id @default(uuid())
   tenantId   String
   specimenId String
-  specimen   LabSpecimen @relation(fields: [specimenId], references: [id])
+  specimen   LabSpecimen @relation(fields: [specimenId], references: [id], onDelete: Cascade)
   placaCode  String?
   stain      String?
   level      Int?
@@ -3013,7 +3024,7 @@ model LabDiagnosticReport {
   id                        String                 @id @default(uuid())
   tenantId                  String
   serviceRequestId          String
-  serviceRequest            LabServiceRequest      @relation(fields: [serviceRequestId], references: [id])
+  serviceRequest            LabServiceRequest      @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
   fmInformeNumber           Int
   fmSource                  FmSource
   status                    DiagnosticReportStatus
@@ -3049,6 +3060,7 @@ model LabDiagnosticReport {
   @@index([tenantId, validatedAt])
   @@index([tenantId, primarySignerId])
   @@index([tenantId, isUrgent, isAlteredOrCritical])
+  @@index([tenantId, serviceRequestId])
   @@map("lab_diagnostic_reports")
   @@schema("mod_lab")
 }
@@ -3057,7 +3069,7 @@ model LabDiagnosticReportSigner {
   id                 String              @id @default(uuid())
   tenantId           String
   diagnosticReportId String
-  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   practitionerId     String?
   codeSnapshot       String
   nameSnapshot       String
@@ -3083,7 +3095,7 @@ model LabObservation {
   id                 String              @id @default(uuid())
   tenantId           String
   diagnosticReportId String
-  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   code               String
   codeSystem         String
   display            String
@@ -3106,7 +3118,7 @@ model LabExamWorkflowEvent {
   id                      String              @id @default(uuid())
   tenantId                String
   diagnosticReportId      String
-  diagnosticReport        LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport        LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   eventType               WorkflowEventType
   sequenceOrder           Int?
   occurredAt              DateTime
@@ -3127,7 +3139,7 @@ model LabCommunication {
   id                      String                 @id @default(uuid())
   tenantId                String
   diagnosticReportId      String
-  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   subjectPatientId        String?
   reason                  String?
   content                 String                 @db.Text
@@ -3153,7 +3165,7 @@ model LabAdverseEvent {
   id                     String               @id @default(uuid())
   tenantId               String
   diagnosticReportId     String?
-  diagnosticReport       LabDiagnosticReport? @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport       LabDiagnosticReport? @relation(fields: [diagnosticReportId], references: [id], onDelete: SetNull)
   eventType              String
   severity               AdverseSeverity
   description            String               @db.Text
@@ -3170,6 +3182,8 @@ model LabAdverseEvent {
   updatedAt              DateTime             @updatedAt
   deletedAt              DateTime?
 
+  attachments            LabDiagnosticReportAttachment[]
+
   @@index([tenantId, diagnosticReportId])
   @@index([tenantId, severity, status])
   @@map("lab_adverse_events")
@@ -3180,7 +3194,7 @@ model LabTechnicalObservation {
   id                     String              @id @default(uuid())
   tenantId               String
   diagnosticReportId     String
-  diagnosticReport       LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport       LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   workflowStage          WorkflowEventType?
   description            String              @db.Text
   observedAt             DateTime
@@ -3197,7 +3211,7 @@ model LabDiagnosticReportAttachment {
   id                     String                    @id @default(uuid())
   tenantId               String
   diagnosticReportId     String
-  diagnosticReport       LabDiagnosticReport       @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport       LabDiagnosticReport       @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   category               AttachmentCategory
   label                  String?
   sequenceOrder          Int?
@@ -3214,6 +3228,7 @@ model LabDiagnosticReportAttachment {
   migrationAttempts      Int                       @default(0)
   migratedAt             DateTime?
   adverseEventId         String?
+  adverseEvent           LabAdverseEvent?          @relation(fields: [adverseEventId], references: [id], onDelete: SetNull)
   createdAt              DateTime                  @default(now())
   updatedAt              DateTime                  @updatedAt
 
@@ -3229,8 +3244,9 @@ model LabExamCharge {
   fmSource                LabExamChargeSource
   fmRecordPk              Int
   diagnosticReportId      String
-  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id])
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
   billingConceptId        String?
+  billingConcept          BillingConcept?        @relation("ExamChargeBillingConcept", fields: [billingConceptId], references: [id], onDelete: SetNull)
   feeCodesText            String?
   feeCodes                String[]
   paymentMethod           LabPaymentMethod
@@ -3238,12 +3254,14 @@ model LabExamCharge {
   currency                String                 @default("CLP")
   status                  LabChargeStatus
   labOriginId             String
+  labOrigin               LabOrigin              @relation("ExamChargeLabOrigin", fields: [labOriginId], references: [id], onDelete: Cascade)
   labOriginCodeSnapshot   String
   legalEntityId           String?
+  legalEntity             LegalEntity?           @relation("ExamChargeLegalEntity", fields: [legalEntityId], references: [id], onDelete: SetNull)
   liquidationId           String?
-  liquidation             LabLiquidation?        @relation(fields: [liquidationId], references: [id])
+  liquidation             LabLiquidation?        @relation(fields: [liquidationId], references: [id], onDelete: SetNull)
   directPaymentBatchId    String?
-  directPaymentBatch      LabDirectPaymentBatch? @relation(fields: [directPaymentBatchId], references: [id])
+  directPaymentBatch      LabDirectPaymentBatch? @relation(fields: [directPaymentBatchId], references: [id], onDelete: SetNull)
   enteredAt               DateTime
   enteredByNameSnapshot   String
   enteredById             String?
@@ -3276,7 +3294,9 @@ model LabLiquidation {
   fmRecordId              String
   fmPk                    Int?
   legalEntityId           String
+  legalEntity             LegalEntity        @relation("LiquidationLegalEntity", fields: [legalEntityId], references: [id], onDelete: Cascade)
   billingAgreementId      String?
+  billingAgreement        BillingAgreement?  @relation("LiquidationBillingAgreement", fields: [billingAgreementId], references: [id], onDelete: SetNull)
   period                  DateTime
   periodLabel             String
   totalAmount             Decimal           @db.Decimal(14, 2)
@@ -3325,6 +3345,7 @@ model LabDirectPaymentBatch {
   periodFrom            DateTime?
   periodTo              DateTime?
   legalEntityId         String?
+  legalEntity           LegalEntity?        @relation("DpbLegalEntity", fields: [legalEntityId], references: [id], onDelete: SetNull)
   rendicionType         RendicionType
   totalAmount           Decimal             @db.Decimal(14, 2)
   chargeCount           Int
@@ -3380,7 +3401,7 @@ model LabImportRun {
 model LabImportBatch {
   id             String       @id @default(uuid())
   runId          String
-  run            LabImportRun @relation(fields: [runId], references: [id])
+  run            LabImportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   phase          String
   fmSource       FmSource
   batchIndex     Int

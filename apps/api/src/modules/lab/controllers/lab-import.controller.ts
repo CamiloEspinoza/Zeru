@@ -47,8 +47,11 @@ export class LabImportController {
 
   @Get('runs/:id/status')
   @RequirePermission('lab', 'admin')
-  async getRunStatus(@Param('id') runId: string) {
-    const status = await this.orchestrator.getRunStatus(runId);
+  async getRunStatus(
+    @Param('id') runId: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    const status = await this.orchestrator.getRunStatus(runId, tenantId);
     if (!status) throw new NotFoundException(`Import run ${runId} not found`);
     return status;
   }

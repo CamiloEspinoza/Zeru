@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { LAB_IMPORT_QUEUE, JOB_NAMES } from '../constants/queue.constants';
+import { LAB_IMPORT_QUEUE, JOB_NAMES, IMPORT_QUEUE_CONFIG } from '../constants/queue.constants';
 import { ExamsBatchHandler } from './handlers/exams-batch.handler';
 import { WorkflowEventsBatchHandler } from './handlers/workflow-events-batch.handler';
 import { CommunicationsBatchHandler } from './handlers/communications-batch.handler';
@@ -17,7 +17,7 @@ import { ChargesBatchHandler } from './handlers/charges-batch.handler';
  * each receiving ALL jobs. This dispatcher pattern is the correct
  * approach for multiple job types in a single queue.
  */
-@Processor(LAB_IMPORT_QUEUE)
+@Processor(LAB_IMPORT_QUEUE, { concurrency: IMPORT_QUEUE_CONFIG.concurrency })
 export class LabImportProcessor extends WorkerHost {
   private readonly logger = new Logger(LabImportProcessor.name);
 
@@ -46,7 +46,7 @@ export class LabImportProcessor extends WorkerHost {
       case JOB_NAMES.CHARGES_BATCH:
         return this.chargesHandler.handle(job.data);
       default:
-        this.logger.warn(`Unknown job name: ${job.name}`);
+        throw new Error(`Unknown job name: ${job.name}`);
     }
   }
 }

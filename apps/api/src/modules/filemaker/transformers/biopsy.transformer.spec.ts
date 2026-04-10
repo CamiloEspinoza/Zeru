@@ -128,10 +128,16 @@ describe('BiopsyTransformer', () => {
       expect(result.isUrgent).toBe(false);
     });
 
-    it('detects altered or critical', () => {
-      const record = makeBiopsyRecord({ 'Alterado o Crítico': 'CRITICO' });
+    it('detects altered or critical when value is "Sí"', () => {
+      const record = makeBiopsyRecord({ 'Alterado o Crítico': 'Sí' });
       const result = transformer.extract(record, 'BIOPSIAS');
       expect(result.isAlteredOrCritical).toBe(true);
+    });
+
+    it('does not flag as altered for non-yes values', () => {
+      const record = makeBiopsyRecord({ 'Alterado o Crítico': 'No' });
+      const result = transformer.extract(record, 'BIOPSIAS');
+      expect(result.isAlteredOrCritical).toBe(false);
     });
 
     it('not altered when empty', () => {

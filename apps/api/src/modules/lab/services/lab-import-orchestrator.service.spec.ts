@@ -16,7 +16,9 @@ describe('LabImportOrchestratorService', () => {
       labImportRun: {
         create: jest.fn().mockResolvedValue({ id: 'run-1' }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
       labImportBatch: {
         create: jest.fn().mockResolvedValue({ id: 'batch-1' }),
@@ -116,7 +118,7 @@ describe('LabImportOrchestratorService', () => {
 
   describe('getRunStatus', () => {
     it('returns run with batch summary', async () => {
-      prisma.labImportRun.findUnique.mockResolvedValue({
+      prisma.labImportRun.findFirst.mockResolvedValue({
         id: 'run-1',
         status: 'RUNNING',
         phase: 'phase-1-exams',
@@ -139,7 +141,7 @@ describe('LabImportOrchestratorService', () => {
     });
 
     it('returns null for non-existent run', async () => {
-      prisma.labImportRun.findUnique.mockResolvedValue(null);
+      prisma.labImportRun.findFirst.mockResolvedValue(null);
       const status = await service.getRunStatus('non-existent');
       expect(status).toBeNull();
     });

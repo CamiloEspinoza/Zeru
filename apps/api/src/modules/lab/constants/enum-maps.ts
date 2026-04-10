@@ -11,6 +11,7 @@ import {
   FmSource,
   Gender,
   LabExamChargeSource,
+  AdverseSeverity,
 } from '@prisma/client';
 import type {
   ExamCategoryType,
@@ -278,4 +279,28 @@ const REVERSE_EXAM_CHARGE_SOURCE_MAP: Record<LabExamChargeSource, string> = {
 
 export function fromLabExamChargeSource(val: LabExamChargeSource): string {
   return REVERSE_EXAM_CHARGE_SOURCE_MAP[val];
+}
+
+// ── AdverseSeverity ──
+
+const ADVERSE_SEVERITY_MAP: Record<string, AdverseSeverity> = {
+  MINOR: AdverseSeverity.MINOR_SEV,
+  MODERATE: AdverseSeverity.MODERATE_SEV,
+  MAJOR: AdverseSeverity.MAJOR_SEV,
+  CRITICAL: AdverseSeverity.CRITICAL_SEV,
+};
+
+export function toAdverseSeverity(val: string): AdverseSeverity {
+  return ADVERSE_SEVERITY_MAP[val] ?? AdverseSeverity.MINOR_SEV;
+}
+
+const REVERSE_ADVERSE_SEVERITY_MAP: Record<AdverseSeverity, string> = {
+  [AdverseSeverity.MINOR_SEV]: 'MINOR',
+  [AdverseSeverity.MODERATE_SEV]: 'MODERATE',
+  [AdverseSeverity.MAJOR_SEV]: 'MAJOR',
+  [AdverseSeverity.CRITICAL_SEV]: 'CRITICAL',
+};
+
+export function fromAdverseSeverity(val: AdverseSeverity): string {
+  return REVERSE_ADVERSE_SEVERITY_MAP[val];
 }

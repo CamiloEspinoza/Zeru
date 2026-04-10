@@ -112,12 +112,16 @@ export class LabLiquidationService {
       },
     });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-liquidation',
-      entityId: liq.id,
-      action: 'create',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-liquidation',
+        entityId: liq.id,
+        action: 'create',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return liq;
   }
@@ -133,21 +137,26 @@ export class LabLiquidationService {
       );
     }
 
-    const updated = await this.prisma.labLiquidation.update({
-      where: { id },
+    await this.prisma.labLiquidation.updateMany({
+      where: { id, tenantId },
       data: {
         status: 'CONFIRMED',
         confirmedAt: new Date(),
         confirmedByNameSnapshot: data.confirmedByNameSnapshot,
       },
     });
+    const updated = await this.prisma.labLiquidation.findUniqueOrThrow({ where: { id } });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-liquidation',
-      entityId: id,
-      action: 'confirm',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-liquidation',
+        entityId: id,
+        action: 'confirm',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return updated;
   }
@@ -163,8 +172,8 @@ export class LabLiquidationService {
       );
     }
 
-    const updated = await this.prisma.labLiquidation.update({
-      where: { id },
+    await this.prisma.labLiquidation.updateMany({
+      where: { id, tenantId },
       data: {
         status: 'INVOICED_LIQ',
         invoiceNumber: data.invoiceNumber,
@@ -172,13 +181,18 @@ export class LabLiquidationService {
         invoiceDate: new Date(data.invoiceDate),
       },
     });
+    const updated = await this.prisma.labLiquidation.findUniqueOrThrow({ where: { id } });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-liquidation',
-      entityId: id,
-      action: 'invoice',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-liquidation',
+        entityId: id,
+        action: 'invoice',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return updated;
   }
@@ -198,8 +212,8 @@ export class LabLiquidationService {
     const totalOwed = Number(liq.totalAmount);
     const newStatus = totalPaid >= totalOwed ? 'PAID_LIQ' : 'PARTIALLY_PAID';
 
-    const updated = await this.prisma.labLiquidation.update({
-      where: { id },
+    await this.prisma.labLiquidation.updateMany({
+      where: { id, tenantId },
       data: {
         status: newStatus,
         paymentAmount: new Decimal(totalPaid),
@@ -207,13 +221,18 @@ export class LabLiquidationService {
         paymentMethodText: data.paymentMethodText,
       },
     });
+    const updated = await this.prisma.labLiquidation.findUniqueOrThrow({ where: { id } });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-liquidation',
-      entityId: id,
-      action: 'payment',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-liquidation',
+        entityId: id,
+        action: 'payment',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return updated;
   }
@@ -230,17 +249,22 @@ export class LabLiquidationService {
       throw new BadRequestException('Cannot cancel a fully paid liquidation');
     }
 
-    const updated = await this.prisma.labLiquidation.update({
-      where: { id },
+    await this.prisma.labLiquidation.updateMany({
+      where: { id, tenantId },
       data: { status: 'CANCELLED_LIQ' },
     });
+    const updated = await this.prisma.labLiquidation.findUniqueOrThrow({ where: { id } });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-liquidation',
-      entityId: id,
-      action: 'cancel',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-liquidation',
+        entityId: id,
+        action: 'cancel',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return updated;
   }

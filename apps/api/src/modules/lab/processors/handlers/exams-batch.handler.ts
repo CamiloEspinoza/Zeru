@@ -199,7 +199,13 @@ export class ExamsBatchHandler {
     const labOrigin = await this.prisma.labOrigin.findFirst({
       where: { tenantId, code: exam.labOriginCode },
     });
-    const labOriginId = labOrigin?.id ?? 'unknown'; // FK must exist
+    if (!labOrigin) {
+      this.logger.warn(
+        `LabOrigin not found for code "${exam.labOriginCode}" (informe ${exam.fmInformeNumber}), skipping record`,
+      );
+      return;
+    }
+    const labOriginId = labOrigin.id;
 
     // 3. Upsert ServiceRequest
     const sr = await this.prisma.labServiceRequest.upsert({
@@ -317,25 +323,27 @@ export class ExamsBatchHandler {
       },
     });
 
-    // 6. Replace Signers (delete + recreate for idempotency)
+    // 6. Replace Signers (atomic delete + recreate for idempotency)
     if (exam.signers.length > 0) {
-      await this.prisma.labDiagnosticReportSigner.deleteMany({
-        where: { tenantId, diagnosticReportId: dr.id },
-      });
-      await this.prisma.labDiagnosticReportSigner.createMany({
-        data: exam.signers.map((s) => ({
-          tenantId,
-          diagnosticReportId: dr.id,
-          codeSnapshot: s.codeSnapshot,
-          nameSnapshot: s.nameSnapshot,
-          role: toSigningRole(s.role),
-          signatureOrder: s.signatureOrder,
-          signedAt: s.signedAt ?? new Date(),
-          isActive: s.isActive,
-          supersededBy: s.supersededBy,
-          correctionReason: s.correctionReason,
-        })),
-      });
+      await this.prisma.$transaction([
+        this.prisma.labDiagnosticReportSigner.deleteMany({
+          where: { tenantId, diagnosticReportId: dr.id },
+        }),
+        this.prisma.labDiagnosticReportSigner.createMany({
+          data: exam.signers.map((s) => ({
+            tenantId,
+            diagnosticReportId: dr.id,
+            codeSnapshot: s.codeSnapshot,
+            nameSnapshot: s.nameSnapshot,
+            role: toSigningRole(s.role),
+            signatureOrder: s.signatureOrder,
+            signedAt: s.signedAt ?? new Date(),
+            isActive: s.isActive,
+            supersededBy: s.supersededBy,
+            correctionReason: s.correctionReason,
+          })),
+        }),
+      ]);
     }
 
     // 7. Create Attachment Refs (upsert by s3Key)
@@ -402,12 +410,14 @@ export class ExamsBatchHandler {
             needsMerge: false,
           },
         })
-        .catch(async () => {
-          // Unique constraint race condition -- find the existing one
-          const found = await this.prisma.labPatient.findFirst({
-            where: { tenantId, rut: exam.subjectRut },
-          });
-          return found;
+        .catch(async (error) => {
+          if (error?.code === 'P2002') {
+            // Unique constraint race condition -- find the existing one
+            return this.prisma.labPatient.findFirst({
+              where: { tenantId, rut: exam.subjectRut },
+            });
+          }
+          throw error; // Re-throw non-unique-constraint errors
         });
 
       return patient?.id ?? null;

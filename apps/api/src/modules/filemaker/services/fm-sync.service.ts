@@ -134,7 +134,19 @@ export class FmSyncService {
 
   private async doPendingToFm() {
     const pending = await this.prisma.fmSyncRecord.findMany({
-      where: { syncStatus: 'PENDING_TO_FM' },
+      where: {
+        syncStatus: 'PENDING_TO_FM',
+        entityType: {
+          notIn: [
+            'lab-exam-charge',
+            'lab-liquidation',
+            'lab-direct-payment-batch',
+            'lab-diagnostic-report',
+            'lab-workflow-event',
+            'lab-signer',
+          ],
+        },
+      },
       take: 10,
     });
 

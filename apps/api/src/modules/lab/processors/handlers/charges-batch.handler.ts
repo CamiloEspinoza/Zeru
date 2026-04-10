@@ -109,29 +109,40 @@ export class ChargesBatchHandler {
             where: { tenantId, code: charge.labOriginCodeSnapshot },
             select: { id: true, legalEntityId: true },
           });
+          if (!origin) {
+            this.logger.warn(
+              `LabOrigin not found for code "${charge.labOriginCodeSnapshot}" (charge record ${record.recordId}), skipping`,
+            );
+            errorCount++;
+            errors.push({
+              recordId: record.recordId,
+              error: `LabOrigin not found for code "${charge.labOriginCodeSnapshot}"`,
+            });
+            continue;
+          }
 
           // Resolve Liquidation (if FK exists)
           let liquidationId: string | null = null;
           if (charge.fkLiquidacion) {
-            const liq = await this.prisma.labLiquidation.findFirst({
-              where: {
-                tenantId,
-                fmPk: parseInt(charge.fkLiquidacion, 10) || undefined,
-              },
-            });
-            liquidationId = liq?.id ?? null;
+            const fmPkLiq = parseInt(charge.fkLiquidacion, 10);
+            if (!isNaN(fmPkLiq) && fmPkLiq > 0) {
+              const liq = await this.prisma.labLiquidation.findFirst({
+                where: { tenantId, fmPk: fmPkLiq },
+              });
+              liquidationId = liq?.id ?? null;
+            }
           }
 
           // Resolve DirectPaymentBatch (if FK exists)
           let directPaymentBatchId: string | null = null;
           if (charge.fkRendicion) {
-            const dpb = await this.prisma.labDirectPaymentBatch.findFirst({
-              where: {
-                tenantId,
-                fmPk: parseInt(charge.fkRendicion, 10) || undefined,
-              },
-            });
-            directPaymentBatchId = dpb?.id ?? null;
+            const fmPkDpb = parseInt(charge.fkRendicion, 10);
+            if (!isNaN(fmPkDpb) && fmPkDpb > 0) {
+              const dpb = await this.prisma.labDirectPaymentBatch.findFirst({
+                where: { tenantId, fmPk: fmPkDpb },
+              });
+              directPaymentBatchId = dpb?.id ?? null;
+            }
           }
 
           await this.prisma.labExamCharge.upsert({
@@ -152,9 +163,9 @@ export class ChargesBatchHandler {
               paymentMethod: toLabPaymentMethod(charge.paymentMethod),
               amount: new Decimal(charge.amount),
               status: toLabChargeStatus(charge.status),
-              labOriginId: origin?.id ?? 'unknown',
+              labOriginId: origin.id,
               labOriginCodeSnapshot: charge.labOriginCodeSnapshot,
-              legalEntityId: origin?.legalEntityId ?? null,
+              legalEntityId: origin.legalEntityId ?? null,
               liquidationId,
               directPaymentBatchId,
               enteredAt: charge.enteredAt ?? new Date(0),
@@ -168,9 +179,9 @@ export class ChargesBatchHandler {
               paymentMethod: toLabPaymentMethod(charge.paymentMethod),
               amount: new Decimal(charge.amount),
               status: toLabChargeStatus(charge.status),
-              labOriginId: origin?.id ?? 'unknown',
+              labOriginId: origin.id,
               labOriginCodeSnapshot: charge.labOriginCodeSnapshot,
-              legalEntityId: origin?.legalEntityId ?? null,
+              legalEntityId: origin.legalEntityId ?? null,
               liquidationId,
               directPaymentBatchId,
               enteredAt: charge.enteredAt ?? new Date(0),

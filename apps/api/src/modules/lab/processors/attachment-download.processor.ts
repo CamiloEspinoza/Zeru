@@ -5,7 +5,8 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
-import { ATTACHMENT_MIGRATION_QUEUE } from '../constants/queue.constants';
+import { FmAuthService } from '../../filemaker/services/fm-auth.service';
+import { ATTACHMENT_MIGRATION_QUEUE, ATTACHMENT_QUEUE_CONFIG } from '../constants/queue.constants';
 
 export interface AttachmentJobData {
   runId: string;
@@ -23,7 +24,10 @@ export interface CitolabS3Config {
   secretAccessKey?: string;
 }
 
-@Processor(ATTACHMENT_MIGRATION_QUEUE)
+@Processor(ATTACHMENT_MIGRATION_QUEUE, {
+  concurrency: ATTACHMENT_QUEUE_CONFIG.concurrency,
+  limiter: ATTACHMENT_QUEUE_CONFIG.rateLimiter,
+})
 export class AttachmentDownloadProcessor extends WorkerHost {
   private readonly logger = new Logger(AttachmentDownloadProcessor.name);
 
@@ -31,6 +35,7 @@ export class AttachmentDownloadProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
     private readonly fmApi: FmApiService,
+    private readonly fmAuthService: FmAuthService,
     @Inject('CITOLAB_S3_CONFIG')
     private readonly citolabConfig: CitolabS3Config,
   ) {
@@ -66,7 +71,13 @@ export class AttachmentDownloadProcessor extends WorkerHost {
         contentType = result.contentType;
       } else if (fmContainerUrl) {
         // Download from FM container via streaming URL
-        const result = await this.downloadFromFmContainer(fmContainerUrl);
+        // Resolve database from the attachment's associated diagnostic report
+        const att = await this.prisma.labDiagnosticReportAttachment.findUnique({
+          where: { id: attachmentId },
+          select: { diagnosticReport: { select: { fmSource: true } } },
+        });
+        const database = att?.diagnosticReport?.fmSource ?? 'BIOPSIAS';
+        const result = await this.downloadFromFmContainer(fmContainerUrl, database);
         fileBuffer = result.buffer;
         contentType = result.contentType;
       } else {
@@ -144,10 +155,15 @@ export class AttachmentDownloadProcessor extends WorkerHost {
   }
 
   /** Download a file from an FM container streaming URL. */
-  async downloadFromFmContainer(url: string): Promise<{ buffer: Buffer; contentType: string }> {
+  async downloadFromFmContainer(url: string, database = 'BIOPSIAS'): Promise<{ buffer: Buffer; contentType: string }> {
     // FM container URLs are streaming URLs (Streaming_SSL)
     // They require authentication — use the FM API's auth token
-    const response = await fetch(url, { redirect: 'follow' });
+    const token = await this.fmAuthService.getToken(database);
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(60000),
+    });
     if (!response.ok) {
       throw new Error(`FM container download failed: ${response.status} ${response.statusText}`);
     }

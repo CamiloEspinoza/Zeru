@@ -84,12 +84,16 @@ export class LabDirectPaymentBatchService {
       },
     });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-direct-payment-batch',
-      entityId: batch.id,
-      action: 'create',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-direct-payment-batch',
+        entityId: batch.id,
+        action: 'create',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return batch;
   }
@@ -110,8 +114,8 @@ export class LabDirectPaymentBatchService {
       _count: true,
     });
 
-    const updated = await this.prisma.labDirectPaymentBatch.update({
-      where: { id },
+    await this.prisma.labDirectPaymentBatch.updateMany({
+      where: { id, tenantId },
       data: {
         status: 'RENDIDA',
         totalAmount: chargeAgg._sum.amount ?? new Decimal(0),
@@ -120,13 +124,18 @@ export class LabDirectPaymentBatchService {
         receiptDate: data.receiptDate ? new Date(data.receiptDate) : null,
       },
     });
+    const updated = await this.prisma.labDirectPaymentBatch.findUniqueOrThrow({ where: { id } });
 
-    this.eventEmitter.emit('fm.lab.sync', {
-      tenantId,
-      entityType: 'lab-direct-payment-batch',
-      entityId: id,
-      action: 'close',
-    } satisfies FmLabSyncEvent);
+    try {
+      this.eventEmitter.emit('fm.lab.sync', {
+        tenantId,
+        entityType: 'lab-direct-payment-batch',
+        entityId: id,
+        action: 'close',
+      } satisfies FmLabSyncEvent);
+    } catch (error) {
+      this.logger.error(`Failed to emit fm.lab.sync: ${error instanceof Error ? error.message : error}`);
+    }
 
     return updated;
   }

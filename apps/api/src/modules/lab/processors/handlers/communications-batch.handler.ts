@@ -112,6 +112,16 @@ export class CommunicationsBatchHandler {
         });
       }
 
+      // Update run counters
+      await this.prisma.labImportRun.update({
+        where: { id: runId },
+        data: {
+          completedBatches: { increment: 1 },
+          processedRecords: { increment: processedCount },
+          errorRecords: { increment: errorCount },
+        },
+      });
+
       await this.orchestrator.advancePhase(runId);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
