@@ -63,6 +63,41 @@ export class LabImportProcessor extends WorkerHost {
       );
       if (runId) {
         try {
+          // Mark the batch as definitively FAILED on final exhaustion
+          const batchIndex = job.data?.batchIndex;
+          const fmSource = job.data?.fmSource || job.data?.chargeSource;
+          const phaseMap: Record<string, string> = {
+            [JOB_NAMES.EXAMS_BATCH]: 'phase-1-exams',
+            [JOB_NAMES.WORKFLOW_EVENTS_BATCH]: 'phase-2-workflow-comms',
+            [JOB_NAMES.COMMUNICATIONS_BATCH]: 'phase-2-workflow-comms',
+            [JOB_NAMES.LIQUIDATIONS]: 'phase-3-liquidations',
+            [JOB_NAMES.CHARGES_BATCH]: 'phase-4-charges',
+          };
+          const phase = phaseMap[job.name];
+
+          if (phase) {
+            // Try by batchId first (some handlers pass it), then fall back to batchIndex
+            const batchId = job.data?.batchId;
+            const batch = batchId
+              ? await this.prisma.labImportBatch.findUnique({ where: { id: batchId } })
+              : batchIndex !== undefined
+                ? await this.prisma.labImportBatch.findFirst({
+                    where: { runId, batchIndex, phase, ...(fmSource ? { fmSource } : {}) },
+                  })
+                : null;
+
+            if (batch) {
+              await this.prisma.labImportBatch.update({
+                where: { id: batch.id },
+                data: {
+                  status: 'FAILED',
+                  completedAt: new Date(),
+                  errors: [{ error: error.message }],
+                },
+              });
+            }
+          }
+
           // Increment failedBatches counter on final exhaustion
           await this.prisma.labImportRun
             .update({

@@ -214,6 +214,7 @@ export class LabImportOrchestratorService {
         nextPhase = 'completed';
         break;
       default:
+        this.logger.error(`advancePhase called with unknown phase "${run.phase}" for run ${runId}`);
         return;
     }
 
@@ -352,7 +353,11 @@ export class LabImportOrchestratorService {
         `Enqueued ${jobs.length} Phase 2 (workflow/comms) jobs for run ${runId}`,
       );
     } else {
-      // No Phase 2 work — skip to Phase 3
+      // No Phase 2 work — update phase before skipping to Phase 3
+      await this.prisma.labImportRun.updateMany({
+        where: { id: runId, phase: PHASES.WORKFLOW_COMMS },
+        data: { phase: PHASES.LIQUIDATIONS },
+      });
       await this.enqueueLiquidationsPhase(runId, tenantId);
     }
   }
@@ -437,6 +442,11 @@ export class LabImportOrchestratorService {
       await this.importQueue.addBulk(jobs);
       this.logger.log(`Enqueued ${jobs.length} Phase 4 (charges) jobs for run ${runId}`);
     } else {
+      // No Phase 4 work — update phase before skipping to Phase 5
+      await this.prisma.labImportRun.updateMany({
+        where: { id: runId, phase: PHASES.CHARGES },
+        data: { phase: PHASES.ATTACHMENTS },
+      });
       await this.enqueueAttachmentsPhase(runId, tenantId);
     }
   }

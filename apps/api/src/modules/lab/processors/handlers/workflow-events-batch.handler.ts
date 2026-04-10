@@ -154,14 +154,17 @@ export class WorkflowEventsBatchHandler {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Workflow batch ${batchId} failed: ${msg}`);
 
-      await this.prisma.labImportBatch.update({
-        where: { id: batchId },
-        data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
-      });
-
-      // Don't increment run counters here — the @OnWorkerEvent('failed') handler
-      // in LabImportProcessor will increment failedBatches on final exhaustion
-      // to avoid counter inflation on retries.
+      try {
+        await this.prisma.labImportBatch.update({
+          where: { id: batchId },
+          data: {
+            status: 'PENDING', // Keep PENDING so advancePhase counts it during retries
+            errors: [{ error: msg }],
+          },
+        });
+      } catch (e) {
+        this.logger.error(`Failed to update batch status: ${e}`);
+      }
 
       throw error;
     }

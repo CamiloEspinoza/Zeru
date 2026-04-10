@@ -145,15 +145,18 @@ export class ExamsBatchHandler {
       this.logger.error(`[${fmSource}] Batch ${batchIndex} failed entirely: ${msg}`);
 
       if (batchId) {
-        await this.prisma.labImportBatch.update({
-          where: { id: batchId },
-          data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
-        });
+        try {
+          await this.prisma.labImportBatch.update({
+            where: { id: batchId },
+            data: {
+              status: 'PENDING', // Keep PENDING so advancePhase counts it during retries
+              errors: [{ error: msg }],
+            },
+          });
+        } catch (e) {
+          this.logger.error(`Failed to update batch status: ${e}`);
+        }
       }
-
-      // Don't increment run counters here — the @OnWorkerEvent('failed') handler
-      // in LabImportProcessor will increment failedBatches on final exhaustion
-      // to avoid counter inflation on retries.
 
       throw error; // Let BullMQ retry
     }

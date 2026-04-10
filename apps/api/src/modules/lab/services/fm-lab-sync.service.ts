@@ -36,6 +36,17 @@ export interface FmLabSyncEvent {
   changedFields?: string[];
 }
 
+/**
+ * FM Lab Sync Service -- handles Zeru -> FM write-back for lab entities.
+ *
+ * IMPORTANT: FM -> Zeru sync (PENDING_TO_ZERU) for lab entities is NOT implemented in v1.
+ * Lab entity types are excluded from FmSyncService.doPendingToZeru() and retryErrors().
+ * Any FM webhook for lab entities that passes the 60s grace window will create orphaned
+ * PENDING_TO_ZERU records. This is a known v1 limitation -- FM->Zeru lab sync will be
+ * implemented in v2 with a dedicated doPendingLabToZeru() processor.
+ *
+ * See: docs/superpowers/specs/2026-04-09-biopsias-papanicolaou-import-design.md S13
+ */
 @Injectable()
 export class FmLabSyncService {
   private readonly logger = new Logger(FmLabSyncService.name);

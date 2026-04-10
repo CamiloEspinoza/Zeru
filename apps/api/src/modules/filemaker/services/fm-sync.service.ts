@@ -9,6 +9,12 @@ import { ConvenioTransformer } from '../transformers/convenio.transformer';
 import { normalizeRut } from '@zeru/shared';
 import type { FmSyncStats } from '@zeru/shared';
 
+/** Grace window (ms) to suppress echo webhooks after Zeru->FM sync. Default: 60s. */
+const WEBHOOK_GRACE_WINDOW_MS = parseInt(
+  process.env.FM_WEBHOOK_GRACE_WINDOW_MS ?? '60000',
+  10,
+);
+
 interface FmSyncEvent {
   tenantId: string;
   entityType: string;
@@ -943,13 +949,38 @@ export class FmSyncService {
         if (
           record.syncStatus === 'SYNCED' &&
           record.lastSyncAt &&
-          Date.now() - record.lastSyncAt.getTime() < 60000
+          Date.now() - record.lastSyncAt.getTime() < WEBHOOK_GRACE_WINDOW_MS
         ) {
           this.logger.debug(
             `Skipping webhook for ${data.recordId} — recently synced from Zeru`,
           );
           continue;
         }
+
+        // Don't overwrite a pending Zeru edit — Zeru wins
+        if (record.syncStatus === 'PENDING_TO_FM') {
+          this.logger.debug(
+            `Skipping webhook for ${data.recordId} — Zeru edit pending, Zeru wins`,
+          );
+          continue;
+        }
+
+        // Lab entity types: FM->Zeru sync not implemented in v1 — skip to avoid orphaned records
+        const labEntityTypes = [
+          'lab-exam-charge',
+          'lab-liquidation',
+          'lab-direct-payment-batch',
+          'lab-diagnostic-report',
+          'lab-workflow-event',
+          'lab-signer',
+        ];
+        if (labEntityTypes.includes(record.entityType)) {
+          this.logger.warn(
+            `FM webhook for lab entity ${record.entityType}/${record.entityId} — FM->Zeru sync not implemented in v1, skipping`,
+          );
+          continue;
+        }
+
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
           data: { syncStatus: 'PENDING_TO_ZERU' },

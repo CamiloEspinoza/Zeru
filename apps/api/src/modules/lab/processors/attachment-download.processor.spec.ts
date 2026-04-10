@@ -26,6 +26,12 @@ describe('AttachmentDownloadProcessor', () => {
         update: jest.fn(),
         count: jest.fn().mockResolvedValue(0),
       },
+      labImportRun: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'run-1',
+          startedAt: new Date('2026-01-01'),
+        }),
+      },
     };
 
     const module = await Test.createTestingModule({
@@ -95,7 +101,7 @@ describe('AttachmentDownloadProcessor', () => {
     );
   });
 
-  it('marks as FAILED after error', async () => {
+  it('keeps PENDING_MIGRATION on intermediate error (retries)', async () => {
     jest.spyOn(processor, 'downloadFromCitolabS3').mockRejectedValue(new Error('NoSuchKey'));
 
     const job = {
@@ -111,10 +117,12 @@ describe('AttachmentDownloadProcessor', () => {
 
     await expect(processor.process(job)).rejects.toThrow('NoSuchKey');
 
+    // On intermediate failures, status stays PENDING_MIGRATION so advancePhase still counts it.
+    // FAILED_MIGRATION is only set on final retry exhaustion via @OnWorkerEvent('failed').
     expect(prisma.labDiagnosticReportAttachment.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          migrationStatus: 'FAILED_MIGRATION',
+          migrationStatus: 'PENDING_MIGRATION',
           migrationError: expect.stringContaining('NoSuchKey'),
         }),
       }),

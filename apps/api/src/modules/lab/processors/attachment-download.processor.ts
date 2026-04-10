@@ -115,10 +115,12 @@ export class AttachmentDownloadProcessor extends WorkerHost {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Attachment ${attachmentId} download failed: ${msg}`);
 
+      // Keep PENDING_MIGRATION so advancePhase still counts it during retries.
+      // Only set FAILED_MIGRATION on final retry exhaustion (handled by @OnWorkerEvent('failed')).
       await this.prisma.labDiagnosticReportAttachment.update({
         where: { id: attachmentId },
         data: {
-          migrationStatus: 'FAILED_MIGRATION',
+          migrationStatus: 'PENDING_MIGRATION',
           migrationError: msg,
         },
       });
@@ -130,10 +132,24 @@ export class AttachmentDownloadProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   async onFailed(job: Job<AttachmentJobData>, error: Error) {
     if (job.attemptsMade >= (job.opts?.attempts ?? 1)) {
-      const { runId } = job.data;
+      const { runId, attachmentId } = job.data;
       this.logger.warn(
         `Attachment job ${job.id} exhausted all ${job.attemptsMade} attempts: ${error.message}`,
       );
+
+      // Mark as definitively FAILED_MIGRATION on final exhaustion
+      try {
+        await this.prisma.labDiagnosticReportAttachment.update({
+          where: { id: attachmentId },
+          data: {
+            migrationStatus: 'FAILED_MIGRATION',
+            migrationError: error.message,
+          },
+        });
+      } catch (e) {
+        this.logger.error(`Failed to mark attachment ${attachmentId} as FAILED_MIGRATION: ${e}`);
+      }
+
       if (runId) {
         await this.checkPhaseCompletion(job.data).catch((e) =>
           this.logger.error(`Failed to check phase completion after attachment exhaustion: ${e}`),
@@ -143,15 +159,21 @@ export class AttachmentDownloadProcessor extends WorkerHost {
   }
 
   /**
-   * Check if all PENDING_MIGRATION attachments for this run's tenant are done.
-   * If none remain, advance the phase.
+   * Check if all PENDING_MIGRATION attachments for this run are done.
+   * Scoped to attachments created since the run started to avoid counting
+   * attachments from previous runs.
    */
   private async checkPhaseCompletion(data: AttachmentJobData): Promise<void> {
     const { runId, tenantId } = data;
+    const run = await this.prisma.labImportRun.findUnique({
+      where: { id: runId },
+      select: { startedAt: true },
+    });
     const remaining = await this.prisma.labDiagnosticReportAttachment.count({
       where: {
         tenantId,
         migrationStatus: { in: ['PENDING_MIGRATION', 'DOWNLOADING'] },
+        ...(run?.startedAt ? { createdAt: { gte: run.startedAt } } : {}),
       },
     });
     if (remaining === 0) {

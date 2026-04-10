@@ -162,7 +162,7 @@ describe('ExamsBatchHandler', () => {
       );
     });
 
-    it('updates batch status on failure', async () => {
+    it('keeps batch PENDING on intermediate failure (retries)', async () => {
       fmApi.getRecords.mockRejectedValue(new Error('FM timeout'));
 
       const job = {
@@ -178,9 +178,11 @@ describe('ExamsBatchHandler', () => {
 
       await expect(handler.handle(job.data)).rejects.toThrow('FM timeout');
 
+      // On intermediate failures, batch stays PENDING so advancePhase still counts it.
+      // FAILED is only set on final retry exhaustion via @OnWorkerEvent('failed').
       expect(prisma.labImportBatch.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ status: 'FAILED' }),
+          data: expect.objectContaining({ status: 'PENDING' }),
         }),
       );
     });

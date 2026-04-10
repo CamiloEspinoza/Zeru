@@ -128,15 +128,18 @@ export class CommunicationsBatchHandler {
       this.logger.error(`Communications batch failed for ${fmSource}: ${msg}`);
 
       if (batch) {
-        await this.prisma.labImportBatch.update({
-          where: { id: batch.id },
-          data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
-        });
+        try {
+          await this.prisma.labImportBatch.update({
+            where: { id: batch.id },
+            data: {
+              status: 'PENDING', // Keep PENDING so advancePhase counts it during retries
+              errors: [{ error: msg }],
+            },
+          });
+        } catch (e) {
+          this.logger.error(`Failed to update batch status: ${e}`);
+        }
       }
-
-      // Don't increment run counters here — the @OnWorkerEvent('failed') handler
-      // in LabImportProcessor will increment failedBatches on final exhaustion
-      // to avoid counter inflation on retries.
 
       throw error;
     }
