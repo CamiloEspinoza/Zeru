@@ -7,6 +7,11 @@ import type {
   Label,
   PaginatedResponse,
 } from "@/types/projects";
+import type {
+  ProjectPropertyDefinition,
+  CreatePropertyDefinitionPayload,
+  UpdatePropertyDefinitionPayload,
+} from "@/types/custom-properties";
 
 export interface CreateProjectPayload {
   name: string;
@@ -124,4 +129,20 @@ export const projectsApi = {
 
   deleteLabel: (projectId: string, labelId: string) =>
     api.delete<void>(`/projects/${projectId}/labels/${labelId}`),
+
+  // Properties (custom property definitions)
+  listProperties: (projectId: string) =>
+    api.get<ProjectPropertyDefinition[]>(`/projects/${projectId}/properties`),
+
+  createProperty: (projectId: string, data: CreatePropertyDefinitionPayload) =>
+    api.post<ProjectPropertyDefinition>(`/projects/${projectId}/properties`, data),
+
+  updateProperty: (projectId: string, propertyId: string, data: UpdatePropertyDefinitionPayload) =>
+    api.patch<ProjectPropertyDefinition>(`/projects/${projectId}/properties/${propertyId}`, data),
+
+  deleteProperty: (projectId: string, propertyId: string) =>
+    api.delete<void>(`/projects/${projectId}/properties/${propertyId}`),
+
+  reorderProperties: (projectId: string, ids: string[]) =>
+    api.post<void>(`/projects/${projectId}/properties/reorder`, { ids }),
 };

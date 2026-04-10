@@ -1,5 +1,6 @@
 import { api } from "@/lib/api-client";
 import type { Task, TaskComment, TaskActivity, PaginatedResponse } from "@/types/projects";
+import type { TaskPropertyValue, SetPropertyValuePayload } from "@/types/custom-properties";
 
 export interface CreateTaskPayload {
   title: string;
@@ -146,4 +147,14 @@ export const tasksApi = {
       projectId,
       versions,
     }),
+
+  // Custom property values
+  getPropertyValues: (taskId: string) =>
+    api.get<TaskPropertyValue[]>(`/tasks/${taskId}/properties`),
+
+  setPropertyValue: (taskId: string, propertyId: string, data: SetPropertyValuePayload) =>
+    api.patch<TaskPropertyValue>(`/tasks/${taskId}/properties/${propertyId}`, data),
+
+  clearPropertyValue: (taskId: string, propertyId: string) =>
+    api.delete<void>(`/tasks/${taskId}/properties/${propertyId}`),
 };
