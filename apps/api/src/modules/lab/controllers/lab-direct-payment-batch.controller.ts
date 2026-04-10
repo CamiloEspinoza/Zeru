@@ -17,8 +17,10 @@ import { LabDirectPaymentBatchService } from '../services/lab-direct-payment-bat
 import {
   createDirectPaymentBatchSchema,
   closeDirectPaymentBatchSchema,
+  labDirectPaymentBatchListSchema,
   type CreateDirectPaymentBatchSchema,
   type CloseDirectPaymentBatchSchema,
+  type LabDirectPaymentBatchListDto,
 } from '../dto/lab-direct-payment-batch.dto';
 
 @Controller('lab/direct-payment-batches')
@@ -30,14 +32,10 @@ export class LabDirectPaymentBatchController {
   @RequirePermission('lab', 'read')
   list(
     @CurrentTenant() tenantId: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query(new ZodValidationPipe(labDirectPaymentBatchListSchema))
+    query: LabDirectPaymentBatchListDto,
   ) {
-    return this.service.findAll(
-      tenantId,
-      page ? parseInt(page, 10) : 1,
-      pageSize ? parseInt(pageSize, 10) : 50,
-    );
+    return this.service.findAll(tenantId, query.page, query.pageSize);
   }
 
   @Get(':id')

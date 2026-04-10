@@ -171,6 +171,15 @@ export class LiquidationsHandler {
         data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
       });
 
+      try {
+        await this.prisma.labImportRun.update({
+          where: { id: runId },
+          data: { completedBatches: { increment: 1 }, failedBatches: { increment: 1 } },
+        });
+      } catch (counterError) {
+        this.logger.error(`Failed to update run counters: ${counterError instanceof Error ? counterError.message : counterError}`);
+      }
+
       throw error;
     }
   }

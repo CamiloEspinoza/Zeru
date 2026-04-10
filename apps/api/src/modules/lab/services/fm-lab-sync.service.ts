@@ -116,6 +116,8 @@ export class FmLabSyncService {
           action: 'lab-sync:create',
           direction: 'zeru_to_fm',
         });
+      } else {
+        this.logger.warn(`No FM record created for ${event.entityType}/${event.entityId} (action=${event.action}) — no handler returned a result`);
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -123,19 +125,24 @@ export class FmLabSyncService {
         `Failed to create FM record for ${event.entityType}/${event.entityId}: ${msg}`,
       );
       // Create an error FmSyncRecord so retry can pick it up
-      await this.prisma.fmSyncRecord.create({
-        data: {
-          tenantId: event.tenantId,
-          entityType: event.entityType,
-          entityId: event.entityId,
-          fmDatabase: this.resolveFmDatabase(),
-          fmLayout: this.resolveFmLayout(event),
-          fmRecordId: `pending-create-${event.entityId}`,
-          syncStatus: 'ERROR',
-          syncError: `[zeru-to-fm] ${msg}`,
-          lastSyncAt: new Date(),
-        },
-      });
+      try {
+        await this.prisma.fmSyncRecord.create({
+          data: {
+            tenantId: event.tenantId,
+            entityType: event.entityType,
+            entityId: event.entityId,
+            fmDatabase: this.resolveFmDatabase(),
+            fmLayout: this.resolveFmLayout(event),
+            fmRecordId: `pending-create-${event.entityId}`,
+            syncStatus: 'ERROR',
+            syncError: `[zeru-to-fm] ${msg}`,
+            lastSyncAt: new Date(),
+          },
+        });
+      } catch (secondaryError) {
+        const secMsg = secondaryError instanceof Error ? secondaryError.message : String(secondaryError);
+        this.logger.error(`CRITICAL: Failed to persist error sync record for ${event.entityType}/${event.entityId}: ${secMsg}`);
+      }
     }
   }
 
@@ -407,8 +414,9 @@ export class FmLabSyncService {
             record.fmRecordId,
           );
           newModId = updated.modId;
-        } catch {
-          // Non-critical -- modId will be refreshed on next sync
+        } catch (modIdError) {
+          const modMsg = modIdError instanceof Error ? modIdError.message : String(modIdError);
+          this.logger.debug(`Non-critical: failed to refresh modId for ${record.entityType}/${record.entityId}: ${modMsg}`);
         }
 
         await this.prisma.fmSyncRecord.update({
@@ -482,13 +490,13 @@ export class FmLabSyncService {
           direction: 'zeru_to_fm',
         });
       } else {
-        // No handler for this entity type — mark synced to avoid infinite retry
+        this.logger.warn(`No create handler for ${record.entityType}/${record.entityId} — marking as permanent error`);
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
           data: {
-            syncStatus: 'SYNCED',
-            lastSyncAt: new Date(),
-            syncError: 'No create handler for entity type',
+            syncStatus: 'ERROR',
+            syncError: 'No create handler for entity type (permanent)',
+            retryCount: 999,
           },
         });
       }

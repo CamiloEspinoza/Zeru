@@ -39,6 +39,17 @@ export class WorkflowEventsBatchHandler {
     const config = TRAZA_CONFIG[fmSource];
     if (!config) {
       this.logger.warn(`No traceability config for source ${fmSource}, skipping`);
+      if (batchId) {
+        await this.prisma.labImportBatch.update({
+          where: { id: batchId },
+          data: { status: 'COMPLETED', completedAt: new Date(), processedCount: 0 },
+        });
+      }
+      await this.prisma.labImportRun.update({
+        where: { id: data.runId },
+        data: { completedBatches: { increment: 1 } },
+      });
+      await this.orchestrator.advancePhase(data.runId);
       return;
     }
 
@@ -113,6 +124,7 @@ export class WorkflowEventsBatchHandler {
           errorCount++;
           const msg = error instanceof Error ? error.message : String(error);
           errors.push({ recordId: record.recordId, error: msg });
+          this.logger.warn(`[${fmSource}] Record ${record.recordId} failed: ${msg}`);
         }
       }
 
@@ -146,6 +158,15 @@ export class WorkflowEventsBatchHandler {
         where: { id: batchId },
         data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
       });
+
+      try {
+        await this.prisma.labImportRun.update({
+          where: { id: data.runId },
+          data: { completedBatches: { increment: 1 }, failedBatches: { increment: 1 } },
+        });
+      } catch (counterError) {
+        this.logger.error(`Failed to update run counters: ${counterError instanceof Error ? counterError.message : counterError}`);
+      }
 
       throw error;
     }

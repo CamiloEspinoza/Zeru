@@ -95,7 +95,20 @@ export class FmSyncService {
   async retryErrors() {
     const maxRetries = 5;
     const errors = await this.prisma.fmSyncRecord.findMany({
-      where: { syncStatus: 'ERROR', retryCount: { lt: maxRetries } },
+      where: {
+        syncStatus: 'ERROR',
+        retryCount: { lt: maxRetries },
+        entityType: {
+          notIn: [
+            'lab-exam-charge',
+            'lab-liquidation',
+            'lab-direct-payment-batch',
+            'lab-diagnostic-report',
+            'lab-workflow-event',
+            'lab-signer',
+          ],
+        },
+      },
       take: 20,
     });
 

@@ -193,6 +193,13 @@ export const labLiquidationListSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 
+export const labDirectPaymentBatchListSchema = z.object({
+  status: z.enum(['OPEN', 'RENDIDA', 'CANCELLED']).optional(),
+  legalEntityId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 // -- Exported types --
 
 export type CreateExamChargeSchema = z.infer<typeof createExamChargeSchema>;
@@ -214,3 +221,4 @@ export type LabPractitionerSearchSchema = z.infer<typeof labPractitionerSearchSc
 export type LabReportSearchSchema = z.infer<typeof labReportSearchSchema>;
 export type LabChargeListSchema = z.infer<typeof labChargeListSchema>;
 export type LabLiquidationListSchema = z.infer<typeof labLiquidationListSchema>;
+export type LabDirectPaymentBatchListDto = z.infer<typeof labDirectPaymentBatchListSchema>;

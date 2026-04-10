@@ -195,6 +195,7 @@ export class ChargesBatchHandler {
           errorCount++;
           const msg = error instanceof Error ? error.message : String(error);
           errors.push({ recordId: record.recordId, error: msg });
+          this.logger.warn(`[${chargeSource}] Record ${record.recordId} failed: ${msg}`);
         }
       }
 
@@ -232,6 +233,15 @@ export class ChargesBatchHandler {
           completedAt: new Date(),
         },
       });
+
+      try {
+        await this.prisma.labImportRun.update({
+          where: { id: runId },
+          data: { completedBatches: { increment: 1 }, failedBatches: { increment: 1 } },
+        });
+      } catch (counterError) {
+        this.logger.error(`Failed to update run counters: ${counterError instanceof Error ? counterError.message : counterError}`);
+      }
 
       throw error;
     }
