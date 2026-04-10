@@ -75,12 +75,16 @@ export class UsersService {
       this.prisma.userTenant.count({ where }),
     ]);
 
-    return {
-      data: memberships.map((m) => {
+    const data = await Promise.all(
+      memberships.map(async (m) => {
         const { personProfiles, ...userData } = m.user;
         const linkedPerson = personProfiles?.[0] ?? null;
+        const avatarUrl = linkedPerson?.avatarS3Key
+          ? await this.resolveAvatarUrl(tenantId, linkedPerson.avatarS3Key)
+          : userData.avatarUrl ?? null;
         return {
           ...userData,
+          avatarUrl,
           role: m.role,
           roleRef: m.roleRef ?? null,
           membershipId: m.id,
@@ -88,6 +92,10 @@ export class UsersService {
           linkedPerson: linkedPerson ? { id: linkedPerson.id, name: linkedPerson.name } : null,
         };
       }),
+    );
+
+    return {
+      data,
       meta: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
     };
   }
@@ -373,6 +381,37 @@ export class UsersService {
     if (!person?.avatarS3Key) return null;
 
     return this.resolveAndStoreAvatar(userId, tenantId, person.avatarS3Key);
+  }
+
+  /** Resuelve avatarUrl on-the-fly desde PersonProfile.avatarS3Key */
+  async resolveAvatarUrl(tenantId: string, avatarS3Key: string | null | undefined): Promise<string | null> {
+    if (!avatarS3Key) return null;
+    try {
+      return await this.s3.getPresignedUrl(tenantId, avatarS3Key, 86400); // 24h
+    } catch {
+      return null;
+    }
+  }
+
+  /** Enriquece un user con avatarUrl resuelto desde PersonProfile */
+  async enrichUserWithAvatar<T extends { avatarUrl?: string | null; personProfiles?: Array<{ avatarS3Key?: string | null }> }>(
+    tenantId: string,
+    user: T,
+  ): Promise<T> {
+    const s3Key = user.personProfiles?.[0]?.avatarS3Key;
+    if (s3Key && !user.avatarUrl) {
+      const url = await this.resolveAvatarUrl(tenantId, s3Key);
+      if (url) return { ...user, avatarUrl: url };
+    }
+    return user;
+  }
+
+  /** Enriquece una lista de users con avatarUrl */
+  async enrichUsersWithAvatars<T extends { avatarUrl?: string | null; personProfiles?: Array<{ avatarS3Key?: string | null }> }>(
+    tenantId: string,
+    users: T[],
+  ): Promise<T[]> {
+    return Promise.all(users.map((u) => this.enrichUserWithAvatar(tenantId, u)));
   }
 
   /** Devuelve el PersonProfile vinculado a un usuario en un tenant */
