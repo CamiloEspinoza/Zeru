@@ -20,6 +20,23 @@ export const brandingApi = {
 
   deleteIsotipo: () => api.delete<void>("/tenants/current/branding/isotipo"),
 
+  uploadFavicon: (file: File) =>
+    api.uploadFile<TenantBranding>("/tenants/current/branding/favicon", file),
+
+  deleteFavicon: () => api.delete<void>("/tenants/current/branding/favicon"),
+
+  setFaviconFromIsotipo: () =>
+    api.post<TenantBranding>(
+      "/tenants/current/branding/favicon/from-isotipo",
+      {},
+    ),
+
+  generateFavicon: () =>
+    api.post<TenantBranding>(
+      "/tenants/current/branding/favicon/generate",
+      {},
+    ),
+
   generatePalette: (
     input: { source: "logo" } | { source: "description"; description: string },
   ) =>

@@ -28,6 +28,9 @@ export class BrandingService {
       isotipoUrl: branding.isotipoUrl
         ? await this.storage.getPresignedUrl(branding.isotipoUrl)
         : null,
+      faviconUrl: branding.faviconUrl
+        ? await this.storage.getPresignedUrl(branding.faviconUrl)
+        : null,
     };
   }
 
@@ -41,7 +44,7 @@ export class BrandingService {
 
   async uploadImage(
     tenantId: string,
-    type: 'logo' | 'isotipo',
+    type: 'logo' | 'isotipo' | 'favicon',
     file: Express.Multer.File,
   ) {
     const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/svg+xml'];
@@ -49,7 +52,7 @@ export class BrandingService {
       throw new BadRequestException('Formato no soportado. Usa PNG, JPG o SVG.');
     }
 
-    const maxSize = type === 'logo' ? 2 * 1024 * 1024 : 1 * 1024 * 1024;
+    const maxSize = type === 'logo' ? 2 * 1024 * 1024 : 1 * 1024 * 1024; // favicon and isotipo share 1MB limit
     if (file.size > maxSize) {
       throw new BadRequestException(
         `Archivo muy grande. Maximo ${type === 'logo' ? '2MB' : '1MB'}.`,
@@ -60,7 +63,9 @@ export class BrandingService {
     const existing = await this.prisma.tenantBranding.findUnique({
       where: { tenantId },
     });
-    const oldKey = type === 'logo' ? existing?.logoUrl : existing?.isotipoUrl;
+    const fieldMap = { logo: 'logoUrl', isotipo: 'isotipoUrl', favicon: 'faviconUrl' } as const;
+    const updateField = fieldMap[type];
+    const oldKey = existing?.[updateField] ?? null;
     if (oldKey) {
       await this.storage.delete(oldKey);
     }
@@ -68,8 +73,6 @@ export class BrandingService {
     const filename = `${uuid()}${extname(file.originalname)}`;
     const key = PlatformStorageService.buildBrandingKey(tenantId, type, filename);
     await this.storage.upload(key, file.buffer, file.mimetype);
-
-    const updateField = type === 'logo' ? 'logoUrl' : 'isotipoUrl';
     const branding = await this.prisma.tenantBranding.upsert({
       where: { tenantId },
       create: { tenantId, [updateField]: key },
@@ -82,18 +85,18 @@ export class BrandingService {
     };
   }
 
-  async deleteImage(tenantId: string, type: 'logo' | 'isotipo') {
+  async deleteImage(tenantId: string, type: 'logo' | 'isotipo' | 'favicon') {
     const existing = await this.prisma.tenantBranding.findUnique({
       where: { tenantId },
     });
     if (!existing) return;
 
-    const key = type === 'logo' ? existing.logoUrl : existing.isotipoUrl;
+    const fieldMap = { logo: 'logoUrl', isotipo: 'isotipoUrl', favicon: 'faviconUrl' } as const;
+    const updateField = fieldMap[type];
+    const key = existing[updateField];
     if (key) {
       await this.storage.delete(key);
     }
-
-    const updateField = type === 'logo' ? 'logoUrl' : 'isotipoUrl';
     return this.prisma.tenantBranding.update({
       where: { tenantId },
       data: { [updateField]: null },
@@ -122,6 +125,9 @@ export class BrandingService {
       isotipoUrl: branding?.isotipoUrl
         ? await this.storage.getPresignedUrl(branding.isotipoUrl)
         : null,
+      faviconUrl: branding?.faviconUrl
+        ? await this.storage.getPresignedUrl(branding.faviconUrl)
+        : null,
       colors: hasColors
         ? {
             primary: branding!.primaryColor!,
@@ -131,6 +137,110 @@ export class BrandingService {
         : null,
       fallbackInitial: tenant.name.charAt(0).toUpperCase(),
       tenantName: tenant.name,
+    };
+  }
+
+  async setFaviconFromIsotipo(tenantId: string) {
+    const branding = await this.prisma.tenantBranding.findUnique({
+      where: { tenantId },
+    });
+    if (!branding?.isotipoUrl) {
+      throw new BadRequestException('Debes subir un isotipo primero');
+    }
+
+    // Just point favicon to the same key as isotipo
+    return this.prisma.tenantBranding.update({
+      where: { tenantId },
+      data: { faviconUrl: branding.isotipoUrl },
+    });
+  }
+
+  async generateFavicon(tenantId: string) {
+    const branding = await this.prisma.tenantBranding.findUnique({
+      where: { tenantId },
+    });
+    if (!branding?.logoUrl && !branding?.isotipoUrl) {
+      throw new BadRequestException('Debes subir un logo o isotipo primero');
+    }
+
+    const imageKey = branding.isotipoUrl || branding.logoUrl;
+    const imageUrl = await this.storage.getPresignedUrl(imageKey!);
+
+    // Download the image to send as base64
+    const imageResponse = await fetch(imageUrl);
+    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = 'image/png';
+
+    const { GoogleGenAI } = await import('@google/genai');
+    const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+    const response = await genai.models.generateContent({
+      model: 'gemini-2.0-flash-exp',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64Image,
+              },
+            },
+            {
+              text: 'Generate a clean, simple favicon (32x32 pixels) based on this logo/icon. The favicon should be a simplified, recognizable version suitable for browser tabs. Use transparent background. Output only the favicon image, no text.',
+            },
+          ],
+        },
+      ],
+      config: {
+        responseModalities: ['image', 'text'],
+      },
+    });
+
+    // Extract generated image from response
+    const parts = response.candidates?.[0]?.content?.parts;
+    const imagePart = parts?.find((p: any) => p.inlineData);
+
+    if (!imagePart?.inlineData?.data) {
+      throw new BadRequestException('No se pudo generar el favicon');
+    }
+
+    const faviconBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
+    const filename = `${uuid()}.png`;
+    const key = PlatformStorageService.buildBrandingKey(tenantId, 'favicon', filename);
+
+    // Delete old favicon if exists and different from isotipo
+    if (branding.faviconUrl && branding.faviconUrl !== branding.isotipoUrl) {
+      await this.storage.delete(branding.faviconUrl);
+    }
+
+    await this.storage.upload(key, faviconBuffer, 'image/png');
+
+    const updated = await this.prisma.tenantBranding.update({
+      where: { tenantId },
+      data: { faviconUrl: key },
+    });
+
+    // Log AI usage
+    try {
+      await this.prisma.aiUsageLog.create({
+        data: {
+          tenantId,
+          provider: 'GEMINI',
+          model: 'gemini-2.0-flash-exp',
+          feature: 'branding-favicon-generation',
+          inputTokens: response.usageMetadata?.promptTokenCount || 0,
+          outputTokens: response.usageMetadata?.candidatesTokenCount || 0,
+        },
+      });
+    } catch (error) {
+      this.logger.warn('Failed to log AI usage for favicon generation', error);
+    }
+
+    return {
+      ...updated,
+      faviconUrl: await this.storage.getPresignedUrl(key),
     };
   }
 

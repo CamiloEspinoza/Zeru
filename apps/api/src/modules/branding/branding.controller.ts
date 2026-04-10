@@ -71,6 +71,31 @@ export class BrandingController {
     return this.brandingService.deleteImage(tenantId, 'isotipo');
   }
 
+  @Post('favicon')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 1 * 1024 * 1024 } }))
+  async uploadFavicon(
+    @CurrentTenant() tenantId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    if (!file) throw new BadRequestException('Archivo requerido');
+    return this.brandingService.uploadImage(tenantId, 'favicon', file);
+  }
+
+  @Delete('favicon')
+  async deleteFavicon(@CurrentTenant() tenantId: string) {
+    return this.brandingService.deleteImage(tenantId, 'favicon');
+  }
+
+  @Post('favicon/from-isotipo')
+  async setFaviconFromIsotipo(@CurrentTenant() tenantId: string) {
+    return this.brandingService.setFaviconFromIsotipo(tenantId);
+  }
+
+  @Post('favicon/generate')
+  async generateFavicon(@CurrentTenant() tenantId: string) {
+    return this.brandingService.generateFavicon(tenantId);
+  }
+
   @Post('generate-palette')
   async generatePalette(
     @CurrentTenant() tenantId: string,

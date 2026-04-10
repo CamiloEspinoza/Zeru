@@ -85,7 +85,7 @@ export class PlatformStorageService {
     }
   }
 
-  static buildBrandingKey(tenantId: string, type: 'logo' | 'isotipo', filename: string): string {
+  static buildBrandingKey(tenantId: string, type: 'logo' | 'isotipo' | 'favicon', filename: string): string {
     return `platform/tenants/${tenantId}/branding/${type}/${filename}`;
   }
 }

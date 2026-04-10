@@ -3,6 +3,7 @@ export interface TenantBranding {
   tenantId: string;
   logoUrl: string | null;
   isotipoUrl: string | null;
+  faviconUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
   accentColor: string | null;
@@ -13,6 +14,7 @@ export interface TenantBranding {
 export interface TenantBrandingAssets {
   logoUrl: string | null;
   isotipoUrl: string | null;
+  faviconUrl: string | null;
   colors: {
     primary: string;
     secondary: string;

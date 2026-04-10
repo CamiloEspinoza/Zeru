@@ -3408,6 +3408,7 @@ model TenantBranding {
   tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   logoUrl        String?
   isotipoUrl     String?
+  faviconUrl     String?
   primaryColor   String?
   secondaryColor String?
   accentColor    String?
