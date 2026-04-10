@@ -33,6 +33,7 @@ import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { LabModule } from './modules/lab/lab.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
     BillingModule,
     ProjectsModule,
     TasksModule,
+    LabModule,
   ],
 })
 export class AppModule implements NestModule {
