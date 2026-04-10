@@ -1,3 +1,5 @@
+import { TenantBranding } from './branding';
+
 export interface Tenant {
   id: string;
   name: string;
@@ -8,6 +10,7 @@ export interface Tenant {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  branding?: TenantBranding | null;
 }
 
 export interface CreateTenantInput {

@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { S3Service } from '../files/s3.service';
 import { UserRole } from '@prisma/client';
 import type { CreateUserSchema, UpdateUserSchema } from './dto';
 
@@ -15,6 +17,11 @@ const userSelect = {
   isActive: true,
   createdAt: true,
   updatedAt: true,
+  personProfiles: {
+    where: { deletedAt: null },
+    select: { id: true, name: true, avatarS3Key: true },
+    take: 1,
+  },
 } as const;
 
 const _membershipSelect = {
@@ -34,6 +41,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly s3: S3Service,
   ) {}
 
   /** Lista todos los usuarios de un tenant (via membresías) */
@@ -138,7 +146,7 @@ export class UsersService {
         },
       });
 
-      void this.sendWelcomeEmail(data.email, user.firstName, tenantName);
+      void this.sendWelcomeEmail(data.email, user.firstName, tenantName, tenantId);
 
       return {
         ...membership.user,
@@ -172,7 +180,7 @@ export class UsersService {
     const membership = result.memberships[0];
     const { password: _, memberships: __, ...userFields } = result;
 
-    void this.sendWelcomeEmail(data.email, data.firstName, tenantName);
+    void this.sendWelcomeEmail(data.email, data.firstName, tenantName, tenantId);
 
     return {
       ...userFields,
@@ -183,9 +191,9 @@ export class UsersService {
     };
   }
 
-  private async sendWelcomeEmail(email: string, firstName: string, tenantName: string): Promise<void> {
+  private async sendWelcomeEmail(email: string, firstName: string, tenantName: string, tenantId?: string): Promise<void> {
     try {
-      await this.emailService.sendWelcomeEmail(email, firstName, tenantName);
+      await this.emailService.sendWelcomeEmail(email, firstName, tenantName, tenantId);
     } catch (err) {
       this.logger.warn(`Could not send welcome email to ${email}: ${(err as Error).message}`);
     }
@@ -251,5 +259,126 @@ export class UsersService {
       membershipId: updated.id,
       membershipActive: updated.isActive,
     };
+  }
+
+  /** Vincula un PersonProfile a un usuario y resuelve el avatar */
+  async linkPerson(userId: string, tenantId: string, personProfileId: string) {
+    // Verify user belongs to tenant
+    const membership = await this.prisma.userTenant.findUnique({
+      where: { userId_tenantId: { userId, tenantId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Usuario no encontrado en esta organización');
+    }
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    // Verify person exists
+    const person = await client.personProfile.findFirst({
+      where: { id: personProfileId, deletedAt: null },
+    });
+    if (!person) {
+      throw new NotFoundException('Perfil de persona no encontrado');
+    }
+
+    // Check if this person is already linked to another user
+    if (person.userId && person.userId !== userId) {
+      throw new ConflictException('Este perfil ya está vinculado a otro usuario');
+    }
+
+    // Check if user already has a linked person in this tenant
+    const existingLink = await client.personProfile.findFirst({
+      where: { userId, deletedAt: null },
+    });
+    if (existingLink && existingLink.id !== personProfileId) {
+      throw new ConflictException('Este usuario ya tiene un perfil vinculado. Desvincule primero.');
+    }
+
+    // Link person to user
+    const updated = await client.personProfile.update({
+      where: { id: personProfileId },
+      data: { userId },
+      select: { id: true, name: true, avatarS3Key: true },
+    });
+
+    // Resolve avatar if person has one
+    if (updated.avatarS3Key) {
+      await this.resolveAndStoreAvatar(userId, tenantId, updated.avatarS3Key);
+    }
+
+    return { linked: true, personProfileId, personName: updated.name };
+  }
+
+  /** Desvincula un PersonProfile de un usuario y limpia el avatar */
+  async unlinkPerson(userId: string, tenantId: string) {
+    const membership = await this.prisma.userTenant.findUnique({
+      where: { userId_tenantId: { userId, tenantId } },
+    });
+    if (!membership) {
+      throw new NotFoundException('Usuario no encontrado en esta organización');
+    }
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const linked = await client.personProfile.findFirst({
+      where: { userId, deletedAt: null },
+    });
+    if (!linked) {
+      throw new BadRequestException('Este usuario no tiene un perfil vinculado');
+    }
+
+    await client.personProfile.update({
+      where: { id: linked.id },
+      data: { userId: null },
+    });
+
+    // Clear avatar URL on user
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+    });
+
+    return { unlinked: true };
+  }
+
+  /** Genera una presigned URL del avatar del PersonProfile y la guarda en User.avatarUrl */
+  async resolveAndStoreAvatar(userId: string, tenantId: string, avatarS3Key: string): Promise<string | null> {
+    try {
+      const url = await this.s3.getPresignedUrl(tenantId, avatarS3Key, 86400); // 24h
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { avatarUrl: url },
+      });
+      return url;
+    } catch (err) {
+      this.logger.warn(`Could not resolve avatar for user ${userId}: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Resuelve el avatar de un usuario desde su PersonProfile vinculado (si existe) */
+  async resolveAvatarFromPerson(userId: string, tenantId: string): Promise<string | null> {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const person = await client.personProfile.findFirst({
+      where: { userId, deletedAt: null },
+      select: { avatarS3Key: true },
+    });
+
+    if (!person?.avatarS3Key) return null;
+
+    return this.resolveAndStoreAvatar(userId, tenantId, person.avatarS3Key);
+  }
+
+  /** Devuelve el PersonProfile vinculado a un usuario en un tenant */
+  async getLinkedPerson(userId: string, tenantId: string) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const person = await client.personProfile.findFirst({
+      where: { userId, deletedAt: null },
+      select: { id: true, name: true, role: true, avatarS3Key: true, email: true },
+    });
+
+    return person ?? null;
   }
 }

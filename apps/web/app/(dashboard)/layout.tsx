@@ -1,5 +1,6 @@
 import { AuthProvider } from "@/providers/auth-provider";
 import { TenantProvider } from "@/providers/tenant-provider";
+import { BrandingProvider } from "@/providers/branding-provider";
 import { SocketProvider } from "@/providers/socket-provider";
 import { OnboardingGuard } from "@/components/onboarding-guard";
 import { AppSidebar } from "@/components/layouts/app-sidebar";
@@ -25,6 +26,7 @@ export default function DashboardLayout({
   return (
     <AuthProvider>
       <TenantProvider>
+        <BrandingProvider>
         <SocketProvider>
           <PresenceSync />
           <NotificationSync />
@@ -55,6 +57,7 @@ export default function DashboardLayout({
             <Toaster />
           </OnboardingGuard>
         </SocketProvider>
+        </BrandingProvider>
       </TenantProvider>
     </AuthProvider>
   );

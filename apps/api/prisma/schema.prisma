@@ -148,6 +148,7 @@ model Tenant {
   geminiConfig        GeminiConfig?
   storageConfig       StorageConfig?
   emailConfig         EmailConfig?
+  branding            TenantBranding?
   conversations       Conversation[]
   accounts            Account[]
   journalEntries      JournalEntry[]
@@ -3498,4 +3499,21 @@ model LabImportBatch {
   @@index([runId, status])
   @@map("lab_import_batches")
   @@schema("mod_lab")
+}
+
+model TenantBranding {
+  id             String   @id @default(uuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logoUrl        String?
+  isotipoUrl     String?
+  faviconUrl     String?
+  primaryColor   String?
+  secondaryColor String?
+  accentColor    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("tenant_brandings")
+  @@schema("public")
 }

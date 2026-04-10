@@ -15,8 +15,10 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createUserSchema,
   updateUserSchema,
+  linkPersonSchema,
   type CreateUserSchema,
   type UpdateUserSchema,
+  type LinkPersonSchema,
 } from './dto';
 import { UsersService } from './users.service';
 
@@ -45,6 +47,11 @@ export class UsersController {
     return this.usersService.findById(id, tenantId);
   }
 
+  @Get(':id/linked-person')
+  getLinkedPerson(@Param('id') id: string, @CurrentTenant() tenantId: string) {
+    return this.usersService.getLinkedPerson(id, tenantId);
+  }
+
   @Post()
   create(
     @Body(new ZodValidationPipe(createUserSchema)) body: CreateUserSchema,
@@ -60,5 +67,22 @@ export class UsersController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.usersService.update(id, tenantId, body);
+  }
+
+  @Patch(':id/link-person')
+  linkPerson(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(linkPersonSchema)) body: LinkPersonSchema,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.usersService.linkPerson(id, tenantId, body.personProfileId);
+  }
+
+  @Patch(':id/unlink-person')
+  unlinkPerson(
+    @Param('id') id: string,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.usersService.unlinkPerson(id, tenantId);
   }
 }
