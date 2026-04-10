@@ -11,9 +11,20 @@ import {
   ATTACHMENT_MIGRATION_QUEUE,
 } from './constants/queue.constants';
 
-// Services
+// Services — Import pipeline
 import { LabImportOrchestratorService } from './services/lab-import-orchestrator.service';
 import { FmRangeResolverService } from './services/fm-range-resolver.service';
+
+// Services — CRUD
+import { LabPatientService } from './services/lab-patient.service';
+import { LabPractitionerService } from './services/lab-practitioner.service';
+import { LabExamChargeService } from './services/lab-exam-charge.service';
+import { LabLiquidationService } from './services/lab-liquidation.service';
+import { LabDirectPaymentBatchService } from './services/lab-direct-payment-batch.service';
+import { LabDiagnosticReportService } from './services/lab-diagnostic-report.service';
+
+// Services — Sync
+import { FmLabSyncService } from './services/fm-lab-sync.service';
 
 // Processors (queue dispatchers)
 import { LabImportProcessor } from './processors/lab-import.processor';
@@ -28,6 +39,12 @@ import { ChargesBatchHandler } from './processors/handlers/charges-batch.handler
 
 // Controllers
 import { LabImportController } from './controllers/lab-import.controller';
+import { LabPatientController } from './controllers/lab-patient.controller';
+import { LabPractitionerController } from './controllers/lab-practitioner.controller';
+import { LabExamChargeController } from './controllers/lab-exam-charge.controller';
+import { LabLiquidationController } from './controllers/lab-liquidation.controller';
+import { LabDirectPaymentBatchController } from './controllers/lab-direct-payment-batch.controller';
+import { LabDiagnosticReportController } from './controllers/lab-diagnostic-report.controller';
 
 @Module({
   imports: [
@@ -50,11 +67,30 @@ import { LabImportController } from './controllers/lab-import.controller';
       { name: ATTACHMENT_MIGRATION_QUEUE },
     ),
   ],
-  controllers: [LabImportController],
+  controllers: [
+    LabImportController,
+    LabPatientController,
+    LabPractitionerController,
+    LabExamChargeController,
+    LabLiquidationController,
+    LabDirectPaymentBatchController,
+    LabDiagnosticReportController,
+  ],
   providers: [
-    // Services
+    // Import pipeline services
     LabImportOrchestratorService,
     FmRangeResolverService,
+
+    // CRUD services
+    LabPatientService,
+    LabPractitionerService,
+    LabExamChargeService,
+    LabLiquidationService,
+    LabDirectPaymentBatchService,
+    LabDiagnosticReportService,
+
+    // Sync service
+    FmLabSyncService,
 
     // Queue processors (one per queue)
     LabImportProcessor,
@@ -79,6 +115,14 @@ import { LabImportController } from './controllers/lab-import.controller';
       }),
     },
   ],
-  exports: [LabImportOrchestratorService],
+  exports: [
+    LabImportOrchestratorService,
+    LabPatientService,
+    LabPractitionerService,
+    LabExamChargeService,
+    LabLiquidationService,
+    LabDirectPaymentBatchService,
+    LabDiagnosticReportService,
+  ],
 })
 export class LabModule {}
