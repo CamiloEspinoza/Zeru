@@ -40,7 +40,7 @@ export const listTasksSchema = z.object({
   dueBefore: z.string().datetime().optional(),
   dueAfter: z.string().datetime().optional(),
   page: z.coerce.number().int().positive().default(1),
-  perPage: z.coerce.number().int().positive().max(100).default(50),
+  perPage: z.coerce.number().int().positive().max(500).default(50),
   sortBy: z
     .enum(['position', 'createdAt', 'updatedAt', 'dueDate', 'priority', 'title'])
     .default('position'),
