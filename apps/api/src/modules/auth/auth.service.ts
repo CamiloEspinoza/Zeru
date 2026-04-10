@@ -6,6 +6,7 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SkillsService } from '../ai/services/skills.service';
 import { EmailService } from '../email/email.service';
+import { UsersService } from '../users/users.service';
 import type { RegisterSchema } from '@zeru/shared';
 import { UserRole } from '@prisma/client';
 
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly skillsService: SkillsService,
     private readonly emailService: EmailService,
+    private readonly usersService: UsersService,
   ) {}
 
   // ─── Passwordless code flow ──────────────────────────────────────────────────
@@ -301,6 +303,9 @@ export class AuthService {
     const refreshToken = this.jwtService.sign(payload, {
       expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d',
     });
+
+    // Resolve avatar from linked PersonProfile (non-blocking)
+    void this.usersService.resolveAvatarFromPerson(user.id, user.tenantId);
 
     return { accessToken, refreshToken, tenantId: user.tenantId };
   }

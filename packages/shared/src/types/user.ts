@@ -35,11 +35,18 @@ export interface UserWithMemberships extends User {
   memberships: UserTenant[];
 }
 
+/** Persona vinculada (resumen) */
+export interface LinkedPerson {
+  id: string;
+  name: string;
+}
+
 /** Usuario como se devuelve en el contexto de un tenant específico */
 export interface UserInTenant extends User {
   role: UserRole;
   roleRef?: RoleInfo | null;
   membershipId: string;
+  linkedPerson?: LinkedPerson | null;
 }
 
 /** Membresía con datos del tenant incluidos (respuesta de /auth/me) */

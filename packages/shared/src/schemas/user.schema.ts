@@ -18,6 +18,11 @@ export const updateMembershipSchema = z.object({
   role: z.enum(USER_ROLES),
 });
 
+export const linkPersonSchema = z.object({
+  personProfileId: z.string().uuid('ID de perfil inválido'),
+});
+
 export type CreateUserSchema = z.infer<typeof createUserSchema>;
 export type UpdateUserSchema = z.infer<typeof updateUserSchema>;
 export type UpdateMembershipSchema = z.infer<typeof updateMembershipSchema>;
+export type LinkPersonSchema = z.infer<typeof linkPersonSchema>;
