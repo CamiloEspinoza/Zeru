@@ -126,7 +126,7 @@ export class UsersService {
         },
       });
 
-      void this.sendWelcomeEmail(data.email, user.firstName, tenantName);
+      void this.sendWelcomeEmail(data.email, user.firstName, tenantName, tenantId);
 
       return {
         ...membership.user,
@@ -160,7 +160,7 @@ export class UsersService {
     const membership = result.memberships[0];
     const { password: _, memberships: __, ...userFields } = result;
 
-    void this.sendWelcomeEmail(data.email, data.firstName, tenantName);
+    void this.sendWelcomeEmail(data.email, data.firstName, tenantName, tenantId);
 
     return {
       ...userFields,
@@ -171,9 +171,9 @@ export class UsersService {
     };
   }
 
-  private async sendWelcomeEmail(email: string, firstName: string, tenantName: string): Promise<void> {
+  private async sendWelcomeEmail(email: string, firstName: string, tenantName: string, tenantId?: string): Promise<void> {
     try {
-      await this.emailService.sendWelcomeEmail(email, firstName, tenantName);
+      await this.emailService.sendWelcomeEmail(email, firstName, tenantName, tenantId);
     } catch (err) {
       this.logger.warn(`Could not send welcome email to ${email}: ${(err as Error).message}`);
     }
