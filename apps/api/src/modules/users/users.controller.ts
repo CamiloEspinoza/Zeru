@@ -30,10 +30,12 @@ export class UsersController {
     @CurrentTenant() tenantId: string,
     @Query('page') page?: string,
     @Query('perPage') perPage?: string,
+    @Query('search') search?: string,
   ) {
     const query = {
       page: page ? parseInt(page, 10) : undefined,
       perPage: perPage ? parseInt(perPage, 10) : undefined,
+      search: search || undefined,
     };
     return this.usersService.findAll(tenantId, query);
   }

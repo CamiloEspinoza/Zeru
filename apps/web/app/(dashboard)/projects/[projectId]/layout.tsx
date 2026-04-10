@@ -41,7 +41,7 @@ export default function ProjectLayout({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <ProjectHeader project={project} />
+      <ProjectHeader project={project} onUpdated={refetch} />
       <ViewSwitcher projectId={projectId} />
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       <ProjectRealtimeSync projectId={projectId} onSectionChanged={refetch} />

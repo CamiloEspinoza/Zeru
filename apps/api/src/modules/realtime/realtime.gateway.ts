@@ -71,7 +71,7 @@ export class RealtimeGateway
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, firstName: true, lastName: true, email: true },
+        select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
       });
 
       if (!user) {
@@ -85,7 +85,7 @@ export class RealtimeGateway
       client.data.email = payload.email;
       client.data.role = payload.role;
       client.data.userName = `${user.firstName} ${user.lastName}`;
-      client.data.userAvatar = null;
+      client.data.userAvatar = user.avatarUrl ?? null;
 
       await client.join(`tenant:${tenantId}`);
       await client.join(`user:${userId}`);

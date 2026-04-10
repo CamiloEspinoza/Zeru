@@ -222,7 +222,7 @@ export class RolesService {
       throw new NotFoundException('Rol no encontrado');
     }
 
-    if (existing.isSystem && (dto.name !== undefined)) {
+    if (existing.isSystem && dto.name !== undefined && dto.name !== existing.name) {
       throw new BadRequestException(
         'No se puede cambiar el nombre de un rol del sistema',
       );

@@ -5,16 +5,21 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useTaskDetail } from "@/hooks/use-task-detail";
+import { useProject } from "@/hooks/use-project";
 import { useProjectStore } from "@/stores/project-store";
-import { TaskStatusBadge } from "@/components/projects/task-status-badge";
-import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
-import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
+import { TaskPresenceAvatars } from "@/components/projects/task-presence-avatars";
 import { TaskComments } from "./task-comments";
 import { TaskDetailTitle } from "./task-detail-title";
 import { TaskDetailDescription } from "./task-detail-description";
 import { TaskActivityFeed } from "./task-activity-feed";
+import { TaskPropertyRow } from "./task-property-row";
+import { TaskStatusSelect } from "./task-status-select";
+import { TaskPrioritySelect } from "./task-priority-select";
+import { TaskAssigneeSelect } from "./task-assignee-select";
+import { TaskDueDatePicker } from "./task-due-date-picker";
+import { TaskLabelSelect } from "./task-label-select";
 import { useTaskPresence } from "@/hooks/use-task-presence";
-import { TaskPresenceAvatars } from "@/components/projects/task-presence-avatars";
+import { useMemo, useCallback } from "react";
 
 interface TaskDetailSheetProps {
   projectKey: string;
@@ -25,17 +30,37 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const taskId = searchParams.get("task");
-  const { task, loading } = useTaskDetail(taskId);
+  const { task, loading, refetch } = useTaskDetail(taskId);
 
   const projectId = task?.projectId ?? null;
-  const storeTask = useProjectStore((s) =>
-    projectId && taskId ? s.getTask(projectId, taskId) : null,
+  const { project } = useProject(projectId);
+
+  const storeStatus = useProjectStore((s) =>
+    projectId && taskId ? s.getTask(projectId, taskId)?.status : undefined,
+  );
+  const storePriority = useProjectStore((s) =>
+    projectId && taskId ? s.getTask(projectId, taskId)?.priority : undefined,
   );
 
-  useTaskPresence(task?.projectId ?? null, taskId);
+  useTaskPresence(projectId, taskId);
 
-  // Merge: store fields win (they're fresh from realtime), but fall back to full-detail fields
-  const displayTask = task ? { ...task, ...(storeTask ?? {}) } : null;
+  const displayTask = useMemo(() => {
+    if (!task) return null;
+    return {
+      ...task,
+      ...(storeStatus !== undefined ? { status: storeStatus } : {}),
+      ...(storePriority !== undefined ? { priority: storePriority } : {}),
+    };
+  }, [task, storeStatus, storePriority]);
+
+  const statuses = useMemo(
+    () => (project?.taskStatuses ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
+    [project?.taskStatuses],
+  );
+
+  const handleRefetch = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   function handleClose(open: boolean) {
     if (open) return;
@@ -47,40 +72,77 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
 
   return (
     <Sheet open={!!taskId} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:max-w-[600px] overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-[640px] overflow-y-auto p-0">
         {loading && !displayTask ? (
-          <div className="space-y-3 py-4">
+          <div className="space-y-3 p-6">
             <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-20 w-full" />
           </div>
         ) : displayTask ? (
-          <>
-            <SheetHeader className="space-y-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className="font-mono">
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <SheetHeader className="px-6 pt-6 pb-4 border-b space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="font-mono text-xs">
                   {projectKey}-{displayTask.number}
                 </Badge>
-                {displayTask.status && <TaskStatusBadge status={displayTask.status} />}
-                <TaskPriorityBadge priority={displayTask.priority} />
+                {displayTask?.projectId && taskId && (
+                  <TaskPresenceAvatars projectId={displayTask.projectId} taskId={taskId} />
+                )}
               </div>
               <SheetTitle className="sr-only">{displayTask.title}</SheetTitle>
               <TaskDetailTitle taskId={displayTask.id} initialTitle={displayTask.title} />
-              {displayTask?.projectId && taskId && (
-                <TaskPresenceAvatars projectId={displayTask.projectId} taskId={taskId} />
-              )}
             </SheetHeader>
-            <div className="mt-6 space-y-6">
+
+            {/* Properties Panel */}
+            <div className="px-6 py-4 border-b bg-muted/30">
+              <TaskPropertyRow label="Estado">
+                <TaskStatusSelect
+                  taskId={displayTask.id}
+                  currentStatusId={displayTask.statusId}
+                  statuses={statuses}
+                  onUpdated={handleRefetch}
+                />
+              </TaskPropertyRow>
+              <TaskPropertyRow label="Prioridad">
+                <TaskPrioritySelect
+                  taskId={displayTask.id}
+                  currentPriority={displayTask.priority}
+                  onUpdated={handleRefetch}
+                />
+              </TaskPropertyRow>
+              <TaskPropertyRow label="Asignados">
+                <TaskAssigneeSelect
+                  taskId={displayTask.id}
+                  projectId={displayTask.projectId}
+                  assignees={displayTask.assignees ?? []}
+                  onUpdated={handleRefetch}
+                />
+              </TaskPropertyRow>
+              <TaskPropertyRow label="Fecha limite">
+                <TaskDueDatePicker
+                  taskId={displayTask.id}
+                  currentDueDate={displayTask.dueDate}
+                  onUpdated={handleRefetch}
+                />
+              </TaskPropertyRow>
+              <TaskPropertyRow label="Etiquetas">
+                <TaskLabelSelect
+                  taskId={displayTask.id}
+                  projectId={displayTask.projectId}
+                  currentLabels={displayTask.labels ?? []}
+                  onUpdated={handleRefetch}
+                />
+              </TaskPropertyRow>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 px-6 py-6 space-y-6 overflow-y-auto">
               <TaskDetailDescription
                 taskId={displayTask.id}
                 initialDescription={displayTask.description}
               />
-              {displayTask.assignees && displayTask.assignees.length > 0 && (
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Asignados</h3>
-                  <TaskAssigneeAvatars assignees={displayTask.assignees} max={10} size="md" />
-                </div>
-              )}
               {displayTask.id && displayTask.projectId && (
                 <div className="border-t pt-6">
                   <TaskComments taskId={displayTask.id} projectId={displayTask.projectId} />
@@ -92,7 +154,7 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                 </div>
               )}
             </div>
-          </>
+          </div>
         ) : null}
       </SheetContent>
     </Sheet>

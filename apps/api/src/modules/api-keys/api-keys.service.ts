@@ -81,7 +81,7 @@ export class ApiKeysService {
         scopes: true,
         lastUsedAt: true,
         createdAt: true,
-        createdBy: { select: { firstName: true, lastName: true } },
+        createdBy: { select: { firstName: true, lastName: true, avatarUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

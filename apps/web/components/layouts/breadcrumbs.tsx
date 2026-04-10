@@ -36,7 +36,7 @@ const LABELS: Record<string, string> = {
   linkedin: "LinkedIn",
   posts: "Posts",
   "org-intelligence": "Inteligencia Organizacional",
-  projects: "Proyectos",
+  projects: "Tableros",
   interviews: "Entrevistas",
   persons: "Personas",
   "knowledge-base": "Base de Conocimiento",

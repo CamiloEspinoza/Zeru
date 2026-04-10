@@ -192,6 +192,7 @@ model User {
   password   String?
   firstName  String
   lastName   String
+  avatarUrl  String?
   isActive   Boolean   @default(true)
   superAdmin Boolean   @default(false)
   type       UserType  @default(HUMAN)
@@ -226,6 +227,7 @@ model User {
   taskActivities          TaskActivity[]             @relation("TaskActivities")
   taskAttachments         TaskAttachment[]           @relation("TaskAttachments")
   taskViewsCreated        TaskView[]                 @relation("TaskViewsCreated")
+  taskPropertyPersonValues TaskPropertyValue[]       @relation("TaskPropertyPersonValues")
 
   @@map("users")
   @@schema("public")
@@ -2209,12 +2211,13 @@ model Project {
   createdById String
   createdBy   User   @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
 
-  members      ProjectMember[]
-  tasks        Task[]
-  taskViews    TaskView[]
-  labels       Label[]
-  taskStatuses TaskStatusConfig[]
-  sections     ProjectSection[]
+  members              ProjectMember[]
+  tasks                Task[]
+  taskViews            TaskView[]
+  labels               Label[]
+  taskStatuses         TaskStatusConfig[]
+  sections             ProjectSection[]
+  propertyDefinitions  ProjectPropertyDefinition[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -2327,14 +2330,15 @@ model Task {
 
   tenantId String
 
-  assignees    TaskAssignee[]
-  labels       TaskLabel[]
-  comments     TaskComment[]
-  attachments  TaskAttachment[]
-  dependencies TaskDependency[] @relation("DependentTask")
-  dependents   TaskDependency[] @relation("DependencyOf")
-  subscribers  TaskSubscriber[]
-  activities   TaskActivity[]
+  assignees       TaskAssignee[]
+  labels          TaskLabel[]
+  comments        TaskComment[]
+  attachments     TaskAttachment[]
+  dependencies    TaskDependency[] @relation("DependentTask")
+  dependents      TaskDependency[] @relation("DependencyOf")
+  subscribers     TaskSubscriber[]
+  activities      TaskActivity[]
+  propertyValues  TaskPropertyValue[]
 
   @@unique([projectId, number])
   @@index([tenantId])
@@ -2558,6 +2562,80 @@ model TaskView {
   @@index([projectId])
   @@index([tenantId])
   @@map("task_views")
+  @@schema("public")
+}
+
+// ─── Custom Properties ──────────────────────────────────
+
+enum PropertyType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTI_SELECT
+  DATE
+  PERSON
+  CHECKBOX
+  URL
+
+  @@schema("public")
+  @@map("property_type")
+}
+
+model ProjectPropertyDefinition {
+  id          String       @id @default(uuid())
+  name        String
+  type        PropertyType
+  /// For SELECT / MULTI_SELECT: JSON array of { id: string, label: string, color: string }
+  options     Json?
+  sortOrder   Int          @default(0)
+  isRequired  Boolean      @default(false)
+  isVisible   Boolean      @default(false)
+  isFilterable Boolean     @default(true)
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  values TaskPropertyValue[]
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@map("project_property_definitions")
+  @@schema("public")
+}
+
+model TaskPropertyValue {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  propertyDefinitionId String
+  propertyDefinition   ProjectPropertyDefinition @relation(fields: [propertyDefinitionId], references: [id], onDelete: Cascade)
+
+  /// Populated according to the property's type
+  textValue        String?
+  numberValue      Float?
+  dateValue        DateTime?
+  booleanValue     Boolean?
+  /// SELECT stores one id; MULTI_SELECT stores multiple ids (from options JSON)
+  selectedOptionIds String[]
+  /// PERSON stores the userId of a project member
+  personUserId     String?
+  personUser       User?    @relation("TaskPropertyPersonValues", fields: [personUserId], references: [id], onDelete: SetNull)
+
+  tenantId String
+
+  @@unique([taskId, propertyDefinitionId])
+  @@index([propertyDefinitionId])
+  @@index([tenantId])
+  @@map("task_property_values")
   @@schema("public")
 }
 

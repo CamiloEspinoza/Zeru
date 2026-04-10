@@ -154,6 +154,7 @@ export class TeamChatService {
                 firstName: true,
                 lastName: true,
                 email: true,
+                avatarUrl: true,
               },
             },
           },
@@ -209,7 +210,7 @@ export class TeamChatService {
         },
         include: {
           author: {
-            select: { id: true, firstName: true, lastName: true, email: true },
+            select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
           },
           mentions: { include: { mentionedUser: { select: { id: true, firstName: true, lastName: true } } } },
           reactions: true,
@@ -254,13 +255,13 @@ export class TeamChatService {
       take: limit,
       include: {
         author: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
         reactions: true,
         mentions: {
           include: {
             mentionedUser: {
-              select: { id: true, firstName: true, lastName: true },
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
             },
           },
         },
@@ -322,7 +323,7 @@ export class TeamChatService {
       data: { content, editedAt: new Date() },
       include: {
         author: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
         reactions: true,
       },

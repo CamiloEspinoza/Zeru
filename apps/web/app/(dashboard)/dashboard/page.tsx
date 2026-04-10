@@ -197,7 +197,7 @@ export default function DashboardPage() {
             <Link href="/org-intelligence/projects">
               <Card className="cursor-pointer transition-colors hover:bg-muted/50">
                 <CardHeader className="pb-2">
-                  <CardDescription>Proyectos activos</CardDescription>
+                  <CardDescription>Tableros activos</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold tabular-nums">

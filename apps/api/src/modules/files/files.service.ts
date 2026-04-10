@@ -77,7 +77,7 @@ export class FilesService {
         take: perPage,
         orderBy: { createdAt: 'desc' },
         include: {
-          uploadedBy: { select: { id: true, firstName: true, lastName: true } },
+          uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
           conversation: { select: { id: true, title: true } },
           journalEntries: {
             include: {
@@ -101,7 +101,7 @@ export class FilesService {
     const doc = await this.prisma.document.findFirst({
       where: { id: docId, tenantId },
       include: {
-        uploadedBy: { select: { id: true, firstName: true, lastName: true } },
+        uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
         conversation: { select: { id: true, title: true } },
         journalEntries: {
           include: {

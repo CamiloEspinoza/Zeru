@@ -23,14 +23,14 @@ export class TaskCommentsService {
       orderBy: { createdAt: 'asc' },
       include: {
         author: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
         replies: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
           include: {
             author: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
             },
             reactions: true,
           },
@@ -66,7 +66,7 @@ export class TaskCommentsService {
       },
       include: {
         author: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
       },
     });
@@ -138,7 +138,7 @@ export class TaskCommentsService {
       },
       include: {
         author: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
       },
     });

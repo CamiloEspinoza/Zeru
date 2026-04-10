@@ -134,7 +134,7 @@ export class AccountingProcessService {
           where: { fiscalPeriodId },
           include: {
             completedBy: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
             },
           },
         },
@@ -192,7 +192,7 @@ export class AccountingProcessService {
       },
       include: {
         completedBy: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
       },
     });

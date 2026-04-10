@@ -234,7 +234,7 @@ export class TasksService {
           assignees: {
             include: {
               user: {
-                select: { id: true, firstName: true, lastName: true, email: true },
+                select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
               },
             },
           },
@@ -273,7 +273,7 @@ export class TasksService {
         assignees: {
           include: {
             user: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
             },
           },
         },
@@ -287,7 +287,7 @@ export class TasksService {
           orderBy: { createdAt: 'asc' },
           include: {
             author: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
             },
             reactions: true,
           },
@@ -295,7 +295,7 @@ export class TasksService {
         attachments: {
           include: {
             uploadedBy: {
-              select: { id: true, firstName: true, lastName: true },
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
             },
           },
         },
@@ -309,7 +309,7 @@ export class TasksService {
         subscribers: {
           include: {
             user: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
             },
           },
         },
@@ -318,7 +318,7 @@ export class TasksService {
           take: 20,
           include: {
             actor: {
-              select: { id: true, firstName: true, lastName: true },
+              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
             },
           },
         },
@@ -335,7 +335,7 @@ export class TasksService {
             assignees: {
               include: {
                 user: {
-                  select: { id: true, firstName: true, lastName: true },
+                  select: { id: true, firstName: true, lastName: true, avatarUrl: true },
                 },
               },
             },
@@ -864,7 +864,7 @@ export class TasksService {
           assignees: {
             include: {
               user: {
-                select: { id: true, firstName: true, lastName: true },
+                select: { id: true, firstName: true, lastName: true, avatarUrl: true },
               },
             },
           },

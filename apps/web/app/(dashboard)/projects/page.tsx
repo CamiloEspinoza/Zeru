@@ -39,7 +39,7 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Proyectos</h1>
+          <h1 className="text-2xl font-semibold">Tableros</h1>
           <p className="text-sm text-muted-foreground">
             Organiza tareas, colabora y haz seguimiento al progreso
           </p>
@@ -48,7 +48,7 @@ export default function ProjectsPage() {
       </div>
 
       <Input
-        placeholder="Buscar proyectos..."
+        placeholder="Buscar tableros..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-sm"
@@ -66,9 +66,9 @@ export default function ProjectsPage() {
         </div>
       ) : projects.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <h3 className="text-base font-medium">No hay proyectos</h3>
+          <h3 className="text-base font-medium">No hay tableros</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crea tu primer proyecto para empezar a organizar tareas.
+            Crea tu primer tablero para empezar a organizar tareas.
           </p>
         </div>
       ) : (

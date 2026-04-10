@@ -196,7 +196,7 @@ export class TaskActivityService {
       take: dto.limit + 1, // Fetch one extra to determine hasMore
       include: {
         actor: {
-          select: { id: true, firstName: true, lastName: true },
+          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
         },
       },
     });

@@ -64,7 +64,7 @@ export class JournalEntriesService {
             },
           },
           createdBy: {
-            select: { id: true, firstName: true, lastName: true },
+            select: { id: true, firstName: true, lastName: true, avatarUrl: true },
           },
           conversation: {
             select: { id: true, title: true },
@@ -103,7 +103,7 @@ export class JournalEntriesService {
           },
         },
         createdBy: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
         conversation: {
           select: { id: true, title: true },

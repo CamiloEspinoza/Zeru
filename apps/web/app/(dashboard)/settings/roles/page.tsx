@@ -179,7 +179,7 @@ export default function RolesSettingsPage() {
       ...role,
       moduleAccess: MODULE_DEFINITIONS.map((m) => ({
         moduleKey: m.key,
-        accessLevel: getModuleAccess(role.moduleAccess, m.key),
+        accessLevel: getModuleAccess(role.moduleAccess ?? [], m.key),
       })),
     });
     setEditorOpen(true);
@@ -243,6 +243,19 @@ export default function RolesSettingsPage() {
     setEditingRole((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
+  function setAllModulesLevel(level: AccessLevel) {
+    setEditingRole((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        moduleAccess: prev.moduleAccess.map((a) => ({
+          ...a,
+          accessLevel: level,
+        })),
+      };
+    });
+  }
+
   function setModuleLevel(moduleKey: string, level: AccessLevel) {
     setEditingRole((prev) => {
       if (!prev) return prev;
@@ -292,7 +305,7 @@ export default function RolesSettingsPage() {
     currentModuleLevel: AccessLevel,
   ): { checked: boolean; isOverride: boolean; includedByLevel: boolean } {
     const fullKey = `${moduleKey}:${permKey}`;
-    const override = editingRole?.overrides.find(
+    const override = (editingRole?.overrides ?? []).find(
       (o) => o.permission === fullKey,
     );
     const includedByLevel = isPermissionIncludedByLevel(
@@ -495,7 +508,14 @@ export default function RolesSettingsPage() {
                     <TableHead className="w-[200px]">Módulo</TableHead>
                     {ACCESS_LEVELS.map((level) => (
                       <TableHead key={level.value} className="text-center">
-                        {level.label}
+                        <button
+                          type="button"
+                          onClick={() => setAllModulesLevel(level.value)}
+                          className="hover:text-primary hover:underline cursor-pointer transition-colors"
+                          title={`Seleccionar "${level.label}" para todos los módulos`}
+                        >
+                          {level.label}
+                        </button>
                       </TableHead>
                     ))}
                     <TableHead className="w-[100px]" />

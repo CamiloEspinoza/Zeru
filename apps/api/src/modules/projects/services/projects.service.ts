@@ -195,7 +195,7 @@ export class ProjectsService {
         take: dto.perPage,
         include: {
           createdBy: {
-            select: { id: true, firstName: true, lastName: true, email: true },
+            select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
           },
           _count: {
             select: {
@@ -226,7 +226,7 @@ export class ProjectsService {
       where: { id, deletedAt: null },
       include: {
         createdBy: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
         },
         members: {
           include: {
@@ -236,6 +236,7 @@ export class ProjectsService {
                 firstName: true,
                 lastName: true,
                 email: true,
+                avatarUrl: true,
               },
             },
           },

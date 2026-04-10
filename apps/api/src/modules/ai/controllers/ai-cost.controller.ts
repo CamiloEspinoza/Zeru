@@ -75,7 +75,7 @@ export class AiCostController {
     const userIds = rows.map((r) => r.userId).filter(Boolean) as string[];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, firstName: true, lastName: true, email: true },
+      select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
     const totalCost = rows.reduce((sum, r) => sum + Number(r._sum.costUsd ?? 0), 0);

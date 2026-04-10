@@ -6,11 +6,14 @@ import { cn } from "@/lib/utils";
 import { usePresenceStore } from "@/stores/presence-store";
 import type { PresenceUser } from "@zeru/shared";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
 interface ProjectPresenceAvatarsProps {
   projectId: string;
   max?: number;
 }
+
+const EMPTY_USERS: PresenceUser[] = [];
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -21,7 +24,8 @@ function initials(name: string): string {
 
 export function ProjectPresenceAvatars({ projectId, max = 4 }: ProjectPresenceAvatarsProps) {
   const pathname = usePathname();
-  const users = usePresenceStore((s) => s.viewUsers.get(pathname ?? `/projects/${projectId}`) ?? []);
+  const viewKey = pathname ?? `/projects/${projectId}`;
+  const users = usePresenceStore((s) => s.viewUsers.get(viewKey) ?? EMPTY_USERS);
 
   if (users.length === 0) return null;
 

@@ -11,6 +11,7 @@ const userSelect = {
   email: true,
   firstName: true,
   lastName: true,
+  avatarUrl: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -36,14 +37,25 @@ export class UsersService {
   ) {}
 
   /** Lista todos los usuarios de un tenant (via membresías) */
-  async findAll(tenantId: string, query?: { page?: number; perPage?: number }) {
+  async findAll(tenantId: string, query?: { page?: number; perPage?: number; search?: string }) {
     const page = query?.page ?? 1;
     const perPage = query?.perPage ?? 10;
     const skip = (page - 1) * perPage;
 
+    const where: Record<string, unknown> = { tenantId };
+    if (query?.search) {
+      where.user = {
+        OR: [
+          { firstName: { contains: query.search, mode: 'insensitive' } },
+          { lastName: { contains: query.search, mode: 'insensitive' } },
+          { email: { contains: query.search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
     const [memberships, total] = await Promise.all([
       this.prisma.userTenant.findMany({
-        where: { tenantId },
+        where,
         include: {
           user: { select: userSelect },
           roleRef: { select: { id: true, name: true, slug: true } },
@@ -52,7 +64,7 @@ export class UsersService {
         take: perPage,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.userTenant.count({ where: { tenantId } }),
+      this.prisma.userTenant.count({ where }),
     ]);
 
     return {

@@ -4,10 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
+import type { TaskComment } from "@/types/projects";
+
+const EMPTY_COMMENTS: TaskComment[] = [];
 import { tasksApi } from "@/lib/api/tasks";
 import { TaskCommentTyping } from "./task-comment-typing";
 
@@ -34,7 +37,7 @@ function timeAgo(iso: string): string {
 export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
   const socket = useSocket();
   const setComments = useProjectStore((s) => s.setComments);
-  const comments = useProjectStore((s) => s.commentsByTask.get(taskId) ?? []);
+  const comments = useProjectStore((s) => s.commentsByTask.get(taskId)) ?? EMPTY_COMMENTS;
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -137,6 +140,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <Avatar className="size-8">
+                {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt={comment.author.firstName} />}
                 <AvatarFallback className="text-xs">
                   {initials(comment.author.firstName, comment.author.lastName)}
                 </AvatarFallback>

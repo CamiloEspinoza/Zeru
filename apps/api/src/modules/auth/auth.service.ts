@@ -363,6 +363,7 @@ export class AuthService {
         email: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,

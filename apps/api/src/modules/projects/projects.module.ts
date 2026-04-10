@@ -5,11 +5,13 @@ import { ProjectSectionsController } from './controllers/project-sections.contro
 import { ProjectStatusesController } from './controllers/project-statuses.controller';
 import { ProjectLabelsController } from './controllers/project-labels.controller';
 import { ProjectViewsController } from './controllers/project-views.controller';
+import { ProjectPropertiesController } from './controllers/project-properties.controller';
 import { ProjectsService } from './services/projects.service';
 import { ProjectMembersService } from './services/project-members.service';
 import { ProjectStatusesService } from './services/project-statuses.service';
 import { ProjectLabelsService } from './services/project-labels.service';
 import { ProjectViewsService } from './services/project-views.service';
+import { ProjectPropertiesService } from './services/project-properties.service';
 
 @Module({
   controllers: [
@@ -19,6 +21,7 @@ import { ProjectViewsService } from './services/project-views.service';
     ProjectStatusesController,
     ProjectLabelsController,
     ProjectViewsController,
+    ProjectPropertiesController,
   ],
   providers: [
     ProjectsService,
@@ -26,6 +29,7 @@ import { ProjectViewsService } from './services/project-views.service';
     ProjectStatusesService,
     ProjectLabelsService,
     ProjectViewsService,
+    ProjectPropertiesService,
   ],
   exports: [ProjectsService, ProjectMembersService],
 })

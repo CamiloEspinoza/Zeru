@@ -10,6 +10,8 @@ interface TaskPresenceAvatarsProps {
   taskId: string;
 }
 
+const EMPTY_USERS: PresenceUser[] = [];
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 0) return "?";
@@ -19,7 +21,7 @@ function initials(name: string): string {
 
 export function TaskPresenceAvatars({ projectId, taskId }: TaskPresenceAvatarsProps) {
   const viewPath = `/projects/${projectId}/task/${taskId}`;
-  const users = usePresenceStore((s) => s.viewUsers.get(viewPath) ?? []);
+  const users = usePresenceStore((s) => s.viewUsers.get(viewPath) ?? EMPTY_USERS);
 
   if (users.length === 0) return null;
 
