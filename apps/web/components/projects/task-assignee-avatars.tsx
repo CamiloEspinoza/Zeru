@@ -2,6 +2,7 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 import type { UserSummary } from "@/types/projects";
 
 interface TaskAssigneeAvatarsProps {
@@ -30,7 +31,7 @@ export function TaskAssigneeAvatars({ assignees, max = 3, size = "sm" }: TaskAss
           className={cn(sizeClass, "border-2 border-background")}
           title={`${a.user.firstName} ${a.user.lastName}`}
         >
-          {a.user.avatarUrl && <AvatarImage src={a.user.avatarUrl} alt={a.user.firstName} />}
+          {a.userId && <AvatarImage src={getUserAvatarUrl(a.userId)!} alt={a.user.firstName} />}
           <AvatarFallback>{initials(a.user)}</AvatarFallback>
         </Avatar>
       ))}

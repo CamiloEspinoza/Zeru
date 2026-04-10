@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
@@ -140,7 +141,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <Avatar className="size-8">
-                {comment.author.avatarUrl && <AvatarImage src={comment.author.avatarUrl} alt={comment.author.firstName} />}
+                {comment.authorId && <AvatarImage src={getUserAvatarUrl(comment.authorId)!} alt={comment.author.firstName} />}
                 <AvatarFallback className="text-xs">
                   {initials(comment.author.firstName, comment.author.lastName)}
                 </AvatarFallback>

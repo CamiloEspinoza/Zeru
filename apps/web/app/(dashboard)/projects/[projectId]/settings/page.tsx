@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -277,7 +278,7 @@ function MemberRow({
     <div className="flex items-center justify-between rounded-md border p-3">
       <div className="flex items-center gap-3">
         <Avatar className="size-8">
-          {member.user.avatarUrl && <AvatarImage src={member.user.avatarUrl} alt={member.user.firstName} />}
+          {member.userId && <AvatarImage src={getUserAvatarUrl(member.userId)!} alt={member.user.firstName} />}
           <AvatarFallback className="text-xs">
             {userInitials(member.user.firstName, member.user.lastName)}
           </AvatarFallback>
@@ -427,7 +428,7 @@ function InviteMemberDialog({
                 className="flex w-full items-center gap-3 rounded-md p-2 text-sm hover:bg-accent transition-colors"
               >
                 <Avatar className="size-7">
-                  {u.avatarUrl && <AvatarImage src={u.avatarUrl} alt={u.firstName} />}
+                  {u.id && <AvatarImage src={getUserAvatarUrl(u.id)!} alt={u.firstName} />}
                   <AvatarFallback className="text-[10px]">
                     {userInitials(u.firstName, u.lastName)}
                   </AvatarFallback>
