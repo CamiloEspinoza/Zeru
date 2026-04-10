@@ -1,8 +1,5 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -10,52 +7,21 @@ import { TaskPriorityBadge } from "@/components/projects/task-priority-badge";
 import { TaskAssigneeAvatars } from "@/components/projects/task-assignee-avatars";
 import type { Task } from "@/types/projects";
 
-interface KanbanCardProps {
+interface KanbanCardOverlayProps {
   task: Task;
   projectKey: string;
 }
 
-export function KanbanCard({ task, projectKey }: KanbanCardProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: task.id,
-    data: { type: "task", task },
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
+/** Rendered inside DragOverlay — a visual clone of the card that follows the cursor. */
+export function KanbanCardOverlay({ task, projectKey }: KanbanCardOverlayProps) {
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const isOverdue = dueDate ? dueDate < new Date() && !task.completedAt : false;
 
-  function handleClick() {
-    const params = new URLSearchParams(searchParams);
-    params.set("task", task.id);
-    router.push(`${pathname}?${params.toString()}`);
-  }
-
   return (
     <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      onClick={handleClick}
       className={cn(
-        "cursor-pointer rounded-md border bg-card p-3 shadow-sm transition-shadow hover:shadow-md",
-        isDragging && "z-10 cursor-grabbing opacity-[0.05]",
+        "w-[272px] cursor-grabbing rounded-md border bg-card p-3 shadow-lg",
+        "rotate-[2deg] scale-[1.02]",
       )}
     >
       {/* Labels */}

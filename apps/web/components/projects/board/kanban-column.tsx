@@ -16,6 +16,7 @@ interface KanbanColumnProps {
   projectId: string;
   projectKey: string;
   onTaskCreated: () => void;
+  isOver: boolean;
 }
 
 export function KanbanColumn({
@@ -25,16 +26,21 @@ export function KanbanColumn({
   projectId,
   projectKey,
   onTaskCreated,
+  isOver,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: status.id,
+  const { setNodeRef } = useDroppable({
+    id: `column-${status.id}`,
     data: { type: "column", statusId: status.id },
   });
 
   const color = status.color ?? "#6B7280";
 
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-lg bg-muted/40">
+    <div
+      className={`flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-colors ${
+        isOver ? "ring-2 ring-primary/40" : ""
+      }`}
+    >
       <div
         className="flex items-center justify-between border-b px-3 py-2"
         style={{ borderTopColor: color, borderTopWidth: 3 }}
@@ -46,11 +52,12 @@ export function KanbanColumn({
       </div>
       <div
         ref={setNodeRef}
-        className={`flex min-h-[100px] flex-1 flex-col gap-2 p-2 transition-colors ${
-          isOver ? "bg-accent/40" : ""
-        }`}
+        className="flex min-h-[100px] flex-1 flex-col gap-1 p-2"
       >
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
           {tasks.map((task) => (
             <KanbanCard key={task.id} task={task} projectKey={projectKey} />
           ))}
@@ -61,7 +68,11 @@ export function KanbanColumn({
           defaultStatusId={status.id}
           onCreated={onTaskCreated}
           trigger={
-            <Button variant="ghost" size="sm" className="justify-start text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="justify-start text-muted-foreground"
+            >
               <HugeiconsIcon icon={PlusSignIcon} className="mr-2 size-4" />
               Agregar tarea
             </Button>
