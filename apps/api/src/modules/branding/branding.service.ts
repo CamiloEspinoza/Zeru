@@ -134,10 +134,104 @@ export class BrandingService {
     };
   }
 
-  /**
-   * Placeholder for AI palette generation — see Task 5.
-   */
-  async generatePalette(_tenantId: string, _dto: GeneratePaletteDto): Promise<never> {
-    throw new Error('Not implemented - see Task 5');
+  async generatePalette(tenantId: string, dto: GeneratePaletteDto) {
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI();
+
+    if (dto.source === 'logo') {
+      const branding = await this.prisma.tenantBranding.findUnique({
+        where: { tenantId },
+      });
+      if (!branding?.logoUrl && !branding?.isotipoUrl) {
+        throw new BadRequestException('Debes subir un logo o isotipo primero');
+      }
+
+      const imageKey = branding.logoUrl || branding.isotipoUrl;
+      const imageUrl = await this.storage.getPresignedUrl(imageKey!);
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        max_tokens: 256,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: imageUrl },
+              },
+              {
+                type: 'text',
+                text: `Analiza este logotipo y sugiere una paleta de 3 colores para una aplicación web:
+- primary: el color dominante/principal del logo, para botones y acciones principales
+- secondary: un color complementario, para badges y elementos secundarios
+- accent: un color de acento, para notificaciones y alertas
+
+Requisitos:
+- Los colores deben funcionar bien sobre fondo blanco (light mode) y fondo oscuro (dark mode)
+- Ratio de contraste WCAG AA mínimo (4.5:1) para texto blanco sobre cada color
+- Los 3 colores deben ser visualmente distintos entre sí
+
+Responde SOLO con JSON válido, sin markdown: {"primary":"#hex","secondary":"#hex","accent":"#hex"}`,
+              },
+            ],
+          },
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content?.trim();
+      if (!content) throw new BadRequestException('No se pudo generar la paleta');
+
+      const palette = JSON.parse(content);
+      await this.logAiUsage(tenantId, response);
+      return palette;
+    }
+
+    // source === 'description'
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 256,
+      messages: [
+        {
+          role: 'user',
+          content: `Genera una paleta de 3 colores para una aplicación web basándote en esta descripción: "${dto.description}"
+
+- primary: color principal para botones y acciones
+- secondary: color complementario para badges y elementos secundarios
+- accent: color de acento para notificaciones y alertas
+
+Requisitos:
+- Los colores deben funcionar bien sobre fondo blanco y fondo oscuro
+- Ratio de contraste WCAG AA mínimo (4.5:1) para texto blanco sobre cada color
+- Los 3 colores deben ser visualmente distintos entre sí
+
+Responde SOLO con JSON válido, sin markdown: {"primary":"#hex","secondary":"#hex","accent":"#hex"}`,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim();
+    if (!content) throw new BadRequestException('No se pudo generar la paleta');
+
+    const palette = JSON.parse(content);
+    await this.logAiUsage(tenantId, response);
+    return palette;
+  }
+
+  private async logAiUsage(tenantId: string, response: any) {
+    try {
+      await this.prisma.aiUsageLog.create({
+        data: {
+          tenantId,
+          provider: 'OPENAI',
+          model: response.model || 'gpt-4o',
+          feature: 'branding-palette-generation',
+          inputTokens: response.usage?.prompt_tokens || 0,
+          outputTokens: response.usage?.completion_tokens || 0,
+        },
+      });
+    } catch (error) {
+      this.logger.warn('Failed to log AI usage', error);
+    }
   }
 }
