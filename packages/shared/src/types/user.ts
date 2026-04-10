@@ -1,10 +1,18 @@
 export type UserRole = 'OWNER' | 'ADMIN' | 'ACCOUNTANT' | 'VIEWER';
+export type UserType = 'HUMAN' | 'SERVICE';
+
+export interface RoleInfo {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
+  type: UserType;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -29,6 +37,7 @@ export interface UserWithMemberships extends User {
 /** Usuario como se devuelve en el contexto de un tenant específico */
 export interface UserInTenant extends User {
   role: UserRole;
+  roleRef?: RoleInfo | null;
   membershipId: string;
 }
 
@@ -36,6 +45,7 @@ export interface UserInTenant extends User {
 export interface MembershipWithTenant {
   id: string;
   role: UserRole;
+  roleRef?: RoleInfo | null;
   tenantId: string;
   tenant: { id: string; name: string; slug: string };
 }

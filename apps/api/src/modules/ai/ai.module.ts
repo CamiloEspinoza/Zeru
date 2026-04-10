@@ -5,6 +5,8 @@ import { FilesModule } from '../files/files.module';
 import { LinkedInModule } from '../linkedin/linkedin.module';
 import { AiConfigService } from './services/ai-config.service';
 import { GeminiConfigService } from './services/gemini-config.service';
+import { AiPricingService } from './services/ai-pricing.service';
+import { AiUsageService } from './services/ai-usage.service';
 import { ActiveStreamsRegistry } from './services/active-streams.registry';
 import { BackgroundQueueService } from './services/background-queue.service';
 import { ChatService } from './services/chat.service';
@@ -13,6 +15,9 @@ import { SkillsService } from './services/skills.service';
 import { ToolExecutor } from './tools/tool-executor';
 import { AiConfigController } from './controllers/ai-config.controller';
 import { GeminiConfigController } from './controllers/gemini-config.controller';
+import { AiPricingController } from './controllers/ai-pricing.controller';
+import { AiCostController } from './controllers/ai-cost.controller';
+import { AiCostGlobalController } from './controllers/ai-cost-global.controller';
 import { ChatController } from './controllers/chat.controller';
 import { MemoryController } from './controllers/memory.controller';
 import { SkillsController } from './controllers/skills.controller';
@@ -20,8 +25,8 @@ import { EncryptionModule } from '../../common/services/encryption.module';
 
 @Module({
   imports: [PrismaModule, AccountingModule, FilesModule, EncryptionModule, forwardRef(() => LinkedInModule)],
-  controllers: [AiConfigController, GeminiConfigController, ChatController, MemoryController, SkillsController],
-  providers: [ActiveStreamsRegistry, AiConfigService, GeminiConfigService, BackgroundQueueService, ChatService, MemoryService, SkillsService, ToolExecutor],
-  exports: [ActiveStreamsRegistry, AiConfigService, GeminiConfigService, BackgroundQueueService, MemoryService, SkillsService],
+  controllers: [AiConfigController, GeminiConfigController, AiPricingController, AiCostController, AiCostGlobalController, ChatController, MemoryController, SkillsController],
+  providers: [ActiveStreamsRegistry, AiConfigService, GeminiConfigService, AiPricingService, AiUsageService, BackgroundQueueService, ChatService, MemoryService, SkillsService, ToolExecutor],
+  exports: [ActiveStreamsRegistry, AiConfigService, GeminiConfigService, AiPricingService, AiUsageService, BackgroundQueueService, MemoryService, SkillsService],
 })
 export class AiModule {}

@@ -23,6 +23,21 @@ const SOFT_DELETABLE_MODELS = new Set([
   'linkedInConnection',
   'linkedInPost',
   'linkedInAgentConfig',
+  'legalEntity',
+  'legalEntityContact',
+  'legalEntityBankAccount',
+  'labOrigin',
+  'billingAgreement',
+  'billingAgreementLine',
+  'billingContact',
+  'billingConcept',
+  'project',
+  'projectSection',
+  'taskStatusConfig',
+  'task',
+  'taskComment',
+  'label',
+  'taskView',
 ]);
 
 const READ_OPS = new Set([

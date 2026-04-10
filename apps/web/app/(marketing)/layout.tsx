@@ -11,29 +11,31 @@ const bricolage = Bricolage_Grotesque({
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://zeruapp.com";
 
 export const metadata: Metadata = {
-  title: "Zeru — Gestión empresarial con agentes de IA, gratuito y open source",
+  title: "Zeru \u2014 Inteligencia Organizacional con IA | Diagnostica tu empresa en d\u00edas",
   description:
-    "Zeru es una plataforma de gestión empresarial construida sobre agentes de inteligencia artificial. Gratuita, open source y multitenant. Crea asientos contables, procesa documentos y gestiona tu empresa en conversación.",
+    "Sube entrevistas con tu equipo y Zeru las transcribe, analiza y diagnostica autom\u00e1ticamente. Knowledge Graph y plan de mejoras con IA. ~$0.65/entrevista.",
   keywords: [
-    "gestión empresarial",
-    "contabilidad IA",
-    "asistente contable",
-    "open source",
-    "ERP Chile",
-    "factura electrónica",
-    "SII",
-    "agentes de inteligencia artificial",
-    "contabilidad chilena",
-    "software contable gratis",
+    "inteligencia organizacional con IA",
+    "diagn\u00f3stico organizacional automatizado",
+    "software diagn\u00f3stico empresarial",
+    "an\u00e1lisis organizacional con inteligencia artificial",
+    "transcripci\u00f3n entrevistas organizacionales",
+    "knowledge graph empresarial",
+    "cuellos de botella organizacionales",
+    "organigrama inteligente con IA",
+    "plataforma gesti\u00f3n empresarial Chile",
+    "c\u00f3mo diagnosticar mi empresa con IA",
+    "alternativa a consultor\u00eda organizacional",
+    "software para entender procesos internos de empresa",
   ],
   authors: [{ name: "Camilo Espinoza", url: "https://www.linkedin.com/in/camilo-espinoza-c/" }],
   creator: "Camilo Espinoza",
   metadataBase: new URL(SITE_URL),
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Zeru — Gestión empresarial con agentes de IA",
+    title: "Zeru \u2014 Inteligencia Organizacional con IA",
     description:
-      "Plataforma gratuita y open source con asistente contable IA. Contabilidad, documentos, inventario y mucho más.",
+      "Plataforma de inteligencia organizacional con IA. Transcribe entrevistas, extrae conocimiento, genera organigramas y diagnostica tu empresa autom\u00e1ticamente.",
     type: "website",
     url: SITE_URL,
     siteName: "Zeru",
@@ -41,9 +43,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Zeru — Gestión empresarial con agentes de IA",
+    title: "Zeru \u2014 Inteligencia Organizacional con IA",
     description:
-      "Plataforma gratuita y open source con asistente contable IA. Contabilidad, documentos, inventario y mucho más.",
+      "Sube entrevistas con tu equipo y Zeru las transcribe, analiza y diagnostica autom\u00e1ticamente. Knowledge Graph y plan de mejoras con IA. ~$0.65/entrevista.",
   },
   robots: {
     index: true,

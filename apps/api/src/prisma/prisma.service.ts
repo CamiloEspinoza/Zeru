@@ -8,16 +8,19 @@ type ExtendedClient = ReturnType<PrismaClient['$extends']>;
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly _client: ExtendedClient;
+  /** Raw PrismaClient without soft-delete extension. Use for queries that need to see deleted records. */
+  readonly rawClient: PrismaClient;
 
   constructor() {
     const base = new PrismaClient();
+    this.rawClient = base;
     this._client = base.$extends(
       createSoftDeleteExtension(base),
     ) as ExtendedClient;
 
     return new Proxy(this, {
       get(target, prop: string | symbol) {
-        if (typeof prop === 'string' && (prop in target || ['forTenant', 'onModuleInit', 'onModuleDestroy', '_client'].includes(prop))) {
+        if (typeof prop === 'string' && (prop in target || ['forTenant', 'onModuleInit', 'onModuleDestroy', '_client', 'rawClient'].includes(prop))) {
           return (target as Record<string | symbol, unknown>)[prop];
         }
         const client = (target as PrismaService)._client;
@@ -43,11 +46,21 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
    * Uses Prisma client extensions for row-level multitenancy.
    * Soft delete is applied via the base extended client.
    */
+  /** Models that do not have a tenantId column (global/auth entities) */
+  private static readonly MODELS_WITHOUT_TENANT = new Set([
+    'Tenant', 'User', 'LoginCode', 'WaitlistEntry', 'FeatureRequest',
+  ]);
+
   forTenant(tenantId: string) {
+    const skipModels = PrismaService.MODELS_WITHOUT_TENANT;
     return this._client.$extends({
       name: 'tenantScope',
       query: {
-        $allOperations({ args, query, operation }) {
+        $allOperations({ model, args, query, operation }) {
+          if (model && skipModels.has(model)) {
+            return query(args);
+          }
+
           const writeOps = ['create', 'createMany', 'upsert'];
           const readOps = [
             'findFirst',
@@ -60,6 +73,19 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
             'groupBy',
           ];
           const mutateOps = ['update', 'updateMany', 'delete', 'deleteMany'];
+
+          if (operation === 'upsert') {
+            if (args.where && typeof args.where === 'object') {
+              (args.where as Record<string, unknown>).tenantId = tenantId;
+            }
+            if (args.create && typeof args.create === 'object') {
+              (args.create as Record<string, unknown>).tenantId = tenantId;
+            }
+            if (args.update && typeof args.update === 'object') {
+              (args.update as Record<string, unknown>).tenantId = tenantId;
+            }
+            return query(args);
+          }
 
           if (writeOps.includes(operation)) {
             if ('data' in args) {

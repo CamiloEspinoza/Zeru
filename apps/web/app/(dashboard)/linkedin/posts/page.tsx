@@ -3,6 +3,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface LinkedInPost {
   id: string;
@@ -55,6 +71,11 @@ export default function LinkedInPostsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAction, setBulkAction] = useState<"publish" | "cancel" | null>(null);
 
+  // Publish confirmation dialog state
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
+  const [postToPublish, setPostToPublish] = useState<LinkedInPost | null>(null);
+  const [bulkPublishConfirmOpen, setBulkPublishConfirmOpen] = useState(false);
+
   const fetchPosts = useCallback(() => {
     setLoading(true);
     setSelected(new Set());
@@ -78,6 +99,8 @@ export default function LinkedInPostsPage() {
   }, [fetchPosts]);
 
   const handlePublish = async (postId: string) => {
+    setPublishConfirmOpen(false);
+    setPostToPublish(null);
     setActionLoading(postId);
     try {
       await api.post(`/linkedin/posts/${postId}/publish`, {});
@@ -121,6 +144,7 @@ export default function LinkedInPostsPage() {
 
   const handleBulkPublish = async () => {
     if (bulkAction || selected.size === 0) return;
+    setBulkPublishConfirmOpen(false);
     setBulkAction("publish");
     try {
       await Promise.allSettled([...selected].map((id) => api.post(`/linkedin/posts/${id}/publish`, {})));
@@ -141,6 +165,11 @@ export default function LinkedInPostsPage() {
     }
   };
 
+  const openPublishConfirmation = (post: LinkedInPost) => {
+    setPostToPublish(post);
+    setPublishConfirmOpen(true);
+  };
+
   const totalPages = Math.ceil(total / 20);
 
   return (
@@ -155,16 +184,20 @@ export default function LinkedInPostsPage() {
 
           {/* Filters */}
           <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="text-sm rounded-lg border border-border bg-background px-3 py-1.5 outline-none focus:ring-1 focus:ring-ring"
+            <Select
+              value={statusFilter || "all"}
+              onValueChange={(v) => { setStatusFilter(v === "all" ? "" : v); setPage(1); }}
             >
-              <option value="">Todos los estados</option>
-              {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todos los estados" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                {Object.entries(STATUS_CONFIG).map(([value, { label }]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -176,7 +209,7 @@ export default function LinkedInPostsPage() {
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
-                onClick={handleBulkPublish}
+                onClick={() => setBulkPublishConfirmOpen(true)}
                 disabled={!!bulkAction}
                 className="flex items-center gap-1.5 rounded-lg bg-[#0A66C2] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#004182] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
@@ -317,7 +350,7 @@ export default function LinkedInPostsPage() {
                     <div className="flex flex-col gap-1.5 shrink-0">
                       {["PENDING_APPROVAL", "SCHEDULED"].includes(post.status) && (
                         <button
-                          onClick={() => handlePublish(post.id)}
+                          onClick={() => openPublishConfirmation(post)}
                           disabled={actionLoading === post.id}
                           className="rounded-lg bg-[#0A66C2] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#004182] transition-colors disabled:opacity-50"
                         >
@@ -367,6 +400,67 @@ export default function LinkedInPostsPage() {
           </div>
         )}
       </div>
+
+      {/* Dialog: Confirmar publicación individual */}
+      <Dialog open={publishConfirmOpen} onOpenChange={setPublishConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Publicar este post en LinkedIn?</DialogTitle>
+            <DialogDescription>
+              El post se publicará inmediatamente en tu perfil de LinkedIn. Esta
+              acción no se puede deshacer fácilmente.
+            </DialogDescription>
+          </DialogHeader>
+          {postToPublish && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs text-foreground line-clamp-4 whitespace-pre-wrap leading-relaxed">
+                {postToPublish.content}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPublishConfirmOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => postToPublish && handlePublish(postToPublish.id)}
+              disabled={!!actionLoading}
+            >
+              {actionLoading ? "Publicando..." : "Publicar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Confirmar publicación masiva */}
+      <Dialog open={bulkPublishConfirmOpen} onOpenChange={setBulkPublishConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Publicar {selected.size} post{selected.size !== 1 ? "s" : ""} en LinkedIn?</DialogTitle>
+            <DialogDescription>
+              Los posts seleccionados se publicarán inmediatamente en tu perfil de
+              LinkedIn. Esta acción no se puede deshacer fácilmente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkPublishConfirmOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleBulkPublish}
+              disabled={!!bulkAction}
+            >
+              {bulkAction === "publish" ? "Publicando..." : "Publicar todos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

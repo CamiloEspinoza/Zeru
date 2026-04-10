@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import type { JournalEntry, JournalEntryStatus } from "@zeru/shared";
@@ -236,7 +237,12 @@ function JournalPageContent() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-muted-foreground py-4">Cargando...</p>
+            <div className="space-y-3 py-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
           ) : (
             <>
               <div className="overflow-x-auto">

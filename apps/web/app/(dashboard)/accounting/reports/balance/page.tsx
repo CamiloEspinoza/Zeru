@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { formatCLP } from "@zeru/shared";
@@ -124,7 +125,12 @@ function TrialBalancePageContent() {
             <p className="text-destructive mb-4">{error}</p>
           )}
           {loading ? (
-            <p className="text-muted-foreground">Cargando...</p>
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

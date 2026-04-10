@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api-client";
+import type { RoleInfo } from "@zeru/shared";
 import { USER_ROLES } from "@zeru/shared";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,9 +33,10 @@ const ROLE_LABELS: Record<string, string> = {
 
 interface CreateUserDialogProps {
   onCreated: () => void;
+  roles?: RoleInfo[];
 }
 
-export function CreateUserDialog({ onCreated }: CreateUserDialogProps) {
+export function CreateUserDialog({ onCreated, roles = [] }: CreateUserDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -140,11 +142,17 @@ export function CreateUserDialog({ onCreated }: CreateUserDialogProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {USER_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {ROLE_LABELS[r] ?? r}
-                    </SelectItem>
-                  ))}
+                  {roles.length > 0
+                    ? roles.map((r) => (
+                        <SelectItem key={r.slug} value={r.slug.toUpperCase()}>
+                          {r.name}
+                        </SelectItem>
+                      ))
+                    : USER_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {ROLE_LABELS[r] ?? r}
+                        </SelectItem>
+                      ))}
                 </SelectContent>
               </Select>
             </div>

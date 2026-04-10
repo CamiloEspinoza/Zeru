@@ -5,86 +5,255 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["public", "citolab_fm", "mod_lab"]
+}
+
+enum PaymentTerms {
+  IMMEDIATE
+  NET_15
+  NET_30
+  NET_45
+  NET_60
+  NET_90
+  CUSTOM
+
+  @@schema("public")
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  VISTA
+  OTHER
+
+  @@schema("public")
+}
+
+enum LabOriginCategory {
+  CONSULTA
+  CENTRO_MEDICO
+  CLINICA_HOSPITAL
+  LABORATORIO
+  OTRO
+
+  @@schema("public")
+}
+
+enum SampleReceptionMode {
+  PRESENCIAL
+  COURIER
+  AMBAS
+
+  @@schema("public")
+}
+
+enum ReportDeliveryMethod {
+  WEB
+  IMPRESO
+  FTP
+  EMAIL
+
+  @@schema("public")
+}
+
+enum BillingAgreementStatus {
+  ACTIVE
+  EXPIRED
+  DRAFT
+
+  @@schema("public")
+}
+
+enum BillingModality {
+  MONTHLY_SETTLEMENT
+  FONASA_VOUCHER
+  ISAPRE_VOUCHER
+  CASH
+  CHECK
+  BANK_TRANSFER
+  OTHER
+
+  @@schema("public")
+}
+
+// ─── Projects & Tasks Enums ─────────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+
+  @@map("project_status")
+  @@schema("public")
+}
+
+enum ProjectVisibility {
+  PUBLIC
+  PRIVATE
+
+  @@map("project_visibility")
+  @@schema("public")
+}
+
+enum ProjectMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+
+  @@map("project_member_role")
+  @@schema("public")
+}
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+
+  @@map("task_priority")
+  @@schema("public")
+}
+
+enum TaskViewType {
+  BOARD
+  LIST
+  CALENDAR
+  TIMELINE
+
+  @@map("task_view_type")
+  @@schema("public")
 }
 
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
-  rut       String?
-  address   String?
-  phone     String?
+  id                    String    @id @default(uuid())
+  name                  String
+  slug                  String    @unique
+  rut                   String?
+  address               String?
+  phone                 String?
   isActive              Boolean   @default(true)
   onboardingCompletedAt DateTime?
   deletedAt             DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  memberships          UserTenant[]
-  aiUsageLogs          AiUsageLog[]
-  aiConfig             AiProviderConfig?
-  geminiConfig         GeminiConfig?
-  storageConfig        StorageConfig?
-  emailConfig          EmailConfig?
-  conversations        Conversation[]
-  accounts             Account[]
-  journalEntries       JournalEntry[]
-  fiscalPeriods        FiscalPeriod[]
-  documents            Document[]
-  accountingSteps      AccountingProcessStep[]
-  memories             Memory[]
-  agentSkills          AgentSkill[]
-  apiKeys              ApiKey[]
-  linkedInConnection   LinkedInConnection?
-  linkedInPosts        LinkedInPost[]
-  linkedInAgentConfig  LinkedInAgentConfig?
+  memberships         UserTenant[]
+  aiUsageLogs         AiUsageLog[]
+  aiConfig            AiProviderConfig?
+  geminiConfig        GeminiConfig?
+  storageConfig       StorageConfig?
+  emailConfig         EmailConfig?
+  conversations       Conversation[]
+  accounts            Account[]
+  journalEntries      JournalEntry[]
+  fiscalPeriods       FiscalPeriod[]
+  documents           Document[]
+  accountingSteps     AccountingProcessStep[]
+  memories            Memory[]
+  agentSkills         AgentSkill[]
+  apiKeys             ApiKey[]
+  linkedInConnection  LinkedInConnection?
+  linkedInPosts       LinkedInPost[]
+  linkedInAgentConfig LinkedInAgentConfig?
+  orgProjects         OrgProject[]
+  departments         Department[]
+  personProfiles      PersonProfile[]
+  orgSuggestions      OrgSuggestion[]
+  channels            Channel[]
+  notifications       Notification[]
+  roles               Role[]
+  fmSyncRecords       FmSyncRecord[]
+  legalEntities       LegalEntity[]
+  labOrigins          LabOrigin[]
+  billingAgreements   BillingAgreement[]
+  billingConcepts     BillingConcept[]
+  projects            Project[]
 
   @@map("tenants")
+  @@schema("public")
+}
+
+enum UserType {
+  HUMAN
+  SERVICE
+
+  @@map("user_type")
+  @@schema("public")
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String?
-  firstName String
-  lastName  String
-  isActive  Boolean  @default(true)
-  deletedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String?
+  firstName  String
+  lastName   String
+  isActive   Boolean   @default(true)
+  superAdmin Boolean   @default(false)
+  type       UserType  @default(HUMAN)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
-  memberships        UserTenant[]
-  conversations      Conversation[]
-  documents          Document[]
-  stepCompletions    AccountingStepCompletion[]
-  memories              Memory[]
-  journalEntriesCreated JournalEntry[]
-  apiKeys               ApiKey[]
+  memberships             UserTenant[]
+  conversations           Conversation[]
+  documents               Document[]
+  stepCompletions         AccountingStepCompletion[]
+  memories                Memory[]
+  journalEntriesCreated   JournalEntry[]
+  apiKeys                 ApiKey[]
+  orgProjectsCreated      OrgProject[]               @relation("OrgProjectsCreated")
+  aiUsageLogs             AiUsageLog[]
+  channelsCreated         Channel[]                  @relation("ChannelCreator")
+  channelMemberships      ChannelMember[]
+  chatMessages            ChatMessage[]              @relation("ChatMessageAuthor")
+  chatReactions           ChatReaction[]             @relation("ChatReactionUser")
+  chatMentionsOf          ChatMention[]              @relation("ChatMentionTarget")
+  notifications           Notification[]             @relation("NotificationRecipient")
+  notificationPreferences NotificationPreference[]   @relation("NotificationPref")
+  personProfiles          PersonProfile[]
+  projectsCreated         Project[]                  @relation("ProjectsCreated")
+  projectMemberships      ProjectMember[]            @relation("ProjectMemberships")
+  tasksCreated            Task[]                     @relation("TasksCreated")
+  taskAssignments         TaskAssignee[]             @relation("TaskAssignments")
+  taskSubscriptions       TaskSubscriber[]           @relation("TaskSubscriptions")
+  taskComments            TaskComment[]              @relation("TaskComments")
+  taskCommentReactions    TaskCommentReaction[]      @relation("TaskCommentReactions")
+  taskActivities          TaskActivity[]             @relation("TaskActivities")
+  taskAttachments         TaskAttachment[]           @relation("TaskAttachments")
+  taskViewsCreated        TaskView[]                 @relation("TaskViewsCreated")
 
   @@map("users")
+  @@schema("public")
 }
 
 /// Membresía: un usuario puede pertenecer a múltiples tenants con roles distintos
 model UserTenant {
-  id        String     @id @default(uuid())
-  role      UserRole   @default(OWNER)
-  isActive  Boolean    @default(true)
+  id        String    @id @default(uuid())
+  role      UserRole  @default(OWNER)
+  isActive  Boolean   @default(true)
   deletedAt DateTime?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  roleId  String?
+  roleRef Role?   @relation(fields: [roleId], references: [id])
 
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
   @@map("user_tenants")
+  @@schema("public")
 }
 
 enum UserRole {
@@ -93,6 +262,67 @@ enum UserRole {
   ADMIN
   ACCOUNTANT
   VIEWER
+
+  @@schema("public")
+}
+
+// ─── RBAC ────────────────────────────────────────────────
+
+enum AccessLevel {
+  NONE
+  VIEW
+  EDIT
+  MANAGE
+
+  @@schema("public")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  description String?
+  isSystem    Boolean  @default(false)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  moduleAccess RoleModuleAccess[]
+  overrides    RolePermissionOverride[]
+  members      UserTenant[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("roles")
+  @@schema("public")
+}
+
+model RoleModuleAccess {
+  id          String      @id @default(uuid())
+  roleId      String
+  role        Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  moduleKey   String
+  accessLevel AccessLevel @default(NONE)
+
+  @@unique([roleId, moduleKey])
+  @@index([roleId])
+  @@map("role_module_access")
+  @@schema("public")
+}
+
+model RolePermissionOverride {
+  id         String  @id @default(uuid())
+  roleId     String
+  role       Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission String
+  granted    Boolean
+
+  @@unique([roleId, permission])
+  @@index([roleId])
+  @@map("role_permission_overrides")
+  @@schema("public")
 }
 
 // ─── AI ──────────────────────────────────────────────────
@@ -101,21 +331,26 @@ enum AiProvider {
   OPENAI
 
   @@map("ai_provider")
+  @@schema("public")
 }
 
 /// Registro detallado de cada interacción con modelos de IA para análisis de costos
 model AiUsageLog {
-  id             String   @id @default(uuid())
-  provider       String   // OPENAI, GEMINI, etc.
-  model          String   // gpt-5.4, text-embedding-3-small, etc.
-  feature        String   // chat, embedding, title-generation, image-generation
-  inputTokens    Int      @default(0)
-  outputTokens   Int      @default(0)
-  totalTokens    Int      @default(0)
-  cachedTokens   Int      @default(0)
+  id              String   @id @default(uuid())
+  provider        String // OPENAI, GEMINI, etc.
+  model           String // gpt-5.4, text-embedding-3-small, etc.
+  feature         String // chat, embedding, title-generation, image-generation
+  inputTokens     Int      @default(0)
+  outputTokens    Int      @default(0)
+  totalTokens     Int      @default(0)
+  cachedTokens    Int      @default(0)
   /// Whether compaction was triggered during this interaction
-  compacted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  compacted       Boolean  @default(false)
+  costUsd         Decimal  @default(0)
+  costOverrideUsd Decimal?
+  units           Decimal?
+  pricingUnit     String?
+  createdAt       DateTime @default(now())
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -123,96 +358,127 @@ model AiUsageLog {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([conversationId])
+  @@index([tenantId, userId, createdAt])
   @@map("ai_usage_logs")
+  @@schema("public")
+}
+
+model AiModelPricing {
+  id                   String    @id @default(uuid())
+  provider             String
+  model                String
+  contextTier          String    @default("DEFAULT")
+  pricingUnit          String // PER_1M_TOKENS, PER_1K_CHARS, PER_HOUR, PER_MINUTE, PER_IMAGE, PER_GENERATION
+  inputPrice           Decimal   @default(0)
+  outputPrice          Decimal   @default(0)
+  cachedPrice          Decimal   @default(0)
+  longContextThreshold Int?
+  description          String?
+  validFrom            DateTime
+  validTo              DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([provider, model, contextTier, validFrom])
+  @@index([provider, model])
+  @@map("ai_model_pricing")
+  @@schema("public")
 }
 
 /// Configuracion de proveedor de IA por tenant
 model AiProviderConfig {
-  id              String      @id @default(uuid())
-  provider        AiProvider  @default(OPENAI)
+  id              String     @id @default(uuid())
+  provider        AiProvider @default(OPENAI)
   encryptedApiKey String
-  model           String      @default("gpt-5.4")
-  reasoningEffort String      @default("medium")
-  isActive        Boolean     @default(true)
+  model           String     @default("gpt-5.4")
+  reasoningEffort String     @default("medium")
+  isActive        Boolean    @default(true)
   deletedAt       DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("ai_provider_configs")
+  @@schema("public")
 }
 
 /// API key de Google Gemini por tenant (para generación de imágenes)
 model GeminiConfig {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   encryptedApiKey String
-  isActive        Boolean  @default(true)
+  isActive        Boolean   @default(true)
   deletedAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("gemini_configs")
+  @@schema("public")
 }
 
 /// Configuracion de almacenamiento S3 por tenant
 model StorageConfig {
-  id                   String   @id @default(uuid())
-  region               String   @default("us-east-1")
+  id                   String    @id @default(uuid())
+  region               String    @default("us-east-1")
   encryptedAccessKeyId String
   encryptedSecretKey   String
   encryptedBucket      String
-  isActive             Boolean  @default(true)
+  isActive             Boolean   @default(true)
   deletedAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("storage_configs")
+  @@schema("public")
 }
 
 /// Configuración de AWS SES para envío de correos por tenant
 model EmailConfig {
-  id                   String   @id @default(uuid())
-  region               String   @default("us-east-1")
+  id                   String    @id @default(uuid())
+  region               String    @default("us-east-1")
   encryptedAccessKeyId String
   encryptedSecretKey   String
   encryptedFromEmail   String
-  isActive             Boolean  @default(true)
+  isActive             Boolean   @default(true)
   deletedAt            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("email_configs")
+  @@schema("public")
 }
 
 /// Sesion de chat entre un usuario y el asistente IA
 model Conversation {
-  id                  String  @id @default(uuid())
-  title               String  @default("Nueva conversación")
+  id                 String    @id @default(uuid())
+  title              String    @default("Nueva conversación")
   /// GENERAL | LINKEDIN
-  agentType           String  @default("GENERAL")
-  lastResponseId      String?
+  agentType          String    @default("GENERAL")
+  lastResponseId     String?
   /// The previous_response_id that was used when the last response was generated (used for manual context reconstruction)
-  parentResponseId    String?
+  parentResponseId   String?
   /// Full response.output array from the last OpenAI response (needed for manual context on tool answer)
-  lastResponseOutput  Json?
-  pendingToolOutputs  Json?
+  lastResponseOutput Json?
+  pendingToolOutputs Json?
   deletedAt          DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -220,16 +486,17 @@ model Conversation {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  messages        Message[]
-  documents       Document[]
-  journalEntries  JournalEntry[]
-  linkedInPosts   LinkedInPost[]
-  aiUsageLogs     AiUsageLog[]
+  messages       Message[]
+  documents      Document[]
+  journalEntries JournalEntry[]
+  linkedInPosts  LinkedInPost[]
+  aiUsageLogs    AiUsageLog[]
 
   @@index([userId])
   @@index([tenantId])
   @@index([tenantId, agentType])
   @@map("conversations")
+  @@schema("public")
 }
 
 enum MessageRole {
@@ -239,24 +506,28 @@ enum MessageRole {
   question
 
   @@map("message_role")
+  @@schema("public")
 }
 
 /// Mensaje individual dentro de una conversacion
 model Message {
-  id          String      @id @default(uuid())
-  role        MessageRole
-  content     Json
-  toolName    String?
-  toolArgs    Json?
-  toolResult  Json?
-  deletedAt   DateTime?
-  createdAt   DateTime    @default(now())
+  id         String      @id @default(uuid())
+  role       MessageRole
+  content    Json
+  toolName   String?
+  toolArgs   Json?
+  toolResult Json?
+  deletedAt  DateTime?
+  createdAt  DateTime    @default(now())
 
+  tenantId       String?
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
+  @@index([tenantId])
   @@map("messages")
+  @@schema("public")
 }
 
 // ─── Memory ──────────────────────────────────────────────
@@ -269,28 +540,29 @@ enum MemoryCategory {
   CONTEXT
 
   @@map("memory_category")
+  @@schema("public")
 }
 
 /// Memoria persistente del asistente por tenant/usuario
 model Memory {
-  id         String         @id @default(uuid())
+  id         String                       @id @default(uuid())
   content    String
-  category   MemoryCategory @default(CONTEXT)
+  category   MemoryCategory               @default(CONTEXT)
   /// Relevancia 1-10; el modelo asigna la importancia al guardar
-  importance Int            @default(5)
+  importance Int                          @default(5)
   /// Embedding pgvector(1536) para búsqueda semántica — gestionado via raw SQL
   embedding  Unsupported("vector(1536)")?
-  isActive   Boolean        @default(true)
+  isActive   Boolean                      @default(true)
   deletedAt  DateTime?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   /// null = memoria de la organización; userId presente = memoria del usuario
   userId String?
-  user   User?  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   /// Documento de origen (si la memoria fue extraída de un documento)
   documentId String?
@@ -300,21 +572,22 @@ model Memory {
   @@index([userId, tenantId])
   @@index([documentId])
   @@map("memories")
+  @@schema("public")
 }
 
 // ─── Accounting ──────────────────────────────────────────
 
 model Account {
-  id           String               @id @default(uuid())
-  code         String
-  name         String
-  type         AccountType
+  id          String              @id @default(uuid())
+  code        String
+  name        String
+  type        AccountType
   /// Sección IFRS IAS 1 (solo en cuentas REVENUE/EXPENSE). Se hereda del ancestro raíz.
-  ifrsSection  AccountIFRSSection?
-  isActive     Boolean              @default(true)
+  ifrsSection AccountIFRSSection?
+  isActive    Boolean             @default(true)
   deletedAt   DateTime?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   parentId String?
   parent   Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
@@ -328,6 +601,7 @@ model Account {
   @@unique([code, tenantId])
   @@index([tenantId])
   @@map("accounts")
+  @@schema("public")
 }
 
 enum AccountType {
@@ -336,6 +610,8 @@ enum AccountType {
   EQUITY
   REVENUE
   EXPENSE
+
+  @@schema("public")
 }
 
 /// Clasificación funcional IFRS (IAS 1) para el Estado de Resultados.
@@ -352,6 +628,7 @@ enum AccountIFRSSection {
   TAX_EXPENSE
 
   @@map("account_ifrs_section")
+  @@schema("public")
 }
 
 /// Origen del asiento: asistente IA o manual (formulario)
@@ -360,6 +637,7 @@ enum JournalEntrySource {
   MANUAL
 
   @@map("journal_entry_source")
+  @@schema("public")
 }
 
 model JournalEntry {
@@ -373,13 +651,13 @@ model JournalEntry {
   updatedAt   DateTime           @updatedAt
 
   /// Usuario que creó el asiento (manual o quien confirmó en el asistente)
-  createdById  String?
-  createdBy    User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdById    String?
+  createdBy      User?               @relation(fields: [createdById], references: [id], onDelete: SetNull)
   /// Origen: asistente o manual
-  createdVia   JournalEntrySource?
+  createdVia     JournalEntrySource?
   /// Conversación del asistente donde se creó (solo si createdVia = ASSISTANT)
   conversationId String?
-  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   fiscalPeriodId String
   fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id])
@@ -396,21 +674,25 @@ model JournalEntry {
   @@index([createdById])
   @@index([conversationId])
   @@map("journal_entries")
+  @@schema("public")
 }
 
 enum JournalEntryStatus {
   DRAFT
   POSTED
   VOIDED
+
+  @@schema("public")
 }
 
 model JournalEntryLine {
-  id          String  @id @default(uuid())
-  debit       Decimal @default(0) @db.Decimal(18, 2)
-  credit      Decimal @default(0) @db.Decimal(18, 2)
+  id          String    @id @default(uuid())
+  debit       Decimal   @default(0) @db.Decimal(18, 2)
+  credit      Decimal   @default(0) @db.Decimal(18, 2)
   description String?
   deletedAt   DateTime?
 
+  tenantId       String?
   journalEntryId String
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
@@ -418,7 +700,9 @@ model JournalEntryLine {
   account   Account @relation(fields: [accountId], references: [id])
 
   @@index([journalEntryId])
+  @@index([tenantId])
   @@map("journal_entry_lines")
+  @@schema("public")
 }
 
 model FiscalPeriod {
@@ -434,27 +718,30 @@ model FiscalPeriod {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  journalEntries      JournalEntry[]
-  stepCompletions     AccountingStepCompletion[]
+  journalEntries  JournalEntry[]
+  stepCompletions AccountingStepCompletion[]
 
   @@index([tenantId])
   @@map("fiscal_periods")
+  @@schema("public")
 }
 
 enum FiscalPeriodStatus {
   OPEN
   CLOSED
+
+  @@schema("public")
 }
 
 /// Paso del proceso contable configurable por organización
 model AccountingProcessStep {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
   order       Int
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -463,6 +750,7 @@ model AccountingProcessStep {
 
   @@index([tenantId])
   @@map("accounting_process_steps")
+  @@schema("public")
 }
 
 /// Estado de completitud de un paso de proceso para un período fiscal
@@ -474,18 +762,21 @@ model AccountingStepCompletion {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  stepId String
-  step   AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  tenantId String?
+  stepId   String
+  step     AccountingProcessStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
 
   fiscalPeriodId String
   fiscalPeriod   FiscalPeriod @relation(fields: [fiscalPeriodId], references: [id], onDelete: Cascade)
 
   completedById String?
-  completedBy   User?  @relation(fields: [completedById], references: [id], onDelete: SetNull)
+  completedBy   User?   @relation(fields: [completedById], references: [id], onDelete: SetNull)
 
   @@unique([stepId, fiscalPeriodId])
   @@index([fiscalPeriodId])
+  @@index([tenantId])
   @@map("accounting_step_completions")
+  @@schema("public")
 }
 
 enum StepStatus {
@@ -493,6 +784,8 @@ enum StepStatus {
   IN_PROGRESS
   COMPLETED
   SKIPPED
+
+  @@schema("public")
 }
 
 // ─── Documents ────────────────────────────────────────────
@@ -508,20 +801,22 @@ enum DocumentCategory {
   COMPROBANTE
   REMUNERACION
   OTRO
+
+  @@schema("public")
 }
 
 /// Documento adjunto: almacenado en S3, asociado a conversacion y asientos
 model Document {
-  id         String            @id @default(uuid())
-  name       String
-  s3Key      String
-  mimeType   String
-  sizeBytes  Int
-  category   DocumentCategory  @default(OTRO)
-  tags       String[]
-  deletedAt  DateTime?
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id        String           @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  category  DocumentCategory @default(OTRO)
+  tags      String[]
+  deletedAt DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -538,6 +833,7 @@ model Document {
   @@index([tenantId])
   @@index([conversationId])
   @@map("documents")
+  @@schema("public")
 }
 
 /// Relacion muchos-a-muchos entre documentos y asientos contables
@@ -545,6 +841,7 @@ model DocumentJournalEntry {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
 
+  tenantId   String?
   documentId String
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -552,24 +849,26 @@ model DocumentJournalEntry {
   journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
 
   @@unique([documentId, journalEntryId])
+  @@index([tenantId])
   @@map("document_journal_entries")
+  @@schema("public")
 }
 
 // ─── Agent Skills ─────────────────────────────────────────
 
 /// Skill instalado por un tenant para extender las capacidades del agente de IA
 model AgentSkill {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   name        String
   description String?
   repoUrl     String
   /// Contenido del SKILL.md (body sin frontmatter)
   content     String
   version     String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean   @default(true)
   deletedAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -579,22 +878,26 @@ model AgentSkill {
   @@unique([tenantId, repoUrl])
   @@index([tenantId])
   @@map("agent_skills")
+  @@schema("public")
 }
 
 /// Archivo de referencia o script perteneciente a un AgentSkill
 model AgentSkillFile {
-  id      String @id @default(uuid())
+  id        String    @id @default(uuid())
   /// Ruta relativa dentro del skill, ej: "references/api_docs.md"
-  path    String
-  content String
+  path      String
+  content   String
   deletedAt DateTime?
 
-  skillId String
-  skill   AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  tenantId String?
+  skillId  String
+  skill    AgentSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([skillId, path])
   @@index([skillId])
+  @@index([tenantId])
   @@map("agent_skill_files")
+  @@schema("public")
 }
 
 model ApiKey {
@@ -615,6 +918,7 @@ model ApiKey {
 
   @@index([keyHash])
   @@map("api_keys")
+  @@schema("public")
 }
 
 /// Código de login passwordless (6 dígitos enviados por email)
@@ -629,44 +933,58 @@ model LoginCode {
 
   @@index([email])
   @@map("login_codes")
+  @@schema("public")
 }
 
 /// Registro de emails en lista de espera
 model WaitlistEntry {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String    @id @default(uuid())
+  email     String    @unique
   deletedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@map("waitlist_entries")
+  @@schema("public")
+}
+
+model FeatureRequest {
+  id        String   @id @default(uuid())
+  text      String
+  email     String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@map("feature_requests")
+  @@schema("public")
 }
 
 // ─── LinkedIn ─────────────────────────────────────────────
 
 /// Conexión OAuth de LinkedIn por tenant (1 por tenant)
 model LinkedInConnection {
-  id            String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   /// Access token encriptado con ENCRYPTION_KEY
-  accessToken   String
+  accessToken           String
   /// Refresh token encriptado (LinkedIn emite refresh tokens de larga duración)
-  refreshToken  String?
-  expiresAt     DateTime
+  refreshToken          String?
+  expiresAt             DateTime
   /// urn:li:person:xxx
-  personUrn     String
-  profileName   String?
-  profileImage  String?
+  personUrn             String
+  profileName           String?
+  profileImage          String?
   /// Token de la app Community Management (r_organization_followers) — encriptado
   communityAccessToken  String?
   communityRefreshToken String?
   communityExpiresAt    DateTime?
-  deletedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  deletedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("linkedin_connections")
+  @@schema("public")
 }
 
 /// Post de LinkedIn creado o programado por el agente
@@ -704,18 +1022,19 @@ model LinkedInPost {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
-  versions       LinkedInPostVersion[]
-  imageVersions  LinkedInImageVersion[]
+  versions      LinkedInPostVersion[]
+  imageVersions LinkedInImageVersion[]
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([status, scheduledAt])
   @@map("linkedin_posts")
+  @@schema("public")
 }
 
 /// Versión del contenido de texto de un post (para historial de regeneraciones)
 model LinkedInPostVersion {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   postId        String
   post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   /// Contenido del post en esta versión
@@ -724,15 +1043,18 @@ model LinkedInPostVersion {
   versionNumber Int
   /// Instrucciones de regeneración que produjeron esta versión (null para la versión original)
   instructions  String?
-  createdAt     DateTime @default(now())
+  tenantId      String?
+  createdAt     DateTime     @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_post_versions")
+  @@schema("public")
 }
 
 /// Versión de imagen generada para un post
 model LinkedInImageVersion {
-  id            String   @id @default(uuid())
+  id            String       @id @default(uuid())
   postId        String
   post          LinkedInPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   /// Prompt usado para generar la imagen
@@ -744,31 +1066,2358 @@ model LinkedInImageVersion {
   /// Número de versión (1, 2, 3...)
   versionNumber Int
   /// Si esta versión es la seleccionada actualmente
-  isSelected    Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  isSelected    Boolean      @default(false)
+  tenantId      String?
+  createdAt     DateTime     @default(now())
 
   @@index([postId])
+  @@index([tenantId])
   @@map("linkedin_image_versions")
+  @@schema("public")
 }
 
 /// Configuración del agente de LinkedIn por tenant
 model LinkedInAgentConfig {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   /// Si true, los posts se publican directamente sin aprobación
-  autoPublish       Boolean  @default(false)
-  defaultVisibility String   @default("PUBLIC")
+  autoPublish       Boolean   @default(false)
+  defaultVisibility String    @default("PUBLIC")
   /// Pilares de contenido configurados: ["thought-leadership", "tips", ...]
   contentPillars    Json?
   /// URN de la organización para People Typeahead API — urn:li:organization:xxx
   organizationUrn   String?
   deletedAt         DateTime?
   /// Idioma preferido para los prompts de generación de imágenes (ej: "es", "en", "pt")
-  preferredLanguage String   @default("es")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  preferredLanguage String    @default("es")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("linkedin_agent_configs")
+  @@schema("public")
+}
+
+// ─── Person Profiles ─────────────────────────────────────
+
+enum PersonStatus {
+  ACTIVE
+  INACTIVE
+  VACANT
+
+  @@map("person_status")
+  @@schema("public")
+}
+
+enum PersonSource {
+  MANUAL
+  AI_INFERRED
+  AI_CONFIRMED
+  CSV_IMPORT
+
+  @@map("person_source")
+  @@schema("public")
+}
+
+/// Departamento organizacional
+model Department {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  color       String?
+
+  parentId String?
+  parent   Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentHierarchy")
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  persons PersonProfile[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("departments")
+  @@schema("public")
+}
+
+/// Perfil de persona para inteligencia organizacional (participantes de entrevistas)
+model PersonProfile {
+  id           String      @id @default(uuid())
+  name         String
+  role         String?
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  personType   String      @default("INTERNAL") // INTERNAL, EXTERNAL, CONTRACTOR
+  company      String? // Empresa externa (solo para externos/contratistas)
+  email        String?
+  phone        String?
+  avatarS3Key  String?
+  notes        String?
+
+  // ─── Jerarquia organizacional ───
+  reportsToId   String?
+  reportsTo     PersonProfile?  @relation("ReportsTo", fields: [reportsToId], references: [id], onDelete: SetNull)
+  directReports PersonProfile[] @relation("ReportsTo")
+
+  // ─── Metadata organizacional ───
+  employeeCode String?
+  startDate    DateTime?
+  status       PersonStatus @default(ACTIVE)
+  source       PersonSource @default(MANUAL)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  orgSuggestions OrgSuggestion[]
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, reportsToId])
+  @@index([tenantId, departmentId])
+  @@map("person_profiles")
+  @@schema("public")
+}
+
+// ─── Org Suggestions ─────────────────────────────────────
+
+enum OrgSuggestionType {
+  CREATE_PERSON
+  UPDATE_PERSON
+  SET_REPORTS_TO
+  DELETE_PERSON
+
+  @@map("org_suggestion_type")
+  @@schema("public")
+}
+
+enum OrgSuggestionStatus {
+  PENDING
+  APPROVED
+  APPROVED_MODIFIED
+  REJECTED
+
+  @@map("org_suggestion_status")
+  @@schema("public")
+}
+
+model OrgSuggestion {
+  id              String              @id @default(uuid())
+  type            OrgSuggestionType
+  status          OrgSuggestionStatus @default(PENDING)
+  confidence      Float
+  data            Json
+  evidence        String?
+  evidenceTimeSec Int?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  rejectReason    String?
+
+  personId String?
+  person   PersonProfile? @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  interviewId String?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, personId])
+  @@map("org_suggestions")
+  @@schema("public")
+}
+
+// ─── Org Intelligence ────────────────────────────────────
+
+enum OrgProjectStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+
+  @@map("org_project_status")
+  @@schema("public")
+}
+
+enum TranscriptionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("transcription_status")
+  @@schema("public")
+}
+
+enum TranscriptionProvider {
+  DEEPGRAM
+  OPENAI
+
+  @@map("transcription_provider")
+  @@schema("public")
+}
+
+enum OrgEntityType {
+  ORGANIZATION
+  DEPARTMENT
+  ROLE
+  PROCESS
+  ACTIVITY
+  SYSTEM
+  DOCUMENT_TYPE
+  PROBLEM
+  IMPROVEMENT
+
+  @@map("org_entity_type")
+  @@schema("public")
+}
+
+enum OrgRelationType {
+  BELONGS_TO
+  EXECUTES
+  OWNS
+  CONTAINS
+  DEPENDS_ON
+  USES
+  PRECEDES
+  FOLLOWS
+  TRIGGERS
+  INPUTS
+  OUTPUTS
+
+  @@map("org_relation_type")
+  @@schema("public")
+}
+
+enum ProblemSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+
+  @@map("problem_severity")
+  @@schema("public")
+}
+
+enum ConflictType {
+  FACTUAL
+  PERSPECTIVE
+  SCOPE
+
+  @@map("conflict_type")
+  @@schema("public")
+}
+
+enum ConflictResolution {
+  PENDING
+  RESOLVED_VERIFIED
+  RESOLVED_BOTH_VALID
+  RESOLVED_MERGED
+  DISMISSED
+
+  @@map("conflict_resolution")
+  @@schema("public")
+}
+
+/// Proyecto de inteligencia organizacional
+model OrgProject {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  status      OrgProjectStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  config      Json?
+  deletedAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("OrgProjectsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  interviews      Interview[]
+  orgEntities     OrgEntity[]
+  orgRelations    OrgRelation[]
+  problems        Problem[]
+  improvements    Improvement[]
+  factualClaims   FactualClaim[]
+  conflictRecords ConflictRecord[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("org_projects")
+  @@schema("public")
+}
+
+/// Entrevista de diagnóstico organizacional
+model Interview {
+  id                    String                 @id @default(uuid())
+  title                 String?
+  audioS3Key            String?
+  audioMimeType         String?
+  audioDurationMs       Int?
+  transcriptionText     String?
+  transcriptionJson     Json?
+  transcriptionStatus   TranscriptionStatus    @default(PENDING)
+  transcriptionProvider TranscriptionProvider?
+  interviewDate         DateTime?
+  extractionResult      Json?
+  processingStatus      String                 @default("PENDING")
+  processingError       String?
+  processingLog         Json?
+  objective             String?
+  generatedIntro        String?
+  generatedQuestions    Json?
+  questionsGeneratedAt  DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  speakers    InterviewSpeaker[]
+  chunks      InterviewChunk[]
+  audioTracks InterviewAudioTrack[]
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@index([tenantId, processingStatus])
+  @@map("interviews")
+  @@schema("public")
+}
+
+/// Pista de audio individual dentro de una entrevista multi-audio
+model InterviewAudioTrack {
+  id           String    @id @default(uuid())
+  interviewId  String
+  interview    Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  trackOrder   Int
+  s3Key        String
+  mimeType     String    @default("audio/mpeg")
+  durationMs   Int?
+  sourceLabel  String?
+  originalName String?
+  createdAt    DateTime  @default(now())
+  tenantId     String
+
+  @@unique([interviewId, trackOrder])
+  @@index([interviewId])
+  @@map("interview_audio_tracks")
+  @@schema("public")
+}
+
+/// Hablante identificado en una entrevista
+model InterviewSpeaker {
+  id            String  @id @default(uuid())
+  speakerLabel  String
+  name          String?
+  role          String?
+  department    String?
+  isInterviewer Boolean @default(false)
+
+  tenantId    String?
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  personEntityId String?
+
+  chunks InterviewChunk[]
+
+  @@unique([interviewId, speakerLabel])
+  @@index([interviewId])
+  @@index([tenantId])
+  @@map("interview_speakers")
+  @@schema("public")
+}
+
+/// Fragmento de transcripción con embedding para búsqueda semántica
+model InterviewChunk {
+  id             String  @id @default(uuid())
+  content        String
+  contextPrefix  String?
+  topicSummary   String?
+  startTimeMs    Int?
+  endTimeMs      Int?
+  chunkOrder     Int
+  tokenCount     Int?
+  embeddingModel String?
+
+  embedding Unsupported("vector(1536)")?
+  tsv       Unsupported("tsvector")?
+
+  interviewId String
+  interview   Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  speakerId String?
+  speaker   InterviewSpeaker? @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+
+  parentChunkId String?
+
+  tenantId String
+
+  @@index([interviewId])
+  @@index([tenantId])
+  @@index([tenantId, interviewId])
+  @@map("interview_chunks")
+  @@schema("public")
+}
+
+/// Entidad del grafo organizacional (departamento, rol, proceso, etc.)
+model OrgEntity {
+  id                String        @id @default(uuid())
+  type              OrgEntityType
+  name              String
+  description       String?
+  metadata          Json?
+  status            String        @default("ACTIVE")
+  aliases           String[]
+  validFrom         DateTime      @default(now())
+  validTo           DateTime?
+  version           Int           @default(1)
+  originalEntityId  String?
+  confidence        Float         @default(0.5)
+  sourceChunkIds    String[]
+  sourceInterviewId String?
+
+  embedding Unsupported("vector(1536)")?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  relationsFrom OrgRelation[] @relation("FromEntity")
+  relationsTo   OrgRelation[] @relation("ToEntity")
+  problemLinks  ProblemLink[]
+
+  @@index([tenantId, projectId, type])
+  @@index([tenantId, type, status])
+  @@index([tenantId, projectId, type, validTo])
+  @@map("org_entities")
+  @@schema("public")
+}
+
+/// Relación entre dos entidades organizacionales
+model OrgRelation {
+  id          String          @id @default(uuid())
+  type        OrgRelationType
+  description String?
+  metadata    Json?
+  weight      Float           @default(1.0)
+
+  fromEntityId String
+  fromEntity   OrgEntity @relation("FromEntity", fields: [fromEntityId], references: [id], onDelete: Cascade)
+
+  toEntityId String
+  toEntity   OrgEntity @relation("ToEntity", fields: [toEntityId], references: [id], onDelete: Cascade)
+
+  validFrom         DateTime  @default(now())
+  validTo           DateTime?
+  confidence        Float     @default(0.5)
+  sourceInterviewId String?
+  sourceChunkId     String?
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, projectId])
+  @@index([fromEntityId])
+  @@index([toEntityId])
+  @@index([type])
+  @@index([tenantId, type, validTo])
+  @@map("org_relations")
+  @@schema("public")
+}
+
+/// Problema detectado en el diagnóstico organizacional
+model Problem {
+  id                String          @id @default(uuid())
+  title             String
+  description       String
+  severity          ProblemSeverity
+  category          String?
+  evidence          Json?
+  confidence        Float           @default(0.5)
+  sourceInterviewId String?
+  riceScore         Json?
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  affectedEntities ProblemLink[]
+  improvements     Improvement[]
+
+  @@index([tenantId, projectId])
+  @@index([severity])
+  @@index([tenantId, projectId, severity])
+  @@map("problems")
+  @@schema("public")
+}
+
+/// Vínculo entre problema y entidad afectada
+model ProblemLink {
+  id                String  @id @default(uuid())
+  impactDescription String?
+
+  tenantId  String?
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  entityId String
+  entity   OrgEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+
+  @@unique([problemId, entityId])
+  @@index([problemId])
+  @@index([entityId])
+  @@index([tenantId])
+  @@map("problem_links")
+  @@schema("public")
+}
+
+/// Mejora propuesta vinculada a un problema
+model Improvement {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  type        String?
+  effort      String?
+  impact      String?
+  priority    Int?
+  status      String    @default("PROPOSED")
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([problemId])
+  @@map("improvements")
+  @@schema("public")
+}
+
+/// Claim factual extraído de entrevistas (inmutable)
+model FactualClaim {
+  id                String   @id @default(uuid())
+  subject           String
+  predicate         String
+  object            String
+  claimType         String
+  confidence        Float    @default(0.5)
+  evidence          String?
+  sourceInterviewId String?
+  sourceChunkId     String?
+  createdAt         DateTime @default(now())
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([subject])
+  @@index([tenantId, projectId, subject, predicate])
+  @@map("factual_claims")
+  @@schema("public")
+}
+
+/// Registro de conflicto entre claims o perspectivas
+model ConflictRecord {
+  id              String             @id @default(uuid())
+  type            ConflictType
+  description     String
+  claimsData      Json
+  interviewIds    String[]
+  resolution      ConflictResolution @default(PENDING)
+  resolutionNotes String?
+  resolvedAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  tenantId  String
+  projectId String
+  project   OrgProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, projectId, resolution])
+  @@map("conflict_records")
+  @@schema("public")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  entityType String
+  entityId   String
+  action     String
+  changes    Json?
+  snapshot   Json?
+  actorType  String
+  actorId    String?
+  source     String
+  ipAddress  String?
+  userAgent  String?
+  socketId   String?
+  tenantId   String
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, entityType, createdAt])
+  @@map("audit_logs")
+  @@schema("public")
+}
+
+// ─── Team Chat ────────────────────────────────────────────
+
+enum ChannelType {
+  PUBLIC
+  PRIVATE
+  DM
+  GROUP_DM
+
+  @@schema("public")
+}
+
+model Channel {
+  id           String      @id @default(uuid())
+  name         String?
+  slug         String?
+  type         ChannelType
+  topic        String?
+  description  String?
+  lastSequence BigInt      @default(0)
+  isArchived   Boolean     @default(false)
+  deletedAt    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ChannelCreator", fields: [createdById], references: [id])
+
+  members  ChannelMember[]
+  messages ChatMessage[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("channels")
+  @@schema("public")
+}
+
+model ChannelMember {
+  id               String   @id @default(uuid())
+  role             String   @default("MEMBER")
+  lastReadSequence BigInt   @default(0)
+  isMuted          Boolean  @default(false)
+  joinedAt         DateTime @default(now())
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+  @@map("channel_members")
+  @@schema("public")
+}
+
+model ChatMessage {
+  id        String    @id @default(uuid())
+  content   String
+  sequence  BigInt
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  channelId String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("ChatMessageAuthor", fields: [authorId], references: [id])
+
+  threadParentId    String?
+  threadParent      ChatMessage?  @relation("Thread", fields: [threadParentId], references: [id])
+  threadReplies     ChatMessage[] @relation("Thread")
+  threadReplyCount  Int           @default(0)
+  lastThreadReplyAt DateTime?
+
+  attachments ChatAttachment[]
+  reactions   ChatReaction[]
+  mentions    ChatMention[]
+
+  @@index([channelId, sequence])
+  @@index([channelId, createdAt])
+  @@index([threadParentId])
+  @@map("chat_messages")
+  @@schema("public")
+}
+
+model ChatAttachment {
+  id        String   @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("chat_attachments")
+  @@schema("public")
+}
+
+model ChatReaction {
+  id    String @id @default(uuid())
+  emoji String
+
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("ChatReactionUser", fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@map("chat_reactions")
+  @@schema("public")
+}
+
+model ChatMention {
+  id String @id @default(uuid())
+
+  messageId String
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  mentionedUserId String
+  mentionedUser   User   @relation("ChatMentionTarget", fields: [mentionedUserId], references: [id])
+
+  @@index([mentionedUserId])
+  @@map("chat_mentions")
+  @@schema("public")
+}
+
+// ─── Notifications ────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid())
+  type      String
+  title     String
+  body      String?
+  data      Json
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  groupKey  String?
+  createdAt DateTime  @default(now())
+
+  recipientId String
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead, createdAt])
+  @@index([recipientId, tenantId, createdAt])
+  @@index([groupKey])
+  @@map("notifications")
+  @@schema("public")
+}
+
+model NotificationPreference {
+  id             String  @id @default(uuid())
+  eventPattern   String
+  inApp          Boolean @default(true)
+  email          Boolean @default(false)
+  push           Boolean @default(false)
+  emailFrequency String  @default("INSTANT")
+
+  userId String
+  user   User   @relation("NotificationPref", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventPattern])
+  @@map("notification_preferences")
+  @@schema("public")
+}
+
+// ─── Resource Locks ───────────────────────────────────────
+
+model ResourceLock {
+  id            String   @id @default(uuid())
+  entityType    String
+  entityId      String
+  fieldName     String
+  userId        String
+  tenantId      String
+  socketId      String
+  acquiredAt    DateTime @default(now())
+  expiresAt     DateTime
+  lastHeartbeat DateTime @default(now())
+
+  @@unique([entityType, entityId, fieldName])
+  @@index([socketId])
+  @@index([expiresAt])
+  @@map("resource_locks")
+  @@schema("public")
+}
+
+// ─── Legal Entity & Lab Origin ───────────────────────────
+
+model LegalEntity {
+  id String @id @default(uuid())
+
+  rut              String
+  legalName        String
+  tradeName        String?
+  businessActivity String?
+
+  isClient   Boolean @default(false)
+  isSupplier Boolean @default(false)
+
+  street       String?
+  streetNumber String?
+  unit         String?
+  commune      String?
+  city         String?
+
+  email   String?
+  phone   String?
+  website String?
+
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contacts          LegalEntityContact[]
+  bankAccounts      LegalEntityBankAccount[]
+  labOrigins        LabOrigin[]
+  billingAgreements BillingAgreement[]
+  practitioners     LabPractitioner[]        @relation("PractitionerInstitution")
+  labLiquidations   LabLiquidation[]         @relation("LiquidationLegalEntity")
+  labExamCharges    LabExamCharge[]          @relation("ExamChargeLegalEntity")
+  labDirectPaymentBatches LabDirectPaymentBatch[] @relation("DpbLegalEntity")
+
+  @@unique([tenantId, rut])
+  @@index([tenantId])
+  @@index([tenantId, isClient])
+  @@index([tenantId, isSupplier])
+  @@map("legal_entities")
+  @@schema("public")
+}
+
+model LegalEntityContact {
+  id        String    @id @default(uuid())
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  mobile    String?
+  isPrimary Boolean   @default(false)
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId      String
+
+  @@index([legalEntityId])
+  @@index([tenantId])
+  @@map("legal_entity_contacts")
+  @@schema("public")
+}
+
+model LegalEntityBankAccount {
+  id            String          @id @default(uuid())
+  bankName      String
+  accountType   BankAccountType
+  accountNumber String
+  holderName    String
+  holderRut     String?
+  isPrimary     Boolean         @default(false)
+  isActive      Boolean         @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+  tenantId      String
+
+  @@index([legalEntityId])
+  @@index([tenantId])
+  @@map("legal_entity_bank_accounts")
+  @@schema("public")
+}
+
+model LabOrigin {
+  id       String            @id @default(uuid())
+  code     String
+  name     String
+  category LabOriginCategory @default(OTRO)
+
+  legalEntityId String?
+  legalEntity   LegalEntity? @relation(fields: [legalEntityId], references: [id], onDelete: SetNull)
+
+  parentId String?
+  parent   LabOrigin?  @relation("LabOriginHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children LabOrigin[] @relation("LabOriginHierarchy")
+
+  street       String?
+  streetNumber String?
+  unit         String?
+  commune      String?
+  city         String?
+  phone        String?
+  email        String?
+
+  sampleReceptionMode   SampleReceptionMode    @default(PRESENCIAL)
+  reportDeliveryMethods ReportDeliveryMethod[]
+
+  deliveryDaysBiopsy   Int?
+  deliveryDaysPap      Int?
+  deliveryDaysCytology Int?
+  deliveryDaysIhc      Int?
+  deliveryDaysDefault  Int?
+
+  encryptedFtpHost     String?
+  encryptedFtpUser     String?
+  encryptedFtpPassword String?
+  ftpPath              String?
+
+  criticalNotificationEmails String[]
+  sendsQualityReports        Boolean  @default(false)
+
+  receptionDays     String?
+  receptionSchedule String?
+  notes             String?
+  isActive          Boolean   @default(true)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  billingAgreementId String?
+  billingAgreement   BillingAgreement? @relation(fields: [billingAgreementId], references: [id], onDelete: SetNull)
+
+  labExamCharges LabExamCharge[] @relation("ExamChargeLabOrigin")
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, category])
+  @@index([tenantId, isActive])
+  @@index([legalEntityId])
+  @@index([billingAgreementId])
+  @@map("lab_origins")
+  @@schema("public")
+}
+
+// ─── Billing ────────────────────────────────────────────
+
+model BillingConcept {
+  id             String  @id @default(uuid())
+  code           String
+  name           String
+  description    String?
+  referencePrice Decimal @db.Decimal(18, 2)
+  currency       String  @default("CLP")
+
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  agreementLines BillingAgreementLine[]
+  labExamCharges LabExamCharge[]       @relation("ExamChargeBillingConcept")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("billing_concepts")
+  @@schema("public")
+}
+
+model BillingAgreement {
+  id   String @id @default(uuid())
+  code String
+  name String
+
+  legalEntityId String
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id], onDelete: Cascade)
+
+  status        BillingAgreementStatus @default(ACTIVE)
+  contractDate  DateTime?
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+
+  paymentTerms        PaymentTerms      @default(NET_30)
+  customPaymentDays   Int?
+  billingDayOfMonth   Int?
+  isMonthlySettlement Boolean           @default(false)
+  billingModalities   BillingModality[]
+
+  examTypes        String[]
+  operationalFlags Json?
+
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  lines           BillingAgreementLine[]
+  contacts        BillingContact[]
+  labOrigins      LabOrigin[]
+  labLiquidations LabLiquidation[] @relation("LiquidationBillingAgreement")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([legalEntityId])
+  @@map("billing_agreements")
+  @@schema("public")
+}
+
+model BillingAgreementLine {
+  id String @id @default(uuid())
+
+  billingAgreementId String
+  billingAgreement   BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+
+  billingConceptId String
+  billingConcept   BillingConcept @relation(fields: [billingConceptId], references: [id], onDelete: Restrict)
+
+  factor          Decimal  @default(1) @db.Decimal(8, 4)
+  negotiatedPrice Decimal  @db.Decimal(18, 2)
+  referencePrice  Decimal? @db.Decimal(18, 2)
+  currency        String   @default("CLP")
+
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+
+  @@unique([billingAgreementId, billingConceptId])
+  @@index([billingAgreementId])
+  @@index([billingConceptId])
+  @@index([tenantId])
+  @@map("billing_agreement_lines")
+  @@schema("public")
+}
+
+model BillingContact {
+  id        String    @id @default(uuid())
+  name      String
+  role      String?
+  email     String?
+  phone     String?
+  mobile    String?
+  isPrimary Boolean   @default(false)
+  notes     String?
+  isActive  Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  billingAgreementId String
+  billingAgreement   BillingAgreement @relation(fields: [billingAgreementId], references: [id], onDelete: Cascade)
+  tenantId           String
+
+  @@index([billingAgreementId])
+  @@index([tenantId])
+  @@map("billing_contacts")
+  @@schema("public")
+}
+
+// ─── Projects & Tasks ────────────────────────────────────
+
+model Project {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  key         String
+  icon        String?
+  color       String?
+  status      ProjectStatus     @default(ACTIVE)
+  visibility  ProjectVisibility @default(PUBLIC)
+  startDate   DateTime?
+  dueDate     DateTime?
+  sortOrder   Int               @default(0)
+  deletedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
+
+  members      ProjectMember[]
+  tasks        Task[]
+  taskViews    TaskView[]
+  labels       Label[]
+  taskStatuses TaskStatusConfig[]
+  sections     ProjectSection[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("projects")
+  @@schema("public")
+}
+
+model ProjectMember {
+  id        String            @id @default(uuid())
+  role      ProjectMemberRole @default(MEMBER)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("ProjectMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("project_members")
+  @@schema("public")
+}
+
+model ProjectSection {
+  id        String    @id @default(uuid())
+  name      String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+
+  tenantId String
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@map("project_sections")
+  @@schema("public")
+}
+
+model TaskStatusConfig {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String
+  color     String?
+  category  String    @default("active")
+  sortOrder Int       @default(0)
+  isDefault Boolean   @default(false)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks Task[]
+
+  tenantId String
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([tenantId])
+  @@map("task_status_configs")
+  @@schema("public")
+}
+
+model Task {
+  id              String       @id @default(uuid())
+  number          Int
+  title           String
+  description     String?
+  descriptionJson Json?
+  priority        TaskPriority @default(NONE)
+  position        String
+  startDate       DateTime?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  estimate        Decimal?     @db.Decimal(10, 2)
+  estimateUnit    String?
+  version         Int          @default(1)
+  deletedAt       DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  statusId String
+  status   TaskStatusConfig @relation(fields: [statusId], references: [id], onDelete: Restrict)
+
+  sectionId String?
+  section   ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  parentId String?
+  parent   Task?   @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  subtasks Task[]  @relation("TaskHierarchy")
+
+  createdById String
+  createdBy   User   @relation("TasksCreated", fields: [createdById], references: [id], onDelete: Restrict)
+
+  tenantId String
+
+  assignees    TaskAssignee[]
+  labels       TaskLabel[]
+  comments     TaskComment[]
+  attachments  TaskAttachment[]
+  dependencies TaskDependency[] @relation("DependentTask")
+  dependents   TaskDependency[] @relation("DependencyOf")
+  subscribers  TaskSubscriber[]
+  activities   TaskActivity[]
+
+  @@unique([projectId, number])
+  @@index([tenantId])
+  @@index([projectId])
+  @@index([projectId, statusId])
+  @@index([parentId])
+  @@index([tenantId, dueDate])
+  @@map("tasks")
+  @@schema("public")
+}
+
+model TaskAssignee {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("TaskAssignments", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("task_assignees")
+  @@schema("public")
+}
+
+model TaskSubscriber {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("TaskSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([taskId, userId])
+  @@index([userId])
+  @@index([tenantId])
+  @@map("task_subscribers")
+  @@schema("public")
+}
+
+model TaskDependency {
+  id             String   @id @default(uuid())
+  dependencyType String   @default("BLOCKS")
+  createdAt      DateTime @default(now())
+
+  taskId String
+  task   Task   @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+
+  dependsOnId String
+  dependsOn   Task   @relation("DependencyOf", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([taskId, dependsOnId])
+  @@index([dependsOnId])
+  @@index([tenantId])
+  @@map("task_dependencies")
+  @@schema("public")
+}
+
+model Label {
+  id        String    @id @default(uuid())
+  name      String
+  color     String
+  sortOrder Int       @default(0)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  tasks TaskLabel[]
+
+  tenantId String
+
+  @@unique([projectId, name])
+  @@index([tenantId])
+  @@map("labels")
+  @@schema("public")
+}
+
+model TaskLabel {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([taskId, labelId])
+  @@index([labelId])
+  @@index([tenantId])
+  @@map("task_labels")
+  @@schema("public")
+}
+
+model TaskComment {
+  id          String    @id @default(uuid())
+  content     String
+  contentJson Json?
+  editedAt    DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("TaskComments", fields: [authorId], references: [id], onDelete: Restrict)
+
+  parentId String?
+  parent   TaskComment?  @relation("CommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  TaskComment[] @relation("CommentThread")
+
+  reactions TaskCommentReaction[]
+
+  tenantId String
+
+  @@index([taskId, createdAt])
+  @@index([tenantId])
+  @@map("task_comments")
+  @@schema("public")
+}
+
+model TaskCommentReaction {
+  id    String @id @default(uuid())
+  emoji String
+
+  commentId String
+  comment   TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("TaskCommentReactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+
+  @@unique([commentId, userId, emoji])
+  @@index([tenantId])
+  @@map("task_comment_reactions")
+  @@schema("public")
+}
+
+model TaskActivity {
+  id        String   @id @default(uuid())
+  action    String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User?   @relation("TaskActivities", fields: [actorId], references: [id], onDelete: SetNull)
+
+  tenantId String
+
+  @@index([taskId, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("task_activities")
+  @@schema("public")
+}
+
+model TaskAttachment {
+  id        String   @id @default(uuid())
+  name      String
+  s3Key     String
+  mimeType  String
+  sizeBytes Int
+  createdAt DateTime @default(now())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("TaskAttachments", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  tenantId String
+
+  @@index([taskId])
+  @@index([tenantId])
+  @@map("task_attachments")
+  @@schema("public")
+}
+
+model TaskView {
+  id        String       @id @default(uuid())
+  name      String
+  type      TaskViewType
+  config    Json         @default("{}")
+  filters   Json         @default("{}")
+  isDefault Boolean      @default(false)
+  icon      String?
+  sortOrder Int          @default(0)
+  deletedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("TaskViewsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  tenantId String
+
+  @@index([projectId])
+  @@index([tenantId])
+  @@map("task_views")
+  @@schema("public")
+}
+
+// ─── FileMaker Connector ─────────────────────────────────
+
+enum FmSyncStatus {
+  SYNCED
+  PENDING_TO_FM
+  PENDING_TO_ZERU
+  ERROR
+
+  @@schema("citolab_fm")
+}
+
+model FmSyncRecord {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  entityType String
+  entityId   String
+
+  fmDatabase String
+  fmLayout   String
+  fmRecordId String
+  fmModId    String?
+
+  syncStatus FmSyncStatus @default(SYNCED)
+  lastSyncAt DateTime     @default(now())
+  syncError  String?
+  retryCount Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, entityType, entityId])
+  @@unique([tenantId, fmDatabase, fmLayout, fmRecordId, entityType])
+  @@index([syncStatus])
+  @@map("fm_sync_records")
+  @@schema("citolab_fm")
+}
+
+model FmSyncLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  entityType String
+  entityId   String?
+  fmRecordId String?
+  action     String
+  direction  String
+  details    Json?
+  error      String?
+  duration   Int?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, action])
+  @@map("fm_sync_logs")
+  @@schema("citolab_fm")
+}
+
+// ─── mod_lab Enums ──────────────────────────────────────
+
+enum FmSource {
+  BIOPSIAS
+  BIOPSIASRESPALDO
+  PAPANICOLAOU
+  PAPANICOLAOUHISTORICO
+
+  @@schema("mod_lab")
+}
+
+enum ExamCategory {
+  BIOPSY
+  PAP
+  CYTOLOGY
+  IMMUNOHISTOCHEMISTRY
+  MOLECULAR
+  OTHER_EXAM
+
+  @@schema("mod_lab")
+}
+
+enum Priority {
+  ROUTINE
+  URGENT
+  ASAP
+
+  @@schema("mod_lab")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER_GENDER
+  UNKNOWN
+
+  @@schema("mod_lab")
+}
+
+enum PractitionerRole {
+  PATHOLOGIST
+  MEDICAL_TECH
+  CYTOTECHNOLOGIST
+  REQUESTING_PHYSICIAN
+  RECEPTION
+  LAB_TECHNICIAN
+  SECRETARY
+  COURIER
+  OTHER_ROLE
+
+  @@schema("mod_lab")
+}
+
+enum SigningRole {
+  PRIMARY_PATHOLOGIST
+  CO_PATHOLOGIST
+  SUPERVISING_PATHOLOGIST
+  EXTERNAL_CONSULTANT
+  SCREENING_TECH
+  SUPERVISING_TECH
+  VISTO_BUENO_TECH
+  VALIDATION_CORRECTION
+  QC_REVIEWER
+  OTHER_SIGNING
+
+  @@schema("mod_lab")
+}
+
+enum SpecimenStatus {
+  RECEIVED_SPECIMEN
+  PROCESSING_SPECIMEN
+  EMBEDDED
+  CUT
+  STAINED
+  ARCHIVED
+  DISCARDED
+
+  @@schema("mod_lab")
+}
+
+enum DiagnosticReportStatus {
+  REGISTERED
+  IN_TRANSIT
+  RECEIVED_STATUS
+  PROCESSING_STATUS
+  REPORTING
+  PRE_VALIDATED
+  VALIDATED_REPORT
+  SIGNED
+  DELIVERED
+  DOWNLOADED
+  CANCELLED_REPORT
+  AMENDED
+
+  @@schema("mod_lab")
+}
+
+enum WorkflowEventType {
+  ORIGIN_INTAKE
+  ORIGIN_HANDOFF_TO_COURIER
+  TRANSPORT
+  RECEIVED_AT_LAB
+  MACROSCOPY
+  EMBEDDING
+  CUTTING_STAINING
+  HISTOLOGY_REPORTING
+  VALIDATION
+  APPROVAL
+  DELIVERY
+  INTAKE
+  PROCESSING_EVENT
+  DIAGNOSIS_TRANSCRIPTION
+  PRE_VALIDATION
+  SECRETARY_VALIDATION
+  PATHOLOGIST_APPROVAL_WEB
+  WEB_VALIDATION
+  PDF_GENERATED
+  WEB_DELIVERY
+  WEB_TRANSPORT
+  WEB_RECEPTION
+  WEB_EXAM_CYTOLOGY
+  WEB_DOWNLOAD
+  WEB_ACKNOWLEDGMENT
+  CLIENT_NOTIFIED
+  CASE_CORRECTION
+  AMENDMENT
+  CRITICAL_NOTIFICATION
+  OTHER_EVENT
+
+  @@schema("mod_lab")
+}
+
+enum ObservationCategory {
+  DIAGNOSIS
+  DIFFERENTIAL
+  FINDING
+  MARKER
+  RECOMMENDATION
+
+  @@schema("mod_lab")
+}
+
+enum CommunicationCategory {
+  SAMPLE_QUALITY_ISSUE
+  ADDITIONAL_INFO_REQUEST
+  INTERNAL_QC
+  CRITICAL_RESULT
+  CLIENT_INQUIRY
+  CORRECTION_REQUEST
+  OTHER_COMM
+
+  @@schema("mod_lab")
+}
+
+enum AttachmentCategory {
+  REPORT_PDF
+  CRITICAL_NOTIFICATION_PDF
+  MACRO_PHOTO
+  MICRO_PHOTO
+  ENCAPSULATION_PHOTO
+  MACRO_DICTATION
+  DIAGNOSIS_MODIFICATION
+  SCANNER_CARTON
+  REQUEST_DOCUMENT
+  MOLECULAR_CONTAINER
+  ADVERSE_EVENT_PHOTO
+  OTHER_ATTACHMENT
+
+  @@schema("mod_lab")
+}
+
+enum AttachmentMigrationStatus {
+  PENDING_MIGRATION
+  DOWNLOADING
+  UPLOADED
+  FAILED_MIGRATION
+  SKIPPED
+
+  @@schema("mod_lab")
+}
+
+enum LabExamChargeSource {
+  BIOPSIAS_INGRESOS
+  PAP_INGRESOS
+
+  @@schema("mod_lab")
+}
+
+enum LabPaymentMethod {
+  LAB_CASH
+  LAB_BANK_TRANSFER
+  LAB_CHECK
+  LAB_VOUCHER
+  LAB_CREDIT_CARD
+  LAB_DEBIT_CARD
+  LAB_AGREEMENT
+  LAB_PENDING_PAYMENT
+  OTHER_PAYMENT
+
+  @@schema("mod_lab")
+}
+
+enum LabChargeStatus {
+  REGISTERED_CHARGE
+  VALIDATED_CHARGE
+  INVOICED_CHARGE
+  PAID_CHARGE
+  CANCELLED_CHARGE
+  REVERSED
+
+  @@schema("mod_lab")
+}
+
+enum LiquidationStatus {
+  DRAFT_LIQ
+  CONFIRMED
+  INVOICED_LIQ
+  PARTIALLY_PAID
+  PAID_LIQ
+  OVERDUE
+  CANCELLED_LIQ
+
+  @@schema("mod_lab")
+}
+
+enum RendicionType {
+  BIOPSY_DIRECT
+  PAP_DIRECT
+  MIXED
+
+  @@schema("mod_lab")
+}
+
+enum DirectPaymentStatus {
+  OPEN_DPB
+  RENDIDA
+  RECONCILED
+  CANCELLED_DPB
+
+  @@schema("mod_lab")
+}
+
+enum AdverseSeverity {
+  MINOR_SEV
+  MODERATE_SEV
+  MAJOR_SEV
+  CRITICAL_SEV
+
+  @@schema("mod_lab")
+}
+
+enum AdverseStatus {
+  OPEN_ADV
+  INVESTIGATING
+  RESOLVED
+  CLOSED_ADV
+
+  @@schema("mod_lab")
+}
+
+// ─── mod_lab Models ─────────────────────────────────────
+
+model LabPatient {
+  id               String    @id @default(uuid())
+  tenantId         String
+  rut              String?
+  firstName        String
+  paternalLastName String
+  maternalLastName String?
+  birthDate        DateTime?
+  gender           Gender?
+  email            String?
+  phone            String?
+  address          String?
+  commune          String?
+  city             String?
+  needsMerge       Boolean      @default(false)
+  mergedIntoId     String?
+  mergedInto       LabPatient?  @relation("PatientMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom       LabPatient[] @relation("PatientMerge")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
+
+  serviceRequests LabServiceRequest[]
+
+  @@unique([tenantId, rut])
+  @@index([tenantId, paternalLastName, firstName])
+  @@index([tenantId, needsMerge])
+  @@map("lab_patients")
+  @@schema("mod_lab")
+}
+
+model LabPractitioner {
+  id               String             @id @default(uuid())
+  tenantId         String
+  rut              String?
+  firstName        String
+  paternalLastName String
+  maternalLastName String?
+  roles            PractitionerRole[]
+  isInternal       Boolean            @default(false)
+  code             String?
+  licenseNumber    String?
+  specialty        String?
+  email            String?
+  phone            String?
+  institutionId    String?
+  institution      LegalEntity?       @relation("PractitionerInstitution", fields: [institutionId], references: [id], onDelete: SetNull)
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  deletedAt        DateTime?
+
+  @@unique([tenantId, rut])
+  @@unique([tenantId, code])
+  @@index([tenantId, paternalLastName, firstName])
+  @@map("lab_practitioners")
+  @@schema("mod_lab")
+}
+
+model LabServiceRequest {
+  id                      String       @id @default(uuid())
+  tenantId                String
+  fmInformeNumber         Int
+  fmSource                FmSource
+  subjectFirstName        String
+  subjectPaternalLastName String
+  subjectMaternalLastName String?
+  subjectRut              String?
+  subjectAge              Int?
+  subjectId               String?
+  patient                 LabPatient?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  category                ExamCategory
+  subcategory             String?
+  priority                Priority     @default(ROUTINE)
+  requestingPhysicianName String?
+  requestingPhysicianId   String?
+  labOriginId             String
+  labOriginCodeSnapshot   String
+  sampleCollectedAt       DateTime?
+  receivedAt              DateTime?
+  requestedAt             DateTime?
+  clinicalHistory         String?      @db.Text
+  muestraDe               String?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  deletedAt               DateTime?
+
+  specimens         LabSpecimen[]
+  diagnosticReports LabDiagnosticReport[]
+
+  @@unique([tenantId, fmSource, fmInformeNumber])
+  @@index([tenantId, labOriginId])
+  @@index([tenantId, subjectId])
+  @@index([tenantId, category, receivedAt])
+  @@index([tenantId, subjectRut])
+  @@map("lab_service_requests")
+  @@schema("mod_lab")
+}
+
+model LabSpecimen {
+  id               String            @id @default(uuid())
+  tenantId         String
+  serviceRequestId String
+  serviceRequest   LabServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  containerLabel   String?
+  sequenceNumber   Int
+  anatomicalSite   String?
+  muestraDeText    String?
+  collectedAt      DateTime?
+  receivedAt       DateTime?
+  status           SpecimenStatus    @default(RECEIVED_SPECIMEN)
+  tacoCode         String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+
+  slides LabSlide[]
+
+  @@index([tenantId, serviceRequestId])
+  @@map("lab_specimens")
+  @@schema("mod_lab")
+}
+
+model LabSlide {
+  id         String      @id @default(uuid())
+  tenantId   String
+  specimenId String
+  specimen   LabSpecimen @relation(fields: [specimenId], references: [id], onDelete: Cascade)
+  placaCode  String?
+  stain      String?
+  level      Int?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([tenantId, specimenId])
+  @@map("lab_slides")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReport {
+  id                        String                 @id @default(uuid())
+  tenantId                  String
+  serviceRequestId          String
+  serviceRequest            LabServiceRequest      @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  fmInformeNumber           Int
+  fmSource                  FmSource
+  status                    DiagnosticReportStatus
+  currentStageOwnerId       String?
+  primarySignerId           String?
+  primarySignerCodeSnapshot String?
+  conclusion                String?                @db.Text
+  fullText                  String?                @db.Text
+  microscopicDescription    String?                @db.Text
+  macroscopicDescription    String?                @db.Text
+  clinicalComments          String?                @db.Text
+  isUrgent                  Boolean                @default(false)
+  isAlteredOrCritical       Boolean                @default(false)
+  criticalNotified          Boolean                @default(false)
+  validatedAt               DateTime?
+  issuedAt                  DateTime?
+  deliveredAt               DateTime?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  deletedAt                 DateTime?
+
+  signers               LabDiagnosticReportSigner[]
+  observations          LabObservation[]
+  workflowEvents        LabExamWorkflowEvent[]
+  communications        LabCommunication[]
+  adverseEvents         LabAdverseEvent[]
+  technicalObservations LabTechnicalObservation[]
+  attachments           LabDiagnosticReportAttachment[]
+  examCharges           LabExamCharge[]
+
+  @@unique([tenantId, fmSource, fmInformeNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, validatedAt])
+  @@index([tenantId, primarySignerId])
+  @@index([tenantId, isUrgent, isAlteredOrCritical])
+  @@index([tenantId, serviceRequestId])
+  @@map("lab_diagnostic_reports")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReportSigner {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  diagnosticReportId String
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  practitionerId     String?
+  codeSnapshot       String
+  nameSnapshot       String
+  roleSnapshot       String?
+  role               SigningRole
+  signatureOrder     Int
+  signedAt           DateTime
+  isActive           Boolean             @default(true)
+  supersededBy       String?
+  correctionReason   String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, practitionerId])
+  @@index([tenantId, role])
+  @@map("lab_diagnostic_report_signers")
+  @@schema("mod_lab")
+}
+
+model LabObservation {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  diagnosticReportId String
+  diagnosticReport   LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  code               String
+  codeSystem         String
+  display            String
+  category           ObservationCategory
+  severity           String?
+  interpretation     String?
+  specimenId         String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  deletedAt          DateTime?
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, code])
+  @@map("lab_observations")
+  @@schema("mod_lab")
+}
+
+model LabExamWorkflowEvent {
+  id                      String              @id @default(uuid())
+  tenantId                String
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  eventType               WorkflowEventType
+  sequenceOrder           Int?
+  occurredAt              DateTime
+  performedById           String?
+  performedByNameSnapshot String
+  location                String?
+  notes                   String?
+  sourceField             String
+  createdAt               DateTime            @default(now())
+
+  @@index([tenantId, diagnosticReportId, occurredAt])
+  @@index([tenantId, eventType, occurredAt])
+  @@map("lab_exam_workflow_events")
+  @@schema("mod_lab")
+}
+
+model LabCommunication {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  subjectPatientId        String?
+  reason                  String?
+  content                 String                 @db.Text
+  response                String?                @db.Text
+  loggedAt                DateTime
+  loggedById              String?
+  loggedByNameSnapshot    String
+  respondedAt             DateTime?
+  respondedById           String?
+  respondedByNameSnapshot String?
+  category                CommunicationCategory?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  deletedAt               DateTime?
+
+  @@index([tenantId, diagnosticReportId, loggedAt])
+  @@index([tenantId, category])
+  @@map("lab_communications")
+  @@schema("mod_lab")
+}
+
+model LabAdverseEvent {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String?
+  diagnosticReport       LabDiagnosticReport? @relation(fields: [diagnosticReportId], references: [id], onDelete: SetNull)
+  eventType              String
+  severity               AdverseSeverity
+  description            String               @db.Text
+  occurredAt             DateTime
+  detectedAt             DateTime?
+  reportedAt             DateTime?
+  reportedByNameSnapshot String
+  reportedById           String?
+  correctiveAction       String?              @db.Text
+  resolvedAt             DateTime?
+  resolvedById           String?
+  status                 AdverseStatus        @default(OPEN_ADV)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  deletedAt              DateTime?
+
+  attachments            LabDiagnosticReportAttachment[]
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, severity, status])
+  @@map("lab_adverse_events")
+  @@schema("mod_lab")
+}
+
+model LabTechnicalObservation {
+  id                     String              @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String
+  diagnosticReport       LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  workflowStage          WorkflowEventType?
+  description            String              @db.Text
+  observedAt             DateTime
+  observedByNameSnapshot String
+  observedById           String?
+  createdAt              DateTime            @default(now())
+
+  @@index([tenantId, diagnosticReportId])
+  @@map("lab_technical_observations")
+  @@schema("mod_lab")
+}
+
+model LabDiagnosticReportAttachment {
+  id                     String                    @id @default(uuid())
+  tenantId               String
+  diagnosticReportId     String
+  diagnosticReport       LabDiagnosticReport       @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  category               AttachmentCategory
+  label                  String?
+  sequenceOrder          Int?
+  s3Bucket               String
+  s3Key                  String
+  contentType            String
+  sizeBytes              Int?
+  checksum               String?
+  fmSourceField          String
+  fmContainerUrlOriginal String?
+  citolabS3KeyOriginal   String?
+  migrationStatus        AttachmentMigrationStatus @default(PENDING_MIGRATION)
+  migrationError         String?
+  migrationAttempts      Int                       @default(0)
+  migratedAt             DateTime?
+  adverseEventId         String?
+  adverseEvent           LabAdverseEvent?          @relation(fields: [adverseEventId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([migrationStatus])
+  @@map("lab_diagnostic_report_attachments")
+  @@schema("mod_lab")
+}
+
+model LabExamCharge {
+  id                      String                 @id @default(uuid())
+  tenantId                String
+  fmSource                LabExamChargeSource
+  fmRecordPk              Int
+  diagnosticReportId      String
+  diagnosticReport        LabDiagnosticReport    @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  billingConceptId        String?
+  billingConcept          BillingConcept?        @relation("ExamChargeBillingConcept", fields: [billingConceptId], references: [id], onDelete: SetNull)
+  feeCodesText            String?
+  feeCodes                String[]
+  paymentMethod           LabPaymentMethod
+  amount                  Decimal                @db.Decimal(14, 4)
+  currency                String                 @default("CLP")
+  status                  LabChargeStatus
+  labOriginId             String
+  labOrigin               LabOrigin              @relation("ExamChargeLabOrigin", fields: [labOriginId], references: [id], onDelete: Cascade)
+  labOriginCodeSnapshot   String
+  legalEntityId           String?
+  legalEntity             LegalEntity?           @relation("ExamChargeLegalEntity", fields: [legalEntityId], references: [id], onDelete: SetNull)
+  liquidationId           String?
+  liquidation             LabLiquidation?        @relation(fields: [liquidationId], references: [id], onDelete: SetNull)
+  directPaymentBatchId    String?
+  directPaymentBatch      LabDirectPaymentBatch? @relation(fields: [directPaymentBatchId], references: [id], onDelete: SetNull)
+  enteredAt               DateTime
+  enteredByNameSnapshot   String
+  enteredById             String?
+  pointOfEntry            String?
+  validatedAt             DateTime?
+  validatedByNameSnapshot String?
+  validatedById           String?
+  cancelledAt             DateTime?
+  cancelledByNameSnapshot String?
+  cancelReason            String?
+  notes                   String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  deletedAt               DateTime?
+
+  @@unique([tenantId, fmSource, fmRecordPk])
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, liquidationId])
+  @@index([tenantId, directPaymentBatchId])
+  @@index([tenantId, status])
+  @@index([tenantId, labOriginId, enteredAt])
+  @@index([tenantId, legalEntityId, enteredAt])
+  @@map("lab_exam_charges")
+  @@schema("mod_lab")
+}
+
+model LabLiquidation {
+  id                      String            @id @default(uuid())
+  tenantId                String
+  fmRecordId              String
+  fmPk                    Int?
+  legalEntityId           String
+  legalEntity             LegalEntity        @relation("LiquidationLegalEntity", fields: [legalEntityId], references: [id], onDelete: Cascade)
+  billingAgreementId      String?
+  billingAgreement        BillingAgreement?  @relation("LiquidationBillingAgreement", fields: [billingAgreementId], references: [id], onDelete: SetNull)
+  period                  DateTime
+  periodLabel             String
+  totalAmount             Decimal           @db.Decimal(14, 2)
+  biopsyAmount            Decimal           @db.Decimal(14, 2)
+  papAmount               Decimal           @db.Decimal(14, 2)
+  cytologyAmount          Decimal           @db.Decimal(14, 2)
+  immunoAmount            Decimal           @db.Decimal(14, 2)
+  biopsyCount             Int
+  papCount                Int
+  cytologyCount           Int
+  immunoCount             Int
+  previousDebt            Decimal           @default(0) @db.Decimal(14, 2)
+  creditBalance           Decimal           @default(0) @db.Decimal(14, 2)
+  status                  LiquidationStatus
+  confirmedAt             DateTime?
+  confirmedByNameSnapshot String?
+  invoiceNumber           String?
+  invoiceType             String?
+  invoiceDate             DateTime?
+  paymentAmount           Decimal?          @db.Decimal(14, 2)
+  paymentDate             DateTime?
+  paymentMethodText       String?
+  liquidationPdfKey       String?
+  invoicePdfKey           String?
+  notes                   String?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  deletedAt               DateTime?
+
+  charges LabExamCharge[]
+
+  @@unique([tenantId, fmRecordId])
+  @@index([tenantId, legalEntityId, period])
+  @@index([tenantId, status])
+  @@index([tenantId, period])
+  @@map("lab_liquidations")
+  @@schema("mod_lab")
+}
+
+model LabDirectPaymentBatch {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  fmRecordId            String?
+  fmPk                  Int?
+  period                DateTime
+  periodFrom            DateTime?
+  periodTo              DateTime?
+  legalEntityId         String?
+  legalEntity           LegalEntity?        @relation("DpbLegalEntity", fields: [legalEntityId], references: [id], onDelete: SetNull)
+  rendicionType         RendicionType
+  totalAmount           Decimal             @db.Decimal(14, 2)
+  chargeCount           Int
+  rendidoByNameSnapshot String?
+  rendidoById           String?
+  rendidoAt             DateTime?
+  status                DirectPaymentStatus
+  receiptNumber         String?
+  receiptDate           DateTime?
+  receiptPdfKey         String?
+  notes                 String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+
+  charges LabExamCharge[]
+
+  @@unique([tenantId, fmRecordId])
+  @@index([tenantId, period, rendicionType])
+  @@index([tenantId, legalEntityId])
+  @@map("lab_direct_payment_batches")
+  @@schema("mod_lab")
+}
+
+model LabImportRun {
+  id               String     @id @default(uuid())
+  tenantId         String
+  sources          FmSource[]
+  dateFrom         DateTime?
+  dateTo           DateTime?
+  batchSize        Int        @default(100)
+  status           String     @default("PENDING")
+  phase            String?
+  totalBatches     Int        @default(0)
+  completedBatches Int        @default(0)
+  failedBatches    Int        @default(0)
+  totalRecords     Int        @default(0)
+  processedRecords Int        @default(0)
+  errorRecords     Int        @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  batches LabImportBatch[]
+
+  @@index([tenantId, status])
+  @@map("lab_import_runs")
+  @@schema("mod_lab")
+}
+
+model LabImportBatch {
+  id             String       @id @default(uuid())
+  runId          String
+  run            LabImportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  phase          String
+  fmSource       FmSource
+  batchIndex     Int
+  offset         Int
+  limit          Int
+  status         String       @default("PENDING")
+  recordCount    Int          @default(0)
+  processedCount Int          @default(0)
+  errorCount     Int          @default(0)
+  errors         Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([runId, status])
+  @@map("lab_import_batches")
+  @@schema("mod_lab")
 }

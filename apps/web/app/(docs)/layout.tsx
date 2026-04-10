@@ -28,7 +28,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
         <div className="flex h-14 items-center gap-6 px-6">
           <Link href="/" className="flex items-center gap-2 font-semibold text-sm">
             <span className="text-white">Zeru</span>
-            <span className="text-white/30">/</span>
+            <span className="text-white/50">/</span>
             <span className="text-white/60">API Reference</span>
           </Link>
           <div className="ml-auto flex items-center gap-4">

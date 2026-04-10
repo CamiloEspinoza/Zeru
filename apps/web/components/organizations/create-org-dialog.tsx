@@ -114,8 +114,9 @@ export function CreateOrgDialog({ open, onOpenChange }: CreateOrgDialogProps) {
                 minLength={2}
                 pattern="^[a-z0-9-]+$"
                 placeholder="mi-empresa"
+                aria-describedby="slug-help"
               />
-              <p className="text-muted-foreground text-xs">
+              <p id="slug-help" className="text-muted-foreground text-xs">
                 Solo minúsculas, números y guiones.
               </p>
             </div>

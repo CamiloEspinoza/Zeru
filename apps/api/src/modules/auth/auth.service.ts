@@ -22,6 +22,7 @@ export interface AuthUser {
   email: string;
   tenantId: string;
   role: UserRole;
+  roleId?: string;
   membershipId: string;
 }
 
@@ -136,7 +137,7 @@ export class AuthService {
       include: {
         memberships: {
           where: { isActive: true },
-          select: { id: true, role: true, tenantId: true, tenant: { select: { id: true, name: true, slug: true, isActive: true } } },
+          select: { id: true, role: true, roleId: true, tenantId: true, tenant: { select: { id: true, name: true, slug: true, isActive: true } } },
         },
       },
     });
@@ -163,6 +164,7 @@ export class AuthService {
         email: user.email,
         tenantId: m.tenantId,
         role: m.role,
+        roleId: m.roleId ?? undefined,
         membershipId: m.id,
       });
     }
@@ -188,7 +190,7 @@ export class AuthService {
       include: {
         memberships: {
           where: { tenantId, isActive: true },
-          select: { id: true, role: true, tenantId: true },
+          select: { id: true, role: true, roleId: true, tenantId: true },
         },
       },
     });
@@ -207,6 +209,7 @@ export class AuthService {
       email: user.email,
       tenantId: membership.tenantId,
       role: membership.role,
+      roleId: membership.roleId ?? undefined,
       membershipId: membership.id,
     });
   }
@@ -227,7 +230,7 @@ export class AuthService {
       include: {
         memberships: {
           where: { tenantId, isActive: true },
-          select: { id: true, role: true, tenantId: true },
+          select: { id: true, role: true, roleId: true, tenantId: true },
         },
       },
     });
@@ -247,6 +250,7 @@ export class AuthService {
       email: user.email,
       tenantId: membership.tenantId,
       role: membership.role,
+      roleId: membership.roleId ?? undefined,
       membershipId: membership.id,
     };
   }
@@ -287,6 +291,7 @@ export class AuthService {
       email: user.email,
       tenantId: user.tenantId,
       role: user.role,
+      roleId: user.roleId,
     };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -326,7 +331,7 @@ export class AuthService {
         include: {
           memberships: {
             where: { tenantId: tenant.id },
-            select: { id: true, role: true, tenantId: true },
+            select: { id: true, role: true, roleId: true, tenantId: true },
           },
         },
       });
@@ -343,6 +348,7 @@ export class AuthService {
       email: result.user.email,
       tenantId: membership.tenantId,
       role: membership.role,
+      roleId: membership.roleId ?? undefined,
       membershipId: membership.id,
     };
 
@@ -399,10 +405,46 @@ export class AuthService {
       email: user.email,
       tenantId: membership.tenantId,
       role: membership.role,
+      roleId: membership.roleId ?? undefined,
       membershipId: membership.id,
     };
 
     return this.login(authUser);
+  }
+
+  async getMyPermissions(userId: string, tenantId: string) {
+    const membership = await (this.prisma as any).userTenant.findFirst({
+      where: { userId, tenantId, isActive: true },
+      include: {
+        roleRef: {
+          include: {
+            moduleAccess: true,
+            overrides: true,
+          },
+        },
+      },
+    });
+
+    if (!membership?.roleRef) {
+      return {
+        role: null,
+        moduleAccess: [],
+        overrides: [],
+      };
+    }
+
+    const role = membership.roleRef;
+    return {
+      role: { id: role.id, name: role.name, slug: role.slug },
+      moduleAccess: role.moduleAccess.map((a: any) => ({
+        moduleKey: a.moduleKey,
+        accessLevel: a.accessLevel,
+      })),
+      overrides: role.overrides.map((o: any) => ({
+        permission: o.permission,
+        granted: o.granted,
+      })),
+    };
   }
 
   async joinWaitlist(email: string) {

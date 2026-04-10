@@ -1,0 +1,465 @@
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+import { execFile } from 'node:child_process';
+import { writeFile, readFile, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { S3Service } from '../../files/s3.service';
+import type {
+  CreateInterviewDto,
+  UpdateInterviewDto,
+  ListInterviewsDto,
+  UpdateSpeakerDto,
+} from '../dto';
+
+const ALLOWED_AUDIO_MIMETYPES = [
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/ogg',
+  'audio/webm',
+];
+
+@Injectable()
+export class InterviewsService {
+  private readonly logger = new Logger(InterviewsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly s3: S3Service,
+  ) {}
+
+  async create(tenantId: string, dto: CreateInterviewDto) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    return client.interview.create({
+      data: {
+        projectId: dto.projectId,
+        title: dto.title,
+        interviewDate: dto.interviewDate ? new Date(dto.interviewDate) : undefined,
+        objective: dto.objective,
+        ...(dto.speakers && dto.speakers.length > 0
+          ? {
+              speakers: {
+                createMany: {
+                  data: dto.speakers.map((s) => ({
+                    speakerLabel: s.speakerLabel,
+                    name: s.name,
+                    role: s.role,
+                    department: s.department,
+                    isInterviewer: s.isInterviewer,
+                  })),
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        speakers: true,
+      },
+    });
+  }
+
+  async findAll(tenantId: string, dto: ListInterviewsDto) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const where = {
+      deletedAt: null,
+      projectId: dto.projectId,
+      ...(dto.processingStatus ? { processingStatus: dto.processingStatus } : {}),
+    };
+
+    const [data, total] = await Promise.all([
+      client.interview.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (dto.page - 1) * dto.perPage,
+        take: dto.perPage,
+        include: {
+          speakers: true,
+          _count: {
+            select: { chunks: true },
+          },
+        },
+      }),
+      client.interview.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page: dto.page,
+        perPage: dto.perPage,
+        totalPages: Math.ceil(total / dto.perPage),
+      },
+    };
+  }
+
+  async findOne(tenantId: string, id: string) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const interview = await client.interview.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        speakers: true,
+        audioTracks: { orderBy: { trackOrder: 'asc' as const } },
+        _count: {
+          select: { chunks: true },
+        },
+      },
+    });
+
+    if (!interview) {
+      throw new NotFoundException(`Entrevista con id ${id} no encontrada`);
+    }
+
+    return interview;
+  }
+
+  async update(tenantId: string, id: string, dto: UpdateInterviewDto) {
+    await this.findOne(tenantId, id);
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    return client.interview.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.interviewDate !== undefined && {
+          interviewDate: dto.interviewDate ? new Date(dto.interviewDate) : null,
+        }),
+        ...(dto.objective !== undefined && { objective: dto.objective }),
+      },
+    });
+  }
+
+  async remove(tenantId: string, id: string) {
+    const interview = await this.findOne(tenantId, id);
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    await client.$transaction(async (tx) => {
+      // Delete chunks and speakers (interview-specific data)
+      await tx.interviewChunk.deleteMany({ where: { interviewId: id } });
+      await tx.interviewSpeaker.deleteMany({ where: { interviewId: id } });
+
+      // Delete knowledge graph entities sourced from this interview.
+      // ProblemLinks and OrgRelations cascade from their parents.
+      await tx.factualClaim.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.problem.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.orgRelation.deleteMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+      });
+      await tx.orgEntity.updateMany({
+        where: { projectId: interview.projectId, sourceInterviewId: id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Soft-delete the interview itself
+      await tx.interview.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+    });
+
+    return { message: 'Entrevista y datos relacionados eliminados' };
+  }
+
+  async uploadAudio(tenantId: string, id: string, file: Express.Multer.File) {
+    if (!ALLOWED_AUDIO_MIMETYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Tipo de archivo no permitido: ${file.mimetype}. Tipos permitidos: ${ALLOWED_AUDIO_MIMETYPES.join(', ')}`,
+      );
+    }
+
+    await this.findOne(tenantId, id);
+
+    // Normalize audio with ffmpeg to fix headers (duration, seek support).
+    // Streaming-generated MP3s (e.g. ElevenLabs) often have incorrect Xing
+    // headers that make browsers report wrong duration and break seeking.
+    const normalized = await this.normalizeAudio(file.buffer, file.originalname);
+
+    const outName = file.originalname.replace(/\.[^.]+$/, '.mp3');
+    const key = `tenants/${tenantId}/interviews/${id}/audio/${outName}`;
+    await this.s3.upload(tenantId, key, normalized, 'audio/mpeg');
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    return client.interview.update({
+      where: { id },
+      data: {
+        audioS3Key: key,
+        audioMimeType: 'audio/mpeg',
+        processingStatus: 'UPLOADED',
+      },
+    });
+  }
+
+  async uploadAudioTrack(
+    tenantId: string,
+    interviewId: string,
+    file: Express.Multer.File,
+    trackOrder: number,
+    sourceLabel?: string,
+  ) {
+    if (!ALLOWED_AUDIO_MIMETYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Tipo de archivo no permitido: ${file.mimetype}`,
+      );
+    }
+
+    await this.findOne(tenantId, interviewId);
+
+    const normalized = await this.normalizeAudio(file.buffer, file.originalname);
+    const outName = file.originalname.replace(/\.[^.]+$/, '.mp3');
+    const key = `tenants/${tenantId}/interviews/${interviewId}/audio/track-${trackOrder}-${outName}`;
+    await this.s3.upload(tenantId, key, normalized, 'audio/mpeg');
+
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    await client.interviewAudioTrack.upsert({
+      where: { interviewId_trackOrder: { interviewId, trackOrder } },
+      create: {
+        interviewId,
+        trackOrder,
+        s3Key: key,
+        mimeType: 'audio/mpeg',
+        sourceLabel,
+        originalName: file.originalname,
+        tenantId,
+      },
+      update: {
+        s3Key: key,
+        sourceLabel,
+        originalName: file.originalname,
+      },
+    });
+
+    if (trackOrder === 1) {
+      await client.interview.update({
+        where: { id: interviewId },
+        data: {
+          audioS3Key: key,
+          audioMimeType: 'audio/mpeg',
+          processingStatus: 'UPLOADED',
+        },
+      });
+    } else {
+      await client.interview.update({
+        where: { id: interviewId },
+        data: { processingStatus: 'UPLOADED' },
+      });
+    }
+
+    const tracks = await client.interviewAudioTrack.findMany({
+      where: { interviewId },
+      orderBy: { trackOrder: 'asc' },
+    });
+
+    return { tracks };
+  }
+
+  async getAudioTracks(tenantId: string, interviewId: string) {
+    await this.findOne(tenantId, interviewId);
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+    return client.interviewAudioTrack.findMany({
+      where: { interviewId },
+      orderBy: { trackOrder: 'asc' },
+    });
+  }
+
+  /**
+   * Re-encode audio through ffmpeg to produce a well-formed MP3 with correct
+   * duration headers. Falls back to the original buffer if ffmpeg is unavailable.
+   */
+  private async normalizeAudio(buffer: Buffer, filename: string): Promise<Buffer> {
+    const uid = randomUUID();
+    const inputPath = join(tmpdir(), `zeru-audio-in-${uid}-${filename}`);
+    const outputPath = join(tmpdir(), `zeru-audio-out-${uid}.mp3`);
+
+    try {
+      await writeFile(inputPath, buffer);
+
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          'ffmpeg',
+          ['-i', inputPath, '-codec:a', 'libmp3lame', '-b:a', '128k', '-y', outputPath],
+          { timeout: 120_000 },
+          (err) => (err ? reject(err) : resolve()),
+        );
+      });
+
+      const result = await readFile(outputPath);
+      this.logger.log(`Audio normalized: ${filename} (${buffer.length} → ${result.length} bytes)`);
+      return result;
+    } catch (err) {
+      this.logger.warn(
+        `ffmpeg normalization failed, using original file: ${(err as Error).message}`,
+      );
+      return buffer;
+    } finally {
+      await unlink(inputPath).catch(() => {});
+      await unlink(outputPath).catch(() => {});
+    }
+  }
+
+  async updateSpeakers(tenantId: string, id: string, dto: UpdateSpeakerDto) {
+    // Verify interview belongs to tenant
+    await this.findOne(tenantId, id);
+
+    // Use base prisma client (not tenant-aware) because InterviewSpeaker
+    // doesn't have tenantId column — tenant isolation is guaranteed by
+    // the findOne check above (interview.tenantId === tenantId)
+    return this.prisma.$transaction(async (tx) => {
+      await tx.interviewSpeaker.deleteMany({
+        where: { interviewId: id },
+      });
+
+      // For each speaker, use explicit personEntityId if provided, otherwise try to match by name
+      const speakersData = await Promise.all(
+        dto.speakers.map(async (s) => {
+          let personEntityId: string | null = s.personEntityId ?? null;
+
+          if (!personEntityId && s.name) {
+            try {
+              const person = await tx.personProfile.findFirst({
+                where: {
+                  tenantId,
+                  deletedAt: null,
+                  name: { contains: s.name, mode: 'insensitive' },
+                },
+                select: { id: true },
+              });
+              personEntityId = person?.id ?? null;
+            } catch {
+              // Ignore matching errors
+            }
+          }
+
+          return {
+            interviewId: id,
+            speakerLabel: s.speakerLabel,
+            name: s.name,
+            role: s.role,
+            department: s.department,
+            isInterviewer: s.isInterviewer ?? false,
+            personEntityId,
+          };
+        }),
+      );
+
+      await tx.interviewSpeaker.createMany({
+        data: speakersData,
+      });
+
+      return tx.interview.findFirst({
+        where: { id },
+        include: { speakers: true },
+      });
+    });
+  }
+
+  async getTranscription(tenantId: string, id: string) {
+    const interview = await this.findOne(tenantId, id);
+
+    return {
+      text: interview.transcriptionText,
+      json: interview.transcriptionJson,
+      status: interview.transcriptionStatus,
+      provider: interview.transcriptionProvider,
+    };
+  }
+
+  async getStatus(tenantId: string, id: string) {
+    const interview = await this.findOne(tenantId, id);
+
+    return {
+      processingStatus: interview.processingStatus,
+      processingError: interview.processingError,
+      transcriptionStatus: interview.transcriptionStatus,
+      processingLog: interview.processingLog ?? [],
+    };
+  }
+
+  async getSegmentEntities(tenantId: string, interviewId: string) {
+    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const interview = await client.interview.findFirst({
+      where: { id: interviewId, deletedAt: null },
+      select: { transcriptionJson: true },
+    });
+
+    if (!interview) {
+      throw new NotFoundException(`Entrevista con id ${interviewId} no encontrada`);
+    }
+
+    const entities = await client.orgEntity.findMany({
+      where: { sourceInterviewId: interviewId, deletedAt: null },
+      select: { id: true, name: true, type: true, confidence: true, aliases: true },
+    });
+
+    const transcriptionJson = interview.transcriptionJson as Record<string, unknown> | null;
+    const segments: Array<{ text: string }> =
+      (transcriptionJson?.segments as Array<{ text: string }>) ?? [];
+
+    type EntityRow = { id: string; name: string; type: string; confidence: number; aliases: string[] };
+    type MappedEntity = { id: string; name: string; type: string; confidence: number; matchType: 'text_match' };
+
+    const mappings: Array<{ segmentIndex: number; entities: MappedEntity[] }> = [];
+    const linkedEntityIds = new Set<string>();
+
+    segments.forEach((seg, segmentIndex) => {
+      const lowerText = seg.text.toLowerCase();
+      const matched: MappedEntity[] = [];
+
+      for (const entity of entities as EntityRow[]) {
+        if (entity.name.length < 3) continue;
+        const terms = [entity.name, ...(entity.aliases ?? [])];
+        const hits = terms.some((t) => t.length >= 3 && lowerText.includes(t.toLowerCase()));
+        if (hits) {
+          matched.push({
+            id: entity.id,
+            name: entity.name,
+            type: entity.type,
+            confidence: entity.confidence,
+            matchType: 'text_match',
+          });
+          linkedEntityIds.add(entity.id);
+        }
+      }
+
+      if (matched.length > 0) {
+        mappings.push({ segmentIndex, entities: matched });
+      }
+    });
+
+    const unlinked = (entities as EntityRow[])
+      .filter((e) => !linkedEntityIds.has(e.id))
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        confidence: e.confidence,
+        matchType: 'text_match' as const,
+      }));
+
+    return {
+      mappings,
+      unlinked,
+      meta: {
+        totalEntities: entities.length,
+        linkedEntities: linkedEntityIds.size,
+        matchStrategy: 'text_match',
+      },
+    };
+  }
+}

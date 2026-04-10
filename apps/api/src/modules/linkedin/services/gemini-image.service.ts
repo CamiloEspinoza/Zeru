@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenAI } from '@google/genai';
 import { randomUUID } from 'crypto';
 import { GeminiConfigService } from '../../ai/services/gemini-config.service';
+import { AiUsageService } from '../../ai/services/ai-usage.service';
 import { S3Service } from '../../files/s3.service';
 
 const GEMINI_IMAGE_MODELS = {
@@ -27,6 +28,7 @@ export class GeminiImageService {
   constructor(
     private readonly config: ConfigService,
     private readonly geminiConfigService: GeminiConfigService,
+    private readonly aiUsageService: AiUsageService,
     private readonly s3Service: S3Service,
   ) {
     this.fallbackApiKey = this.config.get<string>('GOOGLE_GEMINI_API_KEY');
@@ -100,6 +102,23 @@ export class GeminiImageService {
 
     await this.s3Service.upload(tenantId, s3Key, buffer, mimeType);
     const s3Url = await this.s3Service.getPresignedUrl(tenantId, s3Key, 60 * 60 * 24 * 7);
+
+    // Log AI usage for image generation
+    try {
+      await this.aiUsageService.logUsage({
+        provider: 'GEMINI',
+        model: modelId,
+        feature: 'image-generation',
+        tenantId,
+        units: 1,
+        pricingUnit: 'PER_IMAGE',
+        costOverrideUsd: 0.067,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to log AI usage for image generation: ${(err as Error).message}`,
+      );
+    }
 
     return { s3Key, s3Url, buffer, mimeType };
   }

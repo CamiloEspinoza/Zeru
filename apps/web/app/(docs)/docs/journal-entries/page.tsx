@@ -5,7 +5,7 @@ export default function JournalEntriesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-sm font-mono text-white/30 mb-3">Endpoints</p>
+        <p className="text-sm font-mono text-white/50 mb-3">Endpoints</p>
         <h1 className="text-3xl font-bold text-white mb-4">
           Asientos Contables
         </h1>
@@ -23,9 +23,9 @@ export default function JournalEntriesPage() {
         <p className="font-semibold text-white/80">Ciclo de vida de un asiento</p>
         <div className="flex items-center gap-2 font-mono text-xs flex-wrap">
           <span className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400">DRAFT</span>
-          <span className="text-white/30">→ post →</span>
+          <span className="text-white/50">→ post →</span>
           <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">POSTED</span>
-          <span className="text-white/30">→ void →</span>
+          <span className="text-white/50">→ void →</span>
           <span className="px-2 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400">VOIDED</span>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function JournalEntriesPage() {
             type: "string (uuid)",
             required: true,
             location: "body",
-            description: "Periodo fiscal; debe existir y estar OPEN.",
+            description: "Período fiscal; debe existir y estar OPEN.",
           },
           {
             name: "entries[].lines",

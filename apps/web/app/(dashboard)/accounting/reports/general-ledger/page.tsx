@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -351,7 +352,12 @@ function GeneralLedgerPageContent() {
             <p className="text-destructive mb-4">{error}</p>
           )}
           {loading ? (
-            <p className="text-muted-foreground">Cargando...</p>
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
           ) : hasSearched ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

@@ -305,7 +305,7 @@ export default function LoginPage() {
                 autoComplete="email"
                 autoFocus
                 disabled={loading}
-                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/25 focus:border-teal-500/60 h-12 text-base"
+                className="bg-white/[0.04] border-white/10 text-white placeholder:text-white/50 focus:border-teal-500/60 h-12 text-base"
               />
             </Field>
 
@@ -396,7 +396,7 @@ function CodeStep({
                 <InputOTPSlot index={1} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
                 <InputOTPSlot index={2} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
               </InputOTPGroup>
-              <InputOTPSeparator className="text-white/20" />
+              <InputOTPSeparator className="text-white/40" />
               <InputOTPGroup>
                 <InputOTPSlot index={3} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />
                 <InputOTPSlot index={4} className="size-12 text-lg text-white bg-white/[0.04] border-white/10" />

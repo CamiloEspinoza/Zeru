@@ -36,3 +36,11 @@ export function validateRut(rut: string): boolean {
 
   return dv === expectedDv;
 }
+
+/**
+ * Normalizes a Chilean RUT by removing dots, dashes, and spaces.
+ * Returns digits + verification digit (e.g. "12.345.678-9" -> "123456789").
+ */
+export function normalizeRut(rut: string): string {
+  return rut.replace(/[^0-9kK]/g, '').toUpperCase();
+}

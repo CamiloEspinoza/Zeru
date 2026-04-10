@@ -1,0 +1,307 @@
+import { Injectable } from '@nestjs/common';
+import { normalizeRut } from '@zeru/shared';
+import type { FmRecord } from '@zeru/shared';
+import { str, parseNum, parseDate, encodeS3Path, isYes } from './helpers';
+import type {
+  ExtractedExam,
+  ExtractedSigner,
+  ExtractedAttachmentRef,
+  FmSourceType,
+  ExamCategoryType,
+  DiagnosticReportStatusType,
+} from './types';
+
+@Injectable()
+export class BiopsyTransformer {
+  readonly database = 'BIOPSIAS';
+  readonly layout = 'Validación Final*';
+
+  /**
+   * Layout for macroscopy text write-back.
+   * TEXTO* layout contains the TEXTO BIOPSIAS::TEXTO field and macroscopy fields.
+   */
+  readonly macroscopyLayout = 'TEXTO*';
+
+  /**
+   * Convert macroscopic description to FM field data.
+   * The macroscopy text is stored in the TEXTO* layout's macro fields.
+   */
+  macroscopyToFm(data: {
+    macroscopicDescription: string;
+  }): Record<string, unknown> {
+    return {
+      'TEXTO BIOPSIAS::MACRO': data.macroscopicDescription,
+    };
+  }
+
+  /**
+   * Layout for macro signer registration.
+   */
+  readonly macroSignerLayout = 'Ingreso Trazabilidad Macroscopía*';
+
+  /**
+   * Create a macro signer record in FM.
+   */
+  macroSignerToFm(data: {
+    fkInformeNumber: number;
+    pathologistCode: string;
+    pathologistName: string;
+    assistantCode: string | null;
+    assistantName: string | null;
+  }): Record<string, unknown> {
+    const fields: Record<string, unknown> = {
+      '_fk_Informe_Número': data.fkInformeNumber,
+      'PATÓLOGO MACRO': data.pathologistName,
+    };
+    if (data.assistantName) {
+      fields['AYUDANTE MACRO'] = data.assistantName;
+    }
+    return fields;
+  }
+
+  /**
+   * Extract a unified ExamDTO from a BIOPSIAS or BIOPSIASRESPALDO record.
+   */
+  extract(record: FmRecord, fmSource: FmSourceType): ExtractedExam {
+    const d = record.fieldData;
+
+    const informeNumber = parseNum(d['INFORME Nº']);
+    const rawRut = str(d['RUT']);
+    const rut = rawRut ? normalizeRut(rawRut) : null;
+    const labOriginCode = str(d['PROCEDENCIA CODIGO UNICO']);
+
+    // Use FECHA APROBACION for BIOPSIASRESPALDO, FECHA VALIDACIÓN for BIOPSIAS
+    const validationDateField =
+      fmSource === 'BIOPSIASRESPALDO' && !str(d['FECHA VALIDACIÓN'])
+        ? str(d['FECHA APROBACION'])
+        : str(d['FECHA VALIDACIÓN']);
+    const validatedAt = parseDate(validationDateField);
+    const requestedAt = parseDate(str(d['FECHA']));
+
+    return {
+      fmInformeNumber: informeNumber,
+      fmSource,
+      fmRecordId: record.recordId,
+
+      // Patient snapshot
+      subjectFirstName: str(d['NOMBRE']),
+      subjectPaternalLastName: str(d['A.PATERNO']),
+      subjectMaternalLastName: str(d['A.MATERNO']) || null,
+      subjectRut: rut && rut.length >= 3 ? rut : null,
+      subjectAge: parseNum(d['EDAD']) || null,
+      subjectGender: null, // Not available in biopsies
+
+      // ServiceRequest
+      category: parseExamCategory(str(d['TIPO DE EXAMEN'])),
+      subcategory: str(d['SUBTIPO EXAMEN']) || null,
+      isUrgent: str(d['URGENTES']).toUpperCase().includes('URGENTE'),
+      requestingPhysicianName: str(d['SOLICITADA POR']) || null,
+      labOriginCode: labOriginCode || record.recordId,
+      anatomicalSite: str(d['MUESTRA DE']) || null,
+      clinicalHistory: str(d['ANTECEDENTES']) || null,
+      sampleCollectedAt: null, // Not typically in biopsies
+      receivedAt: null,
+      requestedAt,
+
+      // DiagnosticReport
+      status: inferStatus(d, validatedAt),
+      conclusion: str(d['DIAGNOSTICO']) || null,
+      fullText: str(d['TEXTO BIOPSIAS::TEXTO']) || null,
+      microscopicDescription: null,
+      macroscopicDescription: null,
+      isAlteredOrCritical: isYes(str(d['Alterado o Crítico'])),
+      validatedAt,
+      issuedAt: validatedAt,
+
+      // Signers
+      signers: extractSigners(d, validatedAt),
+
+      // Attachment refs
+      attachmentRefs: extractAttachmentRefs(record, labOriginCode, validatedAt, informeNumber),
+    };
+  }
+}
+
+// ── Pure helper functions ──
+
+function parseExamCategory(val: string): ExamCategoryType {
+  const upper = val
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (upper.includes('BIOPSIA')) return 'BIOPSY';
+  if (upper.includes('INMUNOHISTOQUIMICA') || upper.includes('IHQ') || upper.includes('INMUNO'))
+    return 'IMMUNOHISTOCHEMISTRY';
+  if (upper.includes('CITOLOGIA') || upper.includes('THIN PREP')) return 'CYTOLOGY';
+  if (upper.includes('MOLECULAR')) return 'MOLECULAR';
+  if (upper.includes('PAP')) return 'PAP';
+  return 'OTHER';
+}
+
+function inferStatus(
+  d: Record<string, unknown>,
+  validatedAt: Date | null,
+): DiagnosticReportStatusType {
+  const activarSubir = str(d['Activar Subir Examen']);
+  const estadoWeb = str(d['Estado Web']).toLowerCase();
+
+  if (estadoWeb.includes('publicado') || estadoWeb.includes('descargado')) return 'DELIVERED';
+  if (activarSubir && /^s[iíÍ]/i.test(activarSubir)) return 'SIGNED';
+  if (validatedAt) return 'VALIDATED';
+  return 'REGISTERED';
+}
+
+function extractSigners(d: Record<string, unknown>, validatedAt: Date | null): ExtractedSigner[] {
+  const signers: ExtractedSigner[] = [];
+  const signedAt = validatedAt ?? new Date();
+  let order = 0;
+
+  // Primary pathologist
+  const patologo = str(d['PATOLOGO']);
+  if (patologo) {
+    order++;
+    signers.push({
+      codeSnapshot: extractCode(patologo),
+      nameSnapshot: patologo,
+      role: 'PRIMARY_PATHOLOGIST',
+      signatureOrder: order,
+      signedAt,
+      isActive: true,
+      supersededBy: null,
+      correctionReason: null,
+    });
+  }
+
+  // Supervising pathologist
+  const supervisor = str(d['Revisado por patólogo supervisor']);
+  const patSupCorrection = str(d['caso corregido por PAT SUP']);
+
+  if (supervisor) {
+    order++;
+    signers.push({
+      codeSnapshot: extractCode(supervisor),
+      nameSnapshot: supervisor,
+      role: 'SUPERVISING_PATHOLOGIST',
+      signatureOrder: order,
+      signedAt,
+      isActive: !patSupCorrection, // Superseded if PAT SUP correction exists
+      supersededBy: patSupCorrection || null,
+      correctionReason: patSupCorrection ? 'Corregido por patólogo supervisor' : null,
+    });
+  }
+
+  // PAT SUP correction (new supervising pathologist)
+  if (patSupCorrection) {
+    order++;
+    signers.push({
+      codeSnapshot: extractCode(patSupCorrection),
+      nameSnapshot: patSupCorrection,
+      role: 'SUPERVISING_PATHOLOGIST',
+      signatureOrder: order,
+      signedAt,
+      isActive: true,
+      supersededBy: null,
+      correctionReason: null,
+    });
+  }
+
+  // Validation correction
+  const validationCorrection = str(d['caso corregido por validacion']);
+  if (validationCorrection) {
+    order++;
+    signers.push({
+      codeSnapshot: extractCode(validationCorrection),
+      nameSnapshot: validationCorrection,
+      role: 'VALIDATION_CORRECTION',
+      signatureOrder: order,
+      signedAt,
+      isActive: true,
+      supersededBy: null,
+      correctionReason: null,
+    });
+  }
+
+  return signers;
+}
+
+/**
+ * Extract a practitioner code from strings like "Dr. Martínez (PAT-001)".
+ * Falls back to full string if no parenthesized code found.
+ */
+function extractCode(name: string): string {
+  const match = name.match(/\(([^)]+)\)/);
+  return match ? match[1] : name;
+}
+
+function extractAttachmentRefs(
+  record: FmRecord,
+  labOriginCode: string,
+  validatedAt: Date | null,
+  informeNumber: number,
+): ExtractedAttachmentRef[] {
+  const refs: ExtractedAttachmentRef[] = [];
+  const d = record.fieldData;
+
+  // Build S3 key components
+  const year = validatedAt ? String(validatedAt.getFullYear()) : 'unknown';
+  const month = validatedAt ? String(validatedAt.getMonth() + 1).padStart(2, '0') : 'unknown';
+  const encodedOrigin = encodeS3Path(labOriginCode);
+
+  // PDF report
+  const pdfUrl = str(d['INFORMES PDF::PDF INFORME']);
+  if (pdfUrl) {
+    refs.push({
+      category: 'REPORT_PDF',
+      label: `Informe ${informeNumber}`,
+      sequenceOrder: 0,
+      s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}.pdf`,
+      contentType: 'application/pdf',
+      fmSourceField: 'INFORMES PDF::PDF INFORME',
+      fmContainerUrlOriginal: pdfUrl,
+      citolabS3KeyOriginal: `Biopsias/${labOriginCode}/${year}/${month}/${informeNumber}.pdf`,
+    });
+  }
+
+  // Scanner/micro photos from portal SCANNER BP 8
+  const scannerPortal = record.portalData?.['SCANNER BP 8'];
+  if (scannerPortal && Array.isArray(scannerPortal)) {
+    let photoIndex = 0;
+    for (const row of scannerPortal) {
+      // Check FOTO 1 through FOTO 22
+      for (let i = 1; i <= 22; i++) {
+        const fotoUrl = str(row[`SCANNER BP 8::FOTO ${i}`]);
+        if (fotoUrl) {
+          photoIndex++;
+          refs.push({
+            category: 'MICRO_PHOTO',
+            label: `Foto ${photoIndex}`,
+            sequenceOrder: photoIndex,
+            s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_foto_${photoIndex}.jpg`,
+            contentType: 'image/jpeg',
+            fmSourceField: `SCANNER BP 8::FOTO ${i}`,
+            fmContainerUrlOriginal: fotoUrl,
+            citolabS3KeyOriginal: null,
+          });
+        }
+      }
+
+      // Check MACRO
+      const macroUrl = str(row['SCANNER BP 8::MACRO']);
+      if (macroUrl) {
+        photoIndex++;
+        refs.push({
+          category: 'MACRO_PHOTO',
+          label: `Macro ${photoIndex}`,
+          sequenceOrder: photoIndex,
+          s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_macro_${photoIndex}.jpg`,
+          contentType: 'image/jpeg',
+          fmSourceField: 'SCANNER BP 8::MACRO',
+          fmContainerUrlOriginal: macroUrl,
+          citolabS3KeyOriginal: null,
+        });
+      }
+    }
+  }
+
+  return refs;
+}

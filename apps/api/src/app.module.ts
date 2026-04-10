@@ -1,6 +1,8 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -16,12 +18,29 @@ import { StorageConfigModule } from './modules/storage-config/storage-config.mod
 import { EmailConfigModule } from './modules/email-config/email-config.module';
 import { EmailModule } from './modules/email/email.module';
 import { LinkedInModule } from './modules/linkedin/linkedin.module';
+import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligence.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
+import { RedisModule } from './common/services/redis.module';
+import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
+import { AuditModule } from './modules/audit/audit.module';
+import { AuditContextMiddleware } from './modules/audit/audit.middleware';
+import { NotificationModule } from './modules/notification/notification.module';
+import { RolesModule } from './modules/roles/roles.module';
+import { FileMakerModule } from './modules/filemaker/filemaker.module';
+import { LegalEntitiesModule } from './modules/legal-entities/legal-entities.module';
+import { LabOriginsModule } from './modules/lab-origins/lab-origins.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { TasksModule } from './modules/tasks/tasks.module';
+import { LabModule } from './modules/lab/lab.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
+    EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     EncryptionModule,
     EmailModule,
     PrismaModule,
@@ -37,10 +56,26 @@ import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.mi
     PublicApiModule,
     ZeruMcpModule,
     LinkedInModule,
+    OrgIntelligenceModule,
+    CalendarModule,
+    RedisModule,
+    RealtimeModule,
+    AuditModule,
+    NotificationModule,
+    RolesModule,
+    FileMakerModule,
+    LegalEntitiesModule,
+    LabOriginsModule,
+    BillingModule,
+    ProjectsModule,
+    TasksModule,
+    LabModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(TenantResolverMiddleware).forRoutes('*');
+    consumer
+      .apply(TenantResolverMiddleware, AuditContextMiddleware)
+      .forRoutes('*');
   }
 }

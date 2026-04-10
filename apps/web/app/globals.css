@@ -176,3 +176,37 @@
 .font-display {
   font-family: var(--font-display, var(--font-sans));
 }
+
+/* ── Orgchart edges ── */
+.react-flow__edge.orgchart-edge .react-flow__edge-path {
+  stroke: #94A3B8;
+  stroke-width: 1.5;
+  transition: stroke 0.15s, stroke-width 0.15s;
+}
+
+.react-flow__edge.orgchart-edge.selected .react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.orgchart-edge.highlighted .react-flow__edge-path {
+  stroke: var(--primary);
+  stroke-width: 2.5;
+  transition: stroke 0.15s, stroke-width 0.15s;
+}
+
+.react-flow__edge.orgchart-edge.dimmed .react-flow__edge-path {
+  opacity: 0.15;
+  transition: opacity 0.15s;
+}
+
+.react-flow__edge.orgchart-edge .react-flow__edge-interaction {
+  stroke-width: 20;
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .print-container, .print-container * { visibility: visible; }
+  .print-container { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}
