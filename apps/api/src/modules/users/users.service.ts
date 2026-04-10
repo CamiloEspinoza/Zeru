@@ -76,13 +76,18 @@ export class UsersService {
     ]);
 
     return {
-      data: memberships.map((m) => ({
-        ...m.user,
-        role: m.role,
-        roleRef: m.roleRef ?? null,
-        membershipId: m.id,
-        membershipActive: m.isActive,
-      })),
+      data: memberships.map((m) => {
+        const { personProfiles, ...userData } = m.user;
+        const linkedPerson = personProfiles?.[0] ?? null;
+        return {
+          ...userData,
+          role: m.role,
+          roleRef: m.roleRef ?? null,
+          membershipId: m.id,
+          membershipActive: m.isActive,
+          linkedPerson: linkedPerson ? { id: linkedPerson.id, name: linkedPerson.name } : null,
+        };
+      }),
       meta: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
     };
   }
