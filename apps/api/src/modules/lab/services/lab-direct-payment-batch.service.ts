@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { toDirectPaymentStatus } from '../constants/enum-maps';
 import type {
   CreateDirectPaymentBatchSchema,
   CloseDirectPaymentBatchSchema,
@@ -17,12 +18,22 @@ export class LabDirectPaymentBatchService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async findAll(tenantId: string, page = 1, pageSize = 50) {
+  async findAll(
+    tenantId: string,
+    filters: { page?: number; pageSize?: number; status?: string; legalEntityId?: string } = {},
+  ) {
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 50;
     const skip = (page - 1) * pageSize;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = { tenantId };
+    if (filters.status) where.status = toDirectPaymentStatus(filters.status);
+    if (filters.legalEntityId) where.legalEntityId = filters.legalEntityId;
 
     const [items, total] = await Promise.all([
       this.prisma.labDirectPaymentBatch.findMany({
-        where: { tenantId },
+        where,
         include: {
           _count: { select: { charges: true } },
         },
@@ -30,7 +41,7 @@ export class LabDirectPaymentBatchService {
         skip,
         take: pageSize,
       }),
-      this.prisma.labDirectPaymentBatch.count({ where: { tenantId } }),
+      this.prisma.labDirectPaymentBatch.count({ where }),
     ]);
 
     return { items, total, page, pageSize };

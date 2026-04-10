@@ -4,6 +4,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
 import { FmAuthService } from '../../filemaker/services/fm-auth.service';
+import { LabImportOrchestratorService } from '../services/lab-import-orchestrator.service';
 
 describe('AttachmentDownloadProcessor', () => {
   let processor: AttachmentDownloadProcessor;
@@ -23,6 +24,7 @@ describe('AttachmentDownloadProcessor', () => {
           migrationAttempts: 0,
         }),
         update: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
       },
     };
 
@@ -39,6 +41,10 @@ describe('AttachmentDownloadProcessor', () => {
         },
         { provide: FmApiService, useValue: {} },
         { provide: FmAuthService, useValue: { getToken: jest.fn().mockResolvedValue('mock-token') } },
+        {
+          provide: LabImportOrchestratorService,
+          useValue: { advancePhase: jest.fn().mockResolvedValue(undefined) },
+        },
         {
           provide: 'CITOLAB_S3_CONFIG',
           useValue: { bucket: 'archivos-citolab-virginia', region: 'us-east-1' },

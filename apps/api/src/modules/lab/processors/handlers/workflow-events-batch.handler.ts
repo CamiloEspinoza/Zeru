@@ -159,14 +159,9 @@ export class WorkflowEventsBatchHandler {
         data: { status: 'FAILED', errors: [{ error: msg }], completedAt: new Date() },
       });
 
-      try {
-        await this.prisma.labImportRun.update({
-          where: { id: data.runId },
-          data: { completedBatches: { increment: 1 }, failedBatches: { increment: 1 } },
-        });
-      } catch (counterError) {
-        this.logger.error(`Failed to update run counters: ${counterError instanceof Error ? counterError.message : counterError}`);
-      }
+      // Don't increment run counters here — the @OnWorkerEvent('failed') handler
+      // in LabImportProcessor will increment failedBatches on final exhaustion
+      // to avoid counter inflation on retries.
 
       throw error;
     }

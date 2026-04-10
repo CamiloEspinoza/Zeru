@@ -8,6 +8,7 @@ import {
   LabPaymentMethod,
   LabChargeStatus,
   LiquidationStatus,
+  DirectPaymentStatus,
   FmSource,
   Gender,
   LabExamChargeSource,
@@ -303,4 +304,17 @@ const REVERSE_ADVERSE_SEVERITY_MAP: Record<AdverseSeverity, string> = {
 
 export function fromAdverseSeverity(val: AdverseSeverity): string {
   return REVERSE_ADVERSE_SEVERITY_MAP[val];
+}
+
+// ── DirectPaymentStatus (DTO -> Prisma) ──
+
+const DPB_STATUS_MAP: Record<string, DirectPaymentStatus> = {
+  OPEN: DirectPaymentStatus.OPEN_DPB,
+  RENDIDA: DirectPaymentStatus.RENDIDA,
+  RECONCILED: DirectPaymentStatus.RECONCILED,
+  CANCELLED: DirectPaymentStatus.CANCELLED_DPB,
+};
+
+export function toDirectPaymentStatus(val: string): DirectPaymentStatus {
+  return DPB_STATUS_MAP[val] ?? DirectPaymentStatus.OPEN_DPB;
 }

@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -6,6 +6,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
 import { FmAuthService } from '../../filemaker/services/fm-auth.service';
+import { LabImportOrchestratorService } from '../services/lab-import-orchestrator.service';
 import { ATTACHMENT_MIGRATION_QUEUE, ATTACHMENT_QUEUE_CONFIG } from '../constants/queue.constants';
 
 export interface AttachmentJobData {
@@ -36,6 +37,7 @@ export class AttachmentDownloadProcessor extends WorkerHost {
     private readonly s3Service: S3Service,
     private readonly fmApi: FmApiService,
     private readonly fmAuthService: FmAuthService,
+    private readonly orchestrator: LabImportOrchestratorService,
     @Inject('CITOLAB_S3_CONFIG')
     private readonly citolabConfig: CitolabS3Config,
   ) {
@@ -49,7 +51,10 @@ export class AttachmentDownloadProcessor extends WorkerHost {
       where: { id: attachmentId },
     });
 
-    if (!attachment || attachment.migrationStatus === 'UPLOADED') return;
+    if (!attachment || attachment.migrationStatus === 'UPLOADED') {
+      await this.checkPhaseCompletion(job.data);
+      return;
+    }
 
     // Mark as downloading
     await this.prisma.labDiagnosticReportAttachment.update({
@@ -86,6 +91,7 @@ export class AttachmentDownloadProcessor extends WorkerHost {
           where: { id: attachmentId },
           data: { migrationStatus: 'SKIPPED', migrationError: 'No source URL available' },
         });
+        await this.checkPhaseCompletion(job.data);
         return;
       }
 
@@ -102,6 +108,9 @@ export class AttachmentDownloadProcessor extends WorkerHost {
           migrationError: null,
         },
       });
+
+      // Check if all attachments for this run are done
+      await this.checkPhaseCompletion(job.data);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`Attachment ${attachmentId} download failed: ${msg}`);
@@ -115,6 +124,39 @@ export class AttachmentDownloadProcessor extends WorkerHost {
       });
 
       throw error; // Let BullMQ retry
+    }
+  }
+
+  @OnWorkerEvent('failed')
+  async onFailed(job: Job<AttachmentJobData>, error: Error) {
+    if (job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      const { runId } = job.data;
+      this.logger.warn(
+        `Attachment job ${job.id} exhausted all ${job.attemptsMade} attempts: ${error.message}`,
+      );
+      if (runId) {
+        await this.checkPhaseCompletion(job.data).catch((e) =>
+          this.logger.error(`Failed to check phase completion after attachment exhaustion: ${e}`),
+        );
+      }
+    }
+  }
+
+  /**
+   * Check if all PENDING_MIGRATION attachments for this run's tenant are done.
+   * If none remain, advance the phase.
+   */
+  private async checkPhaseCompletion(data: AttachmentJobData): Promise<void> {
+    const { runId, tenantId } = data;
+    const remaining = await this.prisma.labDiagnosticReportAttachment.count({
+      where: {
+        tenantId,
+        migrationStatus: { in: ['PENDING_MIGRATION', 'DOWNLOADING'] },
+      },
+    });
+    if (remaining === 0) {
+      this.logger.log(`All attachments processed for run ${runId}. Advancing phase.`);
+      await this.orchestrator.advancePhase(runId);
     }
   }
 

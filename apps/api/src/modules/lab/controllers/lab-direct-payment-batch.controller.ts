@@ -35,7 +35,7 @@ export class LabDirectPaymentBatchController {
     @Query(new ZodValidationPipe(labDirectPaymentBatchListSchema))
     query: LabDirectPaymentBatchListDto,
   ) {
-    return this.service.findAll(tenantId, query.page, query.pageSize);
+    return this.service.findAll(tenantId, query);
   }
 
   @Get(':id')

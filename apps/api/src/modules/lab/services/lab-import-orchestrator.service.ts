@@ -118,6 +118,15 @@ export class LabImportOrchestratorService {
       totalBatches += batchCount;
     }
 
+    // If no records to import, complete the run immediately
+    if (allBatchDefs.length === 0) {
+      await this.prisma.labImportRun.update({
+        where: { id: run.id },
+        data: { status: 'COMPLETED', completedAt: new Date(), phase: 'completed' },
+      });
+      return { runId: run.id, totalBatches: 0 };
+    }
+
     // Create all batch records
     for (const def of allBatchDefs) {
       await this.prisma.labImportBatch.create({
@@ -186,15 +195,37 @@ export class LabImportOrchestratorService {
 
     if (pendingBatches > 0) return; // Not all jobs done yet
 
-    // Atomic compare-and-swap: only the first worker to reach this point advances the phase
+    // Determine the next phase before the CAS
+    let nextPhase: string;
+    switch (run.phase) {
+      case PHASES.EXAMS:
+        nextPhase = PHASES.WORKFLOW_COMMS;
+        break;
+      case PHASES.WORKFLOW_COMMS:
+        nextPhase = PHASES.LIQUIDATIONS;
+        break;
+      case PHASES.LIQUIDATIONS:
+        nextPhase = PHASES.CHARGES;
+        break;
+      case PHASES.CHARGES:
+        nextPhase = PHASES.ATTACHMENTS;
+        break;
+      case PHASES.ATTACHMENTS:
+        nextPhase = 'completed';
+        break;
+      default:
+        return;
+    }
+
+    // Atomic compare-and-swap: changes phase so second worker's WHERE won't match
     const result = await this.prisma.labImportRun.updateMany({
       where: { id: runId, status: 'RUNNING', phase: run.phase },
-      data: { updatedAt: new Date() },
+      data: { phase: nextPhase, updatedAt: new Date() },
     });
     if (result.count === 0) return; // Another worker already advanced
 
     const currentPhase = run.phase;
-    this.logger.log(`Phase ${currentPhase} complete for run ${runId}. Advancing...`);
+    this.logger.log(`Phase ${currentPhase} complete for run ${runId}. Advancing to ${nextPhase}...`);
 
     switch (currentPhase) {
       case PHASES.EXAMS:
@@ -228,10 +259,7 @@ export class LabImportOrchestratorService {
     dateFrom: Date | null,
     dateTo: Date | null,
   ): Promise<void> {
-    await this.prisma.labImportRun.update({
-      where: { id: runId },
-      data: { phase: PHASES.WORKFLOW_COMMS },
-    });
+    // Phase already set by advancePhase CAS
 
     const dateFilter = dateFrom && dateTo ? { dateFrom, dateTo } : undefined;
     const batchSize = IMPORT_QUEUE_CONFIG.defaultBatchSize;
@@ -330,10 +358,7 @@ export class LabImportOrchestratorService {
   }
 
   private async enqueueLiquidationsPhase(runId: string, tenantId: string): Promise<void> {
-    await this.prisma.labImportRun.update({
-      where: { id: runId },
-      data: { phase: PHASES.LIQUIDATIONS },
-    });
+    // Phase already set by advancePhase CAS
 
     const batchRec = await this.prisma.labImportBatch.create({
       data: {
@@ -361,10 +386,7 @@ export class LabImportOrchestratorService {
   }
 
   private async enqueueChargesPhase(runId: string, tenantId: string): Promise<void> {
-    await this.prisma.labImportRun.update({
-      where: { id: runId },
-      data: { phase: PHASES.CHARGES },
-    });
+    // Phase already set by advancePhase CAS
 
     const batchSize = IMPORT_QUEUE_CONFIG.defaultBatchSize;
     const jobs: {
@@ -420,10 +442,7 @@ export class LabImportOrchestratorService {
   }
 
   private async enqueueAttachmentsPhase(runId: string, tenantId: string): Promise<void> {
-    await this.prisma.labImportRun.update({
-      where: { id: runId },
-      data: { phase: PHASES.ATTACHMENTS },
-    });
+    // Phase already set by advancePhase CAS
 
     // Find all pending attachment records for this tenant
     const pendingAttachments = await this.prisma.labDiagnosticReportAttachment.findMany({

@@ -127,10 +127,11 @@ export class FmRangeResolverService {
     try {
       if (dateFilter) {
         const rangeStr = this.formatFmDateRange(dateFilter.dateFrom, dateFilter.dateTo);
+        // Use the same date field as the workflow handler for consistency
         const response = await this.fmApi.findRecords(
           config.database,
           config.layout,
-          [{ 'Trazabilidad::Fecha_Ingreso examen': rangeStr }],
+          [{ 'Trazabilidad::Fecha_Macroscopía': rangeStr }],
           { limit: 1, dateformats: 2 },
         );
         return {

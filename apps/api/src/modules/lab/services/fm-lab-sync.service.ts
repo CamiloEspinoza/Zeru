@@ -8,7 +8,6 @@ import { LiquidationTransformer } from '../../filemaker/transformers/liquidation
 import { BiopsyTransformer } from '../../filemaker/transformers/biopsy.transformer';
 import { TraceabilityTransformer } from '../../filemaker/transformers/traceability.transformer';
 import {
-  fromLabPaymentMethod,
   fromLabChargeStatus,
   fromLiquidationStatus,
 } from '../constants/enum-maps';
@@ -53,42 +52,48 @@ export class FmLabSyncService {
 
   @OnEvent('fm.lab.sync')
   async handleLabSyncEvent(event: FmLabSyncEvent) {
-    this.logger.log(
-      `Lab sync event: ${event.action} ${event.entityType}/${event.entityId}`,
-    );
-
-    // For creates, we don't have an FmSyncRecord yet -- the sync processor
-    // will create the FM record and then create the FmSyncRecord.
-    if (event.action === 'create') {
-      await this.handleCreate(event);
-      return;
-    }
-
-    // For updates, find the existing FmSyncRecord and mark it PENDING_TO_FM
-    const existing = await this.prisma.fmSyncRecord.findFirst({
-      where: {
-        tenantId: event.tenantId,
-        entityType: event.entityType,
-        entityId: event.entityId,
-      },
-    });
-
-    if (!existing) {
-      this.logger.warn(
-        `No FmSyncRecord for ${event.entityType}/${event.entityId}, ` +
-        `action=${event.action} -- will create FM record`,
+    try {
+      this.logger.log(
+        `Lab sync event: ${event.action} ${event.entityType}/${event.entityId}`,
       );
-      await this.handleCreate(event);
-      return;
-    }
 
-    await this.prisma.fmSyncRecord.update({
-      where: { id: existing.id },
-      data: {
-        syncStatus: 'PENDING_TO_FM',
-        syncError: null,
-      },
-    });
+      // For creates, we don't have an FmSyncRecord yet -- the sync processor
+      // will create the FM record and then create the FmSyncRecord.
+      if (event.action === 'create') {
+        await this.handleCreate(event);
+        return;
+      }
+
+      // For updates, find the existing FmSyncRecord and mark it PENDING_TO_FM
+      const existing = await this.prisma.fmSyncRecord.findFirst({
+        where: {
+          tenantId: event.tenantId,
+          entityType: event.entityType,
+          entityId: event.entityId,
+        },
+      });
+
+      if (!existing) {
+        this.logger.warn(
+          `No FmSyncRecord for ${event.entityType}/${event.entityId}, ` +
+          `action=${event.action} -- will create FM record`,
+        );
+        await this.handleCreate(event);
+        return;
+      }
+
+      await this.prisma.fmSyncRecord.update({
+        where: { id: existing.id },
+        data: {
+          syncStatus: 'PENDING_TO_FM',
+          syncError: null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to handle fm.lab.sync for ${event.entityType}/${event.entityId}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
   }
 
   private async handleCreate(event: FmLabSyncEvent) {
@@ -108,14 +113,18 @@ export class FmLabSyncService {
             lastSyncAt: new Date(),
           },
         });
-        await this.logSync({
-          tenantId: event.tenantId,
-          entityType: event.entityType,
-          entityId: event.entityId,
-          fmRecordId: result.recordId,
-          action: 'lab-sync:create',
-          direction: 'zeru_to_fm',
-        });
+        try {
+          await this.logSync({
+            tenantId: event.tenantId,
+            entityType: event.entityType,
+            entityId: event.entityId,
+            fmRecordId: result.recordId,
+            action: 'lab-sync:create',
+            direction: 'zeru_to_fm',
+          });
+        } catch (logError) {
+          this.logger.warn(`Failed to log sync: ${logError instanceof Error ? logError.message : logError}`);
+        }
       } else {
         this.logger.warn(`No FM record created for ${event.entityType}/${event.entityId} (action=${event.action}) — no handler returned a result`);
       }
@@ -195,28 +204,24 @@ export class FmLabSyncService {
       fkRendicion = dpb?.fmPk ? String(dpb.fmPk) : null;
     }
 
+    // Resolve DR informe number for the FK
+    const dr = await this.prisma.labDiagnosticReport.findUnique({
+      where: { id: charge.diagnosticReportId },
+      select: { fmInformeNumber: true },
+    });
+
     const toFmData = {
-      fkInformeNumber: charge.fmRecordPk, // This is the DR's fmInformeNumber linked via DR
-      paymentMethodName: fromLabPaymentMethod(charge.paymentMethod),
+      fkInformeNumber: dr?.fmInformeNumber ?? charge.fmRecordPk,
+      fkTipoIngreso: null as number | null, // FK to payment method type — not resolvable at create time
       amount: Number(charge.amount),
       feeCodesText: charge.feeCodesText,
       statusName: fromLabChargeStatus(charge.status),
-      labOriginCodeSnapshot: charge.labOriginCodeSnapshot,
       enteredAt: charge.enteredAt,
       enteredByNameSnapshot: charge.enteredByNameSnapshot,
       pointOfEntry: charge.pointOfEntry,
       fkLiquidacion,
       fkRendicion,
     };
-
-    // Resolve DR informe number for the FK
-    const dr = await this.prisma.labDiagnosticReport.findUnique({
-      where: { id: charge.diagnosticReportId },
-      select: { fmInformeNumber: true },
-    });
-    if (dr) {
-      toFmData.fkInformeNumber = dr.fmInformeNumber;
-    }
 
     const fieldData = isBiopsy
       ? this.examChargeTransformer.biopsyChargeToFm(toFmData)
@@ -285,9 +290,11 @@ export class FmLabSyncService {
   ): Promise<{ database: string; layout: string; recordId: string }> {
     const signer = await this.prisma.labDiagnosticReportSigner.findUniqueOrThrow({
       where: { id: event.entityId },
+      include: { diagnosticReport: { select: { fmInformeNumber: true } } },
     });
 
     const fieldData = this.biopsyTransformer.macroSignerToFm({
+      fkInformeNumber: signer.diagnosticReport.fmInformeNumber,
       pathologistCode: signer.codeSnapshot,
       pathologistName: signer.nameSnapshot,
       assistantCode: null,
@@ -332,6 +339,7 @@ export class FmLabSyncService {
       where: {
         syncStatus: 'PENDING_TO_FM',
         entityType: { in: labEntityTypes },
+        retryCount: { lt: 10 }, // max 10 retries
       },
       take: 10,
     });
@@ -395,15 +403,26 @@ export class FmLabSyncService {
 
         const fieldData = await this.buildUpdateFieldData(record);
 
-        if (fieldData && Object.keys(fieldData).length > 0) {
-          await this.fmApi.updateRecord(
-            record.fmDatabase,
-            record.fmLayout,
-            record.fmRecordId,
-            fieldData,
-            record.fmModId ?? undefined,
-          );
+        if (!fieldData || Object.keys(fieldData).length === 0) {
+          // No write-back handler for this entity type — mark as error to avoid false SYNCED
+          await this.prisma.fmSyncRecord.update({
+            where: { id: record.id },
+            data: {
+              syncStatus: 'ERROR',
+              syncError: 'No write-back handler for entity type',
+              retryCount: 999,
+            },
+          });
+          continue;
         }
+
+        await this.fmApi.updateRecord(
+          record.fmDatabase,
+          record.fmLayout,
+          record.fmRecordId,
+          fieldData,
+          record.fmModId ?? undefined,
+        );
 
         // Re-read the FM record to get new modId
         let newModId = currentFmRecord.modId;
@@ -429,14 +448,18 @@ export class FmLabSyncService {
           },
         });
 
-        await this.logSync({
-          tenantId: record.tenantId,
-          entityType: record.entityType,
-          entityId: record.entityId,
-          fmRecordId: record.fmRecordId,
-          action: 'lab-sync:update',
-          direction: 'zeru_to_fm',
-        });
+        try {
+          await this.logSync({
+            tenantId: record.tenantId,
+            entityType: record.entityType,
+            entityId: record.entityId,
+            fmRecordId: record.fmRecordId,
+            action: 'lab-sync:update',
+            direction: 'zeru_to_fm',
+          });
+        } catch (logError) {
+          this.logger.warn(`Failed to log sync: ${logError instanceof Error ? logError.message : logError}`);
+        }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         this.logger.error(`Lab sync failed for ${record.id}: ${msg}`);
@@ -481,14 +504,18 @@ export class FmLabSyncService {
             syncError: null,
           },
         });
-        await this.logSync({
-          tenantId: record.tenantId,
-          entityType: record.entityType,
-          entityId: record.entityId,
-          fmRecordId: result.recordId,
-          action: 'lab-sync:retry-create',
-          direction: 'zeru_to_fm',
-        });
+        try {
+          await this.logSync({
+            tenantId: record.tenantId,
+            entityType: record.entityType,
+            entityId: record.entityId,
+            fmRecordId: result.recordId,
+            action: 'lab-sync:retry-create',
+            direction: 'zeru_to_fm',
+          });
+        } catch (logError) {
+          this.logger.warn(`Failed to log sync: ${logError instanceof Error ? logError.message : logError}`);
+        }
       } else {
         this.logger.warn(`No create handler for ${record.entityType}/${record.entityId} — marking as permanent error`);
         await this.prisma.fmSyncRecord.update({
@@ -570,11 +597,10 @@ export class FmLabSyncService {
 
     const toFmData = {
       fkInformeNumber: dr?.fmInformeNumber ?? 0,
-      paymentMethodName: fromLabPaymentMethod(charge.paymentMethod),
+      fkTipoIngreso: null as number | null, // FK to payment method type — not resolvable at update time
       amount: Number(charge.amount),
       feeCodesText: charge.feeCodesText,
       statusName: fromLabChargeStatus(charge.status),
-      labOriginCodeSnapshot: charge.labOriginCodeSnapshot,
       enteredAt: charge.enteredAt,
       enteredByNameSnapshot: charge.enteredByNameSnapshot,
       pointOfEntry: charge.pointOfEntry,

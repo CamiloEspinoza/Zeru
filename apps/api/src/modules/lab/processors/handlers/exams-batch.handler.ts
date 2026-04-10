@@ -151,13 +151,9 @@ export class ExamsBatchHandler {
         });
       }
 
-      await this.prisma.labImportRun.update({
-        where: { id: runId },
-        data: {
-          completedBatches: { increment: 1 },
-          failedBatches: { increment: 1 },
-        },
-      });
+      // Don't increment run counters here — the @OnWorkerEvent('failed') handler
+      // in LabImportProcessor will increment failedBatches on final exhaustion
+      // to avoid counter inflation on retries.
 
       throw error; // Let BullMQ retry
     }
@@ -200,10 +196,9 @@ export class ExamsBatchHandler {
       where: { tenantId, code: exam.labOriginCode },
     });
     if (!labOrigin) {
-      this.logger.warn(
-        `LabOrigin not found for code "${exam.labOriginCode}" (informe ${exam.fmInformeNumber}), skipping record`,
+      throw new Error(
+        `Unknown labOriginCode: ${exam.labOriginCode} (informe ${exam.fmInformeNumber})`,
       );
-      return;
     }
     const labOriginId = labOrigin.id;
 

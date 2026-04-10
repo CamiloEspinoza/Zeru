@@ -263,7 +263,19 @@ export class FmSyncService {
 
   private async doPendingToZeru() {
     const pending = await this.prisma.fmSyncRecord.findMany({
-      where: { syncStatus: 'PENDING_TO_ZERU' },
+      where: {
+        syncStatus: 'PENDING_TO_ZERU',
+        entityType: {
+          notIn: [
+            'lab-exam-charge',
+            'lab-liquidation',
+            'lab-direct-payment-batch',
+            'lab-diagnostic-report',
+            'lab-workflow-event',
+            'lab-signer',
+          ],
+        },
+      },
       take: 10,
     });
 
@@ -365,14 +377,20 @@ export class FmSyncService {
         const msg = error instanceof Error ? error.message : String(error);
         if (msg.includes('401') || msg.includes('not found') || msg.includes('error 101')) {
           // FM record was deleted — clean up the unknown sync record
-          await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+          await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch((err) => {
+            if (err?.code === 'P2025') return; // record already deleted
+            this.logger.warn(`Failed to delete sync record ${record.id}: ${err?.message}`);
+          });
           return;
         }
         throw error;
       }
 
       if (!fmRecord) {
-        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch((err) => {
+          if (err?.code === 'P2025') return;
+          this.logger.warn(`Failed to delete sync record ${record.id}: ${err?.message}`);
+        });
         return;
       }
 
@@ -409,7 +427,13 @@ export class FmSyncService {
               syncStatus: 'SYNCED',
               lastSyncAt: new Date(),
             },
-          }).catch(() => {}); // Ignore if already exists
+          }).catch((err) => {
+            if (err?.code === 'P2002') {
+              this.logger.debug(`Sync record already exists for LE ${le.id}`);
+              return;
+            }
+            this.logger.error(`Failed to create LE sync record: ${err?.message ?? err}`);
+          });
         }
       }
 
@@ -451,7 +475,10 @@ export class FmSyncService {
 
       if (existingSync) {
         // Import already created the sync record — delete the unknown one
-        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch(() => {});
+        await this.prisma.fmSyncRecord.delete({ where: { id: record.id } }).catch((err) => {
+          if (err?.code === 'P2025') return;
+          this.logger.warn(`Failed to delete unknown sync record ${record.id}: ${err?.message}`);
+        });
       } else {
         // Convert the unknown sync record to lab-origin
         await this.prisma.fmSyncRecord.update({
@@ -490,12 +517,18 @@ export class FmSyncService {
       await this.prisma.labOrigin.update({
         where: { id: record.entityId },
         data: { deletedAt: new Date(), isActive: false },
-      }).catch(() => {});
+      }).catch((err) => {
+        if (err?.code === 'P2025') return; // record already deleted
+        this.logger.warn(`Failed to soft-delete lab-origin/${record.entityId}: ${err?.message}`);
+      });
     } else if (record.entityType === 'legal-entity' && record.entityId) {
       await this.prisma.legalEntity.update({
         where: { id: record.entityId },
         data: { deletedAt: new Date(), isActive: false },
-      }).catch(() => {});
+      }).catch((err) => {
+        if (err?.code === 'P2025') return; // record already deleted
+        this.logger.warn(`Failed to soft-delete legal-entity/${record.entityId}: ${err?.message}`);
+      });
     }
     await this.prisma.fmSyncRecord.update({
       where: { id: record.id },
@@ -607,7 +640,10 @@ export class FmSyncService {
         await this.prisma.billingAgreement.update({
           where: { id: syncRecord.entityId },
           data: { deletedAt: new Date(), isActive: false },
-        }).catch(() => {});
+        }).catch((err) => {
+          if (err?.code === 'P2025') return;
+          this.logger.warn(`Failed to soft-delete billing-agreement/${syncRecord.entityId}: ${err?.message}`);
+        });
         await this.prisma.fmSyncRecord.update({
           where: { id: syncRecord.id },
           data: { syncStatus: 'SYNCED', lastSyncAt: new Date(), syncError: 'FM record deleted' },
@@ -903,6 +939,17 @@ export class FmSyncService {
     if (existing.length > 0) {
       // Mark all as pending to sync from FM to Zeru
       for (const record of existing) {
+        // Skip records recently synced from Zeru to avoid infinite loop
+        if (
+          record.syncStatus === 'SYNCED' &&
+          record.lastSyncAt &&
+          Date.now() - record.lastSyncAt.getTime() < 60000
+        ) {
+          this.logger.debug(
+            `Skipping webhook for ${data.recordId} — recently synced from Zeru`,
+          );
+          continue;
+        }
         await this.prisma.fmSyncRecord.update({
           where: { id: record.id },
           data: { syncStatus: 'PENDING_TO_ZERU' },
@@ -926,17 +973,23 @@ export class FmSyncService {
             lastSyncAt: new Date(),
           },
         });
-      } catch {
-        // Concurrent webhook — record already exists, just ensure it's pending
-        await this.prisma.fmSyncRecord.updateMany({
-          where: {
-            tenantId,
-            fmDatabase: data.database,
-            fmLayout: data.layout,
-            fmRecordId: data.recordId,
-          },
-          data: { syncStatus: 'PENDING_TO_ZERU' },
-        });
+      } catch (createError: unknown) {
+        const err = createError as { code?: string; message?: string };
+        if (err?.code === 'P2002') {
+          // Concurrent webhook — record already exists, just ensure it's pending
+          await this.prisma.fmSyncRecord.updateMany({
+            where: {
+              tenantId,
+              fmDatabase: data.database,
+              fmLayout: data.layout,
+              fmRecordId: data.recordId,
+            },
+            data: { syncStatus: 'PENDING_TO_ZERU' },
+          });
+        } else {
+          this.logger.error(`Webhook sync record create failed: ${err?.message}`);
+          throw createError;
+        }
       }
     }
 

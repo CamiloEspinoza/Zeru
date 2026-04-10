@@ -43,12 +43,14 @@ export class BiopsyTransformer {
    * Create a macro signer record in FM.
    */
   macroSignerToFm(data: {
+    fkInformeNumber: number;
     pathologistCode: string;
     pathologistName: string;
     assistantCode: string | null;
     assistantName: string | null;
   }): Record<string, unknown> {
     const fields: Record<string, unknown> = {
+      '_fk_Informe_Número': data.fkInformeNumber,
       'PATÓLOGO MACRO': data.pathologistName,
     };
     if (data.assistantName) {

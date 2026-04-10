@@ -193,8 +193,10 @@ export const labLiquidationListSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(50),
 });
 
+const DPB_STATUSES = ['OPEN', 'RENDIDA', 'RECONCILED', 'CANCELLED'] as const;
+
 export const labDirectPaymentBatchListSchema = z.object({
-  status: z.enum(['OPEN', 'RENDIDA', 'CANCELLED']).optional(),
+  status: z.enum(DPB_STATUSES).optional(),
   legalEntityId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(50),

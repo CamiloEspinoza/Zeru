@@ -36,11 +36,10 @@ export class ExamChargeTransformer {
    */
   biopsyChargeToFm(charge: {
     fkInformeNumber: number;
-    paymentMethodName: string;
+    fkTipoIngreso: number | null;
     amount: number;
     feeCodesText: string | null;
     statusName: string;
-    labOriginCodeSnapshot: string;
     enteredAt: Date | null;
     enteredByNameSnapshot: string;
     pointOfEntry: string | null;
@@ -49,11 +48,10 @@ export class ExamChargeTransformer {
   }): Record<string, unknown> {
     return {
       '_fk_Informe_Número': charge.fkInformeNumber,
-      'Tipo de Ingreso::Nombre': charge.paymentMethodName,
+      '_fk_Tipo de Ingreso': charge.fkTipoIngreso ?? '',
       'Valor': charge.amount,
       'Códigos Prestación': charge.feeCodesText ?? '',
       'Estado Ingreso': charge.statusName,
-      'BIOPSIAS Cobranzas::PROCEDENCIA CODIGO UNICO': charge.labOriginCodeSnapshot,
       'Ingreso Fecha': charge.enteredAt ? formatFmDate(charge.enteredAt) : '',
       'Ingreso Responsable': charge.enteredByNameSnapshot,
       'Punto de ingreso': charge.pointOfEntry ?? '',
@@ -67,11 +65,10 @@ export class ExamChargeTransformer {
    */
   papChargeToFm(charge: {
     fkInformeNumber: number;
-    paymentMethodName: string;
+    fkTipoIngreso: number | null;
     amount: number;
     feeCodesText: string | null;
     statusName: string;
-    labOriginCodeSnapshot: string;
     enteredAt: Date | null;
     enteredByNameSnapshot: string;
     pointOfEntry: string | null;
@@ -80,11 +77,10 @@ export class ExamChargeTransformer {
   }): Record<string, unknown> {
     return {
       '_fk_Informe_Número': charge.fkInformeNumber,
-      'Tipo de Ingreso::Nombre': charge.paymentMethodName,
+      '_fk_Tipo de Ingreso': charge.fkTipoIngreso ?? '',
       'Valor': charge.amount,
       'Códigos Prestación': charge.feeCodesText ?? '',
       'Estado Ingreso': charge.statusName,
-      'PAP Cobranzas::CODIGO UNICO PROCEDENCIA': charge.labOriginCodeSnapshot,
       'Ingreso Fecha': charge.enteredAt ? formatFmDate(charge.enteredAt) : '',
       'Ingreso Responsable': charge.enteredByNameSnapshot,
       'Punto de ingreso': charge.pointOfEntry ?? '',

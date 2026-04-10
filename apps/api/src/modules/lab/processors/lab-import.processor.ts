@@ -1,6 +1,8 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { LabImportOrchestratorService } from '../services/lab-import-orchestrator.service';
 import { LAB_IMPORT_QUEUE, JOB_NAMES, IMPORT_QUEUE_CONFIG } from '../constants/queue.constants';
 import { ExamsBatchHandler } from './handlers/exams-batch.handler';
 import { WorkflowEventsBatchHandler } from './handlers/workflow-events-batch.handler';
@@ -22,6 +24,8 @@ export class LabImportProcessor extends WorkerHost {
   private readonly logger = new Logger(LabImportProcessor.name);
 
   constructor(
+    private readonly prisma: PrismaService,
+    private readonly orchestrator: LabImportOrchestratorService,
     private readonly examsBatchHandler: ExamsBatchHandler,
     private readonly workflowHandler: WorkflowEventsBatchHandler,
     private readonly commsHandler: CommunicationsBatchHandler,
@@ -47,6 +51,34 @@ export class LabImportProcessor extends WorkerHost {
         return this.chargesHandler.handle(job.data);
       default:
         throw new Error(`Unknown job name: ${job.name}`);
+    }
+  }
+
+  @OnWorkerEvent('failed')
+  async onFailed(job: Job, error: Error) {
+    if (job.attemptsMade >= (job.opts?.attempts ?? 1)) {
+      const runId = job.data?.runId;
+      this.logger.warn(
+        `Job ${job.name} (id: ${job.id}) exhausted all ${job.attemptsMade} attempts: ${error.message}`,
+      );
+      if (runId) {
+        try {
+          // Increment failedBatches counter on final exhaustion
+          await this.prisma.labImportRun
+            .update({
+              where: { id: runId },
+              data: { failedBatches: { increment: 1 } },
+            })
+            .catch((e) =>
+              this.logger.error(`Counter update failed: ${e}`),
+            );
+          await this.orchestrator.advancePhase(runId);
+        } catch (e) {
+          this.logger.error(
+            `Failed to advance phase after job exhaustion: ${e}`,
+          );
+        }
+      }
     }
   }
 }
