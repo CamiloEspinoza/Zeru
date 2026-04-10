@@ -174,9 +174,10 @@ export class TasksService {
     const projectVisibilityClause = {
       project: {
         deletedAt: null,
+        tenantId,
         OR: [
           { visibility: 'PUBLIC' },
-          { members: { some: { userId } } },
+          { members: { some: { userId, tenantId } } },
         ],
       },
     };
