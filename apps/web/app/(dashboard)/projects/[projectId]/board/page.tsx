@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { useProject } from "@/hooks/use-project";
+import { useProjectContext } from "../project-context";
 import { useProjectTasks } from "@/hooks/use-project-tasks";
 import { KanbanBoard } from "@/components/projects/board/kanban-board";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,10 +12,10 @@ export default function BoardPage({
   params: Promise<{ projectId: string }>;
 }) {
   const { projectId } = use(params);
-  const { project } = useProject(projectId);
+  const { project } = useProjectContext();
   const { tasks, loading, refetch } = useProjectTasks(projectId);
 
-  if (!project || loading) {
+  if (loading) {
     return (
       <div className="flex gap-4">
         {Array.from({ length: 4 }).map((_, i) => (

@@ -8,6 +8,7 @@ import { TaskDetailSheet } from "@/components/projects/detail/task-detail-sheet"
 import { ProjectRealtimeSync } from "@/components/projects/project-realtime-sync";
 import { LockSync } from "@/components/realtime/lock-sync";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectProvider } from "./project-context";
 
 export default function ProjectLayout({
   children,
@@ -40,13 +41,15 @@ export default function ProjectLayout({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <ProjectHeader project={project} onUpdated={refetch} />
-      <ViewSwitcher projectId={projectId} />
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-      <ProjectRealtimeSync projectId={projectId} onSectionChanged={refetch} />
-      <LockSync />
-      <TaskDetailSheet projectKey={project.key} />
-    </div>
+    <ProjectProvider project={project} refetch={refetch}>
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <ProjectHeader project={project} onUpdated={refetch} />
+        <ViewSwitcher projectId={projectId} />
+        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <ProjectRealtimeSync projectId={projectId} onSectionChanged={refetch} />
+        <LockSync />
+        <TaskDetailSheet projectKey={project.key} />
+      </div>
+    </ProjectProvider>
   );
 }
