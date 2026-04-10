@@ -225,3 +225,57 @@ export function toGender(val: 'MALE' | 'FEMALE' | 'OTHER' | 'UNKNOWN' | null): G
 export function toLabExamChargeSource(val: ExamChargeSourceType): LabExamChargeSource {
   return val as LabExamChargeSource;
 }
+
+// ── Reverse maps (Prisma -> FM string for write-back) ──
+
+const REVERSE_PAYMENT_METHOD_MAP: Record<LabPaymentMethod, string> = {
+  [LabPaymentMethod.LAB_CASH]: 'Efectivo',
+  [LabPaymentMethod.LAB_BANK_TRANSFER]: 'Transferencia',
+  [LabPaymentMethod.LAB_CHECK]: 'Cheque',
+  [LabPaymentMethod.LAB_VOUCHER]: 'Bono',
+  [LabPaymentMethod.LAB_CREDIT_CARD]: 'Tarjeta Crédito',
+  [LabPaymentMethod.LAB_DEBIT_CARD]: 'Tarjeta Débito',
+  [LabPaymentMethod.LAB_AGREEMENT]: 'Convenio',
+  [LabPaymentMethod.LAB_PENDING_PAYMENT]: 'Pendiente',
+  [LabPaymentMethod.OTHER_PAYMENT]: 'Otro',
+};
+
+export function fromLabPaymentMethod(val: LabPaymentMethod): string {
+  return REVERSE_PAYMENT_METHOD_MAP[val];
+}
+
+const REVERSE_CHARGE_STATUS_MAP: Record<LabChargeStatus, string> = {
+  [LabChargeStatus.REGISTERED_CHARGE]: 'Registrado',
+  [LabChargeStatus.VALIDATED_CHARGE]: 'Validado',
+  [LabChargeStatus.INVOICED_CHARGE]: 'Facturado',
+  [LabChargeStatus.PAID_CHARGE]: 'Pagado',
+  [LabChargeStatus.CANCELLED_CHARGE]: 'Cancelado',
+  [LabChargeStatus.REVERSED]: 'Reversado',
+};
+
+export function fromLabChargeStatus(val: LabChargeStatus): string {
+  return REVERSE_CHARGE_STATUS_MAP[val];
+}
+
+const REVERSE_LIQ_STATUS_MAP: Record<LiquidationStatus, string> = {
+  [LiquidationStatus.DRAFT_LIQ]: 'Borrador',
+  [LiquidationStatus.CONFIRMED]: 'Confirmado',
+  [LiquidationStatus.INVOICED_LIQ]: 'Facturado',
+  [LiquidationStatus.PARTIALLY_PAID]: 'Pago Parcial',
+  [LiquidationStatus.PAID_LIQ]: 'Cancelado Total',
+  [LiquidationStatus.OVERDUE]: 'Vencido',
+  [LiquidationStatus.CANCELLED_LIQ]: 'Anulado',
+};
+
+export function fromLiquidationStatus(val: LiquidationStatus): string {
+  return REVERSE_LIQ_STATUS_MAP[val];
+}
+
+const REVERSE_EXAM_CHARGE_SOURCE_MAP: Record<LabExamChargeSource, string> = {
+  [LabExamChargeSource.BIOPSIAS_INGRESOS]: 'BIOPSIAS_INGRESOS',
+  [LabExamChargeSource.PAP_INGRESOS]: 'PAP_INGRESOS',
+};
+
+export function fromLabExamChargeSource(val: LabExamChargeSource): string {
+  return REVERSE_EXAM_CHARGE_SOURCE_MAP[val];
+}

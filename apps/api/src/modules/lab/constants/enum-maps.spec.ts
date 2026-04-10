@@ -11,6 +11,10 @@ import {
   toFmSource,
   toGender,
   toLabExamChargeSource,
+  fromLabPaymentMethod,
+  fromLabChargeStatus,
+  fromLiquidationStatus,
+  fromLabExamChargeSource,
 } from './enum-maps';
 import {
   ExamCategory,
@@ -217,6 +221,47 @@ describe('Enum Maps', () => {
     });
     it('maps PAP_INGRESOS', () => {
       expect(toLabExamChargeSource('PAP_INGRESOS')).toBe(LabExamChargeSource.PAP_INGRESOS);
+    });
+  });
+
+  describe('Reverse enum maps', () => {
+    it('fromLabPaymentMethod covers all values', () => {
+      for (const val of Object.values(LabPaymentMethod)) {
+        expect(fromLabPaymentMethod(val)).toBeDefined();
+        expect(typeof fromLabPaymentMethod(val)).toBe('string');
+      }
+    });
+
+    it('fromLabChargeStatus covers all values', () => {
+      for (const val of Object.values(LabChargeStatus)) {
+        expect(fromLabChargeStatus(val)).toBeDefined();
+      }
+    });
+
+    it('fromLiquidationStatus covers all values', () => {
+      for (const val of Object.values(LiquidationStatus)) {
+        expect(fromLiquidationStatus(val)).toBeDefined();
+      }
+    });
+
+    it('fromLabExamChargeSource covers all values', () => {
+      for (const val of Object.values(LabExamChargeSource)) {
+        expect(fromLabExamChargeSource(val)).toBeDefined();
+      }
+    });
+
+    it('roundtrip: payment method forward then reverse preserves meaning', () => {
+      expect(fromLabPaymentMethod(toLabPaymentMethod('CASH'))).toBe('Efectivo');
+      expect(fromLabPaymentMethod(toLabPaymentMethod('AGREEMENT'))).toBe('Convenio');
+    });
+
+    it('roundtrip: charge status forward then reverse', () => {
+      expect(fromLabChargeStatus(toLabChargeStatus('CANCELLED'))).toBe('Cancelado');
+    });
+
+    it('roundtrip: liquidation status forward then reverse', () => {
+      expect(fromLiquidationStatus(toLiquidationStatus('CONFIRMED'))).toBe('Confirmado');
+      expect(fromLiquidationStatus(toLiquidationStatus('PAID'))).toBe('Cancelado Total');
     });
   });
 });
