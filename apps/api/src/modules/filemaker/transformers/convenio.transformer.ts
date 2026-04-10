@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
+import { str, parseNum, parseDate, isYes } from './helpers';
 
 // ── Extracted DTOs ──
 
@@ -156,29 +157,7 @@ export class ConvenioTransformer {
   }
 }
 
-// ── Pure helpers ──
-
-function str(val: unknown): string {
-  if (val === null || val === undefined) return '';
-  return String(val).trim();
-}
-
-function parseNum(val: unknown): number {
-  const s = str(val);
-  if (!s) return 0;
-  const n = Number(s.replace(/[^0-9.-]/g, ''));
-  return isNaN(n) ? 0 : n;
-}
-
-function isYes(val: string): boolean {
-  return /^s[iíÍ]/i.test(val);
-}
-
-function parseDate(val: string): Date | null {
-  if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
-}
+// ── Pure helpers (domain-specific to convenio) ──
 
 function parsePaymentTerms(val: string): ExtractedBillingAgreement['paymentTerms'] {
   if (!val) return 'NET_30';

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EncryptionService } from '../../../common/services/encryption.service';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
+import { str, safeParseInt, isYes } from './helpers';
 
 // ── Extracted DTO shapes ──
 
@@ -198,23 +199,7 @@ export class ProcedenciasTransformer {
   }
 }
 
-// ── Pure helper functions ──
-
-function str(val: unknown): string {
-  if (val === null || val === undefined) return '';
-  return String(val).trim();
-}
-
-function safeParseInt(val: unknown): number | null {
-  const s = str(val);
-  if (!s) return null;
-  const n = Number(s.replace(/[^0-9.-]/g, ''));
-  return isNaN(n) ? null : Math.round(n);
-}
-
-function isYes(val: string): boolean {
-  return /^s[iíÍ]/i.test(val);
-}
+// ── Pure helper functions (domain-specific to procedencias) ──
 
 function parseCategory(val: string): ExtractedLabOrigin['category'] {
   // Normalize: remove accents for robust matching
