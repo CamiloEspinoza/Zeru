@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformStorageService } from '../platform-storage/platform-storage.service';
 import { UpdateBrandingDto, GeneratePaletteDto } from './dto';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import { extname } from 'path';
 
 @Injectable()
@@ -70,7 +70,7 @@ export class BrandingService {
       await this.storage.delete(oldKey);
     }
 
-    const filename = `${uuid()}${extname(file.originalname)}`;
+    const filename = `${randomUUID()}${extname(file.originalname)}`;
     const key = PlatformStorageService.buildBrandingKey(tenantId, type, filename);
     await this.storage.upload(key, file.buffer, file.mimetype);
     const branding = await this.prisma.tenantBranding.upsert({
@@ -207,7 +207,7 @@ export class BrandingService {
     }
 
     const faviconBuffer = Buffer.from(imagePart.inlineData.data, 'base64');
-    const filename = `${uuid()}.png`;
+    const filename = `${randomUUID()}.png`;
     const key = PlatformStorageService.buildBrandingKey(tenantId, 'favicon', filename);
 
     // Delete old favicon if exists and different from isotipo
