@@ -32,6 +32,20 @@ export class TraceabilityTransformer {
   readonly database = 'BIOPSIAS';
   readonly layout = 'TRAZA';
 
+  /**
+   * Write macroscopy completion event to FM Trazabilidad record.
+   * Updates the Responsable_Macroscopia and Fecha_Macroscopia fields.
+   */
+  macroscopyEventToFm(data: {
+    performedByNameSnapshot: string;
+    occurredAt: Date;
+  }): Record<string, unknown> {
+    return {
+      'Trazabilidad::Responsable_Macroscopía': data.performedByNameSnapshot,
+      'Trazabilidad::Fecha_Macroscopia': formatFmDate(data.occurredAt),
+    };
+  }
+
   extract(record: FmRecord): TraceabilityResult {
     const d = record.fieldData;
     const events: ExtractedWorkflowEvent[] = [];
@@ -64,4 +78,11 @@ export class TraceabilityTransformer {
       events,
     };
   }
+}
+
+function formatFmDate(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
 }

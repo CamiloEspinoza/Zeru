@@ -30,6 +30,78 @@ export class ExamChargeTransformer {
     });
   }
 
+  /**
+   * Convert a Zeru ExamCharge to FM field data for Biopsias_Ingresos* layout.
+   * Used for create and update write-back.
+   */
+  biopsyChargeToFm(charge: {
+    fkInformeNumber: number;
+    paymentMethodName: string;
+    amount: number;
+    feeCodesText: string | null;
+    statusName: string;
+    labOriginCodeSnapshot: string;
+    enteredAt: Date | null;
+    enteredByNameSnapshot: string;
+    pointOfEntry: string | null;
+    fkLiquidacion: string | null;
+    fkRendicion: string | null;
+  }): Record<string, unknown> {
+    return {
+      '_fk_Informe_Número': charge.fkInformeNumber,
+      'Tipo de Ingreso::Nombre': charge.paymentMethodName,
+      'Valor': charge.amount,
+      'Códigos Prestación': charge.feeCodesText ?? '',
+      'Estado Ingreso': charge.statusName,
+      'BIOPSIAS Cobranzas::PROCEDENCIA CODIGO UNICO': charge.labOriginCodeSnapshot,
+      'Ingreso Fecha': charge.enteredAt ? formatFmDate(charge.enteredAt) : '',
+      'Ingreso Responsable': charge.enteredByNameSnapshot,
+      'Punto de ingreso': charge.pointOfEntry ?? '',
+      '_fk_Liquidaciones Instituciones': charge.fkLiquidacion ?? '',
+      '_fk_Rendición Pago directo': charge.fkRendicion ?? '',
+    };
+  }
+
+  /**
+   * Convert a Zeru ExamCharge to FM field data for PAP_ingresos* layout.
+   */
+  papChargeToFm(charge: {
+    fkInformeNumber: number;
+    paymentMethodName: string;
+    amount: number;
+    feeCodesText: string | null;
+    statusName: string;
+    labOriginCodeSnapshot: string;
+    enteredAt: Date | null;
+    enteredByNameSnapshot: string;
+    pointOfEntry: string | null;
+    fkLiquidacion: string | null;
+    fkRendicion: string | null;
+  }): Record<string, unknown> {
+    return {
+      '_fk_Informe_Número': charge.fkInformeNumber,
+      'Tipo de Ingreso::Nombre': charge.paymentMethodName,
+      'Valor': charge.amount,
+      'Códigos Prestación': charge.feeCodesText ?? '',
+      'Estado Ingreso': charge.statusName,
+      'PAP Cobranzas::CODIGO UNICO PROCEDENCIA': charge.labOriginCodeSnapshot,
+      'Ingreso Fecha': charge.enteredAt ? formatFmDate(charge.enteredAt) : '',
+      'Ingreso Responsable': charge.enteredByNameSnapshot,
+      'Punto de ingreso': charge.pointOfEntry ?? '',
+      '_fk_Liquidaciones Instituciones': charge.fkLiquidacion ?? '',
+      '_fk_Rendición Pago directo': charge.fkRendicion ?? '',
+    };
+  }
+
+  /**
+   * Partial update for cancellation -- only updates status field.
+   */
+  cancelToFm(): Record<string, unknown> {
+    return {
+      'Estado Ingreso': 'Cancelado',
+    };
+  }
+
   private extractCharge(
     d: Record<string, unknown>,
     source: ExamChargeSourceType,
@@ -118,4 +190,14 @@ function parseFeeCodes(val: string): string[] {
     .split(/[|,;]/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/**
+ * Format a Date as MM/DD/YYYY for FM Data API (US format with dateformats=0).
+ */
+function formatFmDate(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
 }

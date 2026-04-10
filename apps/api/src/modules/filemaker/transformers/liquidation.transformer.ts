@@ -8,6 +8,80 @@ export class LiquidationTransformer {
   readonly database = 'BIOPSIAS';
   readonly layout = 'Liquidaciones';
 
+  /**
+   * Convert Zeru Liquidation to FM field data for Liquidaciones layout (create).
+   */
+  toFm(liq: {
+    labOriginCode: string;
+    periodLabel: string;
+    statusName: string;
+    totalAmount: number;
+    biopsyAmount: number;
+    papAmount: number;
+    cytologyAmount: number;
+    immunoAmount: number;
+    biopsyCount: number;
+    papCount: number;
+    cytologyCount: number;
+    immunoCount: number;
+    previousDebt: number;
+    creditBalance: number;
+  }): Record<string, unknown> {
+    return {
+      'CODIGO INSTITUCION': liq.labOriginCode,
+      'PERIODO COBRO': liq.periodLabel,
+      'ESTADO': liq.statusName,
+      'TOTAL LIQUIDACIÓN': liq.totalAmount,
+      'VALOR TOTAL BIOPSIAS': liq.biopsyAmount,
+      'VALOR TOTAL PAP': liq.papAmount,
+      'VALOR TOTAL CITOLOGÍAS': liq.cytologyAmount,
+      'VALOR TOTAL INMUNOS': liq.immunoAmount,
+      'Nº DE BIOPSIAS': liq.biopsyCount,
+      'Nº DE PAP': liq.papCount,
+      'Nº DE CITOLOGÍAS': liq.cytologyCount,
+      'Nº DE INMUNOS': liq.immunoCount,
+      'DEUDA ANTERIOR': liq.previousDebt,
+      'SALDO A FAVOR': liq.creditBalance,
+    };
+  }
+
+  /**
+   * Partial update for confirm action.
+   */
+  confirmToFm(confirmedByName: string): Record<string, unknown> {
+    return {
+      'Confirmado': `Confirmado - ${confirmedByName}`,
+    };
+  }
+
+  /**
+   * Partial update for invoice action.
+   */
+  invoiceToFm(invoice: {
+    invoiceNumber: string;
+    invoiceDate: Date;
+  }): Record<string, unknown> {
+    return {
+      'NUMERO DOCUMENTO': invoice.invoiceNumber,
+      'FECHA FACTURA': formatFmDate(invoice.invoiceDate),
+    };
+  }
+
+  /**
+   * Partial update for payment registration.
+   */
+  paymentToFm(payment: {
+    paymentAmount: number;
+    paymentDate: Date;
+    paymentMethodText: string;
+  }): Record<string, unknown> {
+    return {
+      'MONTO CANCELADO': payment.paymentAmount,
+      'FECHA PAGO': formatFmDate(payment.paymentDate),
+      'MODO DE PAGO': payment.paymentMethodText,
+    };
+  }
+
   extract(record: FmRecord): ExtractedLiquidation {
     const d = record.fieldData;
     const periodRaw = str(d['PERIODO COBRO']);
@@ -50,6 +124,13 @@ export class LiquidationTransformer {
 }
 
 // ── Pure helpers ──
+
+function formatFmDate(d: Date): string {
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${month}/${day}/${year}`;
+}
 
 function parseLiquidationStatus(val: string): LiquidationStatusType {
   const lower = val

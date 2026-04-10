@@ -17,6 +17,47 @@ export class BiopsyTransformer {
   readonly layout = 'Validación Final*';
 
   /**
+   * Layout for macroscopy text write-back.
+   * TEXTO* layout contains the TEXTO BIOPSIAS::TEXTO field and macroscopy fields.
+   */
+  readonly macroscopyLayout = 'TEXTO*';
+
+  /**
+   * Convert macroscopic description to FM field data.
+   * The macroscopy text is stored in the TEXTO* layout's macro fields.
+   */
+  macroscopyToFm(data: {
+    macroscopicDescription: string;
+  }): Record<string, unknown> {
+    return {
+      'TEXTO BIOPSIAS::MACRO': data.macroscopicDescription,
+    };
+  }
+
+  /**
+   * Layout for macro signer registration.
+   */
+  readonly macroSignerLayout = 'Ingreso Trazabilidad Macroscopía*';
+
+  /**
+   * Create a macro signer record in FM.
+   */
+  macroSignerToFm(data: {
+    pathologistCode: string;
+    pathologistName: string;
+    assistantCode: string | null;
+    assistantName: string | null;
+  }): Record<string, unknown> {
+    const fields: Record<string, unknown> = {
+      'PATÓLOGO MACRO': data.pathologistName,
+    };
+    if (data.assistantName) {
+      fields['AYUDANTE MACRO'] = data.assistantName;
+    }
+    return fields;
+  }
+
+  /**
    * Extract a unified ExamDTO from a BIOPSIAS or BIOPSIASRESPALDO record.
    */
   extract(record: FmRecord, fmSource: FmSourceType): ExtractedExam {

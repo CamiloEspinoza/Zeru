@@ -200,4 +200,61 @@ describe('ExamChargeTransformer', () => {
       expect(result.amount).toBe(25000);
     });
   });
+
+  describe('biopsyChargeToFm()', () => {
+    const baseCharge = {
+      fkInformeNumber: 12345,
+      paymentMethodName: 'Convenio',
+      amount: 25000,
+      feeCodesText: 'BIO-001|BIO-002',
+      statusName: 'Registrado',
+      labOriginCodeSnapshot: 'CLI-001',
+      enteredAt: new Date('2026-03-15'),
+      enteredByNameSnapshot: 'Maria Lopez',
+      pointOfEntry: 'Ventanilla 1',
+      fkLiquidacion: '1234',
+      fkRendicion: null,
+    };
+
+    it('produces correct FM fields', () => {
+      const result = transformer.biopsyChargeToFm(baseCharge);
+      expect(result['_fk_Informe_Número']).toBe(12345);
+      expect(result['Tipo de Ingreso::Nombre']).toBe('Convenio');
+      expect(result['Valor']).toBe(25000);
+      expect(result['Estado Ingreso']).toBe('Registrado');
+      expect(result['BIOPSIAS Cobranzas::PROCEDENCIA CODIGO UNICO']).toBe('CLI-001');
+      expect(result['Ingreso Responsable']).toBe('Maria Lopez');
+      expect(result['_fk_Liquidaciones Instituciones']).toBe('1234');
+      expect(result['_fk_Rendición Pago directo']).toBe('');
+    });
+  });
+
+  describe('papChargeToFm()', () => {
+    const baseCharge = {
+      fkInformeNumber: 12345,
+      paymentMethodName: 'Convenio',
+      amount: 25000,
+      feeCodesText: 'BIO-001|BIO-002',
+      statusName: 'Registrado',
+      labOriginCodeSnapshot: 'CLI-001',
+      enteredAt: new Date('2026-03-15'),
+      enteredByNameSnapshot: 'Maria Lopez',
+      pointOfEntry: 'Ventanilla 1',
+      fkLiquidacion: '1234',
+      fkRendicion: null,
+    };
+
+    it('uses PAP field names', () => {
+      const result = transformer.papChargeToFm(baseCharge);
+      expect(result['PAP Cobranzas::CODIGO UNICO PROCEDENCIA']).toBe('CLI-001');
+      expect(result['Valor']).toBe(25000);
+    });
+  });
+
+  describe('cancelToFm()', () => {
+    it('sets status to Cancelado', () => {
+      const result = transformer.cancelToFm();
+      expect(result['Estado Ingreso']).toBe('Cancelado');
+    });
+  });
 });

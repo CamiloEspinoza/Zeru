@@ -200,4 +200,60 @@ describe('LiquidationTransformer', () => {
       expect(result.biopsyCount).toBe(0);
     });
   });
+
+  describe('toFm()', () => {
+    it('produces correct FM fields', () => {
+      const result = transformer.toFm({
+        labOriginCode: 'CLI-001',
+        periodLabel: 'Marzo 2026',
+        statusName: 'Borrador',
+        totalAmount: 500000,
+        biopsyAmount: 300000,
+        papAmount: 100000,
+        cytologyAmount: 50000,
+        immunoAmount: 50000,
+        biopsyCount: 30,
+        papCount: 10,
+        cytologyCount: 5,
+        immunoCount: 5,
+        previousDebt: 0,
+        creditBalance: 0,
+      });
+      expect(result['CODIGO INSTITUCION']).toBe('CLI-001');
+      expect(result['PERIODO COBRO']).toBe('Marzo 2026');
+      expect(result['TOTAL LIQUIDACIÓN']).toBe(500000);
+      expect(result['Nº DE BIOPSIAS']).toBe(30);
+    });
+  });
+
+  describe('confirmToFm()', () => {
+    it('includes name in Confirmado field', () => {
+      const result = transformer.confirmToFm('Juan Perez');
+      expect(result['Confirmado']).toBe('Confirmado - Juan Perez');
+    });
+  });
+
+  describe('invoiceToFm()', () => {
+    it('formats date and sets document number', () => {
+      const result = transformer.invoiceToFm({
+        invoiceNumber: 'FAC-2026-001',
+        invoiceDate: new Date(2026, 2, 20), // March 20, 2026 (local)
+      });
+      expect(result['NUMERO DOCUMENTO']).toBe('FAC-2026-001');
+      expect(result['FECHA FACTURA']).toBe('03/20/2026');
+    });
+  });
+
+  describe('paymentToFm()', () => {
+    it('sets all payment fields', () => {
+      const result = transformer.paymentToFm({
+        paymentAmount: 500000,
+        paymentDate: new Date(2026, 3, 1), // April 1, 2026 (local)
+        paymentMethodText: 'Transferencia',
+      });
+      expect(result['MONTO CANCELADO']).toBe(500000);
+      expect(result['FECHA PAGO']).toBe('04/01/2026');
+      expect(result['MODO DE PAGO']).toBe('Transferencia');
+    });
+  });
 });
