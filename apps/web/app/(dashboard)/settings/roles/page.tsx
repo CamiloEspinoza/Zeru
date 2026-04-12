@@ -542,8 +542,7 @@ export default function RolesSettingsPage() {
                         const hasGranular =
                           mod.granularPermissions.length > 0;
                         return (
-                          <Collapsible key={mod.key} asChild>
-                            <>
+                          <Collapsible key={mod.key}>
                               <TableRow>
                                 <TableCell className="font-medium">
                                   {mod.label}
@@ -632,7 +631,6 @@ export default function RolesSettingsPage() {
                                   </TableRow>
                                 </CollapsibleContent>
                               )}
-                            </>
                           </Collapsible>
                         );
                       })}
