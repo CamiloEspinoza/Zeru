@@ -24,7 +24,8 @@ function getInitials(name: string): string {
  */
 export function UserAvatar({ userId, name, className, fallbackClassName }: UserAvatarProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const src = userId ? `/api/avatars/${userId}` : null;
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+  const src = userId ? `${apiBase}/avatars/${userId}?s=96` : null;
 
   // Check synchronously if image is cached (before first paint)
   const isCached = typeof window !== "undefined" && src

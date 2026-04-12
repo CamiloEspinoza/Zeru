@@ -1,12 +1,13 @@
-import { Controller, Get, Param, Res } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageConfigService } from '../storage-config/storage-config.service';
 
-// In-memory cache: userId → { buffer, contentType, fetchedAt }
-const avatarCache = new Map<string, { buffer: Buffer; contentType: string; fetchedAt: number }>();
+// In-memory cache: "userId:size" → { buffer, fetchedAt }
+const avatarCache = new Map<string, { buffer: Buffer; fetchedAt: number }>();
 const CACHE_TTL_MS = 3600_000; // 1 hour
 
 @Controller('avatars')
@@ -18,24 +19,29 @@ export class AvatarController {
 
   /**
    * Public endpoint — no auth required.
-   * Avatar images are not sensitive and must be loadable via <img src="...">.
+   * Serves resized avatar images. ?s=96 for 96x96 (default).
    */
   @Get(':userId')
   async getAvatar(
     @Param('userId') userId: string,
+    @Query('s') sizeParam: string | undefined,
     @Res() res: Response,
   ) {
-    // Check in-memory cache first
-    const cached = avatarCache.get(userId);
+    const size = Math.min(Math.max(parseInt(sizeParam ?? '96', 10) || 96, 16), 512);
+    const cacheKey = `${userId}:${size}`;
+
+    // Check in-memory cache
+    const cached = avatarCache.get(cacheKey);
     if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      res.set('Content-Type', cached.contentType);
+      res.set('Content-Type', 'image/webp');
+      res.set('Content-Length', String(cached.buffer.length));
       res.set('Cache-Control', 'public, max-age=3600, immutable');
-      res.set('ETag', `"avatar-${userId}"`);
+      res.set('ETag', `"av-${userId}-${size}"`);
       res.send(cached.buffer);
       return;
     }
 
-    // Find linked PersonProfile with avatar — resolve tenantId from the profile
+    // Find PersonProfile with avatar
     const person = await this.prisma.rawClient.personProfile.findFirst({
       where: { userId, deletedAt: null, avatarS3Key: { not: null } },
       select: { avatarS3Key: true, tenantId: true },
@@ -43,14 +49,14 @@ export class AvatarController {
 
     if (!person?.avatarS3Key) {
       res.set('Cache-Control', 'public, max-age=300');
-      res.status(404).json({ message: 'No avatar' });
+      res.status(404).send();
       return;
     }
 
     try {
       const config = await this.storageConfig.getDecryptedConfig(person.tenantId);
       if (!config) {
-        res.status(500).json({ message: 'Storage not configured' });
+        res.status(500).send();
         return;
       }
 
@@ -66,28 +72,32 @@ export class AvatarController {
         const s3Response = await client.send(
           new GetObjectCommand({ Bucket: config.bucket, Key: person.avatarS3Key }),
         );
-        const contentType = s3Response.ContentType ?? 'image/jpeg';
 
         const stream = s3Response.Body as Readable;
         const chunks: Buffer[] = [];
         for await (const chunk of stream) {
           chunks.push(Buffer.from(chunk));
         }
-        const buffer = Buffer.concat(chunks);
+        const rawBuffer = Buffer.concat(chunks);
 
-        avatarCache.set(userId, { buffer, contentType, fetchedAt: Date.now() });
+        // Resize + convert to WebP for small file size
+        const resized = await sharp(rawBuffer)
+          .resize(size, size, { fit: 'cover' })
+          .webp({ quality: 80 })
+          .toBuffer();
 
-        res.set('Content-Type', contentType);
-        res.set('Content-Length', String(buffer.length));
+        avatarCache.set(cacheKey, { buffer: resized, fetchedAt: Date.now() });
+
+        res.set('Content-Type', 'image/webp');
+        res.set('Content-Length', String(resized.length));
         res.set('Cache-Control', 'public, max-age=3600, immutable');
-        res.set('ETag', `"avatar-${userId}"`);
-        res.send(buffer);
+        res.set('ETag', `"av-${userId}-${size}"`);
+        res.send(resized);
       } finally {
         client.destroy();
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      res.status(500).json({ message: `Avatar fetch failed: ${msg}` });
+    } catch {
+      res.status(500).send();
     }
   }
 }

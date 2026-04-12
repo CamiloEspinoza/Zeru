@@ -1,16 +1,12 @@
 const API_BASE =
-  typeof window !== "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api")
-    : (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api");
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
 /**
  * Returns a stable, cacheable avatar URL for a user.
- * Uses the /api/avatars/:userId proxy endpoint which:
- * - Has a fixed URL (browser can cache it)
- * - Sets Cache-Control headers (1h cache + immutable)
- * - Internally resolves the S3 image from PersonProfile
+ * @param userId - User UUID
+ * @param size - Max dimension in pixels (default 96 = 48px * 2x retina)
  */
-export function getUserAvatarUrl(userId: string | undefined | null): string | null {
+export function getUserAvatarUrl(userId: string | undefined | null, size = 96): string | null {
   if (!userId) return null;
-  return `${API_BASE}/avatars/${userId}`;
+  return `${API_BASE}/avatars/${userId}?s=${size}`;
 }
