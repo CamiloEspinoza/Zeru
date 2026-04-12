@@ -21,6 +21,7 @@ import { KanbanCardOverlay } from "./kanban-card-overlay";
 import { useProjectStore } from "@/stores/project-store";
 import { tasksApi } from "@/lib/api/tasks";
 import { positionBetween } from "@/lib/fractional-position";
+import { celebrateConfetti } from "@/lib/confetti";
 import type { Task, TaskStatusConfig } from "@/types/projects";
 
 interface KanbanBoardProps {
@@ -275,6 +276,14 @@ export function KanbanBoard({
         statusId: targetStatusId,
         position: newPosition,
       });
+
+      // 🎉 Celebrate when task moves to a "done" column
+      if (targetStatusId !== previousStatusId) {
+        const targetStatus = statuses.find((s) => s.id === targetStatusId);
+        if (targetStatus?.category === "done") {
+          celebrateConfetti();
+        }
+      }
 
       try {
         await tasksApi.move(taskId, {
