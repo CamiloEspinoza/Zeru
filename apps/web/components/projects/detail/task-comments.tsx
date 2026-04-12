@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Paperclip, FileIcon, Download, Loader2 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Attachment01Icon, File01Icon, Download01Icon, Loading03Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -91,14 +92,14 @@ function renderCommentContent(
         download={attachment.filename}
         className="mt-1 inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm hover:bg-muted transition-colors"
       >
-        <FileIcon className="size-4 text-muted-foreground" />
+        <HugeiconsIcon icon={File01Icon} className="size-4 text-muted-foreground" />
         <span className="font-medium">{attachment.filename}</span>
         {attachment.size && (
           <span className="text-xs text-muted-foreground">
             ({attachment.size})
           </span>
         )}
-        <Download className="size-3.5 text-muted-foreground" />
+        <HugeiconsIcon icon={Download01Icon} className="size-3.5 text-muted-foreground" />
       </a>
     );
   }
@@ -595,9 +596,9 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
                 title="Adjuntar archivo"
               >
                 {uploading ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin" />
                 ) : (
-                  <Paperclip className="size-4" />
+                  <HugeiconsIcon icon={Attachment01Icon} className="size-4" />
                 )}
               </Button>
               {uploading && (
