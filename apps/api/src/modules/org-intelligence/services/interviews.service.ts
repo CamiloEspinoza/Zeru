@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
+import { buildPersonAvatarProxyUrl } from '../../users/avatar-url.helper';
 import type {
   CreateInterviewDto,
   UpdateInterviewDto,
@@ -81,7 +82,11 @@ export class InterviewsService {
         skip: (dto.page - 1) * dto.perPage,
         take: dto.perPage,
         include: {
-          speakers: true,
+          speakers: {
+            include: {
+              personEntity: { select: { avatarS3Key: true } },
+            },
+          },
           _count: {
             select: { chunks: true },
           },
@@ -90,8 +95,19 @@ export class InterviewsService {
       client.interview.count({ where }),
     ]);
 
+    const mappedData = data.map((interview) => ({
+      ...interview,
+      speakers: interview.speakers.map((s) => ({
+        ...s,
+        avatarUrl: s.personEntity?.avatarS3Key
+          ? buildPersonAvatarProxyUrl(s.personEntityId!, s.personEntity.avatarS3Key)
+          : null,
+        personEntity: undefined,
+      })),
+    }));
+
     return {
-      data,
+      data: mappedData,
       meta: {
         total,
         page: dto.page,

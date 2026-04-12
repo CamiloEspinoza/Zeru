@@ -33,9 +33,8 @@ interface InterviewSpeaker {
   department: string | null;
   isInterviewer: boolean;
   personEntityId: string | null;
+  avatarUrl?: string | null;
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
 interface Interview {
   id: string;
@@ -138,7 +137,7 @@ export function InterviewCard({
               <SpeakerAvatarChip
                 key={speaker.id}
                 name={speaker.name ?? speaker.speakerLabel}
-                avatarUrl={speaker.personEntityId ? `${API_BASE}/avatars/person/${speaker.personEntityId}?s=96` : null}
+                avatarUrl={speaker.avatarUrl ?? null}
                 isInterviewer={speaker.isInterviewer}
               />
             ))
