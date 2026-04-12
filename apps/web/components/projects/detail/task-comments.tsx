@@ -64,11 +64,23 @@ function formatFileSize(bytes: number): string {
 
 // ─── Mention rendering helper ────────────────────────────
 
+// Matches both @[userId:Name] (new format) and @[Name] (legacy format)
 const MENTION_REGEX = /@\[([^\]]+)\]/g;
+
+function parseMentionTag(raw: string): { userId: string | null; displayName: string } {
+  // New format: "userId:Display Name"
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx > 8) { // UUID is at least 36 chars, but check > 8 to be safe
+    return { userId: raw.slice(0, colonIdx), displayName: raw.slice(colonIdx + 1) };
+  }
+  // Legacy format: just "Display Name"
+  return { userId: null, displayName: raw };
+}
 
 function renderCommentContent(
   content: string,
   membersByName: Map<string, ProjectMember>,
+  membersById: Map<string, ProjectMember>,
 ) {
   // Check if this is a pure attachment comment
   const attachment = parseAttachment(content);
@@ -117,32 +129,35 @@ function renderCommentContent(
   const regex = new RegExp(MENTION_REGEX.source, "g");
 
   while ((match = regex.exec(content)) !== null) {
-    const name = match[1].trim();
-    const member = membersByName.get(name);
+    const raw = match[1].trim();
+    const { userId, displayName } = parseMentionTag(raw);
+    // Lookup by userId first (new format), then by name (legacy)
+    const member = (userId ? membersById.get(userId) : null) ?? membersByName.get(displayName);
+    // Use current name from member if available (survives renames)
+    const currentName = member ? `${member.user.firstName} ${member.user.lastName}` : displayName;
 
     if (match.index > lastIndex) {
       parts.push(content.slice(lastIndex, match.index));
     }
 
     if (member) {
-      // Known member — show tooltip with avatar
       parts.push(
         <TooltipProvider key={match.index}>
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
-                @{name}
+                @{currentName}
               </span>
             </TooltipTrigger>
             <TooltipContent>
               <div className="flex items-center gap-2">
                 <UserAvatar
-                  name={`${member.user.firstName} ${member.user.lastName}`}
+                  name={currentName}
                   avatarUrl={member.user.avatarUrl}
                   className="size-5"
                 />
                 <div>
-                  <p className="font-medium">{member.user.firstName} {member.user.lastName}</p>
+                  <p className="font-medium">{currentName}</p>
                   {member.user.email && (
                     <p className="text-[10px] opacity-70">{member.user.email}</p>
                   )}
@@ -153,10 +168,9 @@ function renderCommentContent(
         </TooltipProvider>,
       );
     } else {
-      // Unknown member — still render in blue, no tooltip
       parts.push(
         <span key={match.index} className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
-          @{name}
+          @{currentName}
         </span>,
       );
     }
@@ -220,9 +234,12 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
 
-  // Member lookup map for rendering mentions with tooltips
+  // Member lookup maps for rendering mentions with tooltips
   const membersByName = new Map(
     members.map((m) => [`${m.user.firstName} ${m.user.lastName}`, m]),
+  );
+  const membersById = new Map(
+    members.map((m) => [m.userId, m]),
   );
 
   const fetchComments = useCallback(async () => {
@@ -368,16 +385,17 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
 
   function insertMention(member: ProjectMember) {
     const name = `${member.user.firstName} ${member.user.lastName}`;
+    const mentionTag = `${member.userId}:${name}`;
     const before = content.slice(0, mentionStart);
     const cursorPos = textareaRef.current?.selectionStart ?? content.length;
     const after = content.slice(cursorPos);
-    const newContent = `${before}@[${name}] ${after}`;
+    const newContent = `${before}@[${mentionTag}] ${after}`;
     setContent(newContent);
     setMentionQuery(null);
 
     // Refocus textarea
     requestAnimationFrame(() => {
-      const pos = mentionStart + name.length + 4; // @[name] + space
+      const pos = mentionStart + mentionTag.length + 4; // @[tag] + space
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(pos, pos);
     });
@@ -477,11 +495,12 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
       const mentionRegex = new RegExp(MENTION_REGEX.source, "g");
       let m: RegExpExecArray | null;
       while ((m = mentionRegex.exec(content)) !== null) {
-        const name = m[1].trim();
-        const member = members.find(
-          (mb) =>
-            `${mb.user.firstName} ${mb.user.lastName}` === name,
-        );
+        const raw = m[1].trim();
+        const { userId, displayName } = parseMentionTag(raw);
+        // New format: userId is embedded. Legacy: lookup by name.
+        const member = userId
+          ? members.find((mb) => mb.userId === userId)
+          : members.find((mb) => `${mb.user.firstName} ${mb.user.lastName}` === displayName);
         if (member && !mentionedUserIds.includes(member.userId)) {
           mentionedUserIds.push(member.userId);
         }
@@ -548,7 +567,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
                     {timeAgo(comment.createdAt)}
                   </span>
                 </div>
-                {renderCommentContent(comment.content, membersByName)}
+                {renderCommentContent(comment.content, membersByName, membersById)}
               </div>
             </div>
           ))}
