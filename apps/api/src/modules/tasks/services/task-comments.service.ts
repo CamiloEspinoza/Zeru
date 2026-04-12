@@ -109,14 +109,14 @@ export class TaskCommentsService {
           commentContent: dto.content,
         });
 
-        // Auto-subscribe mentioned user to the task
+        // Auto-subscribe mentioned user to the task (upsert to avoid duplicate key error)
         await client.taskSubscriber
-          .create({
-            data: { taskId, userId: mentionedUserId, tenantId },
+          .upsert({
+            where: { taskId_userId: { taskId, userId: mentionedUserId } },
+            create: { taskId, userId: mentionedUserId, tenantId },
+            update: {},
           })
-          .catch(() => {
-            // Ignore duplicate subscription
-          });
+          .catch(() => {});
       }
     }
 
