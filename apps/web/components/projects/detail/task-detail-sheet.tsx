@@ -20,7 +20,7 @@ import { TaskDueDatePicker } from "./task-due-date-picker";
 import { TaskLabelSelect } from "./task-label-select";
 import { TaskCustomProperties } from "@/components/projects/properties/task-custom-properties";
 import { useTaskPresence } from "@/hooks/use-task-presence";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useRef, useEffect } from "react";
 
 interface TaskDetailSheetProps {
   projectKey: string;
@@ -63,6 +63,40 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
     refetch();
   }, [refetch]);
 
+  // ─── Resizable drawer ────────────────────────────────
+  const MIN_WIDTH = 480;
+  const MAX_WIDTH = typeof window !== "undefined" ? Math.min(1200, window.innerWidth * 0.85) : 1200;
+  const [drawerWidth, setDrawerWidth] = useState(640);
+  const isResizing = useRef(false);
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      if (!isResizing.current) return;
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerWidth - e.clientX));
+      setDrawerWidth(newWidth);
+    }
+    function onMouseUp() {
+      if (isResizing.current) {
+        isResizing.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [MAX_WIDTH]);
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
   function handleClose(open: boolean) {
     if (open) return;
     const params = new URLSearchParams(searchParams);
@@ -73,7 +107,12 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
 
   return (
     <Sheet open={!!taskId} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:max-w-[640px] overflow-y-auto p-0" aria-describedby={undefined}>
+      <SheetContent side="right" className="overflow-y-auto p-0" style={{ width: drawerWidth, maxWidth: '85vw' }} aria-describedby={undefined}>
+        {/* Resize handle */}
+        <div
+          onMouseDown={startResize}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-50"
+        />
         <SheetTitle className="sr-only">Detalle de tarea</SheetTitle>
         {loading && !displayTask ? (
           <div className="space-y-3 p-6">
