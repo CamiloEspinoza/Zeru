@@ -111,10 +111,6 @@ function renderCommentContent(
   }
 
   // Render text with @mentions highlighted in blue
-  if (membersByName.size === 0) {
-    return <p className="mt-0.5 text-sm whitespace-pre-wrap">{content}</p>;
-  }
-
   const parts: (string | JSX.Element)[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -123,37 +119,47 @@ function renderCommentContent(
   while ((match = regex.exec(content)) !== null) {
     const name = match[1].trim();
     const member = membersByName.get(name);
-    if (!member) continue;
 
     if (match.index > lastIndex) {
       parts.push(content.slice(lastIndex, match.index));
     }
-    parts.push(
-      <TooltipProvider key={match.index}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
-              @{name}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="flex items-center gap-2">
-              <UserAvatar
-                name={`${member.user.firstName} ${member.user.lastName}`}
-                avatarUrl={member.user.avatarUrl}
-                className="size-5"
-              />
-              <div>
-                <p className="font-medium">{member.user.firstName} {member.user.lastName}</p>
-                {member.user.email && (
-                  <p className="text-[10px] opacity-70">{member.user.email}</p>
-                )}
+
+    if (member) {
+      // Known member — show tooltip with avatar
+      parts.push(
+        <TooltipProvider key={match.index}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+                @{name}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="flex items-center gap-2">
+                <UserAvatar
+                  name={`${member.user.firstName} ${member.user.lastName}`}
+                  avatarUrl={member.user.avatarUrl}
+                  className="size-5"
+                />
+                <div>
+                  <p className="font-medium">{member.user.firstName} {member.user.lastName}</p>
+                  {member.user.email && (
+                    <p className="text-[10px] opacity-70">{member.user.email}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>,
-    );
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>,
+      );
+    } else {
+      // Unknown member — still render in blue, no tooltip
+      parts.push(
+        <span key={match.index} className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+          @{name}
+        </span>,
+      );
+    }
     lastIndex = match.index + match[0].length;
   }
 
@@ -343,6 +349,14 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
         e.preventDefault();
         setMentionQuery(null);
         return;
+      }
+    }
+
+    // Cmd+Enter or Ctrl+Enter to submit
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      if (content.trim() && !submitting) {
+        handleSubmit(e as unknown as React.FormEvent);
       }
     }
   }
@@ -638,6 +652,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
               disabled={submitting || !content.trim()}
             >
               {submitting ? "Enviando..." : "Comentar"}
+              <kbd className="ml-1.5 hidden text-[10px] opacity-50 sm:inline">⌘↵</kbd>
             </Button>
           </div>
         </form>
