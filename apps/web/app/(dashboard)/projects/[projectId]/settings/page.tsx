@@ -8,8 +8,7 @@ import { projectsApi } from "@/lib/api/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -40,10 +39,6 @@ import type { TaskStatusConfig, ProjectMember, Label } from "@/types/projects";
 import { PropertyDefinitionList } from "@/components/projects/properties/property-definition-list";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
-
-function userInitials(firstName?: string, lastName?: string) {
-  return ((firstName?.[0] ?? "") + (lastName?.[0] ?? "")).toUpperCase() || "?";
-}
 
 function slugify(name: string) {
   return name
@@ -277,12 +272,11 @@ function MemberRow({
   return (
     <div className="flex items-center justify-between rounded-md border p-3">
       <div className="flex items-center gap-3">
-        <Avatar className="size-8">
-          {member.userId && <AvatarImage src={getUserAvatarUrl(member.userId)!} alt={member.user.firstName} />}
-          <AvatarFallback className="text-xs">
-            {userInitials(member.user.firstName, member.user.lastName)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          userId={member.userId}
+          name={`${member.user.firstName} ${member.user.lastName}`}
+          className="size-8"
+        />
         <div>
           <p className="text-sm font-medium">
             {member.user.firstName} {member.user.lastName}
@@ -427,12 +421,11 @@ function InviteMemberDialog({
                 disabled={saving}
                 className="flex w-full items-center gap-3 rounded-md p-2 text-sm hover:bg-accent transition-colors"
               >
-                <Avatar className="size-7">
-                  {u.id && <AvatarImage src={getUserAvatarUrl(u.id)!} alt={u.firstName} />}
-                  <AvatarFallback className="text-[10px]">
-                    {userInitials(u.firstName, u.lastName)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  userId={u.id}
+                  name={`${u.firstName} ${u.lastName}`}
+                  className="size-7"
+                />
                 <div className="text-left min-w-0 flex-1">
                   <p className="font-medium truncate">{u.firstName} {u.lastName}</p>
                   <p className="text-xs text-muted-foreground truncate">{u.email}</p>

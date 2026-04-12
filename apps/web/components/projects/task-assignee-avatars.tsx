@@ -1,8 +1,8 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
 import type { UserSummary } from "@/types/projects";
 
 interface TaskAssigneeAvatarsProps {
@@ -11,29 +11,21 @@ interface TaskAssigneeAvatarsProps {
   size?: "sm" | "md";
 }
 
-function initials(user: UserSummary): string {
-  const first = user.firstName?.charAt(0) ?? "";
-  const last = user.lastName?.charAt(0) ?? "";
-  return (first + last).toUpperCase() || "?";
-}
-
 export function TaskAssigneeAvatars({ assignees, max = 3, size = "sm" }: TaskAssigneeAvatarsProps) {
   if (!assignees.length) return null;
   const visible = assignees.slice(0, max);
   const extra = assignees.length - max;
-  const sizeClass = size === "sm" ? "size-6 text-[10px]" : "size-8 text-xs";
+  const sizeClass = size === "sm" ? "size-6" : "size-8";
 
   return (
     <div className="flex items-center -space-x-1.5">
       {visible.map((a) => (
-        <Avatar
+        <UserAvatar
           key={a.userId}
+          userId={a.userId}
+          name={`${a.user.firstName} ${a.user.lastName}`}
           className={cn(sizeClass, "border-2 border-background")}
-          title={`${a.user.firstName} ${a.user.lastName}`}
-        >
-          {a.userId && <AvatarImage src={getUserAvatarUrl(a.userId)!} alt={a.user.firstName} />}
-          <AvatarFallback>{initials(a.user)}</AvatarFallback>
-        </Avatar>
+        />
       ))}
       {extra > 0 && (
         <Avatar className={cn(sizeClass, "border-2 border-background")}>

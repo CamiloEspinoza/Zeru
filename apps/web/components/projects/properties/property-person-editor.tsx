@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   Popover,
   PopoverContent,
@@ -20,7 +21,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { ProjectMember } from "@/types/projects";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 function initials(firstName: string, lastName: string): string {
   return (
@@ -127,17 +127,11 @@ export function PropertyPersonEditor({
                   onSelect={() => handleSelect(member.userId)}
                   data-checked={member.userId === value || undefined}
                 >
-                  <Avatar className="size-4 shrink-0">
-                    {member.userId && (
-                      <AvatarImage
-                        src={getUserAvatarUrl(member.userId)!}
-                        alt={`${member.user.firstName} ${member.user.lastName}`}
-                      />
-                    )}
-                    <AvatarFallback className="text-[6px]">
-                      {initials(member.user.firstName, member.user.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    userId={member.userId}
+                    name={`${member.user.firstName} ${member.user.lastName}`}
+                    className="size-4 shrink-0"
+                  />
                   <span className="truncate">
                     {member.user.firstName} {member.user.lastName}
                   </span>

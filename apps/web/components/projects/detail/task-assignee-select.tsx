@@ -4,21 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { projectsApi } from "@/lib/api/projects";
 import { tasksApi } from "@/lib/api/tasks";
 import type { ProjectMember, UserSummary } from "@/types/projects";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 interface TaskAssigneeSelectProps {
   taskId: string;
   projectId: string;
   assignees: Array<{ userId: string; user: UserSummary }>;
   onUpdated?: () => void;
-}
-
-function initials(user: UserSummary): string {
-  return ((user.firstName?.[0] ?? "") + (user.lastName?.[0] ?? "")).toUpperCase() || "?";
 }
 
 export function TaskAssigneeSelect({
@@ -78,10 +73,12 @@ export function TaskAssigneeSelect({
             <div className="flex items-center gap-1">
               <div className="flex -space-x-1">
                 {assignees.slice(0, 3).map((a) => (
-                  <Avatar key={a.userId} className="size-5 border border-background">
-                    {a.userId && <AvatarImage src={getUserAvatarUrl(a.userId)!} alt={a.user.firstName} />}
-                    <AvatarFallback className="text-[8px]">{initials(a.user)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    key={a.userId}
+                    userId={a.userId}
+                    name={`${a.user.firstName} ${a.user.lastName}`}
+                    className="size-5 border border-background"
+                  />
                 ))}
               </div>
               {assignees.length > 3 && (
@@ -104,10 +101,11 @@ export function TaskAssigneeSelect({
                   onClick={() => handleToggle(m.userId)}
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                 >
-                  <Avatar className="size-6">
-                    {m.userId && <AvatarImage src={getUserAvatarUrl(m.userId)!} alt={m.user.firstName} />}
-                    <AvatarFallback className="text-[9px]">{initials(m.user)}</AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    userId={m.userId}
+                    name={`${m.user.firstName} ${m.user.lastName}`}
+                    className="size-6"
+                  />
                   <span className="truncate flex-1 text-left">
                     {m.user.firstName} {m.user.lastName}
                   </span>

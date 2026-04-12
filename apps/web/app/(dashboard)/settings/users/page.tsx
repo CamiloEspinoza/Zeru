@@ -11,14 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { LinkPersonDialog } from "@/components/users/link-person-dialog";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Propietario",
@@ -26,10 +21,6 @@ const ROLE_LABELS: Record<string, string> = {
   ACCOUNTANT: "Contador",
   VIEWER: "Solo lectura",
 };
-
-function getInitials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-}
 
 export default function UsersSettingsPage() {
   const [users, setUsers] = useState<UserInTenant[]>([]);
@@ -138,17 +129,11 @@ export default function UsersSettingsPage() {
                       <tr key={user.id} className="border-b last:border-0">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <Avatar size="sm">
-                              {user.id && (
-                                <AvatarImage
-                                  src={getUserAvatarUrl(user.id)!}
-                                  alt={`${user.firstName} ${user.lastName}`}
-                                />
-                              )}
-                              <AvatarFallback>
-                                {getInitials(user.firstName, user.lastName)}
-                              </AvatarFallback>
-                            </Avatar>
+                            <UserAvatar
+                              userId={user.id}
+                              name={`${user.firstName} ${user.lastName}`}
+                              className="size-8"
+                            />
                             <span className="font-medium">
                               {user.firstName} {user.lastName}
                             </span>

@@ -12,9 +12,7 @@ import {
   Sun03Icon,
   Moon02Icon,
 } from "@hugeicons/core-free-icons";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { getUserAvatarUrl } from "@/lib/avatar-url";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,9 +53,6 @@ export function NavUser() {
   const router = useRouter();
 
   const fullName = user ? `${user.firstName} ${user.lastName}` : "";
-  const initials = user
-    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
-    : "?";
 
   return (
     <SidebarMenu>
