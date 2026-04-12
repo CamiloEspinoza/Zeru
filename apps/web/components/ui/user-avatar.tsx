@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -22,18 +22,36 @@ function getInitials(name: string): string {
 /**
  * UserAvatar -- renders a user's avatar image from the server-provided avatarUrl.
  * If avatarUrl is falsy, renders initials only (zero HTTP requests).
+ * Reacts to avatarUrl changes (e.g., null → URL when API responds).
  */
 export function UserAvatar({ name, avatarUrl, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
   const src = avatarUrl || null;
+  const prevSrc = useRef(src);
 
-  // Check synchronously if image is cached (before first paint)
-  const isCached = typeof window !== "undefined" && src
-    ? (() => { const img = new Image(); img.src = src; return img.complete && img.naturalWidth > 0; })()
-    : false;
+  const [imgStatus, setImgStatus] = useState<"loading" | "loaded" | "error">(() => {
+    if (!src) return "error";
+    if (typeof window !== "undefined") {
+      const img = new Image();
+      img.src = src;
+      if (img.complete && img.naturalWidth > 0) return "loaded";
+    }
+    return "loading";
+  });
 
-  const [imgStatus, setImgStatus] = useState<"loading" | "loaded" | "error">(
-    !src ? "error" : isCached ? "loaded" : "loading",
-  );
+  // Reset status when avatarUrl changes (e.g., null → URL)
+  useEffect(() => {
+    if (src !== prevSrc.current) {
+      prevSrc.current = src;
+      if (!src) {
+        setImgStatus("error");
+      } else {
+        // Check cache synchronously
+        const img = new Image();
+        img.src = src;
+        setImgStatus(img.complete && img.naturalWidth > 0 ? "loaded" : "loading");
+      }
+    }
+  }, [src]);
 
   const initials = getInitials(name);
 
