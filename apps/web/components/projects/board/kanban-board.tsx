@@ -8,9 +8,11 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
-  closestCorners,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { toast } from "sonner";
@@ -30,6 +32,19 @@ interface KanbanBoardProps {
 }
 
 type ColumnMap = Record<string, Task[]>;
+
+/**
+ * Custom collision detection for multi-column kanban.
+ * Uses pointerWithin for columns (works in all directions),
+ * falls back to rectIntersection for items within columns.
+ */
+const kanbanCollisionDetection: CollisionDetection = (args) => {
+  // First check if pointer is within a droppable (column or task)
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0) return pointerCollisions;
+  // Fallback to rect intersection
+  return rectIntersection(args);
+};
 
 /**
  * Build a map of statusId -> sorted tasks (excluding subtasks).
@@ -289,7 +304,7 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={kanbanCollisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
