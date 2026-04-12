@@ -366,6 +366,26 @@ export class TaskNotificationListener {
     });
   }
 
+  @OnEvent('chat.mentioned')
+  async handleChatMentioned(payload: {
+    type: string;
+    title: string;
+    body?: string;
+    data: Record<string, unknown>;
+    recipientId: string;
+    tenantId: string;
+  }) {
+    await this.notificationService.notify({
+      type: payload.type,
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+      groupKey: `chat-mention:${payload.data.channelId}:${payload.recipientId}`,
+      recipientId: payload.recipientId,
+      tenantId: payload.tenantId,
+    });
+  }
+
   // ─── Helpers ─────────────────────────────────────────────
 
   private async findTask(tenantId: string, taskId: string) {
