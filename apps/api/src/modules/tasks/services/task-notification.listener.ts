@@ -31,7 +31,12 @@ export class TaskNotificationListener {
       type: 'task.assigned',
       title: 'Te asignaron una tarea',
       body: task.title,
-      data: { projectId: task.projectId, taskId: task.id, taskNumber: task.number },
+      data: {
+        projectId: task.projectId,
+        taskId: task.id,
+        taskNumber: task.number,
+        link: `/projects/${task.projectId}/board?task=${task.id}`,
+      },
       groupKey: `task-assign:${task.id}`,
       recipientId: payload.assigneeId,
       tenantId: payload.tenantId,
@@ -73,7 +78,12 @@ export class TaskNotificationListener {
         type: 'task.status_changed',
         title: `Tarea marcada como ${statusName}`,
         body: task.title,
-        data: { projectId: payload.projectId, taskId: task.id, taskNumber: task.number },
+        data: {
+          projectId: payload.projectId,
+          taskId: task.id,
+          taskNumber: task.number,
+          link: `/projects/${payload.projectId}/board?task=${task.id}`,
+        },
         groupKey: `task-status:${task.id}`,
         recipientId,
         tenantId: payload.tenantId,
@@ -119,6 +129,7 @@ export class TaskNotificationListener {
           taskId: task.id,
           taskNumber: task.number,
           commentId: payload.commentId,
+          link: `/projects/${payload.projectId}/board?task=${task.id}`,
         },
         groupKey: `task-comment:${task.id}`,
         recipientId,
@@ -144,7 +155,12 @@ export class TaskNotificationListener {
         type: 'task.completed',
         title: 'Tarea completada',
         body: task.title,
-        data: { projectId: payload.projectId, taskId: task.id, taskNumber: task.number },
+        data: {
+          projectId: payload.projectId,
+          taskId: task.id,
+          taskNumber: task.number,
+          link: `/projects/${payload.projectId}/board?task=${task.id}`,
+        },
         groupKey: `task-complete:${task.id}`,
         recipientId: task.createdById,
         tenantId: payload.tenantId,
@@ -230,7 +246,10 @@ export class TaskNotificationListener {
       type: 'project.member_added',
       title: 'Te agregaron al proyecto',
       body: project.name,
-      data: { projectId: payload.projectId },
+      data: {
+        projectId: payload.projectId,
+        link: `/projects/${payload.projectId}/board`,
+      },
       groupKey: `project-member:${payload.projectId}:${payload.userId}`,
       recipientId: payload.userId,
       tenantId: payload.tenantId,
@@ -251,8 +270,97 @@ export class TaskNotificationListener {
       type: 'task.due_soon',
       title: 'Tarea por vencer',
       body: payload.taskTitle,
-      data: { projectId: payload.projectId, taskId: payload.taskId },
+      data: {
+        projectId: payload.projectId,
+        taskId: payload.taskId,
+        link: `/projects/${payload.projectId}/board?task=${payload.taskId}`,
+      },
       groupKey: `task-due:${payload.taskId}`,
+      recipientId: payload.userId,
+      tenantId: payload.tenantId,
+    });
+  }
+
+  // ─── Task Unassigned ─────────────────────────────────────
+
+  @OnEvent('task.unassigned')
+  async handleTaskUnassigned(payload: {
+    tenantId: string;
+    taskId: string;
+    projectId: string;
+    userId: string; // the removed user
+    actorId: string;
+  }) {
+    if (payload.actorId === payload.userId) return;
+
+    const task = await this.findTask(payload.tenantId, payload.taskId);
+    if (!task) return;
+
+    await this.notificationService.notify({
+      type: 'task.unassigned',
+      title: 'Te removieron de una tarea',
+      body: task.title,
+      data: {
+        projectId: payload.projectId,
+        taskId: task.id,
+        taskNumber: task.number,
+        link: `/projects/${payload.projectId}/board?task=${task.id}`,
+      },
+      groupKey: `task-unassign:${task.id}`,
+      recipientId: payload.userId,
+      tenantId: payload.tenantId,
+    });
+  }
+
+  // ─── Task Overdue ───────────────────────────────────────
+
+  @OnEvent('task.overdue')
+  async handleTaskOverdue(payload: {
+    tenantId: string;
+    projectId: string;
+    taskId: string;
+    taskTitle: string;
+    userId: string;
+  }) {
+    await this.notificationService.notify({
+      type: 'task.overdue',
+      title: 'Tarea vencida',
+      body: payload.taskTitle,
+      data: {
+        projectId: payload.projectId,
+        taskId: payload.taskId,
+        link: `/projects/${payload.projectId}/board?task=${payload.taskId}`,
+      },
+      groupKey: `task-overdue:${payload.taskId}`,
+      recipientId: payload.userId,
+      tenantId: payload.tenantId,
+    });
+  }
+
+  // ─── Project Member Removed ─────────────────────────────
+
+  @OnEvent('project.member_removed')
+  async handleProjectMemberRemoved(payload: {
+    tenantId: string;
+    projectId: string;
+    userId: string; // the removed member
+    actorId: string;
+  }) {
+    if (payload.actorId === payload.userId) return;
+
+    const client = this.prisma.forTenant(payload.tenantId) as unknown as PrismaClient;
+    const project = await client.project.findFirst({
+      where: { id: payload.projectId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!project) return;
+
+    await this.notificationService.notify({
+      type: 'project.member_removed',
+      title: `Te removieron del proyecto ${project.name}`,
+      body: undefined,
+      data: { projectId: payload.projectId },
+      groupKey: `project-removed:${payload.projectId}:${payload.userId}`,
       recipientId: payload.userId,
       tenantId: payload.tenantId,
     });

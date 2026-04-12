@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RealtimeGateway } from './realtime.gateway';
 import { PresenceModule } from '../presence/presence.module';
 import { TeamChatModule } from '../team-chat/team-chat.module';
 import { LockModule } from '../lock/lock.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LockModule } from '../lock/lock.module';
     PresenceModule,
     TeamChatModule,
     LockModule,
+    forwardRef(() => NotificationModule),
   ],
   providers: [RealtimeGateway],
   exports: [RealtimeGateway],

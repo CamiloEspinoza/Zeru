@@ -70,7 +70,7 @@ export class NotificationService {
 
       // Emit WebSocket events to the recipient
       this.gateway.emitToUser(recipientId, 'notification:new', notification);
-      this.gateway.emitToUser(recipientId, 'notification:count', { count: unreadCount });
+      this.gateway.emitToUser(recipientId, 'notification:count', { unread: unreadCount });
     } catch (err) {
       this.logger.error(`Failed to create notification for user ${recipientId}`, err);
     }

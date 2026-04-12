@@ -52,4 +52,41 @@ export class TaskCronService {
       this.logger.error('Failed to check due-soon tasks', err);
     }
   }
+
+  /** Runs every day at 09:00 — finds overdue tasks and notifies assignees */
+  @Cron('0 9 * * *', { name: 'task-overdue-check' })
+  async checkOverdue() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    try {
+      const tasks = await this.prisma.task.findMany({
+        where: {
+          dueDate: { lt: today },
+          completedAt: null,
+          deletedAt: null,
+        },
+        include: {
+          assignees: { select: { userId: true } },
+          project: { select: { id: true, name: true, tenantId: true } },
+        },
+      });
+
+      this.logger.log(`Found ${tasks.length} overdue tasks`);
+
+      for (const task of tasks) {
+        for (const assignee of task.assignees) {
+          this.eventEmitter.emit('task.overdue', {
+            tenantId: task.project.tenantId,
+            projectId: task.projectId,
+            taskId: task.id,
+            taskTitle: task.title,
+            userId: assignee.userId,
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.error('Failed to check overdue tasks', err);
+    }
+  }
 }

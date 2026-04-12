@@ -660,15 +660,23 @@ export class TasksService {
   async removeAssignee(
     tenantId: string,
     taskId: string,
-    _userId: string,
+    userId: string,
     assigneeId: string,
   ) {
-    await this.findOne(tenantId, taskId);
+    const existing = await this.findOne(tenantId, taskId);
 
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
     await client.taskAssignee.delete({
       where: { taskId_userId: { taskId, userId: assigneeId } },
+    });
+
+    this.eventEmitter.emit('task.unassigned', {
+      tenantId,
+      taskId,
+      projectId: existing.projectId,
+      userId: assigneeId,
+      actorId: userId,
     });
 
     return { message: 'Asignado removido' };

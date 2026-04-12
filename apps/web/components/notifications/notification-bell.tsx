@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRealtimeStore } from "@/stores/realtime-store";
 import {
   Popover,
@@ -10,9 +11,10 @@ import { NotificationList } from "./notification-list";
 
 export function NotificationBell() {
   const unreadNotifications = useRealtimeStore((s) => s.unreadNotifications);
+  const [open, setOpen] = useState(false);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           className="relative inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
@@ -45,7 +47,7 @@ export function NotificationBell() {
         sideOffset={8}
         className="w-80 p-0"
       >
-        <NotificationList />
+        <NotificationList onClose={() => setOpen(false)} />
       </PopoverContent>
     </Popover>
   );

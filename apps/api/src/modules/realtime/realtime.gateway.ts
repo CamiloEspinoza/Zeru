@@ -7,7 +7,7 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, forwardRef } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
@@ -19,6 +19,7 @@ import {
 import { PresenceService } from '../presence/presence.service';
 import { TeamChatService } from '../team-chat/team-chat.service';
 import { LockService } from '../lock/lock.service';
+import { NotificationService } from '../notification/notification.service';
 import { buildAvatarProxyUrl } from '../users/avatar-url.helper';
 
 export interface AuthenticatedSocket extends Socket {
@@ -52,6 +53,8 @@ export class RealtimeGateway
     private readonly presenceService: PresenceService,
     private readonly chatService: TeamChatService,
     private readonly lockService: LockService,
+    @Inject(forwardRef(() => NotificationService))
+    private readonly notificationService: NotificationService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -449,6 +452,33 @@ export class RealtimeGateway
 
     const room = `tenant:${tenantId}:channel:${channelId}`;
     this.emitToRoom(room, 'chat:message', message);
+
+    // G4: Notify mentioned users
+    if (mentionedUserIds?.length) {
+      const channel = await this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { name: true, tenantId: true },
+      });
+      const senderName = client.data.userName ?? 'Alguien';
+      const channelName = channel?.name ?? 'canal';
+      const msgTenantId = channel?.tenantId ?? tenantId;
+
+      for (const mentionedId of mentionedUserIds) {
+        if (mentionedId === userId) continue;
+        this.notificationService.notify({
+          type: 'chat.mentioned',
+          title: `@${senderName} en #${channelName}`,
+          body: content.slice(0, 200),
+          data: {
+            channelId,
+            messageId: message.id,
+            link: `/chat/${channelId}`,
+          },
+          recipientId: mentionedId,
+          tenantId: msgTenantId,
+        });
+      }
+    }
   }
 
   @SubscribeMessage('chat:typing')
