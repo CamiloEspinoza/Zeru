@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 interface UserAvatarProps {
   userId: string | null | undefined;
   name: string;
+  /** Set to false to skip the image request entirely (user has no avatar). Default: true */
+  hasAvatar?: boolean;
   className?: string;
   fallbackClassName?: string;
 }
@@ -17,15 +19,15 @@ function getInitials(name: string): string {
   return ((parts[0][0] ?? "") + (parts[parts.length - 1][0] ?? "")).toUpperCase();
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+
 /**
  * UserAvatar — renders a user's avatar image from the /api/avatars/:userId
- * proxy endpoint. Uses a native <img> instead of Radix Avatar to avoid the
- * fallback flash: if the image is in browser cache, it renders synchronously.
+ * proxy endpoint. Uses a native <img> to avoid fallback flash.
  */
-export function UserAvatar({ userId, name, className, fallbackClassName }: UserAvatarProps) {
+export function UserAvatar({ userId, name, hasAvatar = true, className, fallbackClassName }: UserAvatarProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
-  const src = userId ? `${apiBase}/avatars/${userId}?s=96` : null;
+  const src = userId && hasAvatar ? `${API_BASE}/avatars/${userId}?s=96` : null;
 
   // Check synchronously if image is cached (before first paint)
   const isCached = typeof window !== "undefined" && src
@@ -33,7 +35,7 @@ export function UserAvatar({ userId, name, className, fallbackClassName }: UserA
     : false;
 
   const [imgStatus, setImgStatus] = useState<"loading" | "loaded" | "error">(
-    !userId ? "error" : isCached ? "loaded" : "loading",
+    !src ? "error" : isCached ? "loaded" : "loading",
   );
 
   const initials = getInitials(name);
