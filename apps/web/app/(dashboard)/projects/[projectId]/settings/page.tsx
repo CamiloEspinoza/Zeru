@@ -7,6 +7,7 @@ import { useProject } from "@/hooks/use-project";
 import { projectsApi } from "@/lib/api/projects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Delete02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
-import type { TaskStatusConfig, ProjectMember, Label } from "@/types/projects";
+import type { TaskStatusConfig, ProjectMember, Label, Project } from "@/types/projects";
 import { PropertyDefinitionList } from "@/components/projects/properties/property-definition-list";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
@@ -576,6 +577,93 @@ function AddLabelDialog({
 
 /* ─── Main Settings Page ───────────────────────────────────── */
 
+function ProjectGeneralCard({ project, onRefresh }: { project: Project; onRefresh: () => void }) {
+  const [name, setName] = useState(project.name);
+  const [description, setDescription] = useState(project.description ?? "");
+  const [visibility, setVisibility] = useState(project.visibility);
+  const [color, setColor] = useState(project.color ?? "#6B7280");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await projectsApi.update(project.id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        visibility,
+        color,
+      });
+      toast.success("Proyecto actualizado");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al actualizar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isDirty =
+    name !== project.name ||
+    description !== (project.description ?? "") ||
+    visibility !== project.visibility ||
+    color !== (project.color ?? "#6B7280");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>General</CardTitle>
+        <CardDescription>Nombre, descripción y visibilidad del tablero</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="size-9 shrink-0 cursor-pointer rounded border-0 p-0"
+          />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nombre del tablero"
+            className="flex-1"
+          />
+        </div>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Descripción del tablero..."
+          rows={3}
+        />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Visibilidad:</span>
+            <Select value={visibility} onValueChange={(v) => setVisibility(v as "PUBLIC" | "PRIVATE")}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PUBLIC">Público</SelectItem>
+                <SelectItem value="PRIVATE">Privado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {isDirty && (
+            <Button onClick={handleSave} disabled={saving || !name.trim()} size="sm">
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {visibility === "PUBLIC"
+            ? "Todos los miembros de la organización pueden ver este tablero."
+            : "Solo los miembros del tablero pueden verlo."}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ProjectSettingsPage({
   params,
 }: {
@@ -624,6 +712,9 @@ export default function ProjectSettingsPage({
 
   return (
     <div className="max-w-3xl space-y-6">
+      {/* General */}
+      <ProjectGeneralCard project={project} onRefresh={refetch} />
+
       {/* Members */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
