@@ -15,12 +15,15 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
   createUserSchema,
   updateUserSchema,
+  updateMembershipSchema,
   linkPersonSchema,
   type CreateUserSchema,
   type UpdateUserSchema,
+  type UpdateMembershipSchema,
   type LinkPersonSchema,
 } from './dto';
 import { UsersService } from './users.service';
+import { UserRole } from '@prisma/client';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -67,6 +70,15 @@ export class UsersController {
     @CurrentTenant() tenantId: string,
   ) {
     return this.usersService.update(id, tenantId, body);
+  }
+
+  @Patch(':id/role')
+  updateRole(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateMembershipSchema)) body: UpdateMembershipSchema,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.usersService.updateMembership(id, tenantId, body.role as UserRole);
   }
 
   @Patch(':id/link-person')

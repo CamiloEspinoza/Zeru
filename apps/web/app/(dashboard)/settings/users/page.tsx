@@ -14,6 +14,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { LinkPersonDialog } from "@/components/users/link-person-dialog";
+import { UserEditDialog } from "@/components/users/user-edit-dialog";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Propietario",
@@ -26,6 +27,10 @@ export default function UsersSettingsPage() {
   const [users, setUsers] = useState<UserInTenant[]>([]);
   const [roles, setRoles] = useState<RoleInfo[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<UserInTenant | null>(null);
 
   // Link dialog state
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -66,6 +71,11 @@ export default function UsersSettingsPage() {
 
   const getStatusLabel = (isActive: boolean) =>
     isActive ? "Activo" : "Inactivo";
+
+  function handleEditClick(user: UserInTenant) {
+    setEditTarget(user);
+    setEditDialogOpen(true);
+  }
 
   function handleLinkClick(user: UserInTenant) {
     setLinkTarget({
@@ -112,13 +122,16 @@ export default function UsersSettingsPage() {
                       Persona vinculada
                     </th>
                     <th className="text-left py-3 px-4 font-medium">Estado</th>
+                    <th className="text-left py-3 px-4 font-medium">
+                      Acciones
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="py-8 px-4 text-center text-muted-foreground"
                       >
                         No hay usuarios
@@ -180,6 +193,16 @@ export default function UsersSettingsPage() {
                         <td className="py-3 px-4">
                           {getStatusLabel(user.isActive)}
                         </td>
+                        <td className="py-3 px-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleEditClick(user)}
+                          >
+                            Editar
+                          </Button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -189,6 +212,17 @@ export default function UsersSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <UserEditDialog
+        user={editTarget}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditTarget(null);
+        }}
+        onSaved={fetchUsers}
+        roles={roles}
+      />
 
       {linkTarget && (
         <LinkPersonDialog
