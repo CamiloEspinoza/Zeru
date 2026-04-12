@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface SpeakerAvatarChipProps {
@@ -33,21 +32,18 @@ export function SpeakerAvatarChip({
         className,
       )}
     >
-      {/* Avatar circle */}
       <div
         className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium",
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-medium overflow-hidden",
           isInterviewer
             ? "bg-primary text-primary-foreground"
             : "bg-muted text-muted-foreground",
         )}
       >
         {avatarUrl ? (
-          <Image
+          <img
             src={avatarUrl}
             alt={name}
-            width={28}
-            height={28}
             className="h-7 w-7 rounded-full object-cover"
           />
         ) : (
@@ -55,7 +51,6 @@ export function SpeakerAvatarChip({
         )}
       </div>
 
-      {/* Name — hidden by default, expands on hover */}
       <span
         className={cn(
           "max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-medium transition-all duration-200 ease-out group-hover/chip:max-w-[120px] group-hover/chip:px-2",
