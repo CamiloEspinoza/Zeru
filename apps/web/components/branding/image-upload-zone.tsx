@@ -39,12 +39,12 @@ export function ImageUploadZone({
   };
 
   return (
-    <div className={className}>
+    <div className={`flex flex-col ${className ?? ""}`}>
       <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
         {label}
       </p>
       {currentUrl ? (
-        <div className="relative border rounded-lg p-4 flex flex-col items-center justify-center min-h-[140px] bg-muted/30">
+        <div className="relative border rounded-lg p-4 flex flex-col items-center justify-center flex-1 bg-muted/30">
           <img
             src={currentUrl}
             alt={label}
@@ -69,7 +69,7 @@ export function ImageUploadZone({
         </div>
       ) : (
         <div
-          className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center min-h-[140px] cursor-pointer hover:border-primary/50 transition-colors"
+          className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center flex-1 min-h-[140px] cursor-pointer hover:border-primary/50 transition-colors"
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
