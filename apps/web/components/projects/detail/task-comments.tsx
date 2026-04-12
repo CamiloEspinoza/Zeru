@@ -383,19 +383,22 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
     }
   }
 
+  // Track inserted mentions: displayName → userId
+  const insertedMentionsRef = useRef<Map<string, string>>(new Map());
+
   function insertMention(member: ProjectMember) {
     const name = `${member.user.firstName} ${member.user.lastName}`;
-    const mentionTag = `${member.userId}:${name}`;
+    insertedMentionsRef.current.set(name, member.userId);
     const before = content.slice(0, mentionStart);
     const cursorPos = textareaRef.current?.selectionStart ?? content.length;
     const after = content.slice(cursorPos);
-    const newContent = `${before}@[${mentionTag}] ${after}`;
+    const newContent = `${before}@${name} ${after}`;
     setContent(newContent);
     setMentionQuery(null);
 
     // Refocus textarea
     requestAnimationFrame(() => {
-      const pos = mentionStart + mentionTag.length + 4; // @[tag] + space
+      const pos = mentionStart + name.length + 2; // @name + space
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(pos, pos);
     });
@@ -490,30 +493,38 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
     if (!content.trim()) return;
     setSubmitting(true);
     try {
-      // Detect @mentions in the content and resolve to user IDs
+      // Convert @Name to @[userId:Name] using the inserted mentions map
       const mentionedUserIds: string[] = [];
-      const mentionRegex = new RegExp(MENTION_REGEX.source, "g");
+      let finalContent = content.trim();
+
+      // Replace each known mention with the tagged format
+      for (const [name, uid] of insertedMentionsRef.current.entries()) {
+        const pattern = new RegExp(`@${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$|[.,;:!?])`, 'g');
+        if (pattern.test(finalContent)) {
+          finalContent = finalContent.replace(pattern, `@[${uid}:${name}]`);
+          if (!mentionedUserIds.includes(uid)) mentionedUserIds.push(uid);
+        }
+      }
+
+      // Also check for any @[userId:Name] already in content (from paste/edit)
+      const tagRegex = new RegExp(MENTION_REGEX.source, "g");
       let m: RegExpExecArray | null;
-      while ((m = mentionRegex.exec(content)) !== null) {
-        const raw = m[1].trim();
-        const { userId, displayName } = parseMentionTag(raw);
-        // New format: userId is embedded. Legacy: lookup by name.
-        const member = userId
-          ? members.find((mb) => mb.userId === userId)
-          : members.find((mb) => `${mb.user.firstName} ${mb.user.lastName}` === displayName);
-        if (member && !mentionedUserIds.includes(member.userId)) {
-          mentionedUserIds.push(member.userId);
+      while ((m = tagRegex.exec(finalContent)) !== null) {
+        const { userId } = parseMentionTag(m[1].trim());
+        if (userId && !mentionedUserIds.includes(userId)) {
+          mentionedUserIds.push(userId);
         }
       }
 
       await tasksApi.createComment(
         taskId,
-        content.trim(),
+        finalContent,
         undefined,
         mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
       );
       setContent("");
       setMentionQuery(null);
+      insertedMentionsRef.current.clear();
       if (socket && isTypingRef.current) {
         isTypingRef.current = false;
         socket.emit("task:comment:typing:stop", { taskId, projectId });

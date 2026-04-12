@@ -110,9 +110,17 @@ export class TaskNotificationListener {
     commentId: string;
     projectId: string;
     userId: string; // comment author
+    comment?: { content: string; author?: { firstName: string; lastName: string } };
   }) {
     const task = await this.findTask(payload.tenantId, payload.taskId);
     if (!task) return;
+
+    // Clean mention tags from content for display: @[uuid:Name] → @Name
+    const rawContent = payload.comment?.content ?? '';
+    const cleanContent = rawContent.replace(/@\[([^\]]*?):([^\]]+)\]/g, '@$2').replace(/@\[([^\]]+)\]/g, '@$1');
+    const actorName = payload.comment?.author
+      ? `${payload.comment.author.firstName} ${payload.comment.author.lastName}`
+      : 'Alguien';
 
     // Notify all subscribers except the comment author
     const recipientIds = new Set<string>();
@@ -122,8 +130,8 @@ export class TaskNotificationListener {
     for (const recipientId of recipientIds) {
       await this.notificationService.notify({
         type: 'task.comment.created',
-        title: 'Nuevo comentario en tarea',
-        body: task.title,
+        title: `${actorName} comentó en ${task.title}`,
+        body: cleanContent.slice(0, 200) || undefined,
         data: {
           projectId: payload.projectId,
           taskId: task.id,
