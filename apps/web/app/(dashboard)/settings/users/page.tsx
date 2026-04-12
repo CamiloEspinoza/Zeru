@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/avatar";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { LinkPersonDialog } from "@/components/users/link-person-dialog";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Propietario",
@@ -138,9 +139,9 @@ export default function UsersSettingsPage() {
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <Avatar size="sm">
-                              {user.avatarUrl && (
+                              {user.id && (
                                 <AvatarImage
-                                  src={user.avatarUrl}
+                                  src={getUserAvatarUrl(user.id)!}
                                   alt={`${user.firstName} ${user.lastName}`}
                                 />
                               )}

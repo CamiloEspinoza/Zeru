@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { projectsApi } from "@/lib/api/projects";
 import { tasksApi } from "@/lib/api/tasks";
 import type { ProjectMember, UserSummary } from "@/types/projects";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 interface TaskAssigneeSelectProps {
   taskId: string;
@@ -78,7 +79,7 @@ export function TaskAssigneeSelect({
               <div className="flex -space-x-1">
                 {assignees.slice(0, 3).map((a) => (
                   <Avatar key={a.userId} className="size-5 border border-background">
-                    {a.user.avatarUrl && <AvatarImage src={a.user.avatarUrl} alt={a.user.firstName} />}
+                    {a.userId && <AvatarImage src={getUserAvatarUrl(a.userId)!} alt={a.user.firstName} />}
                     <AvatarFallback className="text-[8px]">{initials(a.user)}</AvatarFallback>
                   </Avatar>
                 ))}
@@ -104,7 +105,7 @@ export function TaskAssigneeSelect({
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                 >
                   <Avatar className="size-6">
-                    {m.user.avatarUrl && <AvatarImage src={m.user.avatarUrl} alt={m.user.firstName} />}
+                    {m.userId && <AvatarImage src={getUserAvatarUrl(m.userId)!} alt={m.user.firstName} />}
                     <AvatarFallback className="text-[9px]">{initials(m.user)}</AvatarFallback>
                   </Avatar>
                   <span className="truncate flex-1 text-left">

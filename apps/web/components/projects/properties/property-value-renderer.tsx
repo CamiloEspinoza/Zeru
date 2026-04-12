@@ -6,6 +6,7 @@ import type {
   SetPropertyValuePayload,
 } from "@/types/custom-properties";
 import type { ProjectMember } from "@/types/projects";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 import { PropertyTextEditor } from "./property-text-editor";
 import { PropertyNumberEditor } from "./property-number-editor";
 import { PropertySelectEditor } from "./property-select-editor";
@@ -98,7 +99,7 @@ export function PropertyValueRenderer({
               ? `${personUser.firstName} ${personUser.lastName}`
               : null
           }
-          personAvatarUrl={personUser?.avatarUrl ?? null}
+          personAvatarUrl={getUserAvatarUrl(personUser?.id) ?? null}
           members={members}
           onChange={(userId) =>
             userId !== null ? onSave({ personUserId: userId }) : onClear()

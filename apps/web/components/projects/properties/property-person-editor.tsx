@@ -20,6 +20,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Cancel01Icon, UserIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { ProjectMember } from "@/types/projects";
+import { getUserAvatarUrl } from "@/lib/avatar-url";
 
 function initials(firstName: string, lastName: string): string {
   return (
@@ -127,9 +128,9 @@ export function PropertyPersonEditor({
                   data-checked={member.userId === value || undefined}
                 >
                   <Avatar className="size-4 shrink-0">
-                    {member.user.avatarUrl && (
+                    {member.userId && (
                       <AvatarImage
-                        src={member.user.avatarUrl}
+                        src={getUserAvatarUrl(member.userId)!}
                         alt={`${member.user.firstName} ${member.user.lastName}`}
                       />
                     )}
