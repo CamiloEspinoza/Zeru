@@ -82,11 +82,7 @@ export class InterviewsService {
         skip: (dto.page - 1) * dto.perPage,
         take: dto.perPage,
         include: {
-          speakers: {
-            include: {
-              personEntity: { select: { avatarS3Key: true } },
-            },
-          },
+          speakers: true,
           _count: {
             select: { chunks: true },
           },
@@ -95,14 +91,28 @@ export class InterviewsService {
       client.interview.count({ where }),
     ]);
 
+    // Resolve speaker avatars from PersonProfile (personEntityId is a bare FK, not a Prisma relation)
+    const personIds = data
+      .flatMap((i) => i.speakers)
+      .map((s) => s.personEntityId)
+      .filter((id): id is string => !!id);
+
+    const personAvatars = personIds.length > 0
+      ? await client.personProfile.findMany({
+          where: { id: { in: [...new Set(personIds)] }, deletedAt: null },
+          select: { id: true, avatarS3Key: true },
+        })
+      : [];
+
+    const avatarMap = new Map(personAvatars.map((p) => [p.id, p.avatarS3Key]));
+
     const mappedData = data.map((interview) => ({
       ...interview,
       speakers: interview.speakers.map((s) => ({
         ...s,
-        avatarUrl: s.personEntity?.avatarS3Key
-          ? buildPersonAvatarProxyUrl(s.personEntityId!, s.personEntity.avatarS3Key)
+        avatarUrl: s.personEntityId
+          ? buildPersonAvatarProxyUrl(s.personEntityId, avatarMap.get(s.personEntityId) ?? null)
           : null,
-        personEntity: undefined,
       })),
     }));
 
