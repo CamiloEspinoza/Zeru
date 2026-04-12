@@ -73,7 +73,8 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
 
   return (
     <Sheet open={!!taskId} onOpenChange={handleClose}>
-      <SheetContent side="right" className="w-full sm:max-w-[640px] overflow-y-auto p-0">
+      <SheetContent side="right" className="w-full sm:max-w-[640px] overflow-y-auto p-0" aria-describedby={undefined}>
+        <SheetTitle className="sr-only">Detalle de tarea</SheetTitle>
         {loading && !displayTask ? (
           <div className="space-y-3 p-6">
             <Skeleton className="h-6 w-3/4" />
@@ -92,7 +93,6 @@ export function TaskDetailSheet({ projectKey }: TaskDetailSheetProps) {
                   <TaskPresenceAvatars projectId={displayTask.projectId} taskId={taskId} />
                 )}
               </div>
-              <SheetTitle className="sr-only">{displayTask.title}</SheetTitle>
               <TaskDetailTitle taskId={displayTask.id} initialTitle={displayTask.title} />
             </SheetHeader>
 
