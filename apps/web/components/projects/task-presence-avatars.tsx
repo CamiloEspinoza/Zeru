@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePresenceStore } from "@/stores/presence-store";
 import type { PresenceUser } from "@zeru/shared";
@@ -11,13 +11,6 @@ interface TaskPresenceAvatarsProps {
 }
 
 const EMPTY_USERS: PresenceUser[] = [];
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0][0] ?? "?").toUpperCase();
-  return ((parts[0][0] ?? "") + (parts[parts.length - 1][0] ?? "")).toUpperCase();
-}
 
 export function TaskPresenceAvatars({ projectId, taskId }: TaskPresenceAvatarsProps) {
   const viewPath = `/projects/${projectId}/task/${taskId}`;
@@ -32,14 +25,15 @@ export function TaskPresenceAvatars({ projectId, taskId }: TaskPresenceAvatarsPr
         {users.slice(0, 5).map((user: PresenceUser) => (
           <Tooltip key={user.userId}>
             <TooltipTrigger asChild>
-              <Avatar className="size-5 border-2 border-background">
-                <AvatarFallback
-                  className="text-[8px] font-medium text-white"
-                  style={{ backgroundColor: user.color }}
-                >
-                  {initials(user.name)}
-                </AvatarFallback>
-              </Avatar>
+              <div>
+                <UserAvatar
+                  userId={user.userId}
+                  name={user.name}
+                  className="size-5 ring-2 ring-background"
+                  fallbackColor={user.color}
+                  fallbackClassName="text-[8px]"
+                />
+              </div>
             </TooltipTrigger>
             <TooltipContent>{user.name}</TooltipContent>
           </Tooltip>

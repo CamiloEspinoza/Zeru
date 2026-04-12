@@ -1,7 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { usePresenceStore } from "@/stores/presence-store";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import {
   Tooltip,
   TooltipContent,
@@ -17,37 +17,20 @@ import type { PresenceUser } from "@zeru/shared";
 
 const MAX_VISIBLE = 4;
 
-function UserAvatar({ user, size = 32 }: { user: PresenceUser; size?: number }) {
-  const initials = user.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+function PresenceAvatar({ user, size = 32 }: { user: PresenceUser; size?: number }) {
+  const sizeClass = size <= 24 ? "size-6" : "size-8";
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
-            className="rounded-full flex items-center justify-center text-white text-xs font-medium ring-2 ring-background"
-            style={{
-              width: size,
-              height: size,
-              backgroundColor: user.color,
-            }}
-          >
-            {user.avatar ? (
-              <Image
-                src={user.avatar}
-                alt={user.name}
-                width={size}
-                height={size}
-                className="rounded-full object-cover"
-              />
-            ) : (
-              initials
-            )}
+          <div>
+            <UserAvatar
+              userId={user.userId}
+              name={user.name}
+              className={`${sizeClass} ring-2 ring-background`}
+              fallbackColor={user.color}
+            />
           </div>
         </TooltipTrigger>
         <TooltipContent>{user.name}</TooltipContent>
@@ -69,7 +52,7 @@ export function AvatarStack({ viewPath }: { viewPath: string }) {
   return (
     <div className="flex items-center -space-x-2">
       {visible.map((user) => (
-        <UserAvatar key={user.userId} user={user} />
+        <PresenceAvatar key={user.userId} user={user} />
       ))}
       {overflow > 0 && (
         <Popover>
@@ -82,7 +65,7 @@ export function AvatarStack({ viewPath }: { viewPath: string }) {
             <div className="space-y-2">
               {viewUsers.slice(MAX_VISIBLE).map((user) => (
                 <div key={user.userId} className="flex items-center gap-2 text-sm">
-                  <UserAvatar user={user} size={24} />
+                  <PresenceAvatar user={user} size={24} />
                   <span>{user.name}</span>
                 </div>
               ))}

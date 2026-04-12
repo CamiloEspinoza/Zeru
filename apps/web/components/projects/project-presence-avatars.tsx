@@ -1,12 +1,11 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import { usePresenceStore } from "@/stores/presence-store";
 import type { PresenceUser } from "@zeru/shared";
 import { usePathname } from "next/navigation";
-import { useMemo } from "react";
 
 interface ProjectPresenceAvatarsProps {
   projectId: string;
@@ -14,13 +13,6 @@ interface ProjectPresenceAvatarsProps {
 }
 
 const EMPTY_USERS: PresenceUser[] = [];
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return (parts[0][0] ?? "?").toUpperCase();
-  return ((parts[0][0] ?? "") + (parts[parts.length - 1][0] ?? "")).toUpperCase();
-}
 
 export function ProjectPresenceAvatars({ projectId, max = 4 }: ProjectPresenceAvatarsProps) {
   const pathname = usePathname();
@@ -37,14 +29,14 @@ export function ProjectPresenceAvatars({ projectId, max = 4 }: ProjectPresenceAv
       {visible.map((user: PresenceUser) => (
         <Tooltip key={user.userId}>
           <TooltipTrigger asChild>
-            <Avatar className={cn("size-7 border-2 border-background")}>
-              <AvatarFallback
-                className="text-[10px] font-medium text-white"
-                style={{ backgroundColor: user.color }}
-              >
-                {initials(user.name)}
-              </AvatarFallback>
-            </Avatar>
+            <div>
+              <UserAvatar
+                userId={user.userId}
+                name={user.name}
+                className="size-7 ring-2 ring-background"
+                fallbackColor={user.color}
+              />
+            </div>
           </TooltipTrigger>
           <TooltipContent>{user.name}</TooltipContent>
         </Tooltip>

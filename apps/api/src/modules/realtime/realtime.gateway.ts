@@ -11,6 +11,7 @@ import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   ClientToServerEvents,
@@ -51,6 +52,7 @@ export class RealtimeGateway
     private readonly presenceService: PresenceService,
     private readonly chatService: TeamChatService,
     private readonly lockService: LockService,
+    private readonly config: ConfigService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -71,7 +73,13 @@ export class RealtimeGateway
 
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          personProfiles: { select: { avatarS3Key: true } },
+        },
       });
 
       if (!user) {
@@ -80,12 +88,15 @@ export class RealtimeGateway
         return;
       }
 
+      const hasAvatar = !!user.personProfiles?.[0]?.avatarS3Key;
+      const apiUrl = this.config.get<string>('API_URL', 'http://localhost:3017/api');
+
       client.data.userId = userId;
       client.data.tenantId = tenantId;
       client.data.email = payload.email;
       client.data.role = payload.role;
       client.data.userName = `${user.firstName} ${user.lastName}`;
-      client.data.userAvatar = user.avatarUrl ?? null;
+      client.data.userAvatar = hasAvatar ? `${apiUrl}/avatars/${userId}?s=96` : null;
 
       await client.join(`tenant:${tenantId}`);
       await client.join(`user:${userId}`);

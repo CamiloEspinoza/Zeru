@@ -8,6 +8,7 @@ import { LockModule } from '../lock/lock.module';
 
 @Module({
   imports: [
+    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({

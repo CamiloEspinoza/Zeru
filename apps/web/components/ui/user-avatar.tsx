@@ -10,7 +10,15 @@ interface UserAvatarProps {
   hasAvatar?: boolean;
   className?: string;
   fallbackClassName?: string;
+  /** CSS color for the fallback background (e.g. presence color). Overrides bg-muted. */
+  fallbackColor?: string;
 }
+
+/**
+ * Module-level cache of userIds whose avatar request returned a 404.
+ * Prevents repeated failed requests until page reload.
+ */
+const failedUserIds = new Set<string>();
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -25,9 +33,10 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
  * UserAvatar — renders a user's avatar image from the /api/avatars/:userId
  * proxy endpoint. Uses a native <img> to avoid fallback flash.
  */
-export function UserAvatar({ userId, name, hasAvatar = true, className, fallbackClassName }: UserAvatarProps) {
+export function UserAvatar({ userId, name, hasAvatar = true, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
   const imgRef = useRef<HTMLImageElement>(null);
-  const src = userId && hasAvatar ? `${API_BASE}/avatars/${userId}?s=96` : null;
+  const shouldLoad = userId && hasAvatar !== false && !failedUserIds.has(userId);
+  const src = shouldLoad ? `${API_BASE}/avatars/${userId}?s=96` : null;
 
   // Check synchronously if image is cached (before first paint)
   const isCached = typeof window !== "undefined" && src
@@ -56,15 +65,21 @@ export function UserAvatar({ userId, name, hasAvatar = true, className, fallback
           loading="eager"
           decoding="sync"
           onLoad={() => setImgStatus("loaded")}
-          onError={() => setImgStatus("error")}
+          onError={() => {
+            if (userId) failedUserIds.add(userId);
+            setImgStatus("error");
+          }}
         />
       )}
       {imgStatus !== "loaded" && (
         <span
           className={cn(
-            "flex size-full items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-medium",
+            "flex size-full items-center justify-center rounded-full text-xs font-medium",
+            !fallbackColor && "bg-muted text-muted-foreground",
+            fallbackColor && "text-white",
             fallbackClassName,
           )}
+          style={fallbackColor ? { backgroundColor: fallbackColor } : undefined}
         >
           {initials}
         </span>
