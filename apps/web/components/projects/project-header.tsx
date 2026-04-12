@@ -89,11 +89,9 @@ export function ProjectHeader({ project, onUpdated }: ProjectHeaderProps) {
               {project.key}
             </Badge>
             <Badge variant="secondary">{STATUS_LABELS[project.status]}</Badge>
-            {project.visibility === "PRIVATE" && (
-              <Badge variant="outline" className="text-xs">
-                Privado
-              </Badge>
-            )}
+            <Badge variant="outline" className="text-xs">
+              {project.visibility === "PRIVATE" ? "Privado" : "Público"}
+            </Badge>
           </div>
           {project.description && (
             <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
