@@ -49,7 +49,7 @@ export class EmailService {
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
-      Destination: { ToAddresses: [to] },
+      Destination: { ToAddresses: [this.resolveRecipient(to)] },
       Message: {
         Subject: { Data: `${code} — Tu código de acceso a Zeru`, Charset: 'UTF-8' },
         Body: {
@@ -109,7 +109,7 @@ export class EmailService {
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
-      Destination: { ToAddresses: [to] },
+      Destination: { ToAddresses: [this.resolveRecipient(to)] },
       Message: {
         Subject: { Data: `Te han agregado a ${tenantName} en Zeru`, Charset: 'UTF-8' },
         Body: {
@@ -148,7 +148,7 @@ export class EmailService {
 
     const command = new SendEmailCommand({
       Source: creds.fromEmail,
-      Destination: { ToAddresses: [to] },
+      Destination: { ToAddresses: [this.resolveRecipient(to)] },
       Message: {
         Subject: { Data: subject, Charset: 'UTF-8' },
         Body: {
@@ -220,6 +220,16 @@ export class EmailService {
     } finally {
       client.destroy();
     }
+  }
+
+  /** In dev/staging, redirect ALL emails to a single address for safety */
+  private resolveRecipient(to: string): string {
+    const override = this.config.get<string>('DEV_EMAIL_OVERRIDE');
+    if (override) {
+      this.logger.debug(`[DEV] Email to ${this.maskEmail(to)} redirected to ${override}`);
+      return override;
+    }
+    return to;
   }
 
   private maskEmail(email: string): string {
