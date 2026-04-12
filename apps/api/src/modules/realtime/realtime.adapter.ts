@@ -24,8 +24,22 @@ export class RedisIoAdapter extends IoAdapter {
           port: this.config.get<number>('REDIS_PORT', 6379),
         };
 
-    const pubClient = new Redis(redisOptions);
+    const pubClient = new Redis(redisOptions as string);
     const subClient = pubClient.duplicate();
+
+    // Wait for both clients to be ready (with timeout)
+    await Promise.all([
+      new Promise<void>((resolve) => {
+        if (pubClient.status === 'ready') return resolve();
+        pubClient.once('ready', resolve);
+        setTimeout(resolve, 5000); // Don't block forever
+      }),
+      new Promise<void>((resolve) => {
+        if (subClient.status === 'ready') return resolve();
+        subClient.once('ready', resolve);
+        setTimeout(resolve, 5000);
+      }),
+    ]);
 
     this.adapterConstructor = createAdapter(pubClient, subClient);
   }
