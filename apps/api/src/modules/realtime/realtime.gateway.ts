@@ -7,7 +7,7 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Inject, Logger, forwardRef } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
@@ -19,8 +19,10 @@ import {
 import { PresenceService } from '../presence/presence.service';
 import { TeamChatService } from '../team-chat/team-chat.service';
 import { LockService } from '../lock/lock.service';
-import { NotificationService } from '../notification/notification.service';
 import { buildAvatarProxyUrl } from '../users/avatar-url.helper';
+
+// Lazy import to break circular dependency
+type NotificationServiceType = { notify: (params: Record<string, unknown>) => Promise<void> };
 
 export interface AuthenticatedSocket extends Socket {
   data: {
@@ -53,8 +55,8 @@ export class RealtimeGateway
     private readonly presenceService: PresenceService,
     private readonly chatService: TeamChatService,
     private readonly lockService: LockService,
-    @Inject(forwardRef(() => NotificationService))
-    private readonly notificationService: NotificationService,
+    @Inject('NOTIFICATION_SERVICE')
+    private readonly notificationService: NotificationServiceType,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {

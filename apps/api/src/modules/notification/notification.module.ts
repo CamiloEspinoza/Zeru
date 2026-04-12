@@ -6,7 +6,10 @@ import { RealtimeModule } from '../realtime/realtime.module';
 @Module({
   imports: [forwardRef(() => RealtimeModule)],
   controllers: [NotificationController],
-  providers: [NotificationService],
-  exports: [NotificationService],
+  providers: [
+    NotificationService,
+    { provide: 'NOTIFICATION_SERVICE', useExisting: NotificationService },
+  ],
+  exports: [NotificationService, 'NOTIFICATION_SERVICE'],
 })
 export class NotificationModule {}
