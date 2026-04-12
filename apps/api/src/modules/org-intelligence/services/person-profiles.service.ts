@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { S3Service } from '../../files/s3.service';
 import { UsersService } from '../../users/users.service';
+import { buildPersonAvatarProxyUrl } from '../../users/avatar-url.helper';
 import type {
   CreatePersonProfileDto,
   UpdatePersonProfileDto,
@@ -102,8 +103,13 @@ export class PersonProfilesService {
       client.personProfile.count({ where }),
     ]);
 
+    const mappedData = data.map((person) => ({
+      ...person,
+      avatarUrl: buildPersonAvatarProxyUrl(person.id, person.avatarS3Key),
+    }));
+
     return {
-      data,
+      data: mappedData,
       meta: {
         total,
         page: dto.page,

@@ -6,7 +6,7 @@ import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageConfigService } from '../storage-config/storage-config.service';
 
-// In-memory cache: "userId:size" → { buffer, fetchedAt }
+// In-memory cache: "key:size" → { buffer, fetchedAt }
 const avatarCache = new Map<string, { buffer: Buffer; fetchedAt: number }>();
 const CACHE_TTL_MS = 3600_000; // 1 hour
 
@@ -17,18 +17,43 @@ export class AvatarController {
     private readonly storageConfig: StorageConfigService,
   ) {}
 
-  /**
-   * Public endpoint — no auth required.
-   * Serves resized avatar images. ?s=96 for 96x96 (default).
-   */
+  /** Avatar by userId — looks up linked PersonProfile */
   @Get(':userId')
-  async getAvatar(
+  async getByUserId(
     @Param('userId') userId: string,
     @Query('s') sizeParam: string | undefined,
     @Res() res: Response,
   ) {
+    const person = await this.prisma.rawClient.personProfile.findFirst({
+      where: { userId, deletedAt: null, avatarS3Key: { not: null } },
+      select: { avatarS3Key: true, tenantId: true },
+    });
+    await this.serveAvatar(res, `user-${userId}`, person, sizeParam);
+  }
+
+  /** Avatar by personId — direct PersonProfile lookup */
+  @Get('person/:personId')
+  async getByPersonId(
+    @Param('personId') personId: string,
+    @Query('s') sizeParam: string | undefined,
+    @Res() res: Response,
+  ) {
+    const person = await this.prisma.rawClient.personProfile.findFirst({
+      where: { id: personId, deletedAt: null, avatarS3Key: { not: null } },
+      select: { avatarS3Key: true, tenantId: true },
+    });
+    await this.serveAvatar(res, `person-${personId}`, person, sizeParam);
+  }
+
+  /** Shared logic: fetch from S3, resize, cache, serve */
+  private async serveAvatar(
+    res: Response,
+    cachePrefix: string,
+    person: { avatarS3Key: string | null; tenantId: string } | null,
+    sizeParam: string | undefined,
+  ) {
     const size = Math.min(Math.max(parseInt(sizeParam ?? '96', 10) || 96, 16), 512);
-    const cacheKey = `${userId}:${size}`;
+    const cacheKey = `${cachePrefix}:${size}`;
 
     // Check in-memory cache
     const cached = avatarCache.get(cacheKey);
@@ -36,16 +61,10 @@ export class AvatarController {
       res.set('Content-Type', 'image/webp');
       res.set('Content-Length', String(cached.buffer.length));
       res.set('Cache-Control', 'public, max-age=3600, immutable');
-      res.set('ETag', `"av-${userId}-${size}"`);
+      res.set('ETag', `"${cachePrefix}-${size}"`);
       res.send(cached.buffer);
       return;
     }
-
-    // Find PersonProfile with avatar
-    const person = await this.prisma.rawClient.personProfile.findFirst({
-      where: { userId, deletedAt: null, avatarS3Key: { not: null } },
-      select: { avatarS3Key: true, tenantId: true },
-    });
 
     if (!person?.avatarS3Key) {
       res.set('Cache-Control', 'public, max-age=300');
@@ -80,7 +99,6 @@ export class AvatarController {
         }
         const rawBuffer = Buffer.concat(chunks);
 
-        // Resize + convert to WebP for small file size
         const resized = await sharp(rawBuffer)
           .resize(size, size, { fit: 'cover' })
           .webp({ quality: 80 })
@@ -91,7 +109,7 @@ export class AvatarController {
         res.set('Content-Type', 'image/webp');
         res.set('Content-Length', String(resized.length));
         res.set('Cache-Control', 'public, max-age=3600, immutable');
-        res.set('ETag', `"av-${userId}-${size}"`);
+        res.set('ETag', `"${cachePrefix}-${size}"`);
         res.send(resized);
       } finally {
         client.destroy();

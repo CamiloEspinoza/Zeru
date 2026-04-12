@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
@@ -22,12 +22,17 @@ function getInitials(name: string): string {
 /**
  * UserAvatar -- renders a user's avatar image from the server-provided avatarUrl.
  * If avatarUrl is falsy, renders initials only (zero HTTP requests).
- * Reacts to avatarUrl changes (e.g., null → URL when API responds).
+ * Uses key={avatarUrl} on the inner component to reset state when URL changes.
  */
-export function UserAvatar({ name, avatarUrl, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
-  const src = avatarUrl || null;
-  const prevSrc = useRef(src);
+export function UserAvatar(props: UserAvatarProps) {
+  // Key forces re-mount when avatarUrl changes (null → URL or URL → null)
+  return <UserAvatarInner key={props.avatarUrl ?? "no-avatar"} {...props} />;
+}
 
+function UserAvatarInner({ name, avatarUrl, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
+  const src = avatarUrl || null;
+
+  // Check synchronously if image is cached (only runs once on mount thanks to key)
   const [imgStatus, setImgStatus] = useState<"loading" | "loaded" | "error">(() => {
     if (!src) return "error";
     if (typeof window !== "undefined") {
@@ -37,21 +42,6 @@ export function UserAvatar({ name, avatarUrl, className, fallbackClassName, fall
     }
     return "loading";
   });
-
-  // Reset status when avatarUrl changes (e.g., null → URL)
-  useEffect(() => {
-    if (src !== prevSrc.current) {
-      prevSrc.current = src;
-      if (!src) {
-        setImgStatus("error");
-      } else {
-        // Check cache synchronously
-        const img = new Image();
-        img.src = src;
-        setImgStatus(img.complete && img.naturalWidth > 0 ? "loaded" : "loading");
-      }
-    }
-  }, [src]);
 
   const initials = getInitials(name);
 

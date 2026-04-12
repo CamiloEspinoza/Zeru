@@ -108,7 +108,7 @@ const emptyForm: PersonForm = {
 
 export default function DirectorioPage() {
   const [persons, setPersons] = useState<PersonProfile[]>([]);
-  const [avatarUrls, setAvatarUrls] = useState<Record<string, string>>({});
+  // avatarUrls state removed — avatarUrl now comes from API response directly
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -160,26 +160,7 @@ export default function DirectorioPage() {
     fetchPersons();
   }, [fetchPersons]);
 
-  // Fetch avatar URLs for persons with avatarS3Key
-  useEffect(() => {
-    const personsWithAvatar = persons.filter(
-      (p) => p.avatarS3Key && !avatarUrls[p.id],
-    );
-    if (personsWithAvatar.length === 0) return;
-
-    personsWithAvatar.forEach(async (person) => {
-      try {
-        const res = await api.get<{ url: string | null }>(
-          `/org-intelligence/persons/${person.id}/avatar`,
-        );
-        if (res.url) {
-          setAvatarUrls((prev) => ({ ...prev, [person.id]: res.url! }));
-        }
-      } catch (err) {
-        console.error("Error al cargar avatar:", err);
-      }
-    });
-  }, [persons, avatarUrls]);
+  // avatarUrl now comes directly from the API response (no separate fetch needed)
 
   const openCreateDialog = () => {
     setEditingPerson(null);
@@ -426,7 +407,7 @@ export default function DirectorioPage() {
                 <div className="relative">
                   <PersonAvatar
                     name={person.name}
-                    avatarUrl={avatarUrls[person.id] ?? null}
+                    avatarUrl={(person as Record<string, unknown>).avatarUrl as string ?? null}
                     size="lg"
                   />
                   {uploadingAvatarId === person.id && (
