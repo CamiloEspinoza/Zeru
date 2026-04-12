@@ -169,8 +169,8 @@ export default function InterviewDetailPage({
   const [personSearch, setPersonSearch] = useState("");
   const [searchResults, setSearchResults] = useState<DirectoryPerson[]>([]);
   const [selectedPerson, setSelectedPerson] = useState<DirectoryPerson | null>(null);
-  const [personAvatarUrls, setPersonAvatarUrls] = useState<Record<string, string>>({});
-  const [speakerAvatarUrls, setSpeakerAvatarUrls] = useState<Record<string, string>>({});
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
 
   const isCompleted = (currentProcessingStatus ?? interview?.processingStatus) === "COMPLETED";
   const { segmentEntityMap } = useSegmentEntities(isCompleted ? interviewId : null);
@@ -344,49 +344,13 @@ export default function InterviewDetailPage({
         const res = await api.get<{ data: DirectoryPerson[] }>(
           `/org-intelligence/persons?search=${encodeURIComponent(personSearch)}`,
         );
-        const results = res.data ?? [];
-        setSearchResults(results);
-        results.forEach(async (person) => {
-          if (person.avatarS3Key && !personAvatarUrls[person.id]) {
-            try {
-              const avatarRes = await api.get<{ url: string | null }>(
-                `/org-intelligence/persons/${person.id}/avatar`,
-              );
-              if (avatarRes.url) {
-                setPersonAvatarUrls((prev) => ({ ...prev, [person.id]: avatarRes.url! }));
-              }
-            } catch {
-              // ignore avatar fetch errors
-            }
-          }
-        });
+        setSearchResults(res.data ?? []);
       } catch {
         setSearchResults([]);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [personSearch, personAvatarUrls]);
-
-  useEffect(() => {
-    if (!interview?.speakers) return;
-    interview.speakers.forEach(async (speaker) => {
-      if (speaker.personEntityId && !speakerAvatarUrls[speaker.personEntityId]) {
-        try {
-          const res = await api.get<{ url: string | null }>(
-            `/org-intelligence/persons/${speaker.personEntityId}/avatar`,
-          );
-          if (res.url) {
-            setSpeakerAvatarUrls((prev) => ({
-              ...prev,
-              [speaker.personEntityId!]: res.url!,
-            }));
-          }
-        } catch {
-          // ignore avatar fetch errors
-        }
-      }
-    });
-  }, [interview?.speakers, speakerAvatarUrls]);
+  }, [personSearch]);
 
   const handleProcess = async () => {
     if (!interview) return;
@@ -666,7 +630,6 @@ export default function InterviewDetailPage({
 
       <InterviewParticipantsCard
         speakers={interview.speakers}
-        avatarUrls={speakerAvatarUrls}
         onAdd={openAddSpeakerDialog}
         onEdit={openEditSpeakerDialog}
         onDelete={(index) => setDeleteSpeakerIndex(index)}
@@ -972,7 +935,7 @@ export default function InterviewDetailPage({
                       >
                         <PersonAvatar
                           name={person.name}
-                          avatarUrl={personAvatarUrls[person.id] ?? null}
+                          avatarUrl={person.avatarS3Key ? `${API_BASE}/avatars/person/${person.id}?s=96` : null}
                           size="sm"
                         />
                         <div className="min-w-0 flex-1">
@@ -1031,7 +994,7 @@ export default function InterviewDetailPage({
               <div className="flex items-center gap-3 rounded-md border bg-accent/50 p-3">
                 <PersonAvatar
                   name={selectedPerson.name}
-                  avatarUrl={personAvatarUrls[selectedPerson.id] ?? null}
+                  avatarUrl={selectedPerson.avatarS3Key ? `${API_BASE}/avatars/person/${selectedPerson.id}?s=96` : null}
                   size="sm"
                 />
                 <div className="min-w-0 flex-1">

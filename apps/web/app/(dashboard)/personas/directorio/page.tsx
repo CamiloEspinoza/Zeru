@@ -316,13 +316,6 @@ export default function DirectorioPage() {
         },
       );
 
-      // Re-fetch avatar URL
-      const res = await api.get<{ url: string | null }>(
-        `/org-intelligence/persons/${personId}/avatar`,
-      );
-      if (res.url) {
-        setAvatarUrls((prev) => ({ ...prev, [personId]: res.url! }));
-      }
       await fetchPersons();
     } catch (err) {
       console.error("Error al subir avatar:", err);
@@ -407,7 +400,7 @@ export default function DirectorioPage() {
                 <div className="relative">
                   <PersonAvatar
                     name={person.name}
-                    avatarUrl={(person as Record<string, unknown>).avatarUrl as string ?? null}
+                    avatarUrl={person.avatarS3Key ? `${API_BASE}/avatars/person/${person.id}?s=96` : null}
                     size="lg"
                   />
                   {uploadingAvatarId === person.id && (

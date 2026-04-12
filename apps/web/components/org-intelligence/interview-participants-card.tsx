@@ -22,9 +22,11 @@ interface Speaker {
   personEntityId: string | null;
 }
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+
 interface InterviewParticipantsCardProps {
   speakers: Speaker[];
-  avatarUrls: Record<string, string>;
   onAdd: () => void;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
@@ -33,7 +35,6 @@ interface InterviewParticipantsCardProps {
 
 export function InterviewParticipantsCard({
   speakers,
-  avatarUrls,
   onAdd,
   onEdit,
   onDelete,
@@ -69,7 +70,7 @@ export function InterviewParticipantsCard({
                   {speaker.personEntityId ? (
                     <PersonAvatar
                       name={speaker.name ?? speaker.speakerLabel}
-                      avatarUrl={avatarUrls[speaker.personEntityId] ?? null}
+                      avatarUrl={`${API_BASE}/avatars/person/${speaker.personEntityId}?s=96`}
                       size="sm"
                     />
                   ) : (
