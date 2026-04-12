@@ -64,7 +64,7 @@ function formatFileSize(bytes: number): string {
 
 // ─── Mention rendering helper ────────────────────────────
 
-const MENTION_REGEX = /@([\w\s]+?)(?=\s@|[.,;:!?]|\s|$)/g;
+const MENTION_REGEX = /@\[([^\]]+)\]/g;
 
 function renderCommentContent(
   content: string,
@@ -311,6 +311,11 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
       setMentionQuery(null);
       return;
     }
+    // If this is already a completed mention @[Name], dismiss
+    if (query.startsWith("[") && value.slice(atIndex).includes("]")) {
+      setMentionQuery(null);
+      return;
+    }
 
     setMentionQuery(query);
     setMentionStart(atIndex);
@@ -366,13 +371,13 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
     const before = content.slice(0, mentionStart);
     const cursorPos = textareaRef.current?.selectionStart ?? content.length;
     const after = content.slice(cursorPos);
-    const newContent = `${before}@${name} ${after}`;
+    const newContent = `${before}@[${name}] ${after}`;
     setContent(newContent);
     setMentionQuery(null);
 
     // Refocus textarea
     requestAnimationFrame(() => {
-      const pos = mentionStart + name.length + 2; // @name + space
+      const pos = mentionStart + name.length + 4; // @[name] + space
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(pos, pos);
     });
