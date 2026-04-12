@@ -96,7 +96,7 @@ export class TaskCommentsService {
       comment,
     });
 
-    // Handle mentions
+    // Handle mentions — notify each mentioned user and auto-subscribe them
     if (dto.mentionedUserIds?.length) {
       for (const mentionedUserId of dto.mentionedUserIds) {
         this.eventEmitter.emit('task.mentioned', {
@@ -106,7 +106,17 @@ export class TaskCommentsService {
           projectId: task.projectId,
           mentionedUserId,
           mentionedByUserId: userId,
+          commentContent: dto.content,
         });
+
+        // Auto-subscribe mentioned user to the task
+        await client.taskSubscriber
+          .create({
+            data: { taskId, userId: mentionedUserId, tenantId },
+          })
+          .catch(() => {
+            // Ignore duplicate subscription
+          });
       }
     }
 

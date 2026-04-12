@@ -8,6 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
 import type { TaskComment, ProjectMember } from "@/types/projects";
@@ -62,7 +68,7 @@ const MENTION_REGEX = /@([\w\s]+?)(?=\s@|[.,;:!?]|\s|$)/g;
 
 function renderCommentContent(
   content: string,
-  memberNames: Set<string>,
+  membersByName: Map<string, ProjectMember>,
 ) {
   // Check if this is a pure attachment comment
   const attachment = parseAttachment(content);
@@ -104,8 +110,8 @@ function renderCommentContent(
     );
   }
 
-  // Render text with @mentions highlighted
-  if (memberNames.size === 0) {
+  // Render text with @mentions highlighted in blue
+  if (membersByName.size === 0) {
     return <p className="mt-0.5 text-sm whitespace-pre-wrap">{content}</p>;
   }
 
@@ -116,18 +122,37 @@ function renderCommentContent(
 
   while ((match = regex.exec(content)) !== null) {
     const name = match[1].trim();
-    if (!memberNames.has(name)) continue;
+    const member = membersByName.get(name);
+    if (!member) continue;
 
     if (match.index > lastIndex) {
       parts.push(content.slice(lastIndex, match.index));
     }
     parts.push(
-      <span
-        key={match.index}
-        className="inline-flex items-center rounded bg-primary/10 px-1 py-0.5 text-xs font-medium text-primary"
-      >
-        @{name}
-      </span>,
+      <TooltipProvider key={match.index}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex items-center rounded bg-blue-500/10 px-1 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+              @{name}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="flex items-center gap-2">
+              <UserAvatar
+                name={`${member.user.firstName} ${member.user.lastName}`}
+                avatarUrl={member.user.avatarUrl}
+                className="size-5"
+              />
+              <div>
+                <p className="font-medium">{member.user.firstName} {member.user.lastName}</p>
+                {member.user.email && (
+                  <p className="text-[10px] opacity-70">{member.user.email}</p>
+                )}
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>,
     );
     lastIndex = match.index + match[0].length;
   }
@@ -189,9 +214,9 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionListRef = useRef<HTMLDivElement>(null);
 
-  // Member names set for rendering
-  const memberNames = new Set(
-    members.map((m) => `${m.user.firstName} ${m.user.lastName}`),
+  // Member lookup map for rendering mentions with tooltips
+  const membersByName = new Map(
+    members.map((m) => [`${m.user.firstName} ${m.user.lastName}`, m]),
   );
 
   const fetchComments = useCallback(async () => {
@@ -504,7 +529,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
                     {timeAgo(comment.createdAt)}
                   </span>
                 </div>
-                {renderCommentContent(comment.content, memberNames)}
+                {renderCommentContent(comment.content, membersByName)}
               </div>
             </div>
           ))}

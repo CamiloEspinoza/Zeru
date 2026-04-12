@@ -162,21 +162,44 @@ export class TaskNotificationListener {
     projectId: string;
     mentionedUserId: string;
     mentionedByUserId: string;
+    commentContent?: string;
   }) {
     if (payload.mentionedByUserId === payload.mentionedUserId) return;
 
-    const task = await this.findTask(payload.tenantId, payload.taskId);
+    const client = this.prisma.forTenant(payload.tenantId) as unknown as PrismaClient;
+
+    const [task, actor, project] = await Promise.all([
+      this.findTask(payload.tenantId, payload.taskId),
+      client.user.findUnique({
+        where: { id: payload.mentionedByUserId },
+        select: { firstName: true, lastName: true },
+      }),
+      client.project.findFirst({
+        where: { id: payload.projectId, deletedAt: null },
+        select: { key: true },
+      }),
+    ]);
     if (!task) return;
+
+    const actorName = actor
+      ? `${actor.firstName} ${actor.lastName}`
+      : 'Alguien';
+    const taskKey = project ? `${project.key}-${task.number}` : `#${task.number}`;
+    const title = `${actorName} te mencionó en ${taskKey}`;
+    const body = payload.commentContent
+      ? payload.commentContent.slice(0, 200)
+      : task.title;
 
     await this.notificationService.notify({
       type: 'task.mentioned',
-      title: 'Te mencionaron en una tarea',
-      body: task.title,
+      title,
+      body,
       data: {
         projectId: payload.projectId,
         taskId: task.id,
         taskNumber: task.number,
         commentId: payload.commentId,
+        link: `/projects/${payload.projectId}/board?task=${task.id}`,
       },
       groupKey: `task-mention:${task.id}:${payload.mentionedUserId}`,
       recipientId: payload.mentionedUserId,
