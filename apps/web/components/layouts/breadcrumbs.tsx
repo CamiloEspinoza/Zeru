@@ -73,8 +73,17 @@ async function resolveUuid(
   try {
     switch (parentSegment) {
       case "projects": {
+        // Distinguish board projects from org-intelligence projects by checking the URL path
+        const isOrgIntelligence = typeof window !== "undefined" && window.location.pathname.includes("/org-intelligence/");
+        if (isOrgIntelligence) {
+          const res = await api.get<{ name?: string | null }>(
+            `/org-intelligence/projects/${uuid}`,
+          );
+          return res.name ?? null;
+        }
+        // Board project
         const res = await api.get<{ name?: string | null }>(
-          `/org-intelligence/projects/${uuid}`,
+          `/projects/${uuid}`,
         );
         return res.name ?? null;
       }
