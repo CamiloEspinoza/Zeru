@@ -273,8 +273,8 @@ function MemberRow({
     <div className="flex items-center justify-between rounded-md border p-3">
       <div className="flex items-center gap-3">
         <UserAvatar
-          userId={member.userId}
           name={`${member.user.firstName} ${member.user.lastName}`}
+          avatarUrl={member.user.avatarUrl}
           className="size-8"
         />
         <div>
@@ -422,8 +422,8 @@ function InviteMemberDialog({
                 className="flex w-full items-center gap-3 rounded-md p-2 text-sm hover:bg-accent transition-colors"
               >
                 <UserAvatar
-                  userId={u.id}
                   name={`${u.firstName} ${u.lastName}`}
+                  avatarUrl={u.avatarUrl}
                   className="size-7"
                 />
                 <div className="text-left min-w-0 flex-1">

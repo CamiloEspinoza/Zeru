@@ -128,8 +128,8 @@ export function PropertyPersonEditor({
                   data-checked={member.userId === value || undefined}
                 >
                   <UserAvatar
-                    userId={member.userId}
                     name={`${member.user.firstName} ${member.user.lastName}`}
+                    avatarUrl={member.user.avatarUrl}
                     className="size-4 shrink-0"
                   />
                   <span className="truncate">

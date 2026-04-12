@@ -27,8 +27,8 @@ export function TaskPresenceAvatars({ projectId, taskId }: TaskPresenceAvatarsPr
             <TooltipTrigger asChild>
               <div>
                 <UserAvatar
-                  userId={user.userId}
                   name={user.name}
+                  avatarUrl={user.avatar}
                   className="size-5 ring-2 ring-background"
                   fallbackColor={user.color}
                   fallbackClassName="text-[8px]"

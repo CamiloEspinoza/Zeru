@@ -66,7 +66,7 @@ describe('TaskPropertiesService', () => {
   describe('getTaskPropertyValues', () => {
     it('returns property values for a task', async () => {
       const values = [
-        { id: 'v1', textValue: 'Hello', propertyDefinitionId: 'pd1' },
+        { id: 'v1', textValue: 'Hello', propertyDefinitionId: 'pd1', personUser: null },
       ];
       mockClient.taskPropertyValue.findMany.mockResolvedValue(values);
 
@@ -77,12 +77,12 @@ describe('TaskPropertiesService', () => {
         where: { taskId: TASK_ID },
         include: {
           personUser: {
-            select: {
+            select: expect.objectContaining({
               id: true,
               firstName: true,
               lastName: true,
               avatarUrl: true,
-            },
+            }),
           },
         },
       });

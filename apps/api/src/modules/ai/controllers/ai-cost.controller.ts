@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 
 @Controller('ai/costs')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -73,11 +74,11 @@ export class AiCostController {
       _sum: { costUsd: true, inputTokens: true, outputTokens: true },
     });
     const userIds = rows.map((r) => r.userId).filter(Boolean) as string[];
-    const users = await this.prisma.user.findMany({
+    const rawUsers = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
+      select: USER_SUMMARY_SELECT,
     });
-    const userMap = new Map(users.map((u) => [u.id, u]));
+    const userMap = new Map(rawUsers.map((u) => [u.id, mapUserWithAvatar(u)]));
     const totalCost = rows.reduce((sum, r) => sum + Number(r._sum.costUsd ?? 0), 0);
     return {
       totalCostUsd: totalCost,

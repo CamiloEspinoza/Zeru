@@ -7,6 +7,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type { AddMemberDto, UpdateMemberDto } from '../dto';
 
 @Injectable()
@@ -18,21 +19,14 @@ export class ProjectMembersService {
 
   async findAll(tenantId: string, projectId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-    return client.projectMember.findMany({
+    const raw = await client.projectMember.findMany({
       where: { projectId },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
+        user: { select: USER_SUMMARY_SELECT },
       },
       orderBy: { createdAt: 'asc' },
     });
+    return raw.map((m) => ({ ...m, user: mapUserWithAvatar(m.user) }));
   }
 
   async addMember(
@@ -50,7 +44,7 @@ export class ProjectMembersService {
       throw new ConflictException('El usuario ya es miembro del proyecto');
     }
 
-    const member = await client.projectMember.create({
+    const raw = await client.projectMember.create({
       data: {
         projectId,
         userId: dto.userId,
@@ -58,15 +52,7 @@ export class ProjectMembersService {
         tenantId,
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
+        user: { select: USER_SUMMARY_SELECT },
       },
     });
 
@@ -78,7 +64,7 @@ export class ProjectMembersService {
       actorId,
     });
 
-    return member;
+    return { ...raw, user: mapUserWithAvatar(raw.user) };
   }
 
   async updateMember(
@@ -103,21 +89,14 @@ export class ProjectMembersService {
       );
     }
 
-    return client.projectMember.update({
+    const raw = await client.projectMember.update({
       where: { id: member.id },
       data: { role: dto.role },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            avatarUrl: true,
-          },
-        },
+        user: { select: USER_SUMMARY_SELECT },
       },
     });
+    return { ...raw, user: mapUserWithAvatar(raw.user) };
   }
 
   async removeMember(

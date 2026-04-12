@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type {
   BatchJournalEntryItemSchema,
   CreateJournalEntrySchema,
@@ -63,9 +64,7 @@ export class JournalEntriesService {
               account: true,
             },
           },
-          createdBy: {
-            select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-          },
+          createdBy: { select: USER_SUMMARY_SELECT },
           conversation: {
             select: { id: true, title: true },
           },
@@ -75,7 +74,10 @@ export class JournalEntriesService {
     ]);
 
     return {
-      data: entries,
+      data: entries.map((e) => ({
+        ...e,
+        createdBy: e.createdBy ? mapUserWithAvatar(e.createdBy) : null,
+      })),
       meta: {
         page,
         perPage,
@@ -102,9 +104,7 @@ export class JournalEntriesService {
             },
           },
         },
-        createdBy: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        createdBy: { select: USER_SUMMARY_SELECT },
         conversation: {
           select: { id: true, title: true },
         },
@@ -120,7 +120,11 @@ export class JournalEntriesService {
       (d: { document: { id: string; name: string; mimeType: string; sizeBytes: number } }) => d.document,
     );
     const { documents: _docRel, ...rest } = entry;
-    return { ...rest, documents };
+    return {
+      ...rest,
+      createdBy: rest.createdBy ? mapUserWithAvatar(rest.createdBy) : null,
+      documents,
+    };
   }
 
   async create(

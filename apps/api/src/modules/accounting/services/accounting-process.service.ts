@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type {
   CreateProcessStepSchema,
   UpdateProcessStepSchema,
@@ -133,9 +134,7 @@ export class AccountingProcessService {
         completions: {
           where: { fiscalPeriodId },
           include: {
-            completedBy: {
-              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-            },
+            completedBy: { select: USER_SUMMARY_SELECT },
           },
         },
       },
@@ -143,7 +142,14 @@ export class AccountingProcessService {
 
     return steps.map((step) => ({
       ...step,
-      completion: step.completions[0] ?? null,
+      completion: step.completions[0]
+        ? {
+            ...step.completions[0],
+            completedBy: step.completions[0].completedBy
+              ? mapUserWithAvatar(step.completions[0].completedBy)
+              : null,
+          }
+        : null,
     }));
   }
 
@@ -169,7 +175,7 @@ export class AccountingProcessService {
       throw new NotFoundException(`Fiscal period with id ${data.fiscalPeriodId} not found`);
     }
 
-    return this.prisma.accountingStepCompletion.upsert({
+    const raw = await this.prisma.accountingStepCompletion.upsert({
       where: {
         stepId_fiscalPeriodId: {
           stepId,
@@ -191,10 +197,12 @@ export class AccountingProcessService {
         completedAt: data.status === 'COMPLETED' ? new Date() : null,
       },
       include: {
-        completedBy: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        completedBy: { select: USER_SUMMARY_SELECT },
       },
     });
+    return {
+      ...raw,
+      completedBy: raw.completedBy ? mapUserWithAvatar(raw.completedBy) : null,
+    };
   }
 }

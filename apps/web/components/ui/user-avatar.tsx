@@ -1,24 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface UserAvatarProps {
-  userId: string | null | undefined;
   name: string;
-  /** Set to false to skip the image request entirely (user has no avatar). Default: true */
-  hasAvatar?: boolean;
+  avatarUrl?: string | null;
   className?: string;
   fallbackClassName?: string;
   /** CSS color for the fallback background (e.g. presence color). Overrides bg-muted. */
   fallbackColor?: string;
 }
-
-/**
- * Module-level cache of userIds whose avatar request returned a 404.
- * Prevents repeated failed requests until page reload.
- */
-const failedUserIds = new Set<string>();
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -27,16 +19,12 @@ function getInitials(name: string): string {
   return ((parts[0][0] ?? "") + (parts[parts.length - 1][0] ?? "")).toUpperCase();
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
-
 /**
- * UserAvatar — renders a user's avatar image from the /api/avatars/:userId
- * proxy endpoint. Uses a native <img> to avoid fallback flash.
+ * UserAvatar -- renders a user's avatar image from the server-provided avatarUrl.
+ * If avatarUrl is falsy, renders initials only (zero HTTP requests).
  */
-export function UserAvatar({ userId, name, hasAvatar = true, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const shouldLoad = userId && hasAvatar !== false && !failedUserIds.has(userId);
-  const src = shouldLoad ? `${API_BASE}/avatars/${userId}?s=96` : null;
+export function UserAvatar({ name, avatarUrl, className, fallbackClassName, fallbackColor }: UserAvatarProps) {
+  const src = avatarUrl || null;
 
   // Check synchronously if image is cached (before first paint)
   const isCached = typeof window !== "undefined" && src
@@ -58,17 +46,13 @@ export function UserAvatar({ userId, name, hasAvatar = true, className, fallback
     >
       {src && imgStatus !== "error" && (
         <img
-          ref={imgRef}
           src={src}
           alt={name}
           className="absolute inset-0 size-full rounded-full object-cover"
           loading="eager"
           decoding="sync"
           onLoad={() => setImgStatus("loaded")}
-          onError={() => {
-            if (userId) failedUserIds.add(userId);
-            setImgStatus("error");
-          }}
+          onError={() => setImgStatus("error")}
         />
       )}
       {imgStatus !== "loaded" && (

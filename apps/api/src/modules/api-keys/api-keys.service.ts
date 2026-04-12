@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../users/user-select';
 import type { ApiKeyScope } from '@zeru/shared';
 
 @Injectable()
@@ -72,7 +73,7 @@ export class ApiKeysService {
   }
 
   async list(tenantId: string) {
-    return this.prisma.apiKey.findMany({
+    const raw = await this.prisma.apiKey.findMany({
       where: { tenantId, isActive: true },
       select: {
         id: true,
@@ -81,10 +82,14 @@ export class ApiKeysService {
         scopes: true,
         lastUsedAt: true,
         createdAt: true,
-        createdBy: { select: { firstName: true, lastName: true, avatarUrl: true } },
+        createdBy: { select: USER_SUMMARY_SELECT },
       },
       orderBy: { createdAt: 'desc' },
     });
+    return raw.map((k) => ({
+      ...k,
+      createdBy: k.createdBy ? mapUserWithAvatar(k.createdBy) : null,
+    }));
   }
 
   async revoke(id: string, tenantId: string): Promise<void> {

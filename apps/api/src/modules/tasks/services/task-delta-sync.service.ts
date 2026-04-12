@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type { DeltaSyncDto } from '../dto';
 
 interface DeltaSyncResult {
@@ -44,22 +45,28 @@ export class TaskDeltaSyncService {
     }
 
     // Load all current tasks for the project
-    const currentTasks = await client.task.findMany({
+    const rawTasks = await client.task.findMany({
       where: { projectId: dto.projectId, deletedAt: null },
       include: {
         status: true,
         section: true,
         assignees: {
           include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-            },
+            user: { select: USER_SUMMARY_SELECT },
           },
         },
         labels: { include: { label: true } },
         _count: { select: { subtasks: true, comments: true } },
       },
     });
+
+    const currentTasks = rawTasks.map((task) => ({
+      ...task,
+      assignees: task.assignees.map((a) => ({
+        ...a,
+        user: mapUserWithAvatar(a.user),
+      })),
+    }));
 
     const currentIds = new Set(currentTasks.map((t) => t.id));
     const clientIds = new Set(Object.keys(dto.versions));

@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { S3Service } from './s3.service';
 import { DocumentCategory } from '@prisma/client';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../users/user-select';
 
 export interface CreateDocumentInput {
   name: string;
@@ -70,14 +71,14 @@ export class FilesService {
       };
     }
 
-    const [docs, total] = await Promise.all([
+    const [rawDocs, total] = await Promise.all([
       this.prisma.document.findMany({
         where,
         skip,
         take: perPage,
         orderBy: { createdAt: 'desc' },
         include: {
-          uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+          uploadedBy: { select: USER_SUMMARY_SELECT },
           conversation: { select: { id: true, title: true } },
           journalEntries: {
             include: {
@@ -91,6 +92,11 @@ export class FilesService {
       this.prisma.document.count({ where }),
     ]);
 
+    const docs = rawDocs.map((d) => ({
+      ...d,
+      uploadedBy: d.uploadedBy ? mapUserWithAvatar(d.uploadedBy) : null,
+    }));
+
     return {
       data: docs,
       meta: { page, perPage, total, totalPages: Math.ceil(total / perPage) },
@@ -98,10 +104,10 @@ export class FilesService {
   }
 
   async findById(tenantId: string, docId: string) {
-    const doc = await this.prisma.document.findFirst({
+    const rawDoc = await this.prisma.document.findFirst({
       where: { id: docId, tenantId },
       include: {
-        uploadedBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+        uploadedBy: { select: USER_SUMMARY_SELECT },
         conversation: { select: { id: true, title: true } },
         journalEntries: {
           include: {
@@ -113,10 +119,14 @@ export class FilesService {
       },
     });
 
-    if (!doc) throw new NotFoundException('Documento no encontrado');
+    if (!rawDoc) throw new NotFoundException('Documento no encontrado');
 
-    const downloadUrl = await this.s3.getPresignedUrl(tenantId, doc.s3Key, 3600);
-    return { ...doc, downloadUrl };
+    const downloadUrl = await this.s3.getPresignedUrl(tenantId, rawDoc.s3Key, 3600);
+    return {
+      ...rawDoc,
+      uploadedBy: rawDoc.uploadedBy ? mapUserWithAvatar(rawDoc.uploadedBy) : null,
+      downloadUrl,
+    };
   }
 
   async updateMetadata(

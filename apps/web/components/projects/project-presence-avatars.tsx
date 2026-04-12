@@ -31,8 +31,8 @@ export function ProjectPresenceAvatars({ projectId, max = 4 }: ProjectPresenceAv
           <TooltipTrigger asChild>
             <div>
               <UserAvatar
-                userId={user.userId}
                 name={user.name}
+                avatarUrl={user.avatar}
                 className="size-7 ring-2 ring-background"
                 fallbackColor={user.color}
               />

@@ -7,6 +7,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type {
   CreateTaskDto,
   UpdateTaskDto,
@@ -225,7 +226,7 @@ export class TasksService {
       where.dueDate = dueDateFilter;
     }
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       client.task.findMany({
         where,
         orderBy: { [dto.sortBy]: dto.sortOrder },
@@ -234,9 +235,7 @@ export class TasksService {
         include: {
           assignees: {
             include: {
-              user: {
-                select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-              },
+              user: { select: USER_SUMMARY_SELECT },
             },
           },
           labels: {
@@ -251,6 +250,14 @@ export class TasksService {
       }),
       client.task.count({ where }),
     ]);
+
+    const data = rawData.map((task) => ({
+      ...task,
+      assignees: task.assignees.map((a) => ({
+        ...a,
+        user: mapUserWithAvatar(a.user),
+      })),
+    }));
 
     return {
       data,
@@ -268,14 +275,12 @@ export class TasksService {
   async findOne(tenantId: string, taskId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    const task = await client.task.findFirst({
+    const raw = await client.task.findFirst({
       where: { id: taskId, deletedAt: null },
       include: {
         assignees: {
           include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-            },
+            user: { select: USER_SUMMARY_SELECT },
           },
         },
         labels: {
@@ -287,17 +292,13 @@ export class TasksService {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
           include: {
-            author: {
-              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-            },
+            author: { select: USER_SUMMARY_SELECT },
             reactions: true,
           },
         },
         attachments: {
           include: {
-            uploadedBy: {
-              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-            },
+            uploadedBy: { select: USER_SUMMARY_SELECT },
           },
         },
         dependencies: {
@@ -309,18 +310,14 @@ export class TasksService {
         },
         subscribers: {
           include: {
-            user: {
-              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-            },
+            user: { select: USER_SUMMARY_SELECT },
           },
         },
         activities: {
           orderBy: { createdAt: 'desc' },
           take: 20,
           include: {
-            actor: {
-              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-            },
+            actor: { select: USER_SUMMARY_SELECT },
           },
         },
         subtasks: {
@@ -335,9 +332,7 @@ export class TasksService {
             status: true,
             assignees: {
               include: {
-                user: {
-                  select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-                },
+                user: { select: USER_SUMMARY_SELECT },
               },
             },
           },
@@ -348,11 +343,25 @@ export class TasksService {
       },
     });
 
-    if (!task) {
+    if (!raw) {
       throw new NotFoundException(`Tarea con id ${taskId} no encontrada`);
     }
 
-    return task;
+    return {
+      ...raw,
+      assignees: raw.assignees.map((a) => ({ ...a, user: mapUserWithAvatar(a.user) })),
+      comments: raw.comments.map((c) => ({ ...c, author: mapUserWithAvatar(c.author) })),
+      attachments: raw.attachments.map((a) => ({ ...a, uploadedBy: mapUserWithAvatar(a.uploadedBy) })),
+      subscribers: raw.subscribers.map((s) => ({ ...s, user: mapUserWithAvatar(s.user) })),
+      activities: raw.activities.map((a) => ({
+        ...a,
+        actor: a.actor ? mapUserWithAvatar(a.actor) : null,
+      })),
+      subtasks: raw.subtasks.map((st) => ({
+        ...st,
+        assignees: st.assignees.map((a) => ({ ...a, user: mapUserWithAvatar(a.user) })),
+      })),
+    };
   }
 
   // ─── Update ──────────────────────────────────────────────
@@ -854,7 +863,7 @@ export class TasksService {
       where.dueDate = { lte: deadline };
     }
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       client.task.findMany({
         where,
         orderBy: { dueDate: 'asc' },
@@ -865,9 +874,7 @@ export class TasksService {
           status: true,
           assignees: {
             include: {
-              user: {
-                select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-              },
+              user: { select: USER_SUMMARY_SELECT },
             },
           },
           _count: { select: { subtasks: true, comments: true } },
@@ -875,6 +882,14 @@ export class TasksService {
       }),
       client.task.count({ where }),
     ]);
+
+    const data = rawData.map((task) => ({
+      ...task,
+      assignees: task.assignees.map((a) => ({
+        ...a,
+        user: mapUserWithAvatar(a.user),
+      })),
+    }));
 
     return {
       data,

@@ -75,8 +75,8 @@ export function TaskAssigneeSelect({
                 {assignees.slice(0, 3).map((a) => (
                   <UserAvatar
                     key={a.userId}
-                    userId={a.userId}
                     name={`${a.user.firstName} ${a.user.lastName}`}
+                    avatarUrl={a.user.avatarUrl}
                     className="size-5 border border-background"
                   />
                 ))}
@@ -102,8 +102,8 @@ export function TaskAssigneeSelect({
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent transition-colors"
                 >
                   <UserAvatar
-                    userId={m.userId}
                     name={`${m.user.firstName} ${m.user.lastName}`}
+                    avatarUrl={m.user.avatarUrl}
                     className="size-6"
                   />
                   <span className="truncate flex-1 text-left">

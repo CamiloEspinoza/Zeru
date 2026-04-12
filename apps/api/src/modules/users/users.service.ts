@@ -4,9 +4,9 @@ import * as bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
-import { S3Service } from '../files/s3.service';
 import { UserRole } from '@prisma/client';
 import type { CreateUserSchema, UpdateUserSchema } from './dto';
+import { buildAvatarProxyUrl } from './avatar-url.helper';
 
 const userSelect = {
   id: true,
@@ -41,7 +41,6 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
-    private readonly s3: S3Service,
   ) {}
 
   /** Lista todos los usuarios de un tenant (via membresías) */
@@ -75,24 +74,20 @@ export class UsersService {
       this.prisma.userTenant.count({ where }),
     ]);
 
-    const data = await Promise.all(
-      memberships.map(async (m) => {
-        const { personProfiles, ...userData } = m.user;
-        const linkedPerson = personProfiles?.[0] ?? null;
-        const avatarUrl = linkedPerson?.avatarS3Key
-          ? await this.resolveAvatarUrl(tenantId, linkedPerson.avatarS3Key)
-          : userData.avatarUrl ?? null;
-        return {
-          ...userData,
-          avatarUrl,
-          role: m.role,
-          roleRef: m.roleRef ?? null,
-          membershipId: m.id,
-          membershipActive: m.isActive,
-          linkedPerson: linkedPerson ? { id: linkedPerson.id, name: linkedPerson.name } : null,
-        };
-      }),
-    );
+    const data = memberships.map((m) => {
+      const { personProfiles, ...userData } = m.user;
+      const linkedPerson = personProfiles?.[0] ?? null;
+      const avatarUrl = buildAvatarProxyUrl(userData.id, linkedPerson?.avatarS3Key);
+      return {
+        ...userData,
+        avatarUrl,
+        role: m.role,
+        roleRef: m.roleRef ?? null,
+        membershipId: m.id,
+        membershipActive: m.isActive,
+        linkedPerson: linkedPerson ? { id: linkedPerson.id, name: linkedPerson.name } : null,
+      };
+    });
 
     return {
       data,
@@ -314,11 +309,6 @@ export class UsersService {
       select: { id: true, name: true, avatarS3Key: true },
     });
 
-    // Resolve avatar if person has one
-    if (updated.avatarS3Key) {
-      await this.resolveAndStoreAvatar(userId, tenantId, updated.avatarS3Key);
-    }
-
     return { linked: true, personProfileId, personName: updated.name };
   }
 
@@ -352,66 +342,6 @@ export class UsersService {
     });
 
     return { unlinked: true };
-  }
-
-  /** Genera una presigned URL del avatar del PersonProfile y la guarda en User.avatarUrl */
-  async resolveAndStoreAvatar(userId: string, tenantId: string, avatarS3Key: string): Promise<string | null> {
-    try {
-      const url = await this.s3.getPresignedUrl(tenantId, avatarS3Key, 86400); // 24h
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { avatarUrl: url },
-      });
-      return url;
-    } catch (err) {
-      this.logger.warn(`Could not resolve avatar for user ${userId}: ${(err as Error).message}`);
-      return null;
-    }
-  }
-
-  /** Resuelve el avatar de un usuario desde su PersonProfile vinculado (si existe) */
-  async resolveAvatarFromPerson(userId: string, tenantId: string): Promise<string | null> {
-    const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-
-    const person = await client.personProfile.findFirst({
-      where: { userId, deletedAt: null },
-      select: { avatarS3Key: true },
-    });
-
-    if (!person?.avatarS3Key) return null;
-
-    return this.resolveAndStoreAvatar(userId, tenantId, person.avatarS3Key);
-  }
-
-  /** Resuelve avatarUrl on-the-fly desde PersonProfile.avatarS3Key */
-  async resolveAvatarUrl(tenantId: string, avatarS3Key: string | null | undefined): Promise<string | null> {
-    if (!avatarS3Key) return null;
-    try {
-      return await this.s3.getPresignedUrl(tenantId, avatarS3Key, 86400); // 24h
-    } catch {
-      return null;
-    }
-  }
-
-  /** Enriquece un user con avatarUrl resuelto desde PersonProfile */
-  async enrichUserWithAvatar<T extends { avatarUrl?: string | null; personProfiles?: Array<{ avatarS3Key?: string | null }> }>(
-    tenantId: string,
-    user: T,
-  ): Promise<T> {
-    const s3Key = user.personProfiles?.[0]?.avatarS3Key;
-    if (s3Key && !user.avatarUrl) {
-      const url = await this.resolveAvatarUrl(tenantId, s3Key);
-      if (url) return { ...user, avatarUrl: url };
-    }
-    return user;
-  }
-
-  /** Enriquece una lista de users con avatarUrl */
-  async enrichUsersWithAvatars<T extends { avatarUrl?: string | null; personProfiles?: Array<{ avatarS3Key?: string | null }> }>(
-    tenantId: string,
-    users: T[],
-  ): Promise<T[]> {
-    return Promise.all(users.map((u) => this.enrichUserWithAvatar(tenantId, u)));
   }
 
   /** Devuelve el PersonProfile vinculado a un usuario en un tenant */

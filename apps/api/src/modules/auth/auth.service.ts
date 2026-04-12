@@ -6,7 +6,7 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SkillsService } from '../ai/services/skills.service';
 import { EmailService } from '../email/email.service';
-import { UsersService } from '../users/users.service';
+import { buildAvatarProxyUrl } from '../users/avatar-url.helper';
 import type { RegisterSchema } from '@zeru/shared';
 import { UserRole } from '@prisma/client';
 
@@ -37,7 +37,6 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly skillsService: SkillsService,
     private readonly emailService: EmailService,
-    private readonly usersService: UsersService,
   ) {}
 
   // ─── Passwordless code flow ──────────────────────────────────────────────────
@@ -304,9 +303,6 @@ export class AuthService {
       expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRATION') ?? '30d',
     });
 
-    // Resolve avatar from linked PersonProfile (non-blocking)
-    void this.usersService.resolveAvatarFromPerson(user.id, user.tenantId);
-
     return { accessToken, refreshToken, tenantId: user.tenantId };
   }
 
@@ -361,7 +357,7 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -372,6 +368,11 @@ export class AuthService {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        personProfiles: {
+          where: { deletedAt: null },
+          select: { avatarS3Key: true },
+          take: 1,
+        },
         memberships: {
           where: { isActive: true },
           select: {
@@ -383,6 +384,15 @@ export class AuthService {
         },
       },
     });
+
+    if (!user) return null;
+
+    const { personProfiles, ...rest } = user;
+    const avatarS3Key = personProfiles?.[0]?.avatarS3Key;
+    return {
+      ...rest,
+      avatarUrl: buildAvatarProxyUrl(user.id, avatarS3Key),
+    };
   }
 
   /**

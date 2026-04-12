@@ -26,8 +26,8 @@ function PresenceAvatar({ user, size = 32 }: { user: PresenceUser; size?: number
         <TooltipTrigger asChild>
           <div>
             <UserAvatar
-              userId={user.userId}
               name={user.name}
+              avatarUrl={user.avatar}
               className={`${sizeClass} ring-2 ring-background`}
               fallbackColor={user.color}
             />

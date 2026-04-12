@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type { SetPropertyValueDto } from '../../projects/dto/property.dto';
 
 interface SelectOption {
@@ -20,14 +21,16 @@ export class TaskPropertiesService {
   async getTaskPropertyValues(tenantId: string, taskId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.taskPropertyValue.findMany({
+    const raw = await client.taskPropertyValue.findMany({
       where: { taskId },
       include: {
-        personUser: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-        },
+        personUser: { select: USER_SUMMARY_SELECT },
       },
     });
+    return raw.map((v) => ({
+      ...v,
+      personUser: v.personUser ? mapUserWithAvatar(v.personUser) : null,
+    }));
   }
 
   async upsertValue(
@@ -106,7 +109,7 @@ export class TaskPropertiesService {
     // Build the data payload based on property type
     const data = this.buildValueData(definition.type, dto);
 
-    const result = await client.taskPropertyValue.upsert({
+    const raw = await client.taskPropertyValue.upsert({
       where: {
         taskId_propertyDefinitionId: {
           taskId,
@@ -121,13 +124,14 @@ export class TaskPropertiesService {
       },
       update: data,
       include: {
-        personUser: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-        },
+        personUser: { select: USER_SUMMARY_SELECT },
       },
     });
 
-    return result;
+    return {
+      ...raw,
+      personUser: raw.personUser ? mapUserWithAvatar(raw.personUser) : null,
+    };
   }
 
   async clearValue(

@@ -11,7 +11,6 @@ import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   ClientToServerEvents,
@@ -20,6 +19,7 @@ import {
 import { PresenceService } from '../presence/presence.service';
 import { TeamChatService } from '../team-chat/team-chat.service';
 import { LockService } from '../lock/lock.service';
+import { buildAvatarProxyUrl } from '../users/avatar-url.helper';
 
 export interface AuthenticatedSocket extends Socket {
   data: {
@@ -52,7 +52,6 @@ export class RealtimeGateway
     private readonly presenceService: PresenceService,
     private readonly chatService: TeamChatService,
     private readonly lockService: LockService,
-    private readonly config: ConfigService,
   ) {}
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -88,15 +87,12 @@ export class RealtimeGateway
         return;
       }
 
-      const hasAvatar = !!user.personProfiles?.[0]?.avatarS3Key;
-      const apiUrl = this.config.get<string>('API_URL', 'http://localhost:3017/api');
-
       client.data.userId = userId;
       client.data.tenantId = tenantId;
       client.data.email = payload.email;
       client.data.role = payload.role;
       client.data.userName = `${user.firstName} ${user.lastName}`;
-      client.data.userAvatar = hasAvatar ? `${apiUrl}/avatars/${userId}?s=96` : null;
+      client.data.userAvatar = buildAvatarProxyUrl(userId, user.personProfiles?.[0]?.avatarS3Key);
 
       await client.join(`tenant:${tenantId}`);
       await client.join(`user:${userId}`);

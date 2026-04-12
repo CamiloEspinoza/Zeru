@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type { ActivityQueryDto } from '../dto';
 
 export interface RecordActivityParams {
@@ -190,19 +191,21 @@ export class TaskActivityService {
       }
     }
 
-    const activities = await client.taskActivity.findMany({
+    const rawActivities = await client.taskActivity.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: dto.limit + 1, // Fetch one extra to determine hasMore
       include: {
-        actor: {
-          select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-        },
+        actor: { select: USER_SUMMARY_SELECT },
       },
     });
 
-    const hasMore = activities.length > dto.limit;
-    const items = hasMore ? activities.slice(0, dto.limit) : activities;
+    const hasMore = rawActivities.length > dto.limit;
+    const rawItems = hasMore ? rawActivities.slice(0, dto.limit) : rawActivities;
+    const items = rawItems.map((a) => ({
+      ...a,
+      actor: a.actor ? mapUserWithAvatar(a.actor) : null,
+    }));
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
     return {

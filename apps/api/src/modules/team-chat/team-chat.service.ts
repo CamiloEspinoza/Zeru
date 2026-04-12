@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { AuditService } from '../audit/audit.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../users/user-select';
 import {
   CreateChannelDto,
   CreateDmDto,
@@ -143,35 +144,30 @@ export class TeamChatService {
   }
 
   async getChannel(channelId: string, userId: string) {
-    const channel = await this.prisma.channel.findUnique({
+    const raw = await this.prisma.channel.findUnique({
       where: { id: channelId },
       include: {
         members: {
           include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                avatarUrl: true,
-              },
-            },
+            user: { select: USER_SUMMARY_SELECT },
           },
         },
       },
     });
 
-    if (!channel || channel.deletedAt) {
+    if (!raw || raw.deletedAt) {
       throw new NotFoundException('Channel not found');
     }
 
-    const isMember = channel.members.some((m) => m.userId === userId);
-    if (channel.type !== 'PUBLIC' && !isMember) {
+    const isMember = raw.members.some((m) => m.userId === userId);
+    if (raw.type !== 'PUBLIC' && !isMember) {
       throw new ForbiddenException('You are not a member of this channel');
     }
 
-    return channel;
+    return {
+      ...raw,
+      members: raw.members.map((m) => ({ ...m, user: mapUserWithAvatar(m.user) })),
+    };
   }
 
   // ─── Messages ─────────────────────────────────────────────
@@ -193,7 +189,7 @@ export class TeamChatService {
 
       const sequence = updated.lastSequence;
 
-      const message = await tx.chatMessage.create({
+      const rawMessage = await tx.chatMessage.create({
         data: {
           channelId,
           authorId: userId,
@@ -209,13 +205,13 @@ export class TeamChatService {
             : undefined,
         },
         include: {
-          author: {
-            select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-          },
+          author: { select: USER_SUMMARY_SELECT },
           mentions: { include: { mentionedUser: { select: { id: true, firstName: true, lastName: true } } } },
           reactions: true,
         },
       });
+
+      const message = { ...rawMessage, author: mapUserWithAvatar(rawMessage.author) };
 
       // If this is a thread reply, increment the parent's reply count
       if (threadParentId) {
@@ -240,7 +236,7 @@ export class TeamChatService {
   ) {
     const cursorSequence = cursor ? BigInt(cursor) : undefined;
 
-    const messages = await this.prisma.chatMessage.findMany({
+    const rawMessages = await this.prisma.chatMessage.findMany({
       where: {
         channelId,
         deletedAt: null,
@@ -254,19 +250,24 @@ export class TeamChatService {
       orderBy: { sequence: direction === 'before' ? 'desc' : 'asc' },
       take: limit,
       include: {
-        author: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        author: { select: USER_SUMMARY_SELECT },
         reactions: true,
         mentions: {
           include: {
-            mentionedUser: {
-              select: { id: true, firstName: true, lastName: true, avatarUrl: true },
-            },
+            mentionedUser: { select: USER_SUMMARY_SELECT },
           },
         },
       },
     });
+
+    const messages = rawMessages.map((m) => ({
+      ...m,
+      author: mapUserWithAvatar(m.author),
+      mentions: m.mentions.map((mention) => ({
+        ...mention,
+        mentionedUser: mapUserWithAvatar(mention.mentionedUser),
+      })),
+    }));
 
     // Return in chronological order
     return direction === 'before' ? messages.reverse() : messages;
@@ -318,16 +319,15 @@ export class TeamChatService {
       throw new ForbiddenException('You can only edit your own messages');
     }
 
-    return this.prisma.chatMessage.update({
+    const raw = await this.prisma.chatMessage.update({
       where: { id: messageId },
       data: { content, editedAt: new Date() },
       include: {
-        author: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        author: { select: USER_SUMMARY_SELECT },
         reactions: true,
       },
     });
+    return { ...raw, author: mapUserWithAvatar(raw.author) };
   }
 
   async deleteMessage(messageId: string, userId: string) {

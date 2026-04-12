@@ -130,8 +130,8 @@ export default function UsersSettingsPage() {
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
                             <UserAvatar
-                              userId={user.id}
                               name={`${user.firstName} ${user.lastName}`}
+                              avatarUrl={user.avatarUrl}
                               className="size-8"
                             />
                             <span className="font-medium">

@@ -6,6 +6,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type { CreateCommentDto, UpdateCommentDto } from '../dto';
 
 @Injectable()
@@ -18,26 +19,31 @@ export class TaskCommentsService {
   async findAll(tenantId: string, taskId: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    return client.taskComment.findMany({
+    const raw = await client.taskComment.findMany({
       where: { taskId, deletedAt: null },
       orderBy: { createdAt: 'asc' },
       include: {
-        author: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        author: { select: USER_SUMMARY_SELECT },
         replies: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
           include: {
-            author: {
-              select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-            },
+            author: { select: USER_SUMMARY_SELECT },
             reactions: true,
           },
         },
         reactions: true,
       },
     });
+
+    return raw.map((c) => ({
+      ...c,
+      author: mapUserWithAvatar(c.author),
+      replies: c.replies.map((r) => ({
+        ...r,
+        author: mapUserWithAvatar(r.author),
+      })),
+    }));
   }
 
   async create(
@@ -56,7 +62,7 @@ export class TaskCommentsService {
       throw new NotFoundException(`Tarea con id ${taskId} no encontrada`);
     }
 
-    const comment = await client.taskComment.create({
+    const rawComment = await client.taskComment.create({
       data: {
         content: dto.content,
         taskId,
@@ -65,11 +71,11 @@ export class TaskCommentsService {
         tenantId,
       },
       include: {
-        author: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        author: { select: USER_SUMMARY_SELECT },
       },
     });
+
+    const comment = { ...rawComment, author: mapUserWithAvatar(rawComment.author) };
 
     // Auto-subscribe commenter to task
     await client.taskSubscriber
@@ -130,18 +136,18 @@ export class TaskCommentsService {
       select: { projectId: true },
     });
 
-    const updated = await client.taskComment.update({
+    const rawUpdated = await client.taskComment.update({
       where: { id: commentId },
       data: {
         content: dto.content,
         editedAt: new Date(),
       },
       include: {
-        author: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        author: { select: USER_SUMMARY_SELECT },
       },
     });
+
+    const updated = { ...rawUpdated, author: mapUserWithAvatar(rawUpdated.author) };
 
     if (task) {
       this.eventEmitter.emit('task.comment.updated', {

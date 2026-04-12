@@ -22,8 +22,8 @@ export function TaskAssigneeAvatars({ assignees, max = 3, size = "sm" }: TaskAss
       {visible.map((a) => (
         <UserAvatar
           key={a.userId}
-          userId={a.userId}
           name={`${a.user.firstName} ${a.user.lastName}`}
+          avatarUrl={a.user.avatarUrl}
           className={cn(sizeClass, "border-2 border-background")}
         />
       ))}

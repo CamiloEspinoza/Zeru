@@ -6,6 +6,7 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { USER_SUMMARY_SELECT, mapUserWithAvatar } from '../../users/user-select';
 import type {
   CreateProjectDto,
   UpdateProjectDto,
@@ -187,16 +188,14 @@ export class ProjectsService {
       ...(dto.status ? { status: dto.status } : {}),
     };
 
-    const [data, total] = await Promise.all([
+    const [rawData, total] = await Promise.all([
       client.project.findMany({
         where,
         orderBy: { [dto.sortBy]: dto.sortOrder },
         skip: (dto.page - 1) * dto.perPage,
         take: dto.perPage,
         include: {
-          createdBy: {
-            select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-          },
+          createdBy: { select: USER_SUMMARY_SELECT },
           _count: {
             select: {
               tasks: true,
@@ -207,6 +206,11 @@ export class ProjectsService {
       }),
       client.project.count({ where }),
     ]);
+
+    const data = rawData.map((p) => ({
+      ...p,
+      createdBy: p.createdBy ? mapUserWithAvatar(p.createdBy) : null,
+    }));
 
     return {
       data,
@@ -222,23 +226,13 @@ export class ProjectsService {
   async findOne(tenantId: string, id: string) {
     const client = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    const project = await client.project.findFirst({
+    const raw = await client.project.findFirst({
       where: { id, deletedAt: null },
       include: {
-        createdBy: {
-          select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true },
-        },
+        createdBy: { select: USER_SUMMARY_SELECT },
         members: {
           include: {
-            user: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                avatarUrl: true,
-              },
-            },
+            user: { select: USER_SUMMARY_SELECT },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -264,11 +258,18 @@ export class ProjectsService {
       },
     });
 
-    if (!project) {
+    if (!raw) {
       throw new NotFoundException(`Proyecto con id ${id} no encontrado`);
     }
 
-    return project;
+    return {
+      ...raw,
+      createdBy: raw.createdBy ? mapUserWithAvatar(raw.createdBy) : null,
+      members: raw.members.map((m) => ({
+        ...m,
+        user: mapUserWithAvatar(m.user),
+      })),
+    };
   }
 
   async update(tenantId: string, id: string, userId: string, dto: UpdateProjectDto) {

@@ -136,8 +136,8 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
           {comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <UserAvatar
-                userId={comment.authorId}
                 name={`${comment.author.firstName} ${comment.author.lastName}`}
+                avatarUrl={comment.author.avatarUrl}
                 className="size-8"
               />
               <div className="min-w-0 flex-1">
