@@ -135,6 +135,30 @@ export const tasksApi = {
   removeReaction: (taskId: string, commentId: string, emoji: string) =>
     api.delete<void>(`/tasks/${taskId}/comments/${commentId}/reactions/${encodeURIComponent(emoji)}`),
 
+  // Attachments
+  uploadAttachment: (taskId: string, file: File) =>
+    api.uploadFile<{
+      id: string;
+      name: string;
+      mimeType: string;
+      sizeBytes: number;
+      url: string;
+    }>(`/tasks/${taskId}/attachments`, file),
+
+  listAttachments: (taskId: string) =>
+    api.get<
+      Array<{
+        id: string;
+        name: string;
+        mimeType: string;
+        sizeBytes: number;
+        url: string;
+      }>
+    >(`/tasks/${taskId}/attachments`),
+
+  deleteAttachment: (taskId: string, attachmentId: string) =>
+    api.delete<void>(`/tasks/${taskId}/attachments/${attachmentId}`),
+
   // Activity
   getActivity: (taskId: string, cursor?: string, limit: number = 30) =>
     api.get<{ data: TaskActivity[]; nextCursor: string | null }>(

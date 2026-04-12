@@ -1,10 +1,26 @@
 "use client";
 
+import { useCallback } from "react";
 import { useAutosaveField } from "@/hooks/use-autosave-field";
 import { FieldLockIndicator } from "@/components/projects/field-lock-indicator";
 import { tasksApi } from "@/lib/api/tasks";
-import { Textarea } from "@/components/ui/textarea";
+import { uploadsApi } from "@/lib/api/uploads";
+import { RichEditor } from "@/components/ui/rich-editor";
 import { cn } from "@/lib/utils";
+
+/**
+ * Ensure content is valid HTML for the rich editor.
+ * Old descriptions stored as plain text need to be wrapped in <p> tags.
+ */
+function ensureHtml(content: string): string {
+  if (!content) return "";
+  const trimmed = content.trim();
+  if (trimmed.startsWith("<")) return trimmed;
+  return trimmed
+    .split("\n")
+    .map((line) => `<p>${line || "<br>"}</p>`)
+    .join("");
+}
 
 interface TaskDetailDescriptionProps {
   taskId: string;
@@ -20,25 +36,36 @@ export function TaskDetailDescription({
       entityType: "Task",
       entityId: taskId,
       fieldName: "description",
-      initialValue: initialDescription ?? "",
+      initialValue: ensureHtml(initialDescription ?? ""),
       save: async (v) => {
-        await tasksApi.update(taskId, { description: v.trim() ? v : null });
+        const trimmed = v.replace(/<p><\/p>/g, "").trim();
+        await tasksApi.update(taskId, {
+          description: trimmed && trimmed !== "<p></p>" ? v : null,
+        });
       },
     });
 
+  const handleImageUpload = useCallback(
+    async (file: File): Promise<string> => {
+      const result = await uploadsApi.uploadImage(file);
+      return result.url;
+    },
+    [],
+  );
+
   return (
     <div className="space-y-1">
-      <h3 className="mb-2 text-sm font-medium">Descripción</h3>
-      <Textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
+      <h3 className="mb-2 text-sm font-medium">Descripcion</h3>
+      <RichEditor
+        content={value}
+        onChange={setValue}
         onFocus={onFocus}
         onBlur={onBlur}
-        disabled={isLockedByOther}
-        placeholder="Añade una descripción..."
-        rows={5}
-        maxLength={50000}
+        editable={!isLockedByOther}
+        placeholder="Añade una descripcion..."
+        onImageUpload={handleImageUpload}
         className={cn(isLockedByOther && "opacity-60")}
+        minHeight="100px"
       />
       <div className="flex items-center gap-3">
         <FieldLockIndicator lockedByName={lockedByName} />

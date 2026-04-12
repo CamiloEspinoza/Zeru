@@ -210,3 +210,204 @@
   .print-container { position: absolute; left: 0; top: 0; width: 100%; }
   .no-print { display: none !important; }
 }
+
+/* ── Rich Text Editor (TipTap) ── */
+
+/* Placeholder */
+.rich-editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+  opacity: 0.5;
+}
+
+/* Images */
+.rich-editor-content .rich-editor-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 0.5rem 0;
+}
+
+.rich-editor-content .ProseMirror-selectednode .rich-editor-image {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Links */
+.rich-editor-content .rich-editor-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.rich-editor-content .rich-editor-link:hover {
+  opacity: 0.8;
+}
+
+/* Task list checkboxes */
+.rich-editor-content .rich-editor-task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.rich-editor-content .rich-editor-task-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.rich-editor-content .rich-editor-task-list li label {
+  display: flex;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.rich-editor-content .rich-editor-task-list li label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border);
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.rich-editor-content .rich-editor-task-list li[data-checked="true"] > div > p {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+/* Code blocks */
+.rich-editor-content pre {
+  background: var(--muted);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  overflow-x: auto;
+}
+
+.rich-editor-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Inline code */
+.rich-editor-content :not(pre) > code {
+  background: var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.35rem;
+  font-size: 0.85em;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Blockquote */
+.rich-editor-content blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1rem;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* Mention chips */
+.rich-editor-content .mention {
+  display: inline-flex;
+  align-items: center;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-radius: 0.375rem;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.85em;
+  font-weight: 500;
+  vertical-align: baseline;
+}
+
+/* Horizontal rule */
+.rich-editor-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1rem 0;
+}
+
+/* Prose overrides for smaller spacing */
+.rich-editor-content.prose {
+  line-height: 1.6;
+}
+
+.rich-editor-content.prose p {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.rich-editor-content.prose h1,
+.rich-editor-content.prose h2,
+.rich-editor-content.prose h3 {
+  margin-top: 0.75em;
+  margin-bottom: 0.25em;
+}
+
+.rich-editor-content.prose ul,
+.rich-editor-content.prose ol {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+/* Syntax highlighting tokens (lowlight) */
+.rich-editor-content .hljs-keyword,
+.rich-editor-content .hljs-selector-tag,
+.rich-editor-content .hljs-title,
+.rich-editor-content .hljs-section,
+.rich-editor-content .hljs-doctag,
+.rich-editor-content .hljs-name,
+.rich-editor-content .hljs-strong { font-weight: 600; }
+
+.rich-editor-content .hljs-comment { color: #6a737d; }
+.rich-editor-content .hljs-string,
+.rich-editor-content .hljs-title,
+.rich-editor-content .hljs-section,
+.rich-editor-content .hljs-built_in,
+.rich-editor-content .hljs-literal,
+.rich-editor-content .hljs-type,
+.rich-editor-content .hljs-addition,
+.rich-editor-content .hljs-tag,
+.rich-editor-content .hljs-quote,
+.rich-editor-content .hljs-name,
+.rich-editor-content .hljs-selector-id,
+.rich-editor-content .hljs-selector-class { color: #22863a; }
+.rich-editor-content .hljs-keyword,
+.rich-editor-content .hljs-selector-tag,
+.rich-editor-content .hljs-subst { color: #d73a49; }
+.rich-editor-content .hljs-number,
+.rich-editor-content .hljs-symbol,
+.rich-editor-content .hljs-bullet,
+.rich-editor-content .hljs-link,
+.rich-editor-content .hljs-meta,
+.rich-editor-content .hljs-attr { color: #005cc5; }
+
+.dark .rich-editor-content .hljs-comment { color: #6a737d; }
+.dark .rich-editor-content .hljs-string,
+.dark .rich-editor-content .hljs-title,
+.dark .rich-editor-content .hljs-section,
+.dark .rich-editor-content .hljs-built_in,
+.dark .rich-editor-content .hljs-literal,
+.dark .rich-editor-content .hljs-type,
+.dark .rich-editor-content .hljs-addition,
+.dark .rich-editor-content .hljs-tag,
+.dark .rich-editor-content .hljs-quote,
+.dark .rich-editor-content .hljs-name,
+.dark .rich-editor-content .hljs-selector-id,
+.dark .rich-editor-content .hljs-selector-class { color: #85e89d; }
+.dark .rich-editor-content .hljs-keyword,
+.dark .rich-editor-content .hljs-selector-tag,
+.dark .rich-editor-content .hljs-subst { color: #f97583; }
+.dark .rich-editor-content .hljs-number,
+.dark .rich-editor-content .hljs-symbol,
+.dark .rich-editor-content .hljs-bullet,
+.dark .rich-editor-content .hljs-link,
+.dark .rich-editor-content .hljs-meta,
+.dark .rich-editor-content .hljs-attr { color: #79b8ff; }

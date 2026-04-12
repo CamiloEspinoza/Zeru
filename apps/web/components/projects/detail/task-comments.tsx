@@ -3,15 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RichEditor } from "@/components/ui/rich-editor";
 import { useSocket } from "@/hooks/use-socket";
 import { useProjectStore } from "@/stores/project-store";
 import type { TaskComment } from "@/types/projects";
 
 const EMPTY_COMMENTS: TaskComment[] = [];
 import { tasksApi } from "@/lib/api/tasks";
+import { uploadsApi } from "@/lib/api/uploads";
 import { TaskCommentTyping } from "./task-comment-typing";
 
 interface TaskCommentsProps {
@@ -28,6 +29,32 @@ function timeAgo(iso: string): string {
   if (hours < 24) return `hace ${hours}h`;
   const days = Math.floor(hours / 24);
   return `hace ${days}d`;
+}
+
+/** Check if HTML content is effectively empty */
+function isEmptyHtml(html: string): boolean {
+  const stripped = html
+    .replace(/<p><\/p>/g, "")
+    .replace(/<br\s*\/?>/g, "")
+    .replace(/\s+/g, "")
+    .trim();
+  return stripped.length === 0;
+}
+
+/**
+ * Ensure content is valid HTML for the rich editor.
+ * Old comments stored as plain text need to be wrapped in <p> tags.
+ */
+function ensureHtml(content: string): string {
+  if (!content) return "";
+  const trimmed = content.trim();
+  // If it already starts with an HTML tag, treat it as HTML
+  if (trimmed.startsWith("<")) return trimmed;
+  // Otherwise, wrap plain text lines in <p> tags
+  return trimmed
+    .split("\n")
+    .map((line) => `<p>${line || "<br>"}</p>`)
+    .join("");
 }
 
 export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
@@ -88,17 +115,17 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
     }, 2500);
   }
 
-  function handleContentChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setContent(e.target.value);
+  function handleContentChange(html: string) {
+    setContent(html);
     emitTyping();
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (isEmptyHtml(content)) return;
     setSubmitting(true);
     try {
-      await tasksApi.createComment(taskId, content.trim());
+      await tasksApi.createComment(taskId, content);
       setContent("");
       if (socket && isTypingRef.current) {
         isTypingRef.current = false;
@@ -111,6 +138,11 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
       setSubmitting(false);
     }
   }
+
+  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
+    const result = await uploadsApi.uploadImage(file);
+    return result.url;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -149,7 +181,14 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
                     {timeAgo(comment.createdAt)}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm whitespace-pre-wrap">{comment.content}</p>
+                <div className="mt-0.5">
+                  <RichEditor
+                    content={ensureHtml(comment.content)}
+                    editable={false}
+                    className="border-none p-0"
+                    minHeight="auto"
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -157,15 +196,15 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
       )}
       <TaskCommentTyping taskId={taskId} />
       <form onSubmit={handleSubmit} className="space-y-2">
-        <Textarea
-          value={content}
+        <RichEditor
+          content={content}
           onChange={handleContentChange}
           placeholder="Escribe un comentario..."
-          rows={3}
-          maxLength={10000}
+          onImageUpload={handleImageUpload}
+          minHeight="60px"
         />
         <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={submitting || !content.trim()}>
+          <Button type="submit" size="sm" disabled={submitting || isEmptyHtml(content)}>
             {submitting ? "Enviando..." : "Comentar"}
           </Button>
         </div>
