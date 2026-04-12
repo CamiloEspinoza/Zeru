@@ -7,7 +7,12 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { TaskAccessGuard } from '../../../common/guards/task-access.guard';
@@ -16,6 +21,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { RequireProjectRole } from '../../../common/decorators/project-role.decorator';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { TaskCommentsService } from '../services/task-comments.service';
+import { S3Service } from '../../files/s3.service';
 import {
   createCommentSchema,
   updateCommentSchema,
@@ -26,7 +32,10 @@ import {
 @Controller('tasks/:taskId/comments')
 @UseGuards(JwtAuthGuard, TenantGuard, TaskAccessGuard)
 export class TaskCommentsController {
-  constructor(private readonly commentsService: TaskCommentsService) {}
+  constructor(
+    private readonly commentsService: TaskCommentsService,
+    private readonly s3Service: S3Service,
+  ) {}
 
   @Get()
   async findAll(
@@ -88,5 +97,35 @@ export class TaskCommentsController {
     @CurrentUser('userId') userId: string,
   ) {
     return this.commentsService.removeReaction(tenantId, id, userId, emoji);
+  }
+
+  /**
+   * Upload a file attachment for a task comment.
+   * Returns presigned URL + metadata to embed in the comment content.
+   */
+  @Post('upload')
+  @RequireProjectRole('MEMBER')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  async uploadAttachment(
+    @Param('taskId') taskId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @CurrentTenant() tenantId: string,
+  ) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+
+    const fileId = randomUUID();
+    const s3Key = `tenants/${tenantId}/task-attachments/${taskId}/${fileId}/${file.originalname}`;
+
+    await this.s3Service.upload(tenantId, s3Key, file.buffer, file.mimetype);
+
+    const url = await this.s3Service.getPresignedUrl(tenantId, s3Key, 7 * 24 * 3600);
+
+    return {
+      url,
+      s3Key,
+      filename: file.originalname,
+      size: file.size,
+      mimeType: file.mimetype,
+    };
   }
 }

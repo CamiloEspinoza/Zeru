@@ -123,6 +123,12 @@ export const tasksApi = {
   createComment: (taskId: string, content: string, parentId?: string, mentionedUserIds?: string[]) =>
     api.post<TaskComment>(`/tasks/${taskId}/comments`, { content, parentId, mentionedUserIds }),
 
+  uploadCommentFile: (taskId: string, file: File) =>
+    api.uploadFile<{ url: string; s3Key: string; filename: string; size: number; mimeType: string }>(
+      `/tasks/${taskId}/comments/upload`,
+      file,
+    ),
+
   updateComment: (taskId: string, commentId: string, content: string) =>
     api.patch<TaskComment>(`/tasks/${taskId}/comments/${commentId}`, { content }),
 
