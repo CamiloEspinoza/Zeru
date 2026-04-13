@@ -178,6 +178,8 @@ model Tenant {
   dteCertificates     DteCertificate[]
   dteFolios           DteFolio[]
   dtes                Dte[]
+  dteRcofs            DteRcof[]
+  dteAccountMappings  DteAccountMapping[]
 
   @@map("tenants")
   @@schema("public")
@@ -1932,9 +1934,12 @@ model LegalEntity {
   commune      String?
   city         String?
 
-  email   String?
-  phone   String?
-  website String?
+  email              String?
+  phone              String?
+  website            String?
+  dteExchangeEmail   String?
+  isAuthorizedDte    Boolean   @default(false)
+  siiLastRefresh     DateTime?
 
   isActive  Boolean   @default(true)
   deletedAt DateTime?
@@ -2894,6 +2899,7 @@ model Dte {
   references        DteReference[]
   globalDiscounts   DteGlobalDiscount[]
   logs              DteLog[]
+  exchanges         DteExchange[]
 
   @@unique([tenantId, dteType, folio, emisorRut])
   @@index([tenantId, status])
@@ -2975,6 +2981,80 @@ model DteLog {
   @@index([dteId, action])
   @@index([createdAt])
   @@map("dte_logs")
+  @@schema("public")
+}
+
+model DteExchange {
+  id             String         @id @default(uuid())
+  status         ExchangeStatus @default(PENDING_SEND)
+  recipientEmail String
+  deadlineAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  dteId          String
+  dte            Dte            @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  tenantId       String
+  events         DteExchangeEvent[]
+  @@index([tenantId, status])
+  @@index([tenantId, deadlineAt])
+  @@map("dte_exchanges")
+  @@schema("public")
+}
+
+model DteExchangeEvent {
+  id         String   @id @default(uuid())
+  eventType  String
+  xmlContent String?  @db.Text
+  metadata   Json?
+  actorId    String?
+  createdAt  DateTime @default(now())
+  exchangeId String
+  exchange   DteExchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+  @@index([exchangeId])
+  @@map("dte_exchange_events")
+  @@schema("public")
+}
+
+model DteRcof {
+  id          String         @id @default(uuid())
+  date        DateTime       @db.Date
+  environment DteEnvironment
+  status      RcofStatus     @default(PENDING)
+  summary     Json
+  xmlContent  String?        @db.Text
+  siiTrackId  String?
+  siiResponse Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, date, environment])
+  @@index([tenantId, status])
+  @@map("dte_rcofs")
+  @@schema("public")
+}
+
+model DteAccountMapping {
+  id                      String       @id @default(uuid())
+  dteTypeCode             Int
+  direction               DteDirection
+  receivableAccountId     String?
+  payableAccountId        String?
+  cashAccountId           String?
+  revenueAccountId        String?
+  revenueExemptAccountId  String?
+  purchaseAccountId       String?
+  ivaDebitoAccountId      String?
+  ivaCreditoAccountId     String?
+  salesReturnAccountId    String?
+  purchaseReturnAccountId String?
+  isActive                Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  tenantId                String
+  tenant                  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, dteTypeCode, direction])
+  @@map("dte_account_mappings")
   @@schema("public")
 }
 
