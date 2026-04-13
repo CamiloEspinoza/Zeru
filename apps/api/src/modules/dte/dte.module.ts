@@ -13,9 +13,44 @@ import {
   DTE_QUEUE_CONFIG,
 } from './constants/queue.constants';
 
-// Infrastructure services
-import { SiiCircuitBreakerService } from './sii/sii-circuit-breaker.service';
+// Controllers
+import { DteController } from './controllers/dte.controller';
+import { DteConfigController } from './controllers/dte-config.controller';
+import { CertificateController } from './controllers/certificate.controller';
+import { FolioController } from './controllers/folio.controller';
+
+// Services
+import { DteConfigService } from './services/dte-config.service';
+import { DteService } from './services/dte.service';
+import { DteDraftService } from './services/dte-draft.service';
+import { DteEmissionService } from './services/dte-emission.service';
+import { DteBuilderService } from './services/dte-builder.service';
 import { DteStateMachineService } from './services/dte-state-machine.service';
+import { ReceptorLookupService } from './services/receptor-lookup.service';
+
+// Certificate
+import { CertificateService } from './certificate/certificate.service';
+import { CertificateParserService } from './certificate/certificate-parser.service';
+
+// Folio
+import { FolioService } from './folio/folio.service';
+import { FolioAllocationService } from './folio/folio-allocation.service';
+
+// SII infrastructure
+import { SiiCircuitBreakerService } from './sii/sii-circuit-breaker.service';
+import { SiiSenderService } from './sii/sii-sender.service';
+import { SiiStatusService } from './sii/sii-status.service';
+
+// Processors (BullMQ workers)
+import { DteEmissionProcessor } from './processors/dte-emission.processor';
+import { SiiStatusCheckProcessor } from './processors/sii-status-check.processor';
+
+// Event listeners
+import { DteExchangeListener } from './listeners/dte-exchange.listener';
+import { DteNotificationListener } from './listeners/dte-notification.listener';
+
+// Crons
+import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
 
 @Module({
   imports: [
@@ -57,12 +92,56 @@ import { DteStateMachineService } from './services/dte-state-machine.service';
       },
     ),
   ],
-  controllers: [],
-  providers: [
-    // Infrastructure
-    SiiCircuitBreakerService,
-    DteStateMachineService,
+  controllers: [
+    DteController,
+    DteConfigController,
+    CertificateController,
+    FolioController,
   ],
-  exports: [SiiCircuitBreakerService, DteStateMachineService],
+  providers: [
+    // Services
+    DteConfigService,
+    DteService,
+    DteDraftService,
+    DteEmissionService,
+    DteBuilderService,
+    DteStateMachineService,
+    ReceptorLookupService,
+
+    // Certificate
+    CertificateService,
+    CertificateParserService,
+
+    // Folio
+    FolioService,
+    FolioAllocationService,
+
+    // SII infrastructure
+    SiiCircuitBreakerService,
+    SiiSenderService,
+    SiiStatusService,
+
+    // Processors
+    DteEmissionProcessor,
+    SiiStatusCheckProcessor,
+
+    // Event listeners
+    DteExchangeListener,
+    DteNotificationListener,
+
+    // Crons
+    OrphanRecoveryCron,
+  ],
+  exports: [
+    DteConfigService,
+    DteService,
+    DteEmissionService,
+    DteStateMachineService,
+    CertificateService,
+    FolioService,
+    FolioAllocationService,
+    SiiCircuitBreakerService,
+    ReceptorLookupService,
+  ],
 })
 export class DteModule {}

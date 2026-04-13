@@ -1,0 +1,126 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { TenantGuard } from '../../../common/guards/tenant.guard';
+import { PermissionGuard } from '../../../common/guards/permission.guard';
+import { RequirePermission } from '../../../common/decorators/require-permission.decorator';
+import { CurrentTenant } from '../../../common/decorators/current-tenant.decorator';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
+import { DteEmissionService } from '../services/dte-emission.service';
+import { DteDraftService } from '../services/dte-draft.service';
+import { DteService } from '../services/dte.service';
+import { ReceptorLookupService } from '../services/receptor-lookup.service';
+import {
+  emitDteSchema,
+  updateDteDraftSchema,
+  type EmitDteSchema,
+  type UpdateDteDraftSchema,
+} from '@zeru/shared';
+
+@Controller('dte')
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+export class DteController {
+  constructor(
+    private readonly emissionService: DteEmissionService,
+    private readonly draftService: DteDraftService,
+    private readonly dteService: DteService,
+    private readonly receptorLookup: ReceptorLookupService,
+  ) {}
+
+  // ─── Emission ─────────────────────────────────────────────
+
+  @Post()
+  @RequirePermission('invoicing', 'emit')
+  emit(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(emitDteSchema)) body: EmitDteSchema,
+  ) {
+    return this.emissionService.emit(tenantId, userId, body);
+  }
+
+  // ─── Drafts ───────────────────────────────────────────────
+
+  @Post('draft')
+  @RequirePermission('invoicing', 'create-draft')
+  createDraft(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
+    @Body(new ZodValidationPipe(emitDteSchema)) body: EmitDteSchema,
+  ) {
+    return this.draftService.create(tenantId, userId, body);
+  }
+
+  @Put('draft/:id')
+  @RequirePermission('invoicing', 'edit-draft')
+  updateDraft(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateDteDraftSchema))
+    body: UpdateDteDraftSchema,
+  ) {
+    return this.draftService.update(tenantId, id, body);
+  }
+
+  @Delete('draft/:id')
+  @RequirePermission('invoicing', 'delete-draft')
+  deleteDraft(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.draftService.delete(tenantId, id);
+  }
+
+  @Post('draft/:id/emit')
+  @RequirePermission('invoicing', 'emit')
+  emitFromDraft(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('userId') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.emissionService.emitFromDraft(tenantId, userId, id);
+  }
+
+  // ─── Queries ──────────────────────────────────────────────
+
+  @Get()
+  @RequirePermission('invoicing', 'view')
+  list(
+    @CurrentTenant() tenantId: string,
+    @Query('dteType') dteType?: string,
+    @Query('status') status?: string,
+    @Query('direction') direction?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.dteService.list(tenantId, {
+      dteType: dteType as any,
+      status: status as any,
+      direction: direction as any,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
+  }
+
+  @Get('receptor/lookup')
+  @RequirePermission('invoicing', 'view')
+  lookupReceptor(
+    @CurrentTenant() tenantId: string,
+    @Query('rut') rut: string,
+  ) {
+    return this.receptorLookup.lookup(tenantId, rut);
+  }
+
+  @Get(':id')
+  @RequirePermission('invoicing', 'view')
+  getById(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.dteService.getById(tenantId, id);
+  }
+}
