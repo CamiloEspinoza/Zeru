@@ -16,6 +16,7 @@ import {
 // Controllers
 import { DteController } from './controllers/dte.controller';
 import { DteVoidController } from './controllers/dte-void.controller';
+import { DteReceivedController } from './controllers/dte-received.controller';
 import { DteConfigController } from './controllers/dte-config.controller';
 import { CertificateController } from './controllers/certificate.controller';
 import { FolioController } from './controllers/folio.controller';
@@ -33,6 +34,7 @@ import { DteCorrectionService } from './services/dte-correction.service';
 import { DteReissueService } from './services/dte-reissue.service';
 import { DtePdfService } from './services/dte-pdf.service';
 import { Pdf417Service } from './services/pdf417.service';
+import { DteReceivedService } from './services/dte-received.service';
 
 // Certificate
 import { CertificateService } from './certificate/certificate.service';
@@ -46,6 +48,13 @@ import { FolioAllocationService } from './folio/folio-allocation.service';
 import { SiiCircuitBreakerService } from './sii/sii-circuit-breaker.service';
 import { SiiSenderService } from './sii/sii-sender.service';
 import { SiiStatusService } from './sii/sii-status.service';
+import { SiiReclamoService } from './sii/sii-reclamo.service';
+
+// Exchange
+import { ImapPollingService } from './exchange/imap-polling.service';
+import { DteXmlParserService } from './exchange/dte-xml-parser.service';
+import { DteValidationService } from './exchange/dte-validation.service';
+import { ExchangeResponseService } from './exchange/exchange-response.service';
 
 // Processors (BullMQ workers)
 import { DteEmissionProcessor } from './processors/dte-emission.processor';
@@ -57,6 +66,7 @@ import { DteNotificationListener } from './listeners/dte-notification.listener';
 
 // Crons
 import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
+import { DeadlineCron } from './cron/deadline.cron';
 
 @Module({
   imports: [
@@ -101,6 +111,7 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
   controllers: [
     DteController,
     DteVoidController,
+    DteReceivedController,
     DteConfigController,
     CertificateController,
     FolioController,
@@ -119,6 +130,7 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
     DteReissueService,
     DtePdfService,
     Pdf417Service,
+    DteReceivedService,
 
     // Certificate
     CertificateService,
@@ -132,6 +144,13 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
     SiiCircuitBreakerService,
     SiiSenderService,
     SiiStatusService,
+    SiiReclamoService,
+
+    // Exchange
+    ImapPollingService,
+    DteXmlParserService,
+    DteValidationService,
+    ExchangeResponseService,
 
     // Processors
     DteEmissionProcessor,
@@ -143,6 +162,7 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
 
     // Crons
     OrphanRecoveryCron,
+    DeadlineCron,
   ],
   exports: [
     DteConfigService,
