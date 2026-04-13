@@ -15,6 +15,7 @@ import {
 
 // Controllers
 import { DteController } from './controllers/dte.controller';
+import { DteVoidController } from './controllers/dte-void.controller';
 import { DteConfigController } from './controllers/dte-config.controller';
 import { CertificateController } from './controllers/certificate.controller';
 import { FolioController } from './controllers/folio.controller';
@@ -27,6 +28,9 @@ import { DteEmissionService } from './services/dte-emission.service';
 import { DteBuilderService } from './services/dte-builder.service';
 import { DteStateMachineService } from './services/dte-state-machine.service';
 import { ReceptorLookupService } from './services/receptor-lookup.service';
+import { DteVoidService } from './services/dte-void.service';
+import { DteCorrectionService } from './services/dte-correction.service';
+import { DteReissueService } from './services/dte-reissue.service';
 
 // Certificate
 import { CertificateService } from './certificate/certificate.service';
@@ -94,6 +98,7 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
   ],
   controllers: [
     DteController,
+    DteVoidController,
     DteConfigController,
     CertificateController,
     FolioController,
@@ -107,6 +112,9 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
     DteBuilderService,
     DteStateMachineService,
     ReceptorLookupService,
+    DteVoidService,
+    DteCorrectionService,
+    DteReissueService,
 
     // Certificate
     CertificateService,
