@@ -174,6 +174,9 @@ model Tenant {
   billingAgreements   BillingAgreement[]
   billingConcepts     BillingConcept[]
   projects            Project[]
+  dteConfig           DteConfig?
+  dteCertificates     DteCertificate[]
+  dteFolios           DteFolio[]
 
   @@map("tenants")
   @@schema("public")
@@ -2637,6 +2640,177 @@ model TaskPropertyValue {
   @@index([propertyDefinitionId])
   @@index([tenantId])
   @@map("task_property_values")
+  @@schema("public")
+}
+
+// ─── DTE (Documentos Tributarios Electrónicos) ─────────
+
+enum DteType {
+  FACTURA_ELECTRONICA
+  FACTURA_EXENTA_ELECTRONICA
+  BOLETA_ELECTRONICA
+  BOLETA_EXENTA_ELECTRONICA
+  LIQUIDACION_FACTURA_ELECTRONICA
+  FACTURA_COMPRA_ELECTRONICA
+  GUIA_DESPACHO_ELECTRONICA
+  NOTA_DEBITO_ELECTRONICA
+  NOTA_CREDITO_ELECTRONICA
+  @@schema("public")
+}
+
+enum DteStatus {
+  DRAFT
+  QUEUED
+  SIGNED
+  SENT
+  ACCEPTED
+  ACCEPTED_WITH_OBJECTION
+  REJECTED
+  VOIDED
+  ERROR
+  @@schema("public")
+}
+
+enum DteEnvironment {
+  CERTIFICATION
+  PRODUCTION
+  @@schema("public")
+}
+
+enum DteDirection {
+  EMITTED
+  RECEIVED
+  @@schema("public")
+}
+
+enum DteLogAction {
+  CREATED
+  QUEUED
+  FOLIO_ASSIGNED
+  SIGNED
+  SENT_TO_SII
+  SII_RESPONSE
+  ACCEPTED
+  REJECTED
+  VOIDED
+  ERROR
+  EXCHANGE_SENT
+  EXCHANGE_RECEIVED
+  ACCOUNTING_POSTED
+  PDF_GENERATED
+  @@schema("public")
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  @@schema("public")
+}
+
+enum ExchangeStatus {
+  PENDING_SEND
+  SENT
+  RECEIPT_CONFIRMED
+  ACCEPTED
+  REJECTED
+  CLAIMED
+  TACIT_ACCEPTANCE
+  @@schema("public")
+}
+
+enum RcofStatus {
+  PENDING
+  GENERATED
+  SENT
+  ACCEPTED
+  REJECTED
+  ERROR
+  @@schema("public")
+}
+
+enum DteReferenceCode {
+  ANULA_DOCUMENTO
+  CORRIGE_TEXTO
+  CORRIGE_MONTOS
+  @@schema("public")
+}
+
+model DteConfig {
+  id               String         @id @default(uuid())
+  rut              String
+  razonSocial      String
+  giro             String
+  actividadEco     Int
+  direccion        String
+  comuna           String
+  ciudad           String
+  codigoSucursal   Int?
+  environment      DteEnvironment @default(CERTIFICATION)
+  resolutionNum    Int
+  resolutionDate   DateTime
+  exchangeEmail    String?
+  imapHost         String?
+  imapPort         Int?           @default(993)
+  imapUser         String?
+  imapPass         String?
+  imapEnabled      Boolean        @default(false)
+  imapLastPollAt   DateTime?
+  imapLastUid      Int?
+  autoCreateJournalEntry  Boolean @default(true)
+  autoPostJournalEntry    Boolean @default(false)
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  tenantId         String         @unique
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@map("dte_configs")
+  @@schema("public")
+}
+
+model DteCertificate {
+  id                String            @id @default(uuid())
+  subjectName       String
+  subjectRut        String
+  issuer            String
+  serialNumber      String
+  validFrom         DateTime
+  validUntil        DateTime
+  status            CertificateStatus @default(ACTIVE)
+  encryptedP12      String
+  encryptedPassword String
+  sha256Fingerprint String
+  isPrimary         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, sha256Fingerprint])
+  @@index([tenantId, isPrimary])
+  @@map("dte_certificates")
+  @@schema("public")
+}
+
+model DteFolio {
+  id              String         @id @default(uuid())
+  dteType         DteType
+  environment     DteEnvironment
+  rangeFrom       Int
+  rangeTo         Int
+  nextFolio       Int
+  encryptedCafXml String
+  authorizedAt    DateTime
+  expiresAt       DateTime
+  isActive        Boolean        @default(true)
+  isExhausted     Boolean        @default(false)
+  alertThreshold  Int            @default(10)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@unique([tenantId, dteType, environment, rangeFrom])
+  @@index([tenantId, dteType, environment, isActive, isExhausted])
+  @@map("dte_folios")
   @@schema("public")
 }
 
