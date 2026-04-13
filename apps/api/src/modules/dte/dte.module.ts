@@ -31,6 +31,8 @@ import { ReceptorLookupService } from './services/receptor-lookup.service';
 import { DteVoidService } from './services/dte-void.service';
 import { DteCorrectionService } from './services/dte-correction.service';
 import { DteReissueService } from './services/dte-reissue.service';
+import { DtePdfService } from './services/dte-pdf.service';
+import { Pdf417Service } from './services/pdf417.service';
 
 // Certificate
 import { CertificateService } from './certificate/certificate.service';
@@ -115,6 +117,8 @@ import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
     DteVoidService,
     DteCorrectionService,
     DteReissueService,
+    DtePdfService,
+    Pdf417Service,
 
     // Certificate
     CertificateService,

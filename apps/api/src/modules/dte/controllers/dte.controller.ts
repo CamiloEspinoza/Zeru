@@ -7,8 +7,11 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
@@ -19,6 +22,7 @@ import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { DteEmissionService } from '../services/dte-emission.service';
 import { DteDraftService } from '../services/dte-draft.service';
 import { DteService } from '../services/dte.service';
+import { DtePdfService } from '../services/dte-pdf.service';
 import { ReceptorLookupService } from '../services/receptor-lookup.service';
 import {
   emitDteSchema,
@@ -34,6 +38,7 @@ export class DteController {
     private readonly emissionService: DteEmissionService,
     private readonly draftService: DteDraftService,
     private readonly dteService: DteService,
+    private readonly dtePdfService: DtePdfService,
     private readonly receptorLookup: ReceptorLookupService,
   ) {}
 
@@ -116,6 +121,44 @@ export class DteController {
     @Query('rut') rut: string,
   ) {
     return this.receptorLookup.lookup(tenantId, rut);
+  }
+
+  @Get(':id/pdf')
+  @RequirePermission('invoicing', 'view')
+  async downloadPdf(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Query('format') format: string | undefined,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.dtePdfService.generatePdf(
+      tenantId,
+      id,
+      format === 'thermal' ? 'thermal' : 'standard',
+    );
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="DTE-${id}.pdf"`,
+    });
+    res.send(pdfBuffer);
+  }
+
+  @Get(':id/xml')
+  @RequirePermission('invoicing', 'view')
+  async downloadXml(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const dte = await this.dteService.getById(tenantId, id);
+    if (!dte.xmlContent) {
+      throw new BadRequestException('Este DTE aún no tiene XML generado');
+    }
+    res.set({
+      'Content-Type': 'application/xml',
+      'Content-Disposition': `attachment; filename="DTE-${dte.folio}.xml"`,
+    });
+    res.send(dte.xmlContent);
   }
 
   @Get(':id')
