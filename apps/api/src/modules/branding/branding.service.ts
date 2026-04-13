@@ -55,7 +55,7 @@ export class BrandingService {
     const maxSize = type === 'logo' ? 2 * 1024 * 1024 : 1 * 1024 * 1024; // favicon and isotipo share 1MB limit
     if (file.size > maxSize) {
       throw new BadRequestException(
-        `Archivo muy grande. Maximo ${type === 'logo' ? '2MB' : '1MB'}.`,
+        `Archivo muy grande. Máximo ${type === 'logo' ? '2MB' : '1MB'}.`,
       );
     }
 

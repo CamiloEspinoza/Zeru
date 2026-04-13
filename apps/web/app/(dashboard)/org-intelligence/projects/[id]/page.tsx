@@ -688,7 +688,7 @@ export default function ProjectDetailPage({
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="manual-dept" className="text-xs">
-                        Area
+                        Área
                       </Label>
                       <Input
                         id="manual-dept"

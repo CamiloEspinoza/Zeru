@@ -126,7 +126,7 @@ export function ProjectHeader({ project, onUpdated }: ProjectHeaderProps) {
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descripcion del proyecto..."
+              placeholder="Descripción del proyecto..."
               rows={3}
             />
             <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ export function ProjectHeader({ project, onUpdated }: ProjectHeaderProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PUBLIC">Publico</SelectItem>
+                  <SelectItem value="PUBLIC">Público</SelectItem>
                   <SelectItem value="PRIVATE">Privado</SelectItem>
                 </SelectContent>
               </Select>

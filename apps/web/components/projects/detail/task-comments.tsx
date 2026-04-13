@@ -558,7 +558,7 @@ export function TaskComments({ taskId, projectId }: TaskCommentsProps) {
         </div>
       ) : comments.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Aun no hay comentarios.
+          Aún no hay comentarios.
         </p>
       ) : (
         <div className="space-y-3">

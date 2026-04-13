@@ -496,7 +496,7 @@ export class ProjectsService {
       where: { id: sectionId, projectId, deletedAt: null },
     });
     if (!section) {
-      throw new NotFoundException('Seccion no encontrada');
+      throw new NotFoundException('Sección no encontrada');
     }
 
     const updated = await client.projectSection.update({
@@ -525,7 +525,7 @@ export class ProjectsService {
       where: { id: sectionId, projectId, deletedAt: null },
     });
     if (!section) {
-      throw new NotFoundException('Seccion no encontrada');
+      throw new NotFoundException('Sección no encontrada');
     }
 
     await this.prisma.$transaction(async (tx: any) => {
@@ -549,7 +549,7 @@ export class ProjectsService {
       changes: {},
     });
 
-    return { message: 'Seccion eliminada' };
+    return { message: 'Sección eliminada' };
   }
 
   async reorderSections(

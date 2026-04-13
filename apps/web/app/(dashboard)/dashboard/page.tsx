@@ -60,7 +60,7 @@ interface DashboardStats {
 
 function getGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return "Buenos dias";
+  if (hour < 12) return "Buenos días";
   if (hour < 19) return "Buenas tardes";
   return "Buenas noches";
 }
@@ -172,7 +172,7 @@ export default function DashboardPage() {
           {greeting}, {firstName}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Aqui tienes un resumen de tu plataforma.
+          Aquí tienes un resumen de tu plataforma.
         </p>
       </div>
 
@@ -260,7 +260,7 @@ export default function DashboardPage() {
 
       {/* Section 3: Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Acciones rapidas</h2>
+        <h2 className="text-lg font-semibold mb-3">Acciones rápidas</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <Card

@@ -36,9 +36,9 @@ const PROPERTY_TYPES: Array<{
   icon: typeof TextIcon;
 }> = [
   { value: "TEXT", label: "Texto", icon: TextIcon },
-  { value: "NUMBER", label: "Numero", icon: Calculator01Icon },
-  { value: "SELECT", label: "Seleccion", icon: ArrowDown01Icon },
-  { value: "MULTI_SELECT", label: "Multi-seleccion", icon: MoreHorizontalIcon },
+  { value: "NUMBER", label: "Número", icon: Calculator01Icon },
+  { value: "SELECT", label: "Selección", icon: ArrowDown01Icon },
+  { value: "MULTI_SELECT", label: "Multi-selección", icon: MoreHorizontalIcon },
   { value: "DATE", label: "Fecha", icon: Calendar03Icon },
   { value: "PERSON", label: "Persona", icon: UserIcon },
   { value: "CHECKBOX", label: "Checkbox", icon: CheckmarkSquare01Icon },

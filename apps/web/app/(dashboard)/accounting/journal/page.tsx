@@ -144,7 +144,7 @@ function JournalPageContent() {
             Glosa: entry.description,
             "Código Cuenta": (line as { account?: { code: string; name: string } }).account?.code ?? "",
             "Nombre Cuenta": (line as { account?: { code: string; name: string } }).account?.name ?? "",
-            Débe: Number(line.debit) || 0,
+            Debe: Number(line.debit) || 0,
             Haber: Number(line.credit) || 0,
           });
         }

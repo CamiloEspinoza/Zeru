@@ -178,7 +178,7 @@ function AppearanceTab() {
           <CardTitle>Logotipo e Isotipo</CardTitle>
           <p className="text-sm text-muted-foreground">
             El logotipo se usa en correos y reportes. El isotipo se muestra en
-            el menu lateral.
+            el menú lateral.
           </p>
         </CardHeader>
         <CardContent>
@@ -402,7 +402,7 @@ export default function OrganizationSettingsPage() {
   if (!tenant) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Organizacion</h1>
+        <h1 className="text-2xl font-bold">Organización</h1>
         <p className="text-muted-foreground">Cargando...</p>
       </div>
     );
@@ -421,7 +421,7 @@ export default function OrganizationSettingsPage() {
         <TabsContent value="general" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Datos de la organizacion</CardTitle>
+              <CardTitle>Datos de la organización</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -456,7 +456,7 @@ export default function OrganizationSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">Direccion</Label>
+                  <Label htmlFor="address">Dirección</Label>
                   <Input
                     id="address"
                     value={formData.address ?? ""}
@@ -466,12 +466,12 @@ export default function OrganizationSettingsPage() {
                         address: e.target.value,
                       }))
                     }
-                    placeholder="Direccion"
+                    placeholder="Dirección"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Telefono</Label>
+                  <Label htmlFor="phone">Teléfono</Label>
                   <Input
                     id="phone"
                     value={formData.phone ?? ""}
@@ -487,7 +487,7 @@ export default function OrganizationSettingsPage() {
 
                 {success && (
                   <p className="text-sm text-green-600 dark:text-green-400">
-                    Configuracion guardada correctamente.
+                    Configuración guardada correctamente.
                   </p>
                 )}
 
@@ -500,7 +500,7 @@ export default function OrganizationSettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Identificadores de la organizacion</CardTitle>
+              <CardTitle>Identificadores de la organización</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
@@ -510,7 +510,7 @@ export default function OrganizationSettingsPage() {
                   <code className="font-mono bg-muted px-1 rounded">
                     X-Tenant-Id
                   </code>{" "}
-                  al hacer llamadas a la API publica.
+                  al hacer llamadas a la API pública.
                 </p>
                 <TenantIdField value={tenant.id} />
               </div>

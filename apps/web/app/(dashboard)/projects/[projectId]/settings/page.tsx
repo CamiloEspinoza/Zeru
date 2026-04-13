@@ -676,7 +676,7 @@ export default function ProjectSettingsPage({
   async function handleDelete() {
     if (
       !confirm(
-        "Estas seguro de eliminar este proyecto? Esta accion no se puede deshacer.",
+        "¿Estás seguro de eliminar este proyecto? Esta acción no se puede deshacer.",
       )
     )
       return;

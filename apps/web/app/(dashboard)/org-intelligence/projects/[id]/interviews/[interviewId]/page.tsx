@@ -792,7 +792,7 @@ export default function InterviewDetailPage({
       })()}
 
       <InterviewGuidePrint
-        interviewTitle={interview.title ?? "Entrevista sin titulo"}
+        interviewTitle={interview.title ?? "Entrevista sin título"}
         interviewDate={interview.interviewDate ? new Date(interview.interviewDate).toLocaleDateString("es-CL") : undefined}
         speakers={interview.speakers.map((s) => ({ name: s.name ?? s.speakerLabel, role: s.role ?? undefined, isInterviewer: s.isInterviewer }))}
         introText={generatedIntroText}

@@ -39,9 +39,9 @@ const TYPE_ICONS: Record<PropertyType, typeof TextIcon> = {
 
 const TYPE_LABELS: Record<PropertyType, string> = {
   TEXT: "Texto",
-  NUMBER: "Numero",
-  SELECT: "Seleccion",
-  MULTI_SELECT: "Multi-seleccion",
+  NUMBER: "Número",
+  SELECT: "Selección",
+  MULTI_SELECT: "Multi-selección",
   DATE: "Fecha",
   PERSON: "Persona",
   CHECKBOX: "Checkbox",

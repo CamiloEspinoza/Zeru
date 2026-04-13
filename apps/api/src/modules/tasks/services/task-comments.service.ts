@@ -297,6 +297,6 @@ export class TaskCommentsService {
       }
     }
 
-    return { message: 'Reaccion removida' };
+    return { message: 'Reacción removida' };
   }
 }
