@@ -177,6 +177,7 @@ model Tenant {
   dteConfig           DteConfig?
   dteCertificates     DteCertificate[]
   dteFolios           DteFolio[]
+  dtes                Dte[]
 
   @@map("tenants")
   @@schema("public")
@@ -232,6 +233,8 @@ model User {
   taskAttachments         TaskAttachment[]           @relation("TaskAttachments")
   taskViewsCreated        TaskView[]                 @relation("TaskViewsCreated")
   taskPropertyPersonValues TaskPropertyValue[]       @relation("TaskPropertyPersonValues")
+  dtesCreated              Dte[]                     @relation("DteCreatedBy")
+  dtesDecided              Dte[]                     @relation("DteDecidedBy")
 
   @@map("users")
   @@schema("public")
@@ -673,6 +676,7 @@ model JournalEntry {
 
   lines     JournalEntryLine[]
   documents DocumentJournalEntry[]
+  dte       Dte?
 
   @@unique([number, tenantId])
   @@index([tenantId])
@@ -1948,6 +1952,7 @@ model LegalEntity {
   labLiquidations   LabLiquidation[]         @relation("LiquidationLegalEntity")
   labExamCharges    LabExamCharge[]          @relation("ExamChargeLegalEntity")
   labDirectPaymentBatches LabDirectPaymentBatch[] @relation("DpbLegalEntity")
+  dtes                    Dte[]
 
   @@unique([tenantId, rut])
   @@index([tenantId])
@@ -2808,9 +2813,168 @@ model DteFolio {
   updatedAt       DateTime       @updatedAt
   tenantId        String
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dtes            Dte[]
   @@unique([tenantId, dteType, environment, rangeFrom])
   @@index([tenantId, dteType, environment, isActive, isExhausted])
   @@map("dte_folios")
+  @@schema("public")
+}
+
+model Dte {
+  id             String         @id @default(uuid())
+  dteType        DteType
+  folio          Int
+  environment    DteEnvironment
+  status         DteStatus      @default(DRAFT)
+  direction      DteDirection   @default(EMITTED)
+
+  emisorRut      String
+  emisorRazon    String
+  emisorGiro     String?
+
+  receptorRut    String?
+  receptorRazon  String?
+  receptorGiro   String?
+  receptorDir    String?
+  receptorComuna String?
+  receptorCiudad String?
+
+  formaPago      Int?
+  medioPago      String?
+  indServicio    Int?
+  periodoDesde   DateTime?
+  periodoHasta   DateTime?
+  fechaVenc      DateTime?
+
+  montoNeto      Int            @default(0)
+  montoExento    Int            @default(0)
+  montoBruto     Int?
+  tasaIva        Decimal        @default(19) @db.Decimal(5, 2)
+  iva            Int            @default(0)
+  ivaRetTotal    Int            @default(0)
+  montoTotal     Int            @default(0)
+
+  fechaEmision   DateTime
+
+  xmlContent     String?        @db.Text
+  tedXml         String?        @db.Text
+  xmlS3Key       String?
+  pdfS3Key       String?
+
+  siiTrackId     String?
+  siiResponse    Json?
+
+  receptionDate  DateTime?
+  deadlineDate   DateTime?
+  decidedAt      DateTime?
+
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  folioRangeId   String?
+  folioRange     DteFolio?      @relation(fields: [folioRangeId], references: [id])
+
+  legalEntityId  String?
+  legalEntity    LegalEntity?   @relation(fields: [legalEntityId], references: [id])
+
+  journalEntryId String?        @unique
+  journalEntry   JournalEntry?  @relation(fields: [journalEntryId], references: [id])
+
+  createdById    String?
+  createdBy      User?          @relation("DteCreatedBy", fields: [createdById], references: [id])
+
+  decidedById    String?
+  decidedBy      User?          @relation("DteDecidedBy", fields: [decidedById], references: [id])
+
+  items             DteItem[]
+  references        DteReference[]
+  globalDiscounts   DteGlobalDiscount[]
+  logs              DteLog[]
+
+  @@unique([tenantId, dteType, folio, emisorRut])
+  @@index([tenantId, status])
+  @@index([tenantId, dteType])
+  @@index([tenantId, direction])
+  @@index([tenantId, direction, status])
+  @@index([tenantId, fechaEmision])
+  @@index([tenantId, receptorRut])
+  @@index([tenantId, emisorRut])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deadlineDate])
+  @@index([siiTrackId])
+  @@map("dtes")
+  @@schema("public")
+}
+
+model DteItem {
+  id             String   @id @default(uuid())
+  lineNumber     Int
+  itemName       String
+  description    String?
+  indExe         Int?
+  quantity       Decimal  @db.Decimal(18, 6)
+  unit           String?
+  unitPrice      Decimal  @db.Decimal(18, 6)
+  descuentoPct   Decimal? @db.Decimal(5, 2)
+  descuentoMonto Decimal? @db.Decimal(18, 2)
+  recargoPct     Decimal? @db.Decimal(5, 2)
+  recargoMonto   Decimal? @db.Decimal(18, 2)
+  montoItem      Decimal  @db.Decimal(18, 2)
+  codigosItem    Json?
+  dteId          String
+  dte            Dte      @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  @@index([dteId])
+  @@map("dte_items")
+  @@schema("public")
+}
+
+model DteReference {
+  id              String            @id @default(uuid())
+  lineNumber      Int
+  tipoDocRef      Int
+  folioRef        Int
+  fechaRef        DateTime
+  codRef          DteReferenceCode?
+  razonRef        String?
+  dteId           String
+  dte             Dte               @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  referencedDteId String?
+  @@index([dteId])
+  @@map("dte_references")
+  @@schema("public")
+}
+
+model DteGlobalDiscount {
+  id             String  @id @default(uuid())
+  lineNumber     Int
+  tipoMovimiento String
+  glosa          String?
+  tipoValor      String
+  valor          Decimal @db.Decimal(18, 2)
+  indExeDR       Int?
+  dteId          String
+  dte            Dte     @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  @@index([dteId])
+  @@map("dte_global_discounts")
+  @@schema("public")
+}
+
+model DteLog {
+  id        String       @id @default(uuid())
+  action    DteLogAction
+  message   String?
+  metadata  Json?
+  actorId   String?
+  createdAt DateTime     @default(now())
+  dteId     String
+  dte       Dte          @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  @@index([dteId, action])
+  @@index([createdAt])
+  @@map("dte_logs")
   @@schema("public")
 }
 
