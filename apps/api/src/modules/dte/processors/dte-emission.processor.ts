@@ -218,6 +218,7 @@ export class DteEmissionProcessor extends WorkerHost {
       const sendResult = await this.siiSender.sendDte(
         envelopeXml,
         cert,
+        config.rut,
         config.environment,
       );
 

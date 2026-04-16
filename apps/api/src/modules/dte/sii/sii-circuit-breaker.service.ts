@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   ConsecutiveBreaker,
-  ExponentialBackoff,
   handleAll,
-  retry,
   circuitBreaker,
-  wrap,
   BrokenCircuitError,
 } from 'cockatiel';
 
@@ -16,25 +13,20 @@ export class SiiCircuitBreakerService {
   private isOpen = false;
 
   constructor() {
-    const retryPolicy = retry(handleAll, {
-      maxAttempts: 3,
-      backoff: new ExponentialBackoff({
-        initialDelay: 1000,
-        maxDelay: 30_000,
-      }),
-    });
-
+    // Only circuit breaker — no retry layer here.
+    // BullMQ handles retries at the job level, so adding retries here
+    // would cause double retry stacking (e.g. 3 retries x 5 attempts = 15 calls).
     const breakerPolicy = circuitBreaker(handleAll, {
       halfOpenAfter: 30_000,
       breaker: new ConsecutiveBreaker(5),
     });
 
     breakerPolicy.onStateChange((state) => {
-      this.isOpen = state === 'open';
-      this.logger.warn(`SII circuit breaker state changed to: ${state}`);
+      this.isOpen = String(state) === 'open';
+      this.logger.warn(`SII circuit breaker state changed to: ${String(state)}`);
     });
 
-    this.policy = wrap(retryPolicy, breakerPolicy);
+    this.policy = breakerPolicy;
   }
 
   async execute<T>(fn: () => Promise<T>): Promise<T> {

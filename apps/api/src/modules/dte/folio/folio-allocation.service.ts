@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { DteType, DteEnvironment } from '@prisma/client';
+import { PrismaClient, DteType, DteEnvironment } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 export interface AllocatedFolio {
@@ -29,7 +29,8 @@ export class FolioAllocationService {
     dteType: DteType,
     environment: DteEnvironment,
   ): Promise<AllocatedFolio> {
-    return this.prisma.$transaction(async (tx) => {
+    const db = this.prisma as unknown as PrismaClient;
+    return db.$transaction(async (tx) => {
       const folioRanges = await tx.$queryRawUnsafe<FolioRangeRow[]>(
         `SELECT id, "nextFolio", "rangeTo", "alertThreshold"
          FROM dte_folios

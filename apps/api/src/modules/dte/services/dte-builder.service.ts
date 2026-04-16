@@ -96,12 +96,21 @@ export class DteBuilderService {
     }
 
     const dte = new DTE(dteConfig);
-    dte.generarXML().timbrar(caf).firmar(cert);
+    dte.generarXML();
+    dte.timbrar(caf);
+    dte.firmar(cert);
+
+    const xml = dte.getXML();
+
+    // Extract the TED (Timbre Electrónico del DTE) from the signed XML.
+    // The TED is embedded by the library during timbrado.
+    const tedMatch = xml.match(/<TED[\s\S]*?<\/TED>/);
+    const tedXml = tedMatch ? tedMatch[0] : '';
 
     return {
-      xml: dte.getXML(),
-      tedXml: '',
-      montoTotal: dte.getMontoTotal(),
+      xml,
+      tedXml,
+      montoTotal: dte.montoTotal,
     };
   }
 
@@ -114,15 +123,15 @@ export class DteBuilderService {
     cert: Certificado,
   ): string {
     const envio = new EnvioDTE({
-      rpiEmisor: emisorRut,
-      rpiEnvia: enviaRut,
+      rutEmisor: emisorRut,
+      rutEnvia: enviaRut,
       fchResol: resolutionDate,
       nroResol: resolutionNum,
       certificado: cert,
     });
 
     for (const xml of dteXmls) {
-      envio.agregar(xml);
+      envio.agregar(xml as unknown as DTE);
     }
 
     return envio.generar();

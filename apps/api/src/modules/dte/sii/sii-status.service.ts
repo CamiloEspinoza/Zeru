@@ -30,8 +30,12 @@ export class SiiStatusService {
     this.logger.log(`Checking SII status for trackId=${trackId}`);
 
     const result = await this.circuitBreaker.execute(async () => {
-      const enviador = new EnviadorSII(cert, ambiente);
-      return enviador.consultarEstadoSoap(trackId, emisorRut);
+      const enviador = new EnviadorSII({
+        certificado: cert,
+        rutEmisor: emisorRut,
+        ambiente,
+      });
+      return enviador.consultarEstado(trackId) as Promise<Record<string, any>>;
     });
 
     return {

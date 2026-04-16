@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 export class Pdf417Service {
   async generate(tedXml: string): Promise<string> {
     const bwipjs = await import('bwip-js');
-    const pngBuffer = await bwipjs.toBuffer({
+    const pngBuffer = await (bwipjs as any).toBuffer({
       bcid: 'pdf417',
       text: tedXml,
       scale: 2,
@@ -12,6 +12,6 @@ export class Pdf417Service {
       eclevel: 5,
       encoding: 'latin1',
     });
-    return `data:image/png;base64,${pngBuffer.toString('base64')}`;
+    return `data:image/png;base64,${Buffer.from(pngBuffer).toString('base64')}`;
   }
 }

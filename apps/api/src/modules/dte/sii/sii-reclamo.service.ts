@@ -211,10 +211,10 @@ function buildRegistrarReclamoSoapEnvelope(
     '  <soapenv:Header/>',
     '  <soapenv:Body>',
     '    <ws:ingresarAccionDocumento>',
-    `      <rutEmisor>${rutEmisor}</rutEmisor>`,
-    `      <tipoDoc>${tipoDte}</tipoDoc>`,
-    `      <folio>${folio}</folio>`,
-    `      <accion>${action}</accion>`,
+    `      <rutEmisor>${escapeXml(rutEmisor)}</rutEmisor>`,
+    `      <tipoDoc>${escapeXml(String(tipoDte))}</tipoDoc>`,
+    `      <folio>${escapeXml(String(folio))}</folio>`,
+    `      <accion>${escapeXml(action)}</accion>`,
     '    </ws:ingresarAccionDocumento>',
     '  </soapenv:Body>',
     '</soapenv:Envelope>',
@@ -235,9 +235,9 @@ function buildConsultarEstadoSoapEnvelope(
     '  <soapenv:Header/>',
     '  <soapenv:Body>',
     '    <ws:consultarDocDteCedible>',
-    `      <rutEmisor>${rutEmisor}</rutEmisor>`,
-    `      <tipoDoc>${tipoDte}</tipoDoc>`,
-    `      <folio>${folio}</folio>`,
+    `      <rutEmisor>${escapeXml(rutEmisor)}</rutEmisor>`,
+    `      <tipoDoc>${escapeXml(String(tipoDte))}</tipoDoc>`,
+    `      <folio>${escapeXml(String(folio))}</folio>`,
     '    </ws:consultarDocDteCedible>',
     '  </soapenv:Body>',
     '</soapenv:Envelope>',
@@ -322,6 +322,18 @@ function parseConsultarEstadoResponse(
 // ────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────
+
+/**
+ * Escapes special XML characters to prevent XML injection in SOAP envelopes.
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 /**
  * Sanitizes a RUT to the format expected by SII: no dots, with dash.

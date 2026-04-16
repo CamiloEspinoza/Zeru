@@ -161,6 +161,15 @@ export class DteController {
     res.send(dte.xmlContent);
   }
 
+  @Post(':id/public-link')
+  @RequirePermission('invoicing', 'view')
+  generatePublicLink(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+  ) {
+    return this.dteService.generatePublicLink(tenantId, id);
+  }
+
   @Get(':id')
   @RequirePermission('invoicing', 'view')
   getById(@CurrentTenant() tenantId: string, @Param('id') id: string) {

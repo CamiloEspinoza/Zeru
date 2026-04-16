@@ -136,5 +136,37 @@ export class SiiStatusCheckProcessor extends WorkerHost {
     this.logger.error(
       `Status check failed for ${job.data.dteId}: ${error.message}`,
     );
+
+    try {
+      if (job.attemptsMade >= (job.opts.attempts ?? 5)) {
+        const db = this.prisma.forTenant(
+          job.data.tenantId,
+        ) as unknown as PrismaClient;
+
+        await db.dteLog.create({
+          data: {
+            dteId: job.data.dteId,
+            action: 'ERROR',
+            message: `Error tras ${job.attemptsMade} intentos: ${error.message}`,
+          },
+        });
+
+        await this.stateMachine.transition(
+          job.data.dteId,
+          'SENT',
+          'ERROR',
+          db,
+          `Status check failed after ${job.attemptsMade} attempts: ${error.message}`,
+        );
+
+        this.eventEmitter.emit('dte.failed', {
+          tenantId: job.data.tenantId,
+          dteId: job.data.dteId,
+          error: error.message,
+        });
+      }
+    } catch (logError) {
+      this.logger.error(`Failed to handle status check failure: ${logError}`);
+    }
   }
 }

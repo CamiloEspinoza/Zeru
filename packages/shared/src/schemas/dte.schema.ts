@@ -187,3 +187,22 @@ export const decideReceivedDteSchema = z.object({
 });
 
 export type DecideReceivedDteSchema = z.infer<typeof decideReceivedDteSchema>;
+
+// ─── Account Mapping ─────────────────────────────
+
+export const dteAccountMappingSchema = z.object({
+  dteTypeCode: z.number().int(),
+  direction: z.enum(['EMITTED', 'RECEIVED']),
+  receivableAccountId: z.string().uuid().optional(),
+  payableAccountId: z.string().uuid().optional(),
+  cashAccountId: z.string().uuid().optional(),
+  revenueAccountId: z.string().uuid().optional(),
+  revenueExemptAccountId: z.string().uuid().optional(),
+  purchaseAccountId: z.string().uuid().optional(),
+  ivaDebitoAccountId: z.string().uuid().optional(),
+  ivaCreditoAccountId: z.string().uuid().optional(),
+  salesReturnAccountId: z.string().uuid().optional(),
+  purchaseReturnAccountId: z.string().uuid().optional(),
+});
+
+export type DteAccountMappingSchema = z.infer<typeof dteAccountMappingSchema>;

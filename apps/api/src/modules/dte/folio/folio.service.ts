@@ -68,8 +68,8 @@ export class FolioService {
 
   async getDecryptedCaf(tenantId: string, folioId: string): Promise<CAF> {
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
-    const record = await db.dteFolio.findUniqueOrThrow({
-      where: { id: folioId },
+    const record = await db.dteFolio.findFirstOrThrow({
+      where: { id: folioId, tenantId },
     });
     const cafXml = this.encryption.decrypt(record.encryptedCafXml);
     return new CAF(cafXml);

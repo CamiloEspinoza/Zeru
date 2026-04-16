@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 // Constants
 import {
@@ -20,6 +21,8 @@ import { DteReceivedController } from './controllers/dte-received.controller';
 import { DteConfigController } from './controllers/dte-config.controller';
 import { CertificateController } from './controllers/certificate.controller';
 import { FolioController } from './controllers/folio.controller';
+import { DtePublicController } from './controllers/dte-public.controller';
+import { DteReportsController } from './controllers/dte-reports.controller';
 
 // Services
 import { DteConfigService } from './services/dte-config.service';
@@ -27,6 +30,7 @@ import { DteService } from './services/dte.service';
 import { DteDraftService } from './services/dte-draft.service';
 import { DteEmissionService } from './services/dte-emission.service';
 import { DteBuilderService } from './services/dte-builder.service';
+// import { BoletaBuilderService } from './services/boleta-builder.service';
 import { DteStateMachineService } from './services/dte-state-machine.service';
 import { ReceptorLookupService } from './services/receptor-lookup.service';
 import { DteVoidService } from './services/dte-void.service';
@@ -35,6 +39,7 @@ import { DteReissueService } from './services/dte-reissue.service';
 import { DtePdfService } from './services/dte-pdf.service';
 import { Pdf417Service } from './services/pdf417.service';
 import { DteReceivedService } from './services/dte-received.service';
+import { DteAccountMappingService } from './services/dte-account-mapping.service';
 
 // Certificate
 import { CertificateService } from './certificate/certificate.service';
@@ -49,6 +54,9 @@ import { SiiCircuitBreakerService } from './sii/sii-circuit-breaker.service';
 import { SiiSenderService } from './sii/sii-sender.service';
 import { SiiStatusService } from './sii/sii-status.service';
 import { SiiReclamoService } from './sii/sii-reclamo.service';
+// Plan G (boletas) - not yet wired into providers
+// import { SiiBoletaRestService } from './sii/sii-boleta-rest.service';
+// import { SiiRateLimiterService } from './sii/sii-rate-limiter.service';
 
 // Exchange
 import { ImapPollingService } from './exchange/imap-polling.service';
@@ -63,13 +71,27 @@ import { SiiStatusCheckProcessor } from './processors/sii-status-check.processor
 // Event listeners
 import { DteExchangeListener } from './listeners/dte-exchange.listener';
 import { DteNotificationListener } from './listeners/dte-notification.listener';
+import { DteAccountingListener } from './listeners/dte-accounting.listener';
 
 // Crons
 import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
 import { DeadlineCron } from './cron/deadline.cron';
 
+// Accounting module (for journal entry creation)
+import { AccountingModule } from '../accounting/accounting.module';
+
 @Module({
   imports: [
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (config: ConfigService) => ({
+        secret: config.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: (config.get<string>('JWT_EXPIRATION') ?? '7d') as any,
+        },
+      }),
+      inject: [ConfigService],
+    }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -107,14 +129,17 @@ import { DeadlineCron } from './cron/deadline.cron';
         defaultJobOptions: DTE_QUEUE_CONFIG.RECEIVED,
       },
     ),
+    AccountingModule,
   ],
   controllers: [
     DteController,
+    DtePublicController,
     DteVoidController,
     DteReceivedController,
     DteConfigController,
     CertificateController,
     FolioController,
+    DteReportsController,
   ],
   providers: [
     // Services
@@ -131,6 +156,7 @@ import { DeadlineCron } from './cron/deadline.cron';
     DtePdfService,
     Pdf417Service,
     DteReceivedService,
+    DteAccountMappingService,
 
     // Certificate
     CertificateService,
@@ -159,6 +185,7 @@ import { DeadlineCron } from './cron/deadline.cron';
     // Event listeners
     DteExchangeListener,
     DteNotificationListener,
+    DteAccountingListener,
 
     // Crons
     OrphanRecoveryCron,
@@ -174,6 +201,7 @@ import { DeadlineCron } from './cron/deadline.cron';
     FolioAllocationService,
     SiiCircuitBreakerService,
     ReceptorLookupService,
+    DteAccountMappingService,
   ],
 })
 export class DteModule {}

@@ -10,8 +10,13 @@ export class EncryptionService {
   private readonly encryptionKey: Buffer;
 
   constructor(private readonly config: ConfigService) {
-    const key = this.config.get<string>('ENCRYPTION_KEY') ?? '';
-    this.encryptionKey = Buffer.from(key.padEnd(64, '0').slice(0, 64), 'hex');
+    const key = this.config.get<string>('ENCRYPTION_KEY');
+    if (!key || key.length < 64) {
+      throw new Error(
+        'ENCRYPTION_KEY env var is missing or too short (requires 64 hex chars)',
+      );
+    }
+    this.encryptionKey = Buffer.from(key, 'hex');
   }
 
   encrypt(text: string): string {

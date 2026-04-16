@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PrismaClient, DteType, DteStatus, DteDirection } from '@prisma/client';
 
+const DTE_PUBLIC_LINK_EXPIRY = '30d';
+
 @Injectable()
 export class DteService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
 
   async list(
     tenantId: string,
@@ -46,5 +54,18 @@ export class DteService {
         exchanges: { include: { events: true } },
       },
     });
+  }
+
+  generatePublicLink(tenantId: string, dteId: string): { url: string; expiresIn: string } {
+    const token = this.jwtService.sign(
+      { dteId, tenantId, purpose: 'dte-public-link' },
+      { expiresIn: DTE_PUBLIC_LINK_EXPIRY },
+    );
+
+    const apiUrl =
+      this.config.get<string>('API_URL') ?? 'http://localhost:3017/api';
+    const url = `${apiUrl}/dte/public/${token}`;
+
+    return { url, expiresIn: DTE_PUBLIC_LINK_EXPIRY };
   }
 }

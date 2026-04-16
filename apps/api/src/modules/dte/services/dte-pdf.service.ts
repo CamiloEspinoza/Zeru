@@ -32,7 +32,12 @@ export class DtePdfService {
     });
 
     const templatesDir = join(__dirname, '..', 'templates');
-    const templateNames = ['factura', 'boleta', 'boleta-thermal'];
+    const templateNames = [
+      'factura',
+      'boleta',
+      'boleta-thermal',
+      'guia-despacho',
+    ];
 
     for (const name of templateNames) {
       try {
@@ -42,7 +47,7 @@ export class DtePdfService {
         );
         this.templates[name] = Handlebars.compile(source);
       } catch (error) {
-        this.logger.warn(`Template ${name}.hbs not found: ${error.message}`);
+        this.logger.warn(`Template ${name}.hbs not found: ${(error as Error).message}`);
       }
     }
   }
@@ -79,12 +84,15 @@ export class DtePdfService {
     // Select template
     const siiCode = DTE_TYPE_TO_SII_CODE[dte.dteType] || 0;
     const isBoleta = [39, 41].includes(siiCode);
+    const isGuiaDespacho = siiCode === 52;
     let templateName: string;
 
     if (format === 'thermal') {
       templateName = 'boleta-thermal';
     } else if (isBoleta) {
       templateName = 'boleta';
+    } else if (isGuiaDespacho) {
+      templateName = 'guia-despacho';
     } else {
       templateName = 'factura';
     }
@@ -99,6 +107,35 @@ export class DtePdfService {
       2: 'Crédito',
       3: 'Sin Costo',
     };
+
+    const tipoDespachoNames: Record<number, string> = {
+      1: '1 - Operacion constituye venta',
+      2: '2 - Ventas por efectuar',
+      3: '3 - Consignaciones',
+      4: '4 - Entrega gratuita',
+      5: '5 - Traslados internos',
+      6: '6 - Otros traslados no venta',
+      7: '7 - Guia de devolucion',
+      8: '8 - Traslado para exportacion (no DUS)',
+      9: '9 - Venta para exportacion',
+    };
+
+    const indTrasladoNames: Record<number, string> = {
+      1: '1 - Operacion constituye venta',
+      2: '2 - Ventas por efectuar',
+      3: '3 - Consignaciones',
+      4: '4 - Entrega gratuita',
+      5: '5 - Traslados internos',
+      6: '6 - Otros traslados no venta',
+      7: '7 - Guia de devolucion',
+      8: '8 - Traslado para exportacion (no DUS)',
+      9: '9 - Venta para exportacion',
+    };
+
+    // Extract guia-despacho specific fields from siiResponse JSON if present
+    const siiData = (dte.siiResponse as Record<string, unknown>) ?? {};
+    const tipoDespacho = siiData['tipoDespacho'] as number | undefined;
+    const indTraslado = siiData['indTraslado'] as number | undefined;
 
     // Render HTML
     const html = template({
@@ -151,6 +188,13 @@ export class DtePdfService {
       resolutionDate: '',
       isBoleta,
       branding: { logoUrl: undefined },
+      // Guia de Despacho specific fields
+      tipoDespachoNombre: tipoDespacho
+        ? tipoDespachoNames[tipoDespacho]
+        : undefined,
+      indTrasladoNombre: indTraslado
+        ? indTrasladoNames[indTraslado]
+        : undefined,
     });
 
     // HTML -> PDF via Puppeteer

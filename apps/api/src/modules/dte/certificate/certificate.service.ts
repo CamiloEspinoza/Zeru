@@ -70,7 +70,8 @@ export class CertificateService {
       action: 'UPLOADED',
     });
 
-    return cert;
+    const { encryptedP12: _, encryptedPassword: __, ...safeCert } = cert;
+    return safeCert;
   }
 
   async getPrimaryCert(tenantId: string): Promise<Certificado> {

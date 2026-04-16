@@ -49,7 +49,7 @@ export class DeadlineCron {
     db: PrismaClient,
     now: Date,
   ): Promise<number> {
-    // Find all received DTEs past deadline without a decision
+    // Cross-tenant read is acceptable for cron scanning
     const expired = await db.dte.findMany({
       where: {
         direction: 'RECEIVED',
@@ -60,39 +60,50 @@ export class DeadlineCron {
       select: { id: true, tenantId: true, folio: true, emisorRut: true },
     });
 
+    // Group by tenantId so writes use tenant-scoped clients
+    const grouped = new Map<string, typeof expired>();
     for (const dte of expired) {
-      await db.dte.update({
-        where: { id: dte.id },
-        data: {
-          status: 'ACCEPTED',
-          decidedAt: now,
-        },
-      });
+      const list = grouped.get(dte.tenantId) ?? [];
+      list.push(dte);
+      grouped.set(dte.tenantId, list);
+    }
 
-      // Update exchange status
-      await db.dteExchange.updateMany({
-        where: { dteId: dte.id, tenantId: dte.tenantId },
-        data: { status: 'TACIT_ACCEPTANCE' },
-      });
+    for (const [tenantId, dtes] of grouped) {
+      const tenantDb = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-      await db.dteLog.create({
-        data: {
+      for (const dte of dtes) {
+        await tenantDb.dte.update({
+          where: { id: dte.id },
+          data: {
+            status: 'ACCEPTED',
+            decidedAt: now,
+          },
+        });
+
+        await tenantDb.dteExchange.updateMany({
+          where: { dteId: dte.id, tenantId: dte.tenantId },
+          data: { status: 'TACIT_ACCEPTANCE' },
+        });
+
+        await tenantDb.dteLog.create({
+          data: {
+            dteId: dte.id,
+            action: 'ACCEPTED',
+            message:
+              'Aceptación tácita — plazo de 8 días hábiles vencido sin respuesta',
+          },
+        });
+
+        this.eventEmitter.emit('dte.received.tacit-acceptance', {
+          tenantId: dte.tenantId,
           dteId: dte.id,
-          action: 'ACCEPTED',
-          message:
-            'Aceptación tácita — plazo de 8 días hábiles vencido sin respuesta',
-        },
-      });
+          folio: dte.folio,
+        });
 
-      this.eventEmitter.emit('dte.received.tacit-acceptance', {
-        tenantId: dte.tenantId,
-        dteId: dte.id,
-        folio: dte.folio,
-      });
-
-      this.logger.log(
-        `Tacit acceptance for DTE ${dte.id} (folio ${dte.folio} from ${dte.emisorRut})`,
-      );
+        this.logger.log(
+          `Tacit acceptance for DTE ${dte.id} (folio ${dte.folio} from ${dte.emisorRut})`,
+        );
+      }
     }
 
     return expired.length;

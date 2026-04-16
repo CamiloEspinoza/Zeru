@@ -171,8 +171,10 @@ export class ImapPollingService {
       if (client) {
         try {
           await client.logout();
-        } catch {
-          // Ignore logout errors — connection may already be closed
+        } catch (logoutError) {
+          this.logger.warn(
+            `IMAP logout failed for tenant ${tenantId} (connection may already be closed): ${logoutError}`,
+          );
         }
       }
     }
@@ -260,8 +262,10 @@ export class ImapPollingService {
           if (decoded.includes('<DTE') || decoded.includes('<EnvioDTE')) {
             results.push(decoded);
           }
-        } catch {
-          // Not valid base64, skip
+        } catch (decodeError) {
+          this.logger.warn(
+            `Failed to decode base64 XML attachment in MIME source: ${decodeError}`,
+          );
         }
       } else if (
         bodyContent.includes('<DTE') ||

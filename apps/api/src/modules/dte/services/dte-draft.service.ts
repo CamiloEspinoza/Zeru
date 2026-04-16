@@ -10,10 +10,15 @@ export class DteDraftService {
   async create(tenantId: string, userId: string, data: EmitDteSchema) {
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    // Use a unique negative folio for each draft to avoid violating
+    // the @@unique([tenantId, dteType, folio, emisorRut]) constraint.
+    // The real folio is assigned later in DteEmissionService.emit().
+    const draftFolio = -Math.abs(Date.now() % 2_147_483_647);
+
     return db.dte.create({
       data: {
         dteType: data.dteType,
-        folio: 0,
+        folio: draftFolio,
         environment: 'CERTIFICATION',
         status: 'DRAFT',
         direction: 'EMITTED',
