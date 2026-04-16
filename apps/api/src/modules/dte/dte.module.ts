@@ -30,7 +30,8 @@ import { DteService } from './services/dte.service';
 import { DteDraftService } from './services/dte-draft.service';
 import { DteEmissionService } from './services/dte-emission.service';
 import { DteBuilderService } from './services/dte-builder.service';
-// import { BoletaBuilderService } from './services/boleta-builder.service';
+import { BoletaBuilderService } from './services/boleta-builder.service';
+import { RcofService } from './services/rcof.service';
 import { DteStateMachineService } from './services/dte-state-machine.service';
 import { ReceptorLookupService } from './services/receptor-lookup.service';
 import { DteVoidService } from './services/dte-void.service';
@@ -54,9 +55,8 @@ import { SiiCircuitBreakerService } from './sii/sii-circuit-breaker.service';
 import { SiiSenderService } from './sii/sii-sender.service';
 import { SiiStatusService } from './sii/sii-status.service';
 import { SiiReclamoService } from './sii/sii-reclamo.service';
-// Plan G (boletas) - not yet wired into providers
-// import { SiiBoletaRestService } from './sii/sii-boleta-rest.service';
-// import { SiiRateLimiterService } from './sii/sii-rate-limiter.service';
+import { SiiBoletaRestService } from './sii/sii-boleta-rest.service';
+import { SiiRateLimiterService } from './sii/sii-rate-limiter.service';
 
 // Exchange
 import { ImapPollingService } from './exchange/imap-polling.service';
@@ -76,6 +76,7 @@ import { DteAccountingListener } from './listeners/dte-accounting.listener';
 // Crons
 import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
 import { DeadlineCron } from './cron/deadline.cron';
+import { RcofCron } from './cron/rcof.cron';
 
 // Accounting module (for journal entry creation)
 import { AccountingModule } from '../accounting/accounting.module';
@@ -157,6 +158,8 @@ import { AccountingModule } from '../accounting/accounting.module';
     Pdf417Service,
     DteReceivedService,
     DteAccountMappingService,
+    BoletaBuilderService,
+    RcofService,
 
     // Certificate
     CertificateService,
@@ -171,6 +174,8 @@ import { AccountingModule } from '../accounting/accounting.module';
     SiiSenderService,
     SiiStatusService,
     SiiReclamoService,
+    SiiBoletaRestService,
+    SiiRateLimiterService,
 
     // Exchange
     ImapPollingService,
@@ -190,6 +195,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     // Crons
     OrphanRecoveryCron,
     DeadlineCron,
+    RcofCron,
   ],
   exports: [
     DteConfigService,
