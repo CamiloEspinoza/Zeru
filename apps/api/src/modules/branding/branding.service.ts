@@ -35,10 +35,17 @@ export class BrandingService {
   }
 
   async updateColors(tenantId: string, dto: UpdateBrandingDto) {
+    const data: Record<string, unknown> = {};
+    if (dto.primaryColor !== undefined) data.primaryColor = dto.primaryColor;
+    if (dto.secondaryColor !== undefined) data.secondaryColor = dto.secondaryColor;
+    if (dto.accentColor !== undefined) data.accentColor = dto.accentColor;
+    if (dto.themeOverrides !== undefined) data.themeOverrides = dto.themeOverrides ?? null;
+    if (dto.borderRadius !== undefined) data.borderRadius = dto.borderRadius;
+
     return this.prisma.tenantBranding.upsert({
       where: { tenantId },
-      create: { tenantId, ...dto },
-      update: dto,
+      create: { tenantId, ...data },
+      update: data,
     });
   }
 
@@ -328,14 +335,48 @@ Responde SOLO con JSON válido, sin markdown: {"primary":"#hex","secondary":"#he
     return palette;
   }
 
-  private async logAiUsage(tenantId: string, response: any) {
+  async suggestColor(
+    tenantId: string,
+    description: string,
+  ): Promise<{ hex: string }> {
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI();
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 64,
+      messages: [
+        {
+          role: 'user',
+          content: `Sugiere UN solo color hexadecimal que represente esta descripcion de estilo de marca: "${description}".
+Responde SOLO con el color en formato #RRGGBB, sin explicacion ni texto adicional.`,
+        },
+      ],
+    });
+
+    const content = response.choices[0]?.message?.content?.trim() ?? '';
+    const match = content.match(/#[0-9a-fA-F]{6}/);
+    if (!match) {
+      throw new BadRequestException('No se pudo generar un color valido');
+    }
+
+    await this.logAiUsage(tenantId, response, 'branding-suggest-color');
+
+    return { hex: match[0] };
+  }
+
+  private async logAiUsage(
+    tenantId: string,
+    response: any,
+    feature = 'branding-palette-generation',
+  ) {
     try {
       await this.prisma.aiUsageLog.create({
         data: {
           tenantId,
           provider: 'OPENAI',
           model: response.model || 'gpt-4o',
-          feature: 'branding-palette-generation',
+          feature,
           inputTokens: response.usage?.prompt_tokens || 0,
           outputTokens: response.usage?.completion_tokens || 0,
         },

@@ -1,3 +1,8 @@
+export interface ThemeOverrides {
+  light?: Record<string, string>;
+  dark?: Record<string, string>;
+}
+
 export interface TenantBranding {
   id: string;
   tenantId: string;
@@ -7,6 +12,8 @@ export interface TenantBranding {
   primaryColor: string | null;
   secondaryColor: string | null;
   accentColor: string | null;
+  themeOverrides: ThemeOverrides | null;
+  borderRadius: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +35,8 @@ export interface UpdateBrandingInput {
   primaryColor?: string;
   secondaryColor?: string;
   accentColor?: string;
+  themeOverrides?: ThemeOverrides;
+  borderRadius?: string;
 }
 
 export interface GeneratePaletteInput {
@@ -39,4 +48,8 @@ export interface GeneratePaletteResult {
   primary: string;
   secondary: string;
   accent: string;
+}
+
+export interface SuggestColorResult {
+  hex: string;
 }

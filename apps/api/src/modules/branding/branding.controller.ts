@@ -19,8 +19,10 @@ import { BrandingService } from './branding.service';
 import {
   updateBrandingDto,
   generatePaletteDto,
+  suggestColorDto,
   UpdateBrandingDto,
   GeneratePaletteDto,
+  SuggestColorDto,
 } from './dto';
 
 @Controller('tenants/current/branding')
@@ -102,5 +104,13 @@ export class BrandingController {
     @Body(new ZodValidationPipe(generatePaletteDto)) body: GeneratePaletteDto,
   ) {
     return this.brandingService.generatePalette(tenantId, body);
+  }
+
+  @Post('suggest-color')
+  async suggestColor(
+    @CurrentTenant() tenantId: string,
+    @Body(new ZodValidationPipe(suggestColorDto)) body: SuggestColorDto,
+  ) {
+    return this.brandingService.suggestColor(tenantId, body.description);
   }
 }

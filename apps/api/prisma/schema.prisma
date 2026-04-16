@@ -3511,6 +3511,8 @@ model TenantBranding {
   primaryColor   String?
   secondaryColor String?
   accentColor    String?
+  themeOverrides Json?
+  borderRadius   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
