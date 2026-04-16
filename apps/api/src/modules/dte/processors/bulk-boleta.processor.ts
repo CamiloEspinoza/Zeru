@@ -128,21 +128,27 @@ export class BulkBoletaProcessor extends WorkerHost {
 
     // Step 4: Update all boletas with trackId and transition to SENT
     for (const dte of signedBoletas) {
-      await db.dte.update({
-        where: { id: dte.id },
-        data: {
-          siiTrackId: sendResult.trackId,
-          siiResponse: { trackId: sendResult.trackId, bulk: true } as any,
-        },
-      });
+      try {
+        await db.dte.update({
+          where: { id: dte.id },
+          data: {
+            siiTrackId: sendResult.trackId,
+            siiResponse: { trackId: sendResult.trackId, bulk: true } as any,
+          },
+        });
 
-      await this.stateMachine.transition(
-        dte.id,
-        'SIGNED',
-        'SENT',
-        db,
-        `Enviado al SII en lote (TrackID: ${sendResult.trackId})`,
-      );
+        await this.stateMachine.transition(
+          dte.id,
+          'SIGNED',
+          'SENT',
+          db,
+          `Enviado al SII en lote (TrackID: ${sendResult.trackId})`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to update boleta ${dte.id} after bulk send: ${err}`,
+        );
+      }
     }
 
     // Step 5: Queue a single status check for the batch (using the first DTE as reference)

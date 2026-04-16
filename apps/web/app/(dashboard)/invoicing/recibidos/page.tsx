@@ -13,6 +13,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 
@@ -145,6 +156,9 @@ function RecibidosContent() {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectDteId, setRejectDteId] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
 
   const status = searchParams.get("status") ?? "";
   const pendingOnly = searchParams.get("pending") === "true";
@@ -218,15 +232,24 @@ function RecibidosContent() {
     }
   };
 
-  const handleReject = async (dteId: string) => {
-    if (!tenantId) return;
-    setActionLoading(dteId);
+  const openRejectDialog = (dteId: string) => {
+    setRejectDteId(dteId);
+    setRejectReason("");
+    setRejectDialogOpen(true);
+  };
+
+  const handleReject = async () => {
+    if (!tenantId || !rejectDteId || !rejectReason.trim()) return;
+    setActionLoading(rejectDteId);
     try {
       await api.post(
-        `/dte/received/${dteId}/reject`,
-        { reason: "Rechazado por el usuario" },
+        `/dte/received/${rejectDteId}/reject`,
+        { reason: rejectReason.trim() },
         { tenantId },
       );
+      setRejectDialogOpen(false);
+      setRejectDteId("");
+      setRejectReason("");
       fetchData();
     } catch (err) {
       setError((err as Error).message ?? "Error al rechazar DTE");
@@ -397,7 +420,7 @@ function RecibidosContent() {
                                   disabled={actionLoading === dte.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleReject(dte.id);
+                                    openRejectDialog(dte.id);
                                   }}
                                 >
                                   Rechazar
@@ -456,6 +479,42 @@ function RecibidosContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reject Dialog */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Rechazar DTE</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ingrese el motivo del rechazo. Esta accion enviara una respuesta de
+              rechazo al emisor del documento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Motivo del rechazo..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setRejectDteId("");
+                setRejectReason("");
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!rejectReason.trim() || !!actionLoading}
+              onClick={handleReject}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {actionLoading ? "Rechazando..." : "Confirmar rechazo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

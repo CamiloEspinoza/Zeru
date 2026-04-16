@@ -73,6 +73,9 @@ import { ExchangeResponseService } from './exchange/exchange-response.service';
 import { DteEmissionProcessor } from './processors/dte-emission.processor';
 import { SiiStatusCheckProcessor } from './processors/sii-status-check.processor';
 import { BulkBoletaProcessor } from './processors/bulk-boleta.processor';
+import { DteExchangeProcessor } from './processors/dte-exchange.processor';
+import { DteReceivedProcessor } from './processors/dte-received.processor';
+import { RcofProcessor } from './processors/rcof.processor';
 
 // Event listeners
 import { DteExchangeListener } from './listeners/dte-exchange.listener';
@@ -203,6 +206,9 @@ import { NotificationModule } from '../notification/notification.module';
     DteEmissionProcessor,
     SiiStatusCheckProcessor,
     BulkBoletaProcessor,
+    DteExchangeProcessor,
+    DteReceivedProcessor,
+    RcofProcessor,
 
     // Event listeners
     DteExchangeListener,

@@ -151,7 +151,7 @@ export class DteController {
 
   @Get(':id/xml')
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'download-xml')
   async downloadXml(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

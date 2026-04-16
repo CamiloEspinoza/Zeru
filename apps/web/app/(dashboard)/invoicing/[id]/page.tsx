@@ -7,6 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 
@@ -157,6 +168,8 @@ export default function DteDetailPage() {
   const [loading, setLoading] = useState(!!tenantId && !!id);
   const [error, setError] = useState<string | null>(null);
   const [voidLoading, setVoidLoading] = useState(false);
+  const [voidDialogOpen, setVoidDialogOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState("");
   const [publicLink, setPublicLink] = useState<string | null>(null);
 
   const fetchDte = useCallback(() => {
@@ -241,13 +254,13 @@ export default function DteDetailPage() {
   };
 
   const handleVoid = async () => {
-    if (!tenantId || !id) return;
-    const reason = window.prompt("Motivo de anulacion:");
-    if (!reason) return;
+    if (!tenantId || !id || !voidReason.trim()) return;
 
     setVoidLoading(true);
     try {
-      await api.post(`/dte/${id}/void`, { reason }, { tenantId });
+      await api.post(`/dte/${id}/void`, { reason: voidReason.trim() }, { tenantId });
+      setVoidDialogOpen(false);
+      setVoidReason("");
       fetchDte();
     } catch (err) {
       setError((err as Error).message ?? "Error al anular DTE");
@@ -335,7 +348,7 @@ export default function DteDetailPage() {
               variant="destructive"
               size="sm"
               disabled={voidLoading}
-              onClick={handleVoid}
+              onClick={() => setVoidDialogOpen(true)}
             >
               {voidLoading ? "Anulando..." : "Anular"}
             </Button>
@@ -614,6 +627,41 @@ export default function DteDetailPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Void Dialog */}
+      <AlertDialog open={voidDialogOpen} onOpenChange={setVoidDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anular DTE</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta accion es irreversible. Se generara una Nota de Credito que
+              anula este documento. Ingrese el motivo de la anulacion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Motivo de anulacion..."
+            value={voidReason}
+            onChange={(e) => setVoidReason(e.target.value)}
+            rows={3}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setVoidReason("");
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!voidReason.trim() || voidLoading}
+              onClick={handleVoid}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {voidLoading ? "Anulando..." : "Confirmar anulacion"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -21,7 +21,7 @@ export class DteConfigController {
   @SkipThrottle()
   @RequirePermission('invoicing', 'view-config')
   get(@CurrentTenant() tenantId: string) {
-    return this.service.getOptional(tenantId);
+    return this.service.getForApi(tenantId);
   }
 
   @Put()

@@ -29,109 +29,141 @@ export class DteNotificationListener {
 
   @OnEvent('dte.signed')
   async handleSigned(payload: DteEventPayload) {
-    const typeName = this.getTypeName(payload.dteType);
-    const title = `DTE ${typeName} N.${payload.folio} firmado y listo para descarga`;
+    try {
+      const typeName = this.getTypeName(payload.dteType);
+      const title = `DTE ${typeName} N.${payload.folio} firmado y listo para descarga`;
 
-    this.logger.log(`Notifying: ${typeName} #${payload.folio} firmada y lista`);
+      this.logger.log(`Notifying: ${typeName} #${payload.folio} firmada y lista`);
 
-    const recipients = await this.getRecipients(
-      payload.tenantId,
-      payload.dteId,
-    );
+      const recipients = await this.getRecipients(
+        payload.tenantId,
+        payload.dteId,
+      );
 
-    for (const recipientId of recipients) {
-      await this.notificationService.notify({
-        type: 'dte.signed',
-        title,
-        body: `Monto total: $${(payload.montoTotal ?? 0).toLocaleString('es-CL')}`,
-        data: { dteId: payload.dteId, folio: payload.folio, dteType: payload.dteType },
-        groupKey: `dte-signed:${payload.dteId}`,
-        recipientId,
-        tenantId: payload.tenantId,
-      });
+      for (const recipientId of recipients) {
+        try {
+          await this.notificationService.notify({
+            type: 'dte.signed',
+            title,
+            body: `Monto total: $${(payload.montoTotal ?? 0).toLocaleString('es-CL')}`,
+            data: { dteId: payload.dteId, folio: payload.folio, dteType: payload.dteType },
+            groupKey: `dte-signed:${payload.dteId}`,
+            recipientId,
+            tenantId: payload.tenantId,
+          });
+        } catch (err) {
+          this.logger.error(`Failed to notify recipient ${recipientId} for dte.signed ${payload.dteId}: ${err}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send notification for dte.signed ${payload.dteId}: ${error}`);
     }
   }
 
   @OnEvent('dte.accepted')
   async handleAccepted(payload: DteEventPayload) {
-    const typeName = this.getTypeName(payload.dteType);
-    const title = `DTE ${typeName} N.${payload.folio} aceptado por el SII`;
+    try {
+      const typeName = this.getTypeName(payload.dteType);
+      const title = `DTE ${typeName} N.${payload.folio} aceptado por el SII`;
 
-    this.logger.log(`DTE ${payload.dteId} aceptado por SII`);
+      this.logger.log(`DTE ${payload.dteId} aceptado por SII`);
 
-    const recipients = await this.getRecipients(
-      payload.tenantId,
-      payload.dteId,
-    );
+      const recipients = await this.getRecipients(
+        payload.tenantId,
+        payload.dteId,
+      );
 
-    for (const recipientId of recipients) {
-      await this.notificationService.notify({
-        type: 'dte.accepted',
-        title,
-        data: { dteId: payload.dteId, folio: payload.folio, dteType: payload.dteType },
-        groupKey: `dte-accepted:${payload.dteId}`,
-        recipientId,
-        tenantId: payload.tenantId,
-      });
+      for (const recipientId of recipients) {
+        try {
+          await this.notificationService.notify({
+            type: 'dte.accepted',
+            title,
+            data: { dteId: payload.dteId, folio: payload.folio, dteType: payload.dteType },
+            groupKey: `dte-accepted:${payload.dteId}`,
+            recipientId,
+            tenantId: payload.tenantId,
+          });
+        } catch (err) {
+          this.logger.error(`Failed to notify recipient ${recipientId} for dte.accepted ${payload.dteId}: ${err}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send notification for dte.accepted ${payload.dteId}: ${error}`);
     }
   }
 
   @OnEvent('dte.rejected')
   async handleRejected(payload: DteEventPayload) {
-    const typeName = this.getTypeName(payload.dteType);
-    const title = `DTE ${typeName} N.${payload.folio} RECHAZADO por el SII — revisar`;
+    try {
+      const typeName = this.getTypeName(payload.dteType);
+      const title = `DTE ${typeName} N.${payload.folio} RECHAZADO por el SII — revisar`;
 
-    this.logger.warn(`DTE ${payload.dteId} RECHAZADO por SII`);
+      this.logger.warn(`DTE ${payload.dteId} RECHAZADO por SII`);
 
-    const recipients = await this.getRecipients(
-      payload.tenantId,
-      payload.dteId,
-    );
+      const recipients = await this.getRecipients(
+        payload.tenantId,
+        payload.dteId,
+      );
 
-    for (const recipientId of recipients) {
-      await this.notificationService.notify({
-        type: 'dte.rejected',
-        title,
-        body: 'Acción requerida: revise el DTE rechazado y corrija los errores.',
-        data: {
-          dteId: payload.dteId,
-          folio: payload.folio,
-          dteType: payload.dteType,
-          urgent: true,
-        },
-        groupKey: `dte-rejected:${payload.dteId}`,
-        recipientId,
-        tenantId: payload.tenantId,
-      });
+      for (const recipientId of recipients) {
+        try {
+          await this.notificationService.notify({
+            type: 'dte.rejected',
+            title,
+            body: 'Acción requerida: revise el DTE rechazado y corrija los errores.',
+            data: {
+              dteId: payload.dteId,
+              folio: payload.folio,
+              dteType: payload.dteType,
+              urgent: true,
+            },
+            groupKey: `dte-rejected:${payload.dteId}`,
+            recipientId,
+            tenantId: payload.tenantId,
+          });
+        } catch (err) {
+          this.logger.error(`Failed to notify recipient ${recipientId} for dte.rejected ${payload.dteId}: ${err}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send notification for dte.rejected ${payload.dteId}: ${error}`);
     }
   }
 
   @OnEvent('dte.failed')
   async handleFailed(payload: DteEventPayload) {
-    const title = `Error en DTE — ${payload.error ?? 'Error desconocido'}`;
+    try {
+      const title = `Error en DTE — ${payload.error ?? 'Error desconocido'}`;
 
-    this.logger.error(`DTE ${payload.dteId} ERROR: ${payload.error}`);
+      this.logger.error(`DTE ${payload.dteId} ERROR: ${payload.error}`);
 
-    const recipients = await this.getRecipients(
-      payload.tenantId,
-      payload.dteId,
-    );
+      const recipients = await this.getRecipients(
+        payload.tenantId,
+        payload.dteId,
+      );
 
-    for (const recipientId of recipients) {
-      await this.notificationService.notify({
-        type: 'dte.failed',
-        title,
-        body: payload.error ?? 'Se produjo un error inesperado al procesar el DTE.',
-        data: {
-          dteId: payload.dteId,
-          folio: payload.folio,
-          dteType: payload.dteType,
-          error: payload.error,
-          urgent: true,
-        },
-        recipientId,
-        tenantId: payload.tenantId,
-      });
+      for (const recipientId of recipients) {
+        try {
+          await this.notificationService.notify({
+            type: 'dte.failed',
+            title,
+            body: payload.error ?? 'Se produjo un error inesperado al procesar el DTE.',
+            data: {
+              dteId: payload.dteId,
+              folio: payload.folio,
+              dteType: payload.dteType,
+              error: payload.error,
+              urgent: true,
+            },
+            recipientId,
+            tenantId: payload.tenantId,
+          });
+        } catch (err) {
+          this.logger.error(`Failed to notify recipient ${recipientId} for dte.failed ${payload.dteId}: ${err}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send notification for dte.failed ${payload.dteId}: ${error}`);
     }
   }
 
@@ -163,23 +195,13 @@ export class DteNotificationListener {
         return [dte.createdById];
       }
 
-      // Fallback: find all users with invoicing module access in this tenant
-      const usersWithAccess = await db.userTenant.findMany({
-        where: {
-          tenantId,
-          role: {
-            moduleAccess: {
-              some: {
-                moduleKey: 'invoicing',
-                accessLevel: { not: 'NONE' },
-              },
-            },
-          },
-        },
+      // Fallback: find all active users in this tenant
+      const activeMembers = await db.userTenant.findMany({
+        where: { tenantId, isActive: true },
         select: { userId: true },
       });
 
-      return usersWithAccess.map((u) => u.userId);
+      return activeMembers.map((u) => u.userId);
     } catch (err) {
       this.logger.error(`Failed to resolve notification recipients: ${err}`);
       return [];
