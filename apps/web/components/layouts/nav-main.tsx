@@ -113,6 +113,7 @@ const appNavSections: NavSection[] = [
           { title: "Emitidos", href: "/invoicing/emitidos" },
           { title: "Recibidos", href: "/invoicing/recibidos" },
           { title: "Nueva emisión", href: "/invoicing/new" },
+          { title: "Certificación SII", href: "/invoicing/certification" },
         ],
       },
       {

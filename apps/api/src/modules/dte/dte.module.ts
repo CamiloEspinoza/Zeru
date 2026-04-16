@@ -41,10 +41,15 @@ import { DtePdfService } from './services/dte-pdf.service';
 import { Pdf417Service } from './services/pdf417.service';
 import { DteReceivedService } from './services/dte-received.service';
 import { DteAccountMappingService } from './services/dte-account-mapping.service';
+import { XmlSanitizerService } from './services/xml-sanitizer.service';
 
 // Certificate
 import { CertificateService } from './certificate/certificate.service';
 import { CertificateParserService } from './certificate/certificate-parser.service';
+
+// Certification (SII certification process)
+import { CertificationService } from './certification/certification.service';
+import { CertificationController } from './certification/certification.controller';
 
 // Folio
 import { FolioService } from './folio/folio.service';
@@ -141,6 +146,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     CertificateController,
     FolioController,
     DteReportsController,
+    CertificationController,
   ],
   providers: [
     // Services
@@ -160,10 +166,14 @@ import { AccountingModule } from '../accounting/accounting.module';
     DteAccountMappingService,
     BoletaBuilderService,
     RcofService,
+    XmlSanitizerService,
 
     // Certificate
     CertificateService,
     CertificateParserService,
+
+    // Certification
+    CertificationService,
 
     // Folio
     FolioService,
@@ -208,6 +218,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     SiiCircuitBreakerService,
     ReceptorLookupService,
     DteAccountMappingService,
+    XmlSanitizerService,
   ],
 })
 export class DteModule {}
