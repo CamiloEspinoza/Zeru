@@ -8,6 +8,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
@@ -20,7 +21,7 @@ import { SiiReclamoService, ReclamoAction } from '../sii/sii-reclamo.service';
 import { DteStatus } from '@prisma/client';
 
 @Controller('dte/received')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard, ThrottlerGuard)
 export class DteReceivedController {
   constructor(
     private readonly receivedService: DteReceivedService,
@@ -31,6 +32,7 @@ export class DteReceivedController {
   // ─── Bandeja (inbox) ──────────────────────────────────────
 
   @Get()
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   list(
     @CurrentTenant() tenantId: string,
@@ -50,6 +52,7 @@ export class DteReceivedController {
   // ─── Accept / Reject ─────────────────────────────────────
 
   @Post(':id/accept')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @RequirePermission('invoicing', 'manage-received')
   accept(
     @CurrentTenant() tenantId: string,
@@ -60,6 +63,7 @@ export class DteReceivedController {
   }
 
   @Post(':id/reject')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @RequirePermission('invoicing', 'manage-received')
   reject(
     @CurrentTenant() tenantId: string,
@@ -73,6 +77,7 @@ export class DteReceivedController {
   // ─── SII Reclamo (formal claim via SII WS) ───────────────
 
   @Post(':id/reclamo')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'manage-received')
   async registerReclamo(
     @CurrentTenant() tenantId: string,
@@ -96,6 +101,7 @@ export class DteReceivedController {
   }
 
   @Get(':id/reclamo-status')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async getReclamoStatus(
     @CurrentTenant() tenantId: string,
@@ -120,6 +126,7 @@ export class DteReceivedController {
   // ─── Manual Upload ────────────────────────────────────────
 
   @Post('upload')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'manage-received')
   upload(
     @CurrentTenant() tenantId: string,
@@ -135,6 +142,7 @@ export class DteReceivedController {
   // ─── IMAP Poll Trigger ────────────────────────────────────
 
   @Post('poll')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @RequirePermission('invoicing', 'manage-received')
   triggerPoll(@CurrentTenant() tenantId: string) {
     return this.imapPolling.pollForNewDtes(tenantId);

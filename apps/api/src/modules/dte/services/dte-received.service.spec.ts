@@ -5,6 +5,9 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { DteXmlParserService } from '../exchange/dte-xml-parser.service';
 import { DteValidationService } from '../exchange/dte-validation.service';
 import { ExchangeResponseService } from '../exchange/exchange-response.service';
+import { CertificateService } from '../certificate/certificate.service';
+
+const mockCert = { fake: 'cert' };
 
 describe('DteReceivedService', () => {
   let service: DteReceivedService;
@@ -12,6 +15,7 @@ describe('DteReceivedService', () => {
   let xmlParser: any;
   let validationService: any;
   let exchangeResponse: any;
+  let certificateService: any;
   let eventEmitter: any;
 
   beforeEach(async () => {
@@ -95,6 +99,10 @@ describe('DteReceivedService', () => {
       generateEnvioRecibos: jest.fn().mockResolvedValue('<EnvioRecibos/>'),
     };
 
+    certificateService = {
+      getPrimaryCert: jest.fn().mockResolvedValue(mockCert),
+    };
+
     eventEmitter = {
       emit: jest.fn(),
     };
@@ -106,6 +114,7 @@ describe('DteReceivedService', () => {
         { provide: DteXmlParserService, useValue: xmlParser },
         { provide: DteValidationService, useValue: validationService },
         { provide: ExchangeResponseService, useValue: exchangeResponse },
+        { provide: CertificateService, useValue: certificateService },
         { provide: EventEmitter2, useValue: eventEmitter },
       ],
     }).compile();
@@ -193,18 +202,22 @@ describe('DteReceivedService', () => {
 
     await service.acceptDte('tenant-1', 'dte-1', 'user-1');
 
+    expect(certificateService.getPrimaryCert).toHaveBeenCalledWith('tenant-1');
     expect(exchangeResponse.generateRecepcionDte).toHaveBeenCalledWith(
       'tenant-1',
       'dte-1',
+      mockCert,
     );
     expect(exchangeResponse.generateResultadoDte).toHaveBeenCalledWith(
       'tenant-1',
       'dte-1',
       true,
+      mockCert,
     );
     expect(exchangeResponse.generateEnvioRecibos).toHaveBeenCalledWith(
       'tenant-1',
       'dte-1',
+      mockCert,
     );
 
     expect(db.dte.update).toHaveBeenCalledWith(

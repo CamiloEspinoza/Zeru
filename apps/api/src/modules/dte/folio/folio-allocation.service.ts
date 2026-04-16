@@ -39,6 +39,7 @@ export class FolioAllocationService {
            AND "environment"::text = $3
            AND "isActive" = true
            AND "isExhausted" = false
+           AND "expiresAt" > NOW()
          ORDER BY "rangeFrom" ASC
          LIMIT 1
          FOR UPDATE`,
@@ -59,11 +60,14 @@ export class FolioAllocationService {
       const isExhausted = nextFolio > range.rangeTo;
       const remaining = range.rangeTo - folio;
 
+      // Defense-in-depth: include tenantId in WHERE to prevent cross-tenant updates
+      // even though the SELECT already filters by tenantId with FOR UPDATE lock.
       await tx.$executeRawUnsafe(
-        `UPDATE dte_folios SET "nextFolio" = $1, "isExhausted" = $2, "updatedAt" = NOW() WHERE id = $3`,
+        `UPDATE dte_folios SET "nextFolio" = $1, "isExhausted" = $2, "updatedAt" = NOW() WHERE id = $3 AND "tenantId" = $4`,
         nextFolio,
         isExhausted,
         range.id,
+        tenantId,
       );
 
       if (remaining > 0 && remaining <= range.alertThreshold) {

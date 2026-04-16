@@ -89,6 +89,14 @@ export class DteAccountingListener {
     const { tenantId, dteId } = payload;
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    const config = await db.dteConfig.findFirst({ where: {} });
+    if (!config?.autoCreateJournalEntry) {
+      this.logger.debug(
+        `Auto journal entry disabled for tenant ${tenantId}, skipping`,
+      );
+      return;
+    }
+
     const dte = await db.dte.findFirst({
       where: { id: dteId },
     });
@@ -137,6 +145,15 @@ export class DteAccountingListener {
       return;
     }
 
+    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+    if (Math.abs(totalDebit - totalCredit) >= 1) {
+      this.logger.error(
+        `Asiento desbalanceado para DTE ${dteId}: débito=${totalDebit}, crédito=${totalCredit}`,
+      );
+      return;
+    }
+
     const typeName = DTE_TYPE_NAMES[dteTypeCode] ?? `Tipo ${dteTypeCode}`;
     const description = `${typeName} N.${dte.folio} - ${dte.receptorRazon ?? dte.receptorRut ?? 'S/N'}`;
 
@@ -163,6 +180,14 @@ export class DteAccountingListener {
   ) {
     const { tenantId, dteId } = payload;
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const config = await db.dteConfig.findFirst({ where: {} });
+    if (!config?.autoCreateJournalEntry) {
+      this.logger.debug(
+        `Auto journal entry disabled for tenant ${tenantId}, skipping`,
+      );
+      return;
+    }
 
     const dte = await db.dte.findFirst({
       where: { id: dteId },
@@ -207,6 +232,15 @@ export class DteAccountingListener {
     if (lines.length < 2) {
       this.logger.warn(
         `Not enough account mappings configured for DTE type ${dteTypeCode} (RECEIVED) in tenant ${tenantId}`,
+      );
+      return;
+    }
+
+    const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
+    const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
+    if (Math.abs(totalDebit - totalCredit) >= 1) {
+      this.logger.error(
+        `Asiento desbalanceado para DTE ${dteId}: débito=${totalDebit}, crédito=${totalCredit}`,
       );
       return;
     }
@@ -485,6 +519,14 @@ export class DteAccountingListener {
           debit: 0,
           credit: iva,
           description: 'IVA Credito Fiscal (reverso)',
+        });
+      }
+      if (mapping.purchaseAccountId && exento > 0) {
+        lines.push({
+          accountId: mapping.purchaseAccountId,
+          debit: 0,
+          credit: exento,
+          description: 'Devoluciones/Reverso compras exentas',
         });
       }
       return lines;

@@ -92,11 +92,17 @@ export class CertificateService {
       action: 'DECRYPTED',
     });
 
-    const p12Base64 = this.encryption.decrypt(record.encryptedP12);
-    const password = this.encryption.decrypt(record.encryptedPassword);
-    const p12Buffer = Buffer.from(p12Base64, 'base64');
+    try {
+      const p12Base64 = this.encryption.decrypt(record.encryptedP12);
+      const password = this.encryption.decrypt(record.encryptedPassword);
+      const p12Buffer = Buffer.from(p12Base64, 'base64');
 
-    return new Certificado(p12Buffer, password);
+      return new Certificado(p12Buffer, password);
+    } catch {
+      throw new BadRequestException(
+        'No se pudo descifrar el certificado digital. Verifique que la contraseña sea correcta y que el archivo .p12 no esté corrupto.',
+      );
+    }
   }
 
   async validatePrimaryCertExists(tenantId: string): Promise<void> {

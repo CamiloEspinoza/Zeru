@@ -46,15 +46,17 @@ export interface UpsertMappingData {
 export class DteAccountMappingService {
   private readonly logger = new Logger(DteAccountMappingService.name);
 
-  private readonly db: PrismaClient;
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor(private readonly prisma: PrismaService) {
-    this.db = this.prisma as unknown as PrismaClient;
+  /** Get a tenant-scoped Prisma client. */
+  private tenantDb(tenantId: string): PrismaClient {
+    return this.prisma.forTenant(tenantId) as unknown as PrismaClient;
   }
 
   /** Get the mapping for a specific DTE type + direction. */
   async getMapping(tenantId: string, dteTypeCode: number, direction: DteDirection) {
-    return this.db.dteAccountMapping.findUnique({
+    const db = this.tenantDb(tenantId);
+    return db.dteAccountMapping.findUnique({
       where: {
         tenantId_dteTypeCode_direction: {
           tenantId,
@@ -67,9 +69,10 @@ export class DteAccountMappingService {
 
   /** Create or update a mapping. */
   async upsert(tenantId: string, data: UpsertMappingData) {
+    const db = this.tenantDb(tenantId);
     const { dteTypeCode, direction, ...accounts } = data;
 
-    return this.db.dteAccountMapping.upsert({
+    return db.dteAccountMapping.upsert({
       where: {
         tenantId_dteTypeCode_direction: {
           tenantId,
@@ -89,7 +92,8 @@ export class DteAccountMappingService {
 
   /** List all mappings for a tenant. */
   async list(tenantId: string) {
-    const mappings = await this.db.dteAccountMapping.findMany({
+    const db = this.tenantDb(tenantId);
+    const mappings = await db.dteAccountMapping.findMany({
       where: { tenantId },
       orderBy: [{ dteTypeCode: 'asc' }, { direction: 'asc' }],
     });
@@ -105,7 +109,8 @@ export class DteAccountMappingService {
    * Account IDs will be null — the user must configure them via the UI.
    */
   async seedDefaults(tenantId: string) {
-    const existing = await this.db.dteAccountMapping.count({
+    const db = this.tenantDb(tenantId);
+    const existing = await db.dteAccountMapping.count({
       where: { tenantId },
     });
 
@@ -116,7 +121,7 @@ export class DteAccountMappingService {
       return this.list(tenantId);
     }
 
-    await this.db.dteAccountMapping.createMany({
+    await db.dteAccountMapping.createMany({
       data: DEFAULT_MAPPINGS.map((m) => ({
         tenantId,
         dteTypeCode: m.dteTypeCode,

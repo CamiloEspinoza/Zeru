@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
@@ -19,7 +20,7 @@ import { DteReissueService } from '../services/dte-reissue.service';
 import { voidDteSchema, correctAmountsSchema } from '@zeru/shared';
 
 @Controller('dte')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard, ThrottlerGuard)
 export class DteVoidController {
   constructor(
     private readonly voidService: DteVoidService,
@@ -28,12 +29,14 @@ export class DteVoidController {
   ) {}
 
   @Get(':id/can-void')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'void-dte')
   canVoid(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.voidService.checkCanVoid(tenantId, id);
   }
 
   @Post(':id/void')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'void-dte')
   void(
     @CurrentTenant() tenantId: string,
@@ -45,6 +48,7 @@ export class DteVoidController {
   }
 
   @Post(':id/correct-text')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'void-dte')
   correctText(
     @CurrentTenant() tenantId: string,
@@ -61,6 +65,7 @@ export class DteVoidController {
   }
 
   @Post(':id/correct-amounts')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'void-dte')
   correctAmounts(
     @CurrentTenant() tenantId: string,
@@ -72,6 +77,7 @@ export class DteVoidController {
   }
 
   @Post(':id/reissue')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @RequirePermission('invoicing', 'emit-dte')
   reissue(
     @CurrentTenant() tenantId: string,

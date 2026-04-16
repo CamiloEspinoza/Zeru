@@ -128,7 +128,6 @@ export class SiiBoletaRestService {
       const agent = new https.Agent({
         key: cert.getPrivateKeyPEM(),
         cert: cert.getCertificatePEM(),
-        rejectUnauthorized: false,
       });
 
       const response = await fetch(url, {
@@ -197,7 +196,6 @@ export class SiiBoletaRestService {
       const agent = new https.Agent({
         key: cert.getPrivateKeyPEM(),
         cert: cert.getCertificatePEM(),
-        rejectUnauthorized: false,
       });
 
       const response = await fetch(url, {
@@ -270,7 +268,6 @@ export class SiiBoletaRestService {
       const agent = new https.Agent({
         key: cert.getPrivateKeyPEM(),
         cert: cert.getCertificatePEM(),
-        rejectUnauthorized: false,
       });
 
       const response = await fetch(url, {

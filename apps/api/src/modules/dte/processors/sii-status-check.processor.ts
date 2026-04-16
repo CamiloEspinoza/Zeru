@@ -23,6 +23,7 @@ interface StatusCheckJobData {
   dteId: string;
   tenantId: string;
   trackId: string;
+  recheckCount?: number;
 }
 
 @Processor(DTE_STATUS_CHECK_QUEUE, {
@@ -121,13 +122,39 @@ export class SiiStatusCheckProcessor extends WorkerHost {
 
       this.logger.log(`DTE ${dteId} → ${finalStatus}`);
     } else {
-      await this.statusQueue.add(DTE_JOB_NAMES.CHECK_STATUS, job.data, {
-        delay: 60_000,
-        jobId: `status-${dteId}-${Date.now()}`,
-      });
-      this.logger.log(
-        `DTE ${dteId} still processing, re-queued status check`,
-      );
+      const recheckCount = job.data.recheckCount ?? 0;
+
+      if (recheckCount >= 100) {
+        await this.stateMachine.transition(
+          dteId,
+          'SENT',
+          'ERROR',
+          db,
+          `Estado no terminal tras ${recheckCount} reintentos de consulta`,
+        );
+
+        this.eventEmitter.emit('dte.failed', {
+          tenantId,
+          dteId,
+          error: `Status check exceeded maximum re-checks (${recheckCount})`,
+        });
+
+        this.logger.error(
+          `DTE ${dteId} exceeded max status re-checks (${recheckCount}), transitioning to ERROR`,
+        );
+      } else {
+        await this.statusQueue.add(
+          DTE_JOB_NAMES.CHECK_STATUS,
+          { ...job.data, recheckCount: recheckCount + 1 },
+          {
+            delay: 60_000,
+            jobId: `status-${dteId}-${Date.now()}`,
+          },
+        );
+        this.logger.log(
+          `DTE ${dteId} still processing, re-queued status check (${recheckCount + 1}/100)`,
+        );
+      }
     }
   }
 

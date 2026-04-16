@@ -3,9 +3,11 @@ import {
   Get,
   Param,
   Res,
+  UseGuards,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { DtePdfService } from '../services/dte-pdf.service';
@@ -17,6 +19,8 @@ interface DtePublicTokenPayload {
 }
 
 @Controller('dte/public')
+@UseGuards(ThrottlerGuard)
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 export class DtePublicController {
   private readonly logger = new Logger(DtePublicController.name);
 

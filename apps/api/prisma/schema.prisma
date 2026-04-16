@@ -180,6 +180,7 @@ model Tenant {
   dtes                Dte[]
   dteRcofs            DteRcof[]
   dteAccountMappings  DteAccountMapping[]
+  dteExchanges        DteExchange[]
 
   @@map("tenants")
   @@schema("public")
@@ -2995,6 +2996,7 @@ model DteExchange {
   dteId          String
   dte            Dte            @relation(fields: [dteId], references: [id], onDelete: Cascade)
   tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   events         DteExchangeEvent[]
   @@index([tenantId, status])
   @@index([tenantId, deadlineAt])

@@ -72,37 +72,43 @@ export class DeadlineCron {
       const tenantDb = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
       for (const dte of dtes) {
-        await tenantDb.dte.update({
-          where: { id: dte.id },
-          data: {
-            status: 'ACCEPTED',
-            decidedAt: now,
-          },
-        });
+        try {
+          await tenantDb.dte.update({
+            where: { id: dte.id },
+            data: {
+              status: 'ACCEPTED',
+              decidedAt: now,
+            },
+          });
 
-        await tenantDb.dteExchange.updateMany({
-          where: { dteId: dte.id, tenantId: dte.tenantId },
-          data: { status: 'TACIT_ACCEPTANCE' },
-        });
+          await tenantDb.dteExchange.updateMany({
+            where: { dteId: dte.id, tenantId: dte.tenantId },
+            data: { status: 'TACIT_ACCEPTANCE' },
+          });
 
-        await tenantDb.dteLog.create({
-          data: {
+          await tenantDb.dteLog.create({
+            data: {
+              dteId: dte.id,
+              action: 'ACCEPTED',
+              message:
+                'Aceptación tácita — plazo de 8 días hábiles vencido sin respuesta',
+            },
+          });
+
+          this.eventEmitter.emit('dte.received.tacit-acceptance', {
+            tenantId: dte.tenantId,
             dteId: dte.id,
-            action: 'ACCEPTED',
-            message:
-              'Aceptación tácita — plazo de 8 días hábiles vencido sin respuesta',
-          },
-        });
+            folio: dte.folio,
+          });
 
-        this.eventEmitter.emit('dte.received.tacit-acceptance', {
-          tenantId: dte.tenantId,
-          dteId: dte.id,
-          folio: dte.folio,
-        });
-
-        this.logger.log(
-          `Tacit acceptance for DTE ${dte.id} (folio ${dte.folio} from ${dte.emisorRut})`,
-        );
+          this.logger.log(
+            `Tacit acceptance for DTE ${dte.id} (folio ${dte.folio} from ${dte.emisorRut})`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to mark tacit acceptance for DTE ${dte.id} (folio ${dte.folio}): ${error}`,
+          );
+        }
       }
     }
 
@@ -140,19 +146,25 @@ export class DeadlineCron {
     });
 
     for (const dte of approaching) {
-      this.eventEmitter.emit('dte.received.deadline-approaching', {
-        tenantId: dte.tenantId,
-        dteId: dte.id,
-        folio: dte.folio,
-        emisorRut: dte.emisorRut,
-        emisorRazon: dte.emisorRazon,
-        deadlineDate: dte.deadlineDate,
-        dteType: dte.dteType,
-      });
+      try {
+        this.eventEmitter.emit('dte.received.deadline-approaching', {
+          tenantId: dte.tenantId,
+          dteId: dte.id,
+          folio: dte.folio,
+          emisorRut: dte.emisorRut,
+          emisorRazon: dte.emisorRazon,
+          deadlineDate: dte.deadlineDate,
+          dteType: dte.dteType,
+        });
 
-      this.logger.log(
-        `Deadline alert for DTE ${dte.id} (folio ${dte.folio}): expires ${dte.deadlineDate?.toISOString()}`,
-      );
+        this.logger.log(
+          `Deadline alert for DTE ${dte.id} (folio ${dte.folio}): expires ${dte.deadlineDate?.toISOString()}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send deadline alert for DTE ${dte.id} (folio ${dte.folio}): ${error}`,
+        );
+      }
     }
 
     return approaching.length;

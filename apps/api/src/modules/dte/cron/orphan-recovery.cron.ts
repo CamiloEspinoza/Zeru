@@ -52,24 +52,30 @@ export class OrphanRecoveryCron {
       const tenantDb = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
       for (const orphan of dtes) {
-        // Log recovery action using tenant-scoped client
-        await tenantDb.dteLog.create({
-          data: {
-            dteId: orphan.id,
-            action: 'QUEUED',
-            message: 'Re-encolado por cron de recuperación de huérfanos',
-          },
-        });
+        try {
+          // Log recovery action using tenant-scoped client
+          await tenantDb.dteLog.create({
+            data: {
+              dteId: orphan.id,
+              action: 'QUEUED',
+              message: 'Re-encolado por cron de recuperación de huérfanos',
+            },
+          });
 
-        await this.emissionQueue.add(
-          DTE_JOB_NAMES.EMIT,
-          { dteId: orphan.id, tenantId },
-          { ...DTE_QUEUE_CONFIG.EMISSION, jobId: `emit-${orphan.id}` },
-        );
+          await this.emissionQueue.add(
+            DTE_JOB_NAMES.EMIT,
+            { dteId: orphan.id, tenantId },
+            { ...DTE_QUEUE_CONFIG.EMISSION, jobId: `emit-${orphan.id}` },
+          );
 
-        this.logger.log(
-          `Re-queued orphaned DTE ${orphan.id} (folio ${orphan.folio})`,
-        );
+          this.logger.log(
+            `Re-queued orphaned DTE ${orphan.id} (folio ${orphan.folio})`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to re-queue orphaned DTE ${orphan.id} (folio ${orphan.folio}): ${error}`,
+          );
+        }
       }
     }
   }

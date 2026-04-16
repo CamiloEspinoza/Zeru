@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EncryptionService } from '../../../common/services/encryption.service';
 import { DteConfigService } from '../services/dte-config.service';
+import { XmlSanitizerService } from '../services/xml-sanitizer.service';
 import { CAF } from '@devlas/dte-sii';
 import { DteType, DteEnvironment, PrismaClient } from '@prisma/client';
 import { SII_CODE_TO_DTE_TYPE } from '../constants/dte-types.constants';
@@ -12,9 +13,12 @@ export class FolioService {
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
     private readonly dteConfigService: DteConfigService,
+    private readonly xmlSanitizer: XmlSanitizerService,
   ) {}
 
   async uploadCaf(tenantId: string, cafXml: string) {
+    this.xmlSanitizer.validateNoInjection(cafXml);
+
     const caf = new CAF(cafXml);
     const dteTypeStr = SII_CODE_TO_DTE_TYPE[caf.getTipoDTE()];
     if (!dteTypeStr) {

@@ -5,6 +5,7 @@ import {
   UseGuards,
   BadRequestException,
 } from '@nestjs/common';
+import { ThrottlerGuard, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
@@ -14,12 +15,13 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 @Controller('dte/reports')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard, ThrottlerGuard)
 export class DteReportsController {
-  private readonly db: PrismaClient;
+  constructor(private readonly prisma: PrismaService) {}
 
-  constructor(private readonly prisma: PrismaService) {
-    this.db = this.prisma as unknown as PrismaClient;
+  /** Get a tenant-scoped Prisma client. */
+  private tenantDb(tenantId: string): PrismaClient {
+    return this.prisma.forTenant(tenantId) as unknown as PrismaClient;
   }
 
   /**
@@ -28,6 +30,7 @@ export class DteReportsController {
    * Returns IVA summary: IVA Debito (ventas) - IVA Credito (compras) = IVA por pagar
    */
   @Get('iva-summary')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async ivaSummary(
     @CurrentTenant() tenantId: string,
@@ -35,8 +38,9 @@ export class DteReportsController {
     @Query('to') to: string,
   ) {
     const { startDate, endDate } = this.parseMonthRange(from, to);
+    const db = this.tenantDb(tenantId);
 
-    const result = await this.db.$queryRaw<
+    const result = await db.$queryRaw<
       Array<{
         direction: string;
         total_neto: string;
@@ -49,10 +53,22 @@ export class DteReportsController {
       Prisma.sql`
         SELECT
           direction::text,
-          COALESCE(SUM("montoNeto"), 0)::text AS total_neto,
-          COALESCE(SUM("montoExento"), 0)::text AS total_exento,
-          COALESCE(SUM(iva), 0)::text AS total_iva,
-          COALESCE(SUM("montoTotal"), 0)::text AS total_monto,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoNeto"
+            ELSE "montoNeto"
+          END), 0)::text AS total_neto,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoExento"
+            ELSE "montoExento"
+          END), 0)::text AS total_exento,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -iva
+            ELSE iva
+          END), 0)::text AS total_iva,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoTotal"
+            ELSE "montoTotal"
+          END), 0)::text AS total_monto,
           COUNT(*)::text AS doc_count
         FROM dtes
         WHERE "tenantId" = ${tenantId}
@@ -98,14 +114,16 @@ export class DteReportsController {
    * Libro de ventas: all emitted DTEs for the month, grouped by type.
    */
   @Get('sales-book')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async salesBook(
     @CurrentTenant() tenantId: string,
     @Query('month') month: string,
   ) {
     const { startDate, endDate } = this.parseMonth(month);
+    const db = this.tenantDb(tenantId);
 
-    const entries = await this.db.$queryRaw<
+    const entries = await db.$queryRaw<
       Array<{
         id: string;
         dte_type: string;
@@ -142,7 +160,7 @@ export class DteReportsController {
       `,
     );
 
-    const summary = await this.db.$queryRaw<
+    const summary = await db.$queryRaw<
       Array<{
         dte_type: string;
         doc_count: string;
@@ -156,10 +174,22 @@ export class DteReportsController {
         SELECT
           "dteType"::text AS dte_type,
           COUNT(*)::text AS doc_count,
-          COALESCE(SUM("montoExento"), 0)::text AS total_exento,
-          COALESCE(SUM("montoNeto"), 0)::text AS total_neto,
-          COALESCE(SUM(iva), 0)::text AS total_iva,
-          COALESCE(SUM("montoTotal"), 0)::text AS total_monto
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoExento"
+            ELSE "montoExento"
+          END), 0)::text AS total_exento,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoNeto"
+            ELSE "montoNeto"
+          END), 0)::text AS total_neto,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -iva
+            ELSE iva
+          END), 0)::text AS total_iva,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoTotal"
+            ELSE "montoTotal"
+          END), 0)::text AS total_monto
         FROM dtes
         WHERE "tenantId" = ${tenantId}
           AND direction = 'EMITTED'
@@ -198,14 +228,16 @@ export class DteReportsController {
    * Libro de compras: all received DTEs for the month, grouped by type.
    */
   @Get('purchase-book')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async purchaseBook(
     @CurrentTenant() tenantId: string,
     @Query('month') month: string,
   ) {
     const { startDate, endDate } = this.parseMonth(month);
+    const db = this.tenantDb(tenantId);
 
-    const entries = await this.db.$queryRaw<
+    const entries = await db.$queryRaw<
       Array<{
         id: string;
         dte_type: string;
@@ -242,7 +274,7 @@ export class DteReportsController {
       `,
     );
 
-    const summary = await this.db.$queryRaw<
+    const summary = await db.$queryRaw<
       Array<{
         dte_type: string;
         doc_count: string;
@@ -256,10 +288,22 @@ export class DteReportsController {
         SELECT
           "dteType"::text AS dte_type,
           COUNT(*)::text AS doc_count,
-          COALESCE(SUM("montoExento"), 0)::text AS total_exento,
-          COALESCE(SUM("montoNeto"), 0)::text AS total_neto,
-          COALESCE(SUM(iva), 0)::text AS total_iva,
-          COALESCE(SUM("montoTotal"), 0)::text AS total_monto
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoExento"
+            ELSE "montoExento"
+          END), 0)::text AS total_exento,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoNeto"
+            ELSE "montoNeto"
+          END), 0)::text AS total_neto,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -iva
+            ELSE iva
+          END), 0)::text AS total_iva,
+          COALESCE(SUM(CASE
+            WHEN "dteType" = 'NOTA_CREDITO_ELECTRONICA' THEN -"montoTotal"
+            ELSE "montoTotal"
+          END), 0)::text AS total_monto
         FROM dtes
         WHERE "tenantId" = ${tenantId}
           AND direction = 'RECEIVED'

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PrismaClient } from '@prisma/client';
+import { Certificado, Signer } from '@devlas/dte-sii';
 import { DteConfigService } from '../services/dte-config.service';
 import { DTE_TYPE_TO_SII_CODE } from '../constants/dte-types.constants';
 
@@ -78,6 +79,7 @@ export class ExchangeResponseService {
   async generateRecepcionDte(
     tenantId: string,
     dteId: string,
+    cert: Certificado,
     estado: EstadoRecepDte = EstadoRecepDte.OK,
   ): Promise<string> {
     const { dte, config } = await this.loadDteAndConfig(tenantId, dteId);
@@ -90,7 +92,6 @@ export class ExchangeResponseService {
     const glosa = RECEP_DTE_GLOSA[estado];
     const fechaEmision = formatDate(dte.fechaEmision);
 
-    // TODO: Add XML digital signature once certificate signing is integrated
     const xml = [
       '<?xml version="1.0" encoding="ISO-8859-1"?>',
       '<RespuestaDTE version="1.0">',
@@ -121,7 +122,8 @@ export class ExchangeResponseService {
       '</RespuestaDTE>',
     ].join('\n');
 
-    return xml;
+    const signer = new Signer(cert);
+    return signer.firmarDocumento(xml, 'Recepcion');
   }
 
   /**
@@ -136,6 +138,7 @@ export class ExchangeResponseService {
     tenantId: string,
     dteId: string,
     accepted: boolean,
+    cert: Certificado,
   ): Promise<string> {
     const { dte, config } = await this.loadDteAndConfig(tenantId, dteId);
     const tipoDte = DTE_TYPE_TO_SII_CODE[dte.dteType];
@@ -149,7 +152,6 @@ export class ExchangeResponseService {
     const glosa = ESTADO_DTE_GLOSA[estado];
     const fechaEmision = formatDate(dte.fechaEmision);
 
-    // TODO: Add XML digital signature once certificate signing is integrated
     const xml = [
       '<?xml version="1.0" encoding="ISO-8859-1"?>',
       '<RespuestaDTE version="1.0">',
@@ -181,7 +183,8 @@ export class ExchangeResponseService {
       '</RespuestaDTE>',
     ].join('\n');
 
-    return xml;
+    const signer = new Signer(cert);
+    return signer.firmarDocumento(xml, 'Resultado');
   }
 
   /**
@@ -195,6 +198,7 @@ export class ExchangeResponseService {
   async generateEnvioRecibos(
     tenantId: string,
     dteId: string,
+    cert: Certificado,
   ): Promise<string> {
     const { dte, config } = await this.loadDteAndConfig(tenantId, dteId);
     const tipoDte = DTE_TYPE_TO_SII_CODE[dte.dteType];
@@ -207,7 +211,6 @@ export class ExchangeResponseService {
     const fechaEmision = formatDate(dte.fechaEmision);
     const timestamp = formatTimestamp(now);
 
-    // TODO: Add XML digital signature once certificate signing is integrated
     const xml = [
       '<?xml version="1.0" encoding="ISO-8859-1"?>',
       '<EnvioRecibos version="1.0">',
@@ -236,7 +239,8 @@ export class ExchangeResponseService {
       '</EnvioRecibos>',
     ].join('\n');
 
-    return xml;
+    const signer = new Signer(cert);
+    return signer.firmarSetDTE(xml, 'SetRecibos', 'EnvioRecibos');
   }
 
   /**

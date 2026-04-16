@@ -14,6 +14,8 @@ import {
   ValidationResult,
 } from '../exchange/dte-validation.service';
 import { ExchangeResponseService } from '../exchange/exchange-response.service';
+import { CertificateService } from '../certificate/certificate.service';
+import { XmlSanitizerService } from './xml-sanitizer.service';
 import { SII_CODE_TO_DTE_TYPE } from '../constants/dte-types.constants';
 import { ImapXmlReceivedPayload } from '../exchange/imap-polling.service';
 
@@ -32,6 +34,8 @@ export class DteReceivedService {
     private readonly xmlParser: DteXmlParserService,
     private readonly validationService: DteValidationService,
     private readonly exchangeResponse: ExchangeResponseService,
+    private readonly certificateService: CertificateService,
+    private readonly xmlSanitizer: XmlSanitizerService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -46,6 +50,8 @@ export class DteReceivedService {
     this.logger.log(
       `Processing received XML from ${fromEmail} for tenant ${tenantId}`,
     );
+
+    this.xmlSanitizer.validateNoInjection(xmlContent);
 
     const parsedDtes = this.xmlParser.parseEnvioDte(xmlContent);
 
@@ -215,6 +221,8 @@ export class DteReceivedService {
     xmlContent: string,
     _userId: string,
   ): Promise<ReceivedDteResult[]> {
+    this.xmlSanitizer.validateNoInjection(xmlContent);
+
     const parsedDtes = this.xmlParser.parseEnvioDte(xmlContent);
 
     if (parsedDtes.length === 0) {
@@ -252,19 +260,25 @@ export class DteReceivedService {
       throw new ConflictException('Solo se pueden aceptar DTEs recibidos');
     }
 
-    // Generate response XMLs
+    // Load certificate for XML signing
+    const cert = await this.certificateService.getPrimaryCert(tenantId);
+
+    // Generate signed response XMLs
     const recepcionXml = await this.exchangeResponse.generateRecepcionDte(
       tenantId,
       dteId,
+      cert,
     );
     const resultadoXml = await this.exchangeResponse.generateResultadoDte(
       tenantId,
       dteId,
       true,
+      cert,
     );
     const recibosXml = await this.exchangeResponse.generateEnvioRecibos(
       tenantId,
       dteId,
+      cert,
     );
 
     // Update DTE status and log
@@ -348,10 +362,14 @@ export class DteReceivedService {
       throw new ConflictException('Solo se pueden rechazar DTEs recibidos');
     }
 
+    // Load certificate for XML signing
+    const cert = await this.certificateService.getPrimaryCert(tenantId);
+
     const resultadoXml = await this.exchangeResponse.generateResultadoDte(
       tenantId,
       dteId,
       false,
+      cert,
     );
 
     await db.dte.update({

@@ -3,6 +3,7 @@ import { DteEnvironment } from '@prisma/client';
 import { SiiCircuitBreakerService } from './sii-circuit-breaker.service';
 import { CertificateService } from '../certificate/certificate.service';
 import { SII_ENVIRONMENTS } from '../constants/sii-endpoints.constants';
+import { DteConfigService } from '../services/dte-config.service';
 
 /**
  * SII RegistroReclamoDTE actions:
@@ -53,6 +54,7 @@ export class SiiReclamoService {
   constructor(
     private readonly circuitBreaker: SiiCircuitBreakerService,
     private readonly certificateService: CertificateService,
+    private readonly configService: DteConfigService,
   ) {}
 
   /**
@@ -170,17 +172,13 @@ export class SiiReclamoService {
   }
 
   /**
-   * Resolves the DTE environment for the tenant.
-   * Defaults to CERTIFICATION if no config is found.
+   * Resolves the DTE environment for the tenant from configuration.
    */
   private async resolveEnvironment(
-    _tenantId: string,
+    tenantId: string,
   ): Promise<DteEnvironment> {
-    // The CertificateService already validates the certificate exists.
-    // Environment is determined by the tenant's DTE config.
-    // For now, default to CERTIFICATION until DteConfigService is injected.
-    // TODO: Inject DteConfigService and read config.environment
-    return 'CERTIFICATION';
+    const config = await this.configService.get(tenantId);
+    return config.environment;
   }
 
   /**

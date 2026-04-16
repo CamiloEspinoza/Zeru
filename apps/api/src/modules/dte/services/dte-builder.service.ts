@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { DTE, CAF, Certificado, EnvioDTE } from '@devlas/dte-sii';
 import { DteType } from '@prisma/client';
 import { DTE_TYPE_TO_SII_CODE } from '../constants/dte-types.constants';
@@ -96,9 +96,30 @@ export class DteBuilderService {
     }
 
     const dte = new DTE(dteConfig);
-    dte.generarXML();
-    dte.timbrar(caf);
-    dte.firmar(cert);
+
+    try {
+      dte.generarXML();
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Error al generar el XML del DTE (folio ${input.folio}): ${(error as Error).message}`,
+      );
+    }
+
+    try {
+      dte.timbrar(caf);
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Error al timbrar el DTE (folio ${input.folio}): ${(error as Error).message}`,
+      );
+    }
+
+    try {
+      dte.firmar(cert);
+    } catch (error) {
+      throw new InternalServerErrorException(
+        `Error al firmar el DTE (folio ${input.folio}): ${(error as Error).message}`,
+      );
+    }
 
     const xml = dte.getXML();
 
@@ -106,6 +127,12 @@ export class DteBuilderService {
     // The TED is embedded by the library during timbrado.
     const tedMatch = xml.match(/<TED[\s\S]*?<\/TED>/);
     const tedXml = tedMatch ? tedMatch[0] : '';
+
+    if (!tedXml) {
+      throw new InternalServerErrorException(
+        `No se pudo extraer el Timbre Electrónico (TED) del DTE firmado (folio ${input.folio}). El XML generado puede estar incompleto.`,
+      );
+    }
 
     return {
       xml,
