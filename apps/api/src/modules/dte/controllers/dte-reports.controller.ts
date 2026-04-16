@@ -31,7 +31,7 @@ export class DteReportsController {
    */
   @Get('iva-summary')
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-reports')
   async ivaSummary(
     @CurrentTenant() tenantId: string,
     @Query('from') from: string,
@@ -115,7 +115,7 @@ export class DteReportsController {
    */
   @Get('sales-book')
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-reports')
   async salesBook(
     @CurrentTenant() tenantId: string,
     @Query('month') month: string,
@@ -229,7 +229,7 @@ export class DteReportsController {
    */
   @Get('purchase-book')
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-reports')
   async purchaseBook(
     @CurrentTenant() tenantId: string,
     @Query('month') month: string,

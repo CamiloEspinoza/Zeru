@@ -40,13 +40,13 @@ export class CertificateController {
 
   @Get()
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view-config')
+  @RequirePermission('invoicing', 'view-dte')
   list(@CurrentTenant() tenantId: string) {
     return this.service.list(tenantId);
   }
 
   @Post()
-  @RequirePermission('invoicing', 'manage-config')
+  @RequirePermission('invoicing', 'manage-certificate')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseInterceptors(
     FileInterceptor('file', { limits: { fileSize: MAX_P12_SIZE } }),
@@ -93,7 +93,7 @@ export class CertificateController {
   }
 
   @Delete(':id')
-  @RequirePermission('invoicing', 'manage-config')
+  @RequirePermission('invoicing', 'manage-certificate')
   delete(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.delete(tenantId, id);
   }

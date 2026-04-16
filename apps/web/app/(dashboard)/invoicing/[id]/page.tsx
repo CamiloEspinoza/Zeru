@@ -176,26 +176,54 @@ export default function DteDetailPage() {
     fetchDte();
   }, [fetchDte]);
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!tenantId || !id) return;
-    const token = localStorage.getItem("access_token");
-    const apiBase =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
-    window.open(
-      `${apiBase}/dte/${id}/pdf?token=${token}`,
-      "_blank",
-    );
+    try {
+      const token = localStorage.getItem("access_token");
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+      const response = await fetch(`${apiBase}/dte/${id}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-Tenant-Id": tenantId ?? "",
+        },
+      });
+      if (!response.ok) throw new Error("Error al descargar PDF");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `DTE-${dte?.folio ?? id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error al descargar el PDF");
+    }
   };
 
-  const handleDownloadXml = () => {
+  const handleDownloadXml = async () => {
     if (!tenantId || !id) return;
-    const token = localStorage.getItem("access_token");
-    const apiBase =
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
-    window.open(
-      `${apiBase}/dte/${id}/xml?token=${token}`,
-      "_blank",
-    );
+    try {
+      const token = localStorage.getItem("access_token");
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+      const response = await fetch(`${apiBase}/dte/${id}/xml`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "X-Tenant-Id": tenantId ?? "",
+        },
+      });
+      if (!response.ok) throw new Error("Error al descargar XML");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `DTE-${dte?.folio ?? id}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Error al descargar el XML");
+    }
   };
 
   const handleGenerateLink = async () => {

@@ -33,7 +33,7 @@ export class DteReceivedController {
 
   @Get()
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-dte')
   list(
     @CurrentTenant() tenantId: string,
     @Query('status') status?: string,
@@ -102,7 +102,7 @@ export class DteReceivedController {
 
   @Get(':id/reclamo-status')
   @SkipThrottle()
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-dte')
   async getReclamoStatus(
     @CurrentTenant() tenantId: string,
     @Query('emisorRut') emisorRut: string,

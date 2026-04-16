@@ -94,4 +94,24 @@ export class FolioAllocationService {
       return { folio, folioRangeId: range.id };
     });
   }
+
+  /**
+   * Allocate multiple folios sequentially.
+   *
+   * Each allocation acquires a `FOR UPDATE` lock on the folio range row,
+   * so this is safe for concurrent access but not optimized for large batches.
+   * A more efficient batch allocation can be implemented later if needed.
+   */
+  async allocateBatch(
+    tenantId: string,
+    dteType: DteType,
+    environment: DteEnvironment,
+    count: number,
+  ): Promise<AllocatedFolio[]> {
+    const results: AllocatedFolio[] = [];
+    for (let i = 0; i < count; i++) {
+      results.push(await this.allocate(tenantId, dteType, environment));
+    }
+    return results;
+  }
 }

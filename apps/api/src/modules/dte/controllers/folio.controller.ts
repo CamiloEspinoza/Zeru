@@ -27,7 +27,7 @@ export class FolioController {
 
   @Post()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  @RequirePermission('invoicing', 'manage-config')
+  @RequirePermission('invoicing', 'manage-caf')
   uploadCaf(
     @CurrentTenant() tenantId: string,
     @Body('cafXml') cafXml: string,

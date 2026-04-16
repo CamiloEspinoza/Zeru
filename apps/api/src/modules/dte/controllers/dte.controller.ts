@@ -46,7 +46,7 @@ export class DteController {
   // ─── Emission ─────────────────────────────────────────────
 
   @Post()
-  @RequirePermission('invoicing', 'emit')
+  @RequirePermission('invoicing', 'emit-dte')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   emit(
     @CurrentTenant() tenantId: string,
@@ -59,7 +59,7 @@ export class DteController {
   // ─── Drafts ───────────────────────────────────────────────
 
   @Post('draft')
-  @RequirePermission('invoicing', 'create-draft')
+  @RequirePermission('invoicing', 'emit-dte')
   createDraft(
     @CurrentTenant() tenantId: string,
     @CurrentUser('userId') userId: string,
@@ -69,7 +69,7 @@ export class DteController {
   }
 
   @Put('draft/:id')
-  @RequirePermission('invoicing', 'edit-draft')
+  @RequirePermission('invoicing', 'emit-dte')
   updateDraft(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -80,13 +80,13 @@ export class DteController {
   }
 
   @Delete('draft/:id')
-  @RequirePermission('invoicing', 'delete-draft')
+  @RequirePermission('invoicing', 'emit-dte')
   deleteDraft(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.draftService.delete(tenantId, id);
   }
 
   @Post('draft/:id/emit')
-  @RequirePermission('invoicing', 'emit')
+  @RequirePermission('invoicing', 'emit-dte')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   emitFromDraft(
     @CurrentTenant() tenantId: string,
@@ -169,7 +169,7 @@ export class DteController {
   }
 
   @Post(':id/public-link')
-  @RequirePermission('invoicing', 'view')
+  @RequirePermission('invoicing', 'view-dte')
   generatePublicLink(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

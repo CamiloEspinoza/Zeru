@@ -72,6 +72,7 @@ import { ExchangeResponseService } from './exchange/exchange-response.service';
 // Processors (BullMQ workers)
 import { DteEmissionProcessor } from './processors/dte-emission.processor';
 import { SiiStatusCheckProcessor } from './processors/sii-status-check.processor';
+import { BulkBoletaProcessor } from './processors/bulk-boleta.processor';
 
 // Event listeners
 import { DteExchangeListener } from './listeners/dte-exchange.listener';
@@ -82,9 +83,13 @@ import { DteAccountingListener } from './listeners/dte-accounting.listener';
 import { OrphanRecoveryCron } from './cron/orphan-recovery.cron';
 import { DeadlineCron } from './cron/deadline.cron';
 import { RcofCron } from './cron/rcof.cron';
+import { CertificateExpiryCron } from './cron/certificate-expiry.cron';
 
 // Accounting module (for journal entry creation)
 import { AccountingModule } from '../accounting/accounting.module';
+
+// Notification module (for DTE event notifications)
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -136,6 +141,7 @@ import { AccountingModule } from '../accounting/accounting.module';
       },
     ),
     AccountingModule,
+    NotificationModule,
   ],
   controllers: [
     DteController,
@@ -196,6 +202,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     // Processors
     DteEmissionProcessor,
     SiiStatusCheckProcessor,
+    BulkBoletaProcessor,
 
     // Event listeners
     DteExchangeListener,
@@ -206,6 +213,7 @@ import { AccountingModule } from '../accounting/accounting.module';
     OrphanRecoveryCron,
     DeadlineCron,
     RcofCron,
+    CertificateExpiryCron,
   ],
   exports: [
     DteConfigService,
