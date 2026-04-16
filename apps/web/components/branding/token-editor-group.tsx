@@ -51,6 +51,7 @@ export function TokenEditorGroup({
                 value={hexValue}
                 onChange={(e) => onChange(variable, e.target.value)}
                 className="size-7 rounded border-0 cursor-pointer p-0 bg-transparent shrink-0"
+                aria-label={`Selector de color: ${label}`}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

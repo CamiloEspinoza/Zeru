@@ -191,41 +191,45 @@ function getPixelData(
  * @returns hex colour string, e.g. "#e63946"
  */
 export async function extractDominantColor(imageUrl: string): Promise<string> {
-  const img = await loadImage(imageUrl);
-  const { data, width, height } = getPixelData(img);
+  try {
+    const img = await loadImage(imageUrl);
+    const { data, width, height } = getPixelData(img);
 
-  // Convert RGBA pixels to OKLCH, skipping transparent ones
-  const pixels: OklchPixel[] = [];
-  const totalPixels = width * height;
-  for (let i = 0; i < totalPixels; i++) {
-    const offset = i * 4;
-    const oklch = rgbaToOklch(data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
-    if (oklch) pixels.push(oklch);
+    // Convert RGBA pixels to OKLCH, skipping transparent ones
+    const pixels: OklchPixel[] = [];
+    const totalPixels = width * height;
+    for (let i = 0; i < totalPixels; i++) {
+      const offset = i * 4;
+      const oklch = rgbaToOklch(data[offset], data[offset + 1], data[offset + 2], data[offset + 3]);
+      if (oklch) pixels.push(oklch);
+    }
+
+    if (pixels.length === 0) {
+      // Fully transparent image — return a sensible default
+      return '#6366f1';
+    }
+
+    // Run simplified k-means with k = 5
+    const clusters = kMeans(pixels, 5);
+
+    // Sort by cluster size descending (largest first)
+    clusters.sort((a, b) => b.members.length - a.members.length);
+
+    // Filter out undesirable clusters
+    const viable = clusters.filter((cl) => {
+      const { l, c } = cl.centroid;
+      if (l > 0.9) return false; // near-white
+      if (l < 0.1) return false; // near-black
+      if (c < 0.02) return false; // achromatic / low-chroma
+      return true;
+    });
+
+    // Pick the largest viable cluster, or fall back to the largest overall
+    const chosen = viable.length > 0 ? viable[0] : clusters[0];
+
+    const hex = formatHex({ mode: 'oklch', ...chosen.centroid });
+    return hex ?? '#6366f1';
+  } catch {
+    return '#6366f1'; // fallback on CORS or any other error
   }
-
-  if (pixels.length === 0) {
-    // Fully transparent image — return a sensible default
-    return '#6366f1';
-  }
-
-  // Run simplified k-means with k = 5
-  const clusters = kMeans(pixels, 5);
-
-  // Sort by cluster size descending (largest first)
-  clusters.sort((a, b) => b.members.length - a.members.length);
-
-  // Filter out undesirable clusters
-  const viable = clusters.filter((cl) => {
-    const { l, c } = cl.centroid;
-    if (l > 0.9) return false; // near-white
-    if (l < 0.1) return false; // near-black
-    if (c < 0.02) return false; // achromatic / low-chroma
-    return true;
-  });
-
-  // Pick the largest viable cluster, or fall back to the largest overall
-  const chosen = viable.length > 0 ? viable[0] : clusters[0];
-
-  const hex = formatHex({ mode: 'oklch', ...chosen.centroid });
-  return hex ?? '#6366f1';
 }

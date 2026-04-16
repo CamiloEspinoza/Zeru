@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import type { Tenant } from "@zeru/shared";
 import { api } from "@/lib/api-client";
@@ -55,5 +55,16 @@ export function useTenant() {
       .finally(() => setLoading(false));
   }, [router, pathname]);
 
-  return { tenant, loading };
+  const refreshTenant = useCallback(async () => {
+    const tenantId = localStorage.getItem("tenantId");
+    if (!tenantId) return;
+    try {
+      const data = await api.get<Tenant>("/tenants/current", { tenantId });
+      setTenant(data);
+    } catch {
+      // Silently fail — tenant stays as-is
+    }
+  }, []);
+
+  return { tenant, loading, refreshTenant };
 }

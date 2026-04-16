@@ -11,6 +11,7 @@ import { useTenant } from "@/hooks/use-tenant";
 interface TenantContextValue {
   tenant: Tenant | null;
   loading: boolean;
+  refreshTenant: () => Promise<void>;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);

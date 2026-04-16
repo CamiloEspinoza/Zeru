@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,11 +15,13 @@ import {
   generateTheme,
   mergeThemeWithOverrides,
   themeToCSS,
+  BORDER_RADIUS_MAP,
 } from '@/lib/theme-generator';
 import type { ThemeOutput, ThemeOverrides } from '@/lib/theme-generator';
 import { brandingApi } from '@/lib/api/branding';
 import { extractDominantColor } from '@/lib/color-extraction';
 import type { TenantBranding } from '@zeru/shared';
+import { useTenantContext } from '@/providers/tenant-provider';
 
 // ---------------------------------------------------------------------------
 // Token group definitions
@@ -71,10 +73,10 @@ const CHART_TOKENS = [
 ];
 
 const RADIUS_PRESETS = [
-  { value: 'sm', label: 'S', css: '0.25rem' },
-  { value: 'md', label: 'M', css: '0.5rem' },
-  { value: 'lg', label: 'L', css: '0.75rem' },
-  { value: 'xl', label: 'XL', css: '1rem' },
+  { value: 'sm', label: 'S' },
+  { value: 'md', label: 'M' },
+  { value: 'lg', label: 'L' },
+  { value: 'xl', label: 'XL' },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,8 @@ interface ThemeEditorProps {
 }
 
 export function ThemeEditor({ branding, logoUrl, onSaved }: ThemeEditorProps) {
+  const { refreshTenant } = useTenantContext();
+
   // --- State ---------------------------------------------------------------
   const [primaryColor, setPrimaryColor] = useState<string>(
     branding?.primaryColor ?? '',
@@ -111,26 +115,30 @@ export function ThemeEditor({ branding, logoUrl, onSaved }: ThemeEditorProps) {
   const generatedRef = useRef<ThemeOutput | null>(null);
 
   // --- Derived values ------------------------------------------------------
-  const isValidHex = /^#[0-9a-fA-F]{6}$/.test(primaryColor);
-  const generated: ThemeOutput | null = isValidHex
-    ? generateTheme(primaryColor)
-    : null;
+  const isValidHex = primaryColor ? /^#[0-9a-fA-F]{6}$/.test(primaryColor) : false;
+
+  const generated = useMemo(
+    () => (isValidHex ? generateTheme(primaryColor) : null),
+    [isValidHex, primaryColor],
+  );
   generatedRef.current = generated;
 
-  const radiusCss =
-    RADIUS_PRESETS.find((r) => r.value === borderRadius)?.css ?? '0.5rem';
+  const radiusCss = BORDER_RADIUS_MAP[borderRadius] ?? '0.5rem';
 
-  const merged = generated
-    ? mergeThemeWithOverrides(generated, overrides)
-    : null;
+  const merged = useMemo(
+    () => (generated ? mergeThemeWithOverrides(generated, overrides) : null),
+    [generated, overrides],
+  );
 
   // --- Live preview (inject <style>) ---------------------------------------
+  // Uses a DIFFERENT style ID than BrandingProvider ('branding-overrides') so
+  // that unmounting the editor does not destroy the persistent branding styles.
   useEffect(() => {
-    const STYLE_ID = 'branding-overrides';
+    const STYLE_ID = 'theme-editor-preview';
     let styleEl = document.getElementById(STYLE_ID) as HTMLStyleElement | null;
 
     if (!merged) {
-      // Remove any existing style tag when there's nothing to preview
+      // Remove our preview tag when there's nothing to preview
       if (styleEl) styleEl.remove();
       return;
     }
@@ -144,7 +152,7 @@ export function ThemeEditor({ branding, logoUrl, onSaved }: ThemeEditorProps) {
     styleEl.textContent = themeToCSS(merged, radiusCss);
 
     return () => {
-      // Cleanup on unmount
+      // Cleanup only the editor preview tag on unmount
       const el = document.getElementById(STYLE_ID);
       if (el) el.remove();
     };
@@ -239,6 +247,7 @@ export function ThemeEditor({ branding, logoUrl, onSaved }: ThemeEditorProps) {
         themeOverrides,
         borderRadius,
       });
+      await refreshTenant();
       onSaved();
     } catch {
       // Error handling would go here
@@ -296,6 +305,7 @@ export function ThemeEditor({ branding, logoUrl, onSaved }: ThemeEditorProps) {
               value={isValidHex ? primaryColor : '#6366f1'}
               onChange={(e) => handlePrimaryChange(e.target.value)}
               className="size-10 rounded border-0 cursor-pointer p-0 bg-transparent shrink-0"
+              aria-label="Selector de color principal"
             />
             <Input
               id="primary-color"
