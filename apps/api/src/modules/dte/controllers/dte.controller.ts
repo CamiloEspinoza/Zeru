@@ -12,6 +12,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { ThrottlerGuard, Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../../common/guards/tenant.guard';
 import { PermissionGuard } from '../../../common/guards/permission.guard';
@@ -32,7 +33,7 @@ import {
 } from '@zeru/shared';
 
 @Controller('dte')
-@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard, ThrottlerGuard)
 export class DteController {
   constructor(
     private readonly emissionService: DteEmissionService,
@@ -46,6 +47,7 @@ export class DteController {
 
   @Post()
   @RequirePermission('invoicing', 'emit')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   emit(
     @CurrentTenant() tenantId: string,
     @CurrentUser('userId') userId: string,
@@ -85,6 +87,7 @@ export class DteController {
 
   @Post('draft/:id/emit')
   @RequirePermission('invoicing', 'emit')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   emitFromDraft(
     @CurrentTenant() tenantId: string,
     @CurrentUser('userId') userId: string,
@@ -96,6 +99,7 @@ export class DteController {
   // ─── Queries ──────────────────────────────────────────────
 
   @Get()
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   list(
     @CurrentTenant() tenantId: string,
@@ -115,6 +119,7 @@ export class DteController {
   }
 
   @Get('receptor/lookup')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   lookupReceptor(
     @CurrentTenant() tenantId: string,
@@ -124,6 +129,7 @@ export class DteController {
   }
 
   @Get(':id/pdf')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async downloadPdf(
     @CurrentTenant() tenantId: string,
@@ -144,6 +150,7 @@ export class DteController {
   }
 
   @Get(':id/xml')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   async downloadXml(
     @CurrentTenant() tenantId: string,
@@ -171,6 +178,7 @@ export class DteController {
   }
 
   @Get(':id')
+  @SkipThrottle()
   @RequirePermission('invoicing', 'view')
   getById(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.dteService.getById(tenantId, id);

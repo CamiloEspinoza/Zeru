@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validateRut } from '../utils/format-rut';
 
 // ─── Helpers ──────────────────────────────────────
 
@@ -9,7 +10,8 @@ const rutSchema = z
   .regex(
     /^\d{1,2}\.?\d{3}\.?\d{3}-[\dkK]$|^\d{7,8}-[\dkK]$/,
     'RUT inválido',
-  );
+  )
+  .refine(validateRut, { message: 'RUT inválido: dígito verificador no coincide' });
 
 // ─── DteConfig ────────────────────────────────────
 

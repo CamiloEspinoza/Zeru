@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EncryptionService } from '../../../common/services/encryption.service';
+import { DteConfigService } from '../services/dte-config.service';
 import { CAF } from '@devlas/dte-sii';
 import { DteType, DteEnvironment, PrismaClient } from '@prisma/client';
 import { SII_CODE_TO_DTE_TYPE } from '../constants/dte-types.constants';
@@ -10,6 +11,7 @@ export class FolioService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly dteConfigService: DteConfigService,
   ) {}
 
   async uploadCaf(tenantId: string, cafXml: string) {
@@ -18,6 +20,17 @@ export class FolioService {
     if (!dteTypeStr) {
       throw new BadRequestException(
         `Tipo DTE no soportado: ${caf.getTipoDTE()}`,
+      );
+    }
+
+    // Validate that the CAF's RUT matches the tenant's configured RUT
+    const config = await this.dteConfigService.get(tenantId);
+    const cafRut = caf.getRutEmisor();
+    const configRut = config.rut.replace(/\./g, '');
+    const normalizedCafRut = String(cafRut).replace(/\./g, '');
+    if (normalizedCafRut !== configRut) {
+      throw new BadRequestException(
+        `El RUT del CAF (${cafRut}) no coincide con el RUT configurado del emisor (${config.rut}). Verifique que el archivo CAF corresponde a su empresa.`,
       );
     }
     const dteType = dteTypeStr as DteType;
