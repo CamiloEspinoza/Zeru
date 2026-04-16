@@ -1,7 +1,8 @@
 import { z } from 'zod';
+import { THEME_TOKEN_NAMES } from '../types/branding';
 
 const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
-const oklchRegex = /^oklch\(.+\)$/;
+const oklchRegex = /^oklch\(\s*[\d.]+\s+[\d.]+\s+[\d.]+(\s*\/\s*[\d.]+%?)?\s*\)$/;
 
 export const cssColorValue = z
   .string()
@@ -9,10 +10,15 @@ export const cssColorValue = z
     message: 'Debe ser un color hex (#RRGGBB) o oklch()',
   });
 
+const themeTokenKey = z.string().refine(
+  (k) => (THEME_TOKEN_NAMES as readonly string[]).includes(k),
+  { message: 'Nombre de token no valido' },
+);
+
 export const themeOverridesSchema = z
   .object({
-    light: z.record(z.string(), cssColorValue).optional(),
-    dark: z.record(z.string(), cssColorValue).optional(),
+    light: z.record(themeTokenKey, cssColorValue).optional(),
+    dark: z.record(themeTokenKey, cssColorValue).optional(),
   })
   .optional();
 
@@ -21,7 +27,7 @@ export const updateBrandingSchema = z.object({
   secondaryColor: z.string().regex(hexColorRegex, 'Color secundario inválido').optional(),
   accentColor: z.string().regex(hexColorRegex, 'Color de acento inválido').optional(),
   themeOverrides: themeOverridesSchema,
-  borderRadius: z.string().max(20, 'Valor de border-radius muy largo').optional(),
+  borderRadius: z.enum(['sm', 'md', 'lg', 'xl']).optional(),
 });
 
 export const generatePaletteSchema = z.discriminatedUnion('source', [

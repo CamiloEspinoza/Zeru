@@ -299,7 +299,12 @@ Responde SOLO con JSON válido, sin markdown: {"primary":"#hex","secondary":"#he
       const content = response.choices[0]?.message?.content?.trim();
       if (!content) throw new BadRequestException('No se pudo generar la paleta');
 
-      const palette = JSON.parse(content);
+      let palette;
+      try {
+        palette = JSON.parse(content);
+      } catch {
+        throw new BadRequestException('La respuesta del modelo no es JSON valido, intenta de nuevo');
+      }
       await this.logAiUsage(tenantId, response);
       return palette;
     }
@@ -330,7 +335,12 @@ Responde SOLO con JSON válido, sin markdown: {"primary":"#hex","secondary":"#he
     const content = response.choices[0]?.message?.content?.trim();
     if (!content) throw new BadRequestException('No se pudo generar la paleta');
 
-    const palette = JSON.parse(content);
+    let palette;
+    try {
+      palette = JSON.parse(content);
+    } catch {
+      throw new BadRequestException('La respuesta del modelo no es JSON valido, intenta de nuevo');
+    }
     await this.logAiUsage(tenantId, response);
     return palette;
   }

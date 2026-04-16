@@ -1,4 +1,10 @@
 import { parse, formatHex, converter, wcagContrast } from 'culori';
+import { THEME_TOKEN_NAMES } from '@zeru/shared';
+import type { ThemeTokenName } from '@zeru/shared';
+
+// Re-export for consumers
+export { THEME_TOKEN_NAMES };
+export type { ThemeTokenName };
 
 // ---------------------------------------------------------------------------
 // Types & interfaces
@@ -23,46 +29,6 @@ export interface ThemeOverrides {
 export interface ShadeScale {
   [key: number]: OklchColor;
 }
-
-// ---------------------------------------------------------------------------
-// Token names (30 CSS custom properties used by shadcn/ui + sidebar)
-// ---------------------------------------------------------------------------
-
-export const THEME_TOKEN_NAMES = [
-  '--background',
-  '--foreground',
-  '--card',
-  '--card-foreground',
-  '--popover',
-  '--popover-foreground',
-  '--primary',
-  '--primary-foreground',
-  '--secondary',
-  '--secondary-foreground',
-  '--muted',
-  '--muted-foreground',
-  '--accent',
-  '--accent-foreground',
-  '--destructive',
-  '--border',
-  '--input',
-  '--ring',
-  '--chart-1',
-  '--chart-2',
-  '--chart-3',
-  '--chart-4',
-  '--chart-5',
-  '--sidebar',
-  '--sidebar-foreground',
-  '--sidebar-primary',
-  '--sidebar-primary-foreground',
-  '--sidebar-accent',
-  '--sidebar-accent-foreground',
-  '--sidebar-border',
-  '--sidebar-ring',
-] as const;
-
-export type ThemeTokenName = (typeof THEME_TOKEN_NAMES)[number];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -315,6 +281,17 @@ export function mergeThemeWithOverrides(
     dark: { ...generated.dark, ...overrides.dark },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Border radius presets (single source of truth)
+// ---------------------------------------------------------------------------
+
+export const BORDER_RADIUS_MAP: Record<string, string> = {
+  sm: '0.25rem',
+  md: '0.5rem',
+  lg: '0.75rem',
+  xl: '1rem',
+};
 
 // ---------------------------------------------------------------------------
 // CSS serialisation
