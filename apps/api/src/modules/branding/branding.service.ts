@@ -356,11 +356,12 @@ Responde SOLO con el color en formato #RRGGBB, sin explicacion ni texto adiciona
 
     const content = response.choices[0]?.message?.content?.trim() ?? '';
     const match = content.match(/#[0-9a-fA-F]{6}/);
+
+    await this.logAiUsage(tenantId, response, 'branding-suggest-color');
+
     if (!match) {
       throw new BadRequestException('No se pudo generar un color valido');
     }
-
-    await this.logAiUsage(tenantId, response, 'branding-suggest-color');
 
     return { hex: match[0] };
   }
