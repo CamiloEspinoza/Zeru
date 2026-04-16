@@ -6,15 +6,9 @@ import {
   generateTheme,
   mergeThemeWithOverrides,
   themeToCSS,
+  BORDER_RADIUS_MAP,
 } from '@/lib/theme-generator';
 import type { ThemeOverrides } from '@zeru/shared';
-
-const BORDER_RADIUS_MAP: Record<string, string> = {
-  sm: '0.25rem',
-  md: '0.45rem',
-  lg: '0.625rem',
-  xl: '0.875rem',
-};
 
 export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const { tenant } = useTenantContext();
