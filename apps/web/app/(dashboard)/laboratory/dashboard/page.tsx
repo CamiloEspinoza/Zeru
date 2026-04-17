@@ -723,9 +723,9 @@ export default function LaboratoryDashboardPage() {
                         tickFormatter={(v: number) => `${v}d`}
                       />
                       <Tooltip
-                        formatter={(value: number) => [
+                        formatter={(value) => [
                           `${value} días`,
-                          undefined,
+                          undefined as unknown as string,
                         ]}
                       />
                       <Legend />
@@ -887,7 +887,7 @@ export default function LaboratoryDashboardPage() {
                   <KpiCard
                     title="Top Procedencia"
                     value={
-                      financial.topOrigins[0]?.originName || "Sin datos"
+                      financial.topOrigins[0]?.originCode || "Sin datos"
                     }
                     subtitle={
                       financial.topOrigins[0]
