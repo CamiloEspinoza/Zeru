@@ -45,6 +45,12 @@ export class LabImportController {
     };
   }
 
+  @Get('runs')
+  @RequirePermission('lab', 'admin')
+  async listRuns(@CurrentTenant() tenantId: string) {
+    return this.orchestrator.listRuns(tenantId);
+  }
+
   @Get('runs/:id/status')
   @RequirePermission('lab', 'admin')
   async getRunStatus(

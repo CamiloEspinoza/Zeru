@@ -60,12 +60,14 @@ export class FmRangeResolverService {
     try {
       if (dateFilter) {
         const rangeStr = this.formatFmDateRange(dateFilter.dateFrom, dateFilter.dateTo);
+        this.logger.log(`[${source}] Querying FM _find: field="${config.dateField}" range="${rangeStr}"`);
         const response = await this.fmApi.findRecords(
           config.database,
           config.layout,
           [{ [config.dateField]: rangeStr }],
           { limit: 1, dateformats: 2 },
         );
+        this.logger.log(`[${source}] FM _find returned totalRecordCount=${response.totalRecordCount}`);
         return {
           source,
           totalRecords: response.totalRecordCount,

@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, Calendar03Icon, Download01Icon, Loading03Icon } from "@hugeicons/core-free-icons";
+import { cn } from "@/lib/utils";
 import { api } from "@/lib/api-client";
 import { toast } from "sonner";
 import type {
@@ -15,7 +18,11 @@ import type {
 } from "@zeru/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -1077,6 +1084,269 @@ function StatCard({
   );
 }
 
+// ── Import Types ──
+
+interface ImportRun {
+  id: string;
+  sources: string[];
+  dateFrom: string | null;
+  dateTo: string | null;
+  batchSize: number;
+  status: string;
+  phase: string | null;
+  totalBatches: number;
+  completedBatches: number;
+  failedBatches: number;
+  totalRecords: number;
+  processedRecords: number;
+  errorRecords: number;
+  startedAt: string | null;
+  completedAt: string | null;
+  error: string | null;
+  createdAt: string;
+}
+
+const SOURCE_OPTIONS = [
+  { value: "BIOPSIAS", label: "Biopsias" },
+  { value: "PAPANICOLAOU", label: "Papanicolaou" },
+  { value: "BIOPSIASRESPALDO", label: "Biopsias (Respaldo)" },
+  { value: "PAPANICOLAOUHISTORICO", label: "PAP (Histórico)" },
+];
+
+const IMPORT_STATUS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  RUNNING: { label: "En curso", variant: "default" },
+  COMPLETED: { label: "Completado", variant: "secondary" },
+  FAILED: { label: "Error", variant: "destructive" },
+  CANCELLED: { label: "Cancelado", variant: "outline" },
+};
+
+function ImportDatePicker({ value, onChange, placeholder }: {
+  value: Date | undefined;
+  onChange: (d: Date | undefined) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className={cn("w-[180px] justify-start text-left font-normal", !value && "text-muted-foreground")}>
+          <HugeiconsIcon icon={Calendar03Icon} className="mr-2 size-4" />
+          {value ? format(value, "dd MMM yyyy", { locale: es }) : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          selected={value}
+          defaultMonth={value}
+          startMonth={new Date(1990, 0)}
+          endMonth={new Date(2030, 11)}
+          onSelect={(d) => { onChange(d); setOpen(false); }}
+          locale={es}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ImportTab() {
+  const [sources, setSources] = useState<string[]>(["BIOPSIAS", "PAPANICOLAOU"]);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [batchSize, setBatchSize] = useState("50");
+  const [starting, setStarting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [runs, setRuns] = useState<ImportRun[]>([]);
+  const [loadingRuns, setLoadingRuns] = useState(true);
+
+  const fetchRuns = useCallback(async () => {
+    try {
+      const data = await api.get<ImportRun[]>("/lab/import/runs");
+      setRuns(data);
+    } catch { /* silent */ }
+    finally { setLoadingRuns(false); }
+  }, []);
+
+  useEffect(() => {
+    fetchRuns();
+    const interval = setInterval(fetchRuns, 5000);
+    return () => clearInterval(interval);
+  }, [fetchRuns]);
+
+  function toggleSource(src: string) {
+    setSources((prev) => prev.includes(src) ? prev.filter((s) => s !== src) : [...prev, src]);
+  }
+
+  async function handleStart() {
+    setConfirmOpen(false);
+    setStarting(true);
+    try {
+      const body: Record<string, unknown> = { sources, batchSize: parseInt(batchSize, 10) };
+      if (dateFrom) body.dateFrom = dateFrom.toISOString();
+      if (dateTo) { const end = new Date(dateTo); end.setHours(23, 59, 59, 999); body.dateTo = end.toISOString(); }
+      const res = await api.post<{ runId: string; totalBatches: number }>("/lab/import/start", body);
+      toast.success(`Importación iniciada: ${res.totalBatches.toLocaleString("es-CL")} batches`);
+      fetchRuns();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al iniciar importación");
+    } finally { setStarting(false); }
+  }
+
+  const hasActiveRun = runs.some((r) => r.status === "RUNNING");
+
+  const fmtDate = (iso: string | null) => iso ? format(new Date(iso), "dd MMM yyyy", { locale: es }) : "—";
+  const fmtDateTime = (iso: string | null) => iso ? format(new Date(iso), "dd MMM HH:mm", { locale: es }) : "—";
+  const fmtNum = (n: number) => (n ?? 0).toLocaleString("es-CL");
+
+  return (
+    <div className="space-y-6">
+      {/* New import form */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Nueva importación</CardTitle>
+          <CardDescription>Selecciona las fuentes y el rango de fechas a importar desde FileMaker.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm font-medium mb-2">Fuentes</p>
+            <div className="flex flex-wrap gap-2">
+              {SOURCE_OPTIONS.map((opt) => (
+                <Button key={opt.value} variant={sources.includes(opt.value) ? "default" : "outline"} size="sm" onClick={() => toggleSource(opt.value)}>
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-medium mb-2">Rango de fechas</p>
+            <div className="flex items-center gap-3">
+              <ImportDatePicker value={dateFrom} onChange={setDateFrom} placeholder="Desde..." />
+              <span className="text-muted-foreground">—</span>
+              <ImportDatePicker value={dateTo} onChange={setDateTo} placeholder="Hasta..." />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">Deja vacio para importar todos los registros.</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium mb-2">Registros por batch</p>
+            <Select value={batchSize} onValueChange={setBatchSize}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="200">200</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-3 pt-2">
+            <Button onClick={() => setConfirmOpen(true)} disabled={sources.length === 0 || starting || hasActiveRun}>
+              {starting ? (
+                <><HugeiconsIcon icon={Loading03Icon} className="size-4 animate-spin" />Iniciando...</>
+              ) : (
+                <><HugeiconsIcon icon={Download01Icon} className="size-4" />Iniciar importación</>
+              )}
+            </Button>
+            {hasActiveRun && <p className="text-sm text-muted-foreground">Ya hay una importación en curso.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Confirmation dialog */}
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar importación</DialogTitle>
+            <DialogDescription>Esto descargara registros de FileMaker y los importara al sistema.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p><span className="font-medium">Fuentes:</span> {sources.join(", ")}</p>
+            <p><span className="font-medium">Desde:</span> {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Sin límite"}</p>
+            <p><span className="font-medium">Hasta:</span> {dateTo ? format(dateTo, "dd/MM/yyyy") : "Sin límite"}</p>
+            <p><span className="font-medium">Batch size:</span> {batchSize}</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+            <Button onClick={handleStart}>Confirmar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import runs history */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Historial de importaciónes</CardTitle>
+          <CardDescription>Últimas 50 ejecuciones</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingRuns ? (
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : runs.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No hay importaciónes registradas.</p>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Estado</TableHead>
+                    <TableHead>Fuentes</TableHead>
+                    <TableHead>Rango</TableHead>
+                    <TableHead className="text-right">Registros</TableHead>
+                    <TableHead className="text-right">Progreso</TableHead>
+                    <TableHead>Iniciado</TableHead>
+                    <TableHead>Duración</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {runs.map((run) => {
+                    const pct = run.totalBatches > 0 ? Math.round((run.completedBatches / run.totalBatches) * 100) : 0;
+                    const dur = run.startedAt
+                      ? Math.round(((run.completedAt ? new Date(run.completedAt).getTime() : Date.now()) - new Date(run.startedAt).getTime()) / 1000)
+                      : null;
+                    return (
+                      <TableRow key={run.id}>
+                        <TableCell>
+                          <Badge variant={IMPORT_STATUS[run.status]?.variant ?? "outline"}>
+                            {IMPORT_STATUS[run.status]?.label ?? run.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">{run.sources.join(", ")}</TableCell>
+                        <TableCell className="text-xs tabular-nums">{fmtDate(run.dateFrom)} — {fmtDate(run.dateTo)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          <span className="font-medium">{fmtNum(run.processedRecords)}</span>
+                          <span className="text-muted-foreground">/{fmtNum(run.totalRecords)}</span>
+                          {run.errorRecords > 0 && <span className="text-destructive ml-1">({run.errorRecords} err)</span>}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center gap-2 justify-end">
+                            <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={cn("h-full rounded-full transition-all", run.status === "FAILED" ? "bg-destructive" : run.status === "COMPLETED" ? "bg-green-500" : "bg-primary")}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs tabular-nums w-8 text-right">{pct}%</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 text-right tabular-nums">{run.completedBatches}/{run.totalBatches} batches</p>
+                        </TableCell>
+                        <TableCell className="text-xs tabular-nums">{fmtDateTime(run.startedAt)}</TableCell>
+                        <TableCell className="text-xs tabular-nums">
+                          {dur !== null ? (dur >= 60 ? `${Math.floor(dur / 60)}m ${dur % 60}s` : `${dur}s`) : "—"}
+                          {run.status === "RUNNING" && <HugeiconsIcon icon={Loading03Icon} className="inline-block ml-1 size-3 animate-spin text-primary" />}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main Page ──
 
 export default function FileMakerDiscoveryPage() {
@@ -1095,6 +1365,7 @@ export default function FileMakerDiscoveryPage() {
         <TabsList>
           <TabsTrigger value="explorer">Explorador</TabsTrigger>
           <TabsTrigger value="sync">Estado de Sync</TabsTrigger>
+          <TabsTrigger value="import">Importación</TabsTrigger>
         </TabsList>
 
         <TabsContent value="explorer">
@@ -1103,6 +1374,10 @@ export default function FileMakerDiscoveryPage() {
 
         <TabsContent value="sync">
           <SyncStatusTab />
+        </TabsContent>
+
+        <TabsContent value="import">
+          <ImportTab />
         </TabsContent>
       </Tabs>
     </div>

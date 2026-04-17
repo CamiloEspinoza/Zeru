@@ -15,6 +15,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Download01Icon,
+  File02Icon,
+  ArrowDown01Icon,
+  Search01Icon,
+} from "@hugeicons/core-free-icons";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
 import { useDebouncedSearch } from "@/hooks/use-debounced-search";
@@ -64,6 +78,35 @@ function OriginsListContent() {
   );
   const [activeOnly, setActiveOnly] = useState(searchParams.get("active") !== "false");
   const [hasFtp, setHasFtp] = useState(searchParams.get("ftp") === "true");
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport(format: "xlsx" | "csv") {
+    setExporting(true);
+    try {
+      const token = localStorage.getItem("access_token");
+      const tenantId = tenant?.id ?? localStorage.getItem("tenantId");
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3017/api";
+      const res = await fetch(`${baseUrl}/lab-origins/export?format=${format}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-tenant-id": tenantId ?? "",
+        },
+      });
+      if (!res.ok) throw new Error("Error al exportar");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `procedencias.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exportado como ${format.toUpperCase()}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al exportar");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     const initial = searchParams.get("search");
@@ -148,12 +191,18 @@ function OriginsListContent() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle>Procedencias</CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <Input
-                placeholder="Buscar código o nombre…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-[220px]"
-              />
+              <div className="relative">
+                <HugeiconsIcon
+                  icon={Search01Icon}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+                />
+                <Input
+                  placeholder="Buscar código o nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-[220px] pl-8"
+                />
+              </div>
               <Select value={category} onValueChange={(v) => setCategory(v as CategoryKey | "ALL")}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Categoría" />
@@ -181,6 +230,25 @@ function OriginsListContent() {
               >
                 Con FTP
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={exporting || loading}>
+                    <HugeiconsIcon icon={Download01Icon} className="size-4" />
+                    {exporting ? "Exportando..." : "Exportar"}
+                    <HugeiconsIcon icon={ArrowDown01Icon} className="size-3 ml-0.5 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExport("xlsx")}>
+                    <HugeiconsIcon icon={File02Icon} className="size-4 text-green-600" />
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport("csv")}>
+                    <HugeiconsIcon icon={File02Icon} className="size-4 text-blue-600" />
+                    CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>

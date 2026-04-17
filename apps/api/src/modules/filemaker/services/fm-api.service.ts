@@ -40,7 +40,7 @@ export class FmApiService {
         Authorization: `Bearer ${token}`,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(90000),
     });
 
     // Auto-refresh on 401
@@ -72,7 +72,9 @@ export class FmApiService {
 
   private normalizeRecords(raw: any): FmResponse {
     const data = raw.response?.data ?? [];
-    const totalRecordCount = raw.response?.dataInfo?.totalRecordCount ?? data.length;
+    const dataInfo = raw.response?.dataInfo;
+    // foundCount = records matching the find; totalRecordCount = all records in the table
+    const totalRecordCount = dataInfo?.foundCount ?? dataInfo?.totalRecordCount ?? data.length;
 
     const records: FmRecord[] = data.map((item: any) => ({
       recordId: item.recordId,

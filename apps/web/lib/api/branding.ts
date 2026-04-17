@@ -4,11 +4,18 @@ import type { TenantBranding, GeneratePaletteResult } from "@zeru/shared";
 export const brandingApi = {
   get: () => api.get<TenantBranding | null>("/tenants/current/branding"),
 
-  updateColors: (colors: {
+  updateColors: (data: {
     primaryColor?: string;
     secondaryColor?: string;
     accentColor?: string;
-  }) => api.patch<TenantBranding>("/tenants/current/branding", colors),
+    themeOverrides?: { light?: Record<string, string>; dark?: Record<string, string> };
+    borderRadius?: string;
+  }) => api.patch<TenantBranding>("/tenants/current/branding", data),
+
+  suggestColor: (description: string) =>
+    api.post<{ hex: string }>("/tenants/current/branding/suggest-color", {
+      description,
+    }),
 
   uploadLogo: (file: File) =>
     api.uploadFile<TenantBranding>("/tenants/current/branding/logo", file),

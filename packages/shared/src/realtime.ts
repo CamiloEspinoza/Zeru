@@ -196,6 +196,14 @@ export interface ServerToClientEvents {
     taskId: string;
     userId: string;
   }) => void;
+  'queues:stats': (data: {
+    queues: Array<{
+      name: string;
+      displayName: string;
+      isPaused: boolean;
+      counts: Record<string, number>;
+    }>;
+  }) => void;
   'section:changed': (data: {
     projectId: string;
     sectionId: string | null;

@@ -37,6 +37,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { LabModule } from './modules/lab/lab.module';
 import { PlatformStorageModule } from './modules/platform-storage/platform-storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
+import { QueueAdminModule } from './modules/queue-admin/queue-admin.module';
 import { DteModule } from './modules/dte/dte.module';
 import { BrowserModule } from './modules/browser/browser.module';
 
@@ -78,6 +79,7 @@ import { BrowserModule } from './modules/browser/browser.module';
     LabModule,
     PlatformStorageModule,
     BrandingModule,
+    QueueAdminModule,
     DteModule,
     BrowserModule,
   ],

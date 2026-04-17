@@ -26,6 +26,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "culori": "^4.0.2",
     "date-fns": "^4.1.0",
     "html-to-image": "1.11.11",
     "html2pdf.js": "^0.14.0",
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
+    "@types/culori": "^4.0.1",
     "@types/dagre": "^0.7.54",
     "@types/node": "^20",
     "@types/react": "^19",

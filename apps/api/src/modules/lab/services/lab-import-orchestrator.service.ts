@@ -89,6 +89,7 @@ export class LabImportOrchestratorService {
 
     // Resolve record counts per source
     let totalBatches = 0;
+    let totalRecords = 0;
     const allBatchDefs: BatchDefinition[] = [];
 
     for (const source of orderedSources) {
@@ -100,6 +101,7 @@ export class LabImportOrchestratorService {
 
       if (stats.totalRecords === 0) continue;
 
+      totalRecords += stats.totalRecords;
       const batchCount = Math.ceil(stats.totalRecords / batchSize);
       for (let i = 0; i < batchCount; i++) {
         allBatchDefs.push({
@@ -147,7 +149,7 @@ export class LabImportOrchestratorService {
       where: { id: run.id },
       data: {
         totalBatches,
-        totalRecords: allBatchDefs.reduce((sum, d) => sum + d.totalRecords, 0),
+        totalRecords,
       },
     });
 
@@ -348,6 +350,10 @@ export class LabImportOrchestratorService {
     }
 
     if (jobs.length > 0) {
+      await this.prisma.labImportRun.update({
+        where: { id: runId },
+        data: { totalBatches: { increment: jobs.length } },
+      });
       await this.importQueue.addBulk(jobs);
       this.logger.log(
         `Enqueued ${jobs.length} Phase 2 (workflow/comms) jobs for run ${runId}`,
@@ -375,6 +381,11 @@ export class LabImportOrchestratorService {
         limit: 10000, // All liquidations in one job (~2.6k records)
         status: 'PENDING',
       },
+    });
+
+    await this.prisma.labImportRun.update({
+      where: { id: runId },
+      data: { totalBatches: { increment: 1 } },
     });
 
     await this.importQueue.add(
@@ -439,6 +450,10 @@ export class LabImportOrchestratorService {
     }
 
     if (jobs.length > 0) {
+      await this.prisma.labImportRun.update({
+        where: { id: runId },
+        data: { totalBatches: { increment: jobs.length } },
+      });
       await this.importQueue.addBulk(jobs);
       this.logger.log(`Enqueued ${jobs.length} Phase 4 (charges) jobs for run ${runId}`);
     } else {
@@ -506,6 +521,36 @@ export class LabImportOrchestratorService {
     });
 
     this.logger.log(`Import run ${runId} completed. ${failedCount} failed batches.`);
+  }
+
+  /**
+   * List all import runs for a tenant (most recent first).
+   */
+  async listRuns(tenantId: string) {
+    return this.prisma.labImportRun.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        sources: true,
+        dateFrom: true,
+        dateTo: true,
+        batchSize: true,
+        status: true,
+        phase: true,
+        totalBatches: true,
+        completedBatches: true,
+        failedBatches: true,
+        totalRecords: true,
+        processedRecords: true,
+        errorRecords: true,
+        startedAt: true,
+        completedAt: true,
+        error: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
   }
 
   /**

@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImageUploadZone } from "@/components/branding/image-upload-zone";
-import { ColorPickerField } from "@/components/branding/color-picker-field";
+import { ThemeEditor } from "@/components/branding/theme-editor";
 
 function TenantIdField({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -45,45 +45,14 @@ function TenantIdField({ value }: { value: string }) {
 function AppearanceTab() {
   const [branding, setBranding] = useState<TenantBranding | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [colors, setColors] = useState({
-    primaryColor: "",
-    secondaryColor: "",
-    accentColor: "",
-  });
-  const [generatingPalette, setGeneratingPalette] = useState(false);
   const [generatingFavicon, setGeneratingFavicon] = useState(false);
-  const [descriptionOpen, setDescriptionOpen] = useState(false);
-  const [description, setDescription] = useState("");
 
   useEffect(() => {
     brandingApi.get().then((data) => {
       setBranding(data);
-      if (data) {
-        setColors({
-          primaryColor: data.primaryColor || "",
-          secondaryColor: data.secondaryColor || "",
-          accentColor: data.accentColor || "",
-        });
-      }
       setLoading(false);
     });
   }, []);
-
-  const handleSaveColors = async () => {
-    setSaving(true);
-    try {
-      const payload: Record<string, string> = {};
-      if (colors.primaryColor) payload.primaryColor = colors.primaryColor;
-      if (colors.secondaryColor)
-        payload.secondaryColor = colors.secondaryColor;
-      if (colors.accentColor) payload.accentColor = colors.accentColor;
-      const updated = await brandingApi.updateColors(payload);
-      setBranding(updated);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const refreshBranding = async () => {
     const data = await brandingApi.get();
@@ -111,40 +80,6 @@ function AppearanceTab() {
     };
     await methods[type]();
     await refreshBranding();
-  };
-
-  const handleGenerateFromLogo = async () => {
-    setGeneratingPalette(true);
-    try {
-      const palette = await brandingApi.generatePalette({ source: "logo" });
-      setColors({
-        primaryColor: palette.primary,
-        secondaryColor: palette.secondary,
-        accentColor: palette.accent,
-      });
-    } finally {
-      setGeneratingPalette(false);
-    }
-  };
-
-  const handleGenerateFromDescription = async () => {
-    if (!description.trim()) return;
-    setGeneratingPalette(true);
-    try {
-      const palette = await brandingApi.generatePalette({
-        source: "description",
-        description,
-      });
-      setColors({
-        primaryColor: palette.primary,
-        secondaryColor: palette.secondary,
-        accentColor: palette.accent,
-      });
-      setDescriptionOpen(false);
-      setDescription("");
-    } finally {
-      setGeneratingPalette(false);
-    }
   };
 
   const handleFaviconFromIsotipo = async () => {
@@ -251,107 +186,16 @@ function AppearanceTab() {
         <CardHeader>
           <CardTitle>Paleta de colores</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Define los colores principales. Se aplican a toda la interfaz y
-            comunicaciones.
+            Define el color principal. Se generan automaticamente todos los
+            colores del sistema para light y dark mode.
           </p>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* AI Buttons */}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateFromLogo}
-              disabled={
-                generatingPalette ||
-                (!branding?.logoUrl && !branding?.isotipoUrl)
-              }
-            >
-              {generatingPalette ? "Generando..." : "Generar desde logo"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDescriptionOpen(true)}
-              disabled={generatingPalette}
-            >
-              Describir estilo deseado
-            </Button>
-          </div>
-
-          {/* Description input */}
-          {descriptionOpen && (
-            <div className="flex gap-2 items-end">
-              <div className="flex-1 space-y-1">
-                <Label>Describe el estilo deseado</Label>
-                <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ej: Colores corporativos azul marino y dorado, estilo profesional"
-                />
-              </div>
-              <Button
-                onClick={handleGenerateFromDescription}
-                disabled={generatingPalette}
-                size="sm"
-              >
-                {generatingPalette ? "Generando..." : "Generar"}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDescriptionOpen(false)}
-              >
-                Cancelar
-              </Button>
-            </div>
-          )}
-
-          {/* Color Pickers */}
-          <div className="grid grid-cols-3 gap-4">
-            <ColorPickerField
-              label="Primario"
-              hint="Botones, links, acciones"
-              value={colors.primaryColor}
-              onChange={(v) =>
-                setColors((c) => ({ ...c, primaryColor: v }))
-              }
-            />
-            <ColorPickerField
-              label="Secundario"
-              hint="Badges, highlights"
-              value={colors.secondaryColor}
-              onChange={(v) =>
-                setColors((c) => ({ ...c, secondaryColor: v }))
-              }
-            />
-            <ColorPickerField
-              label="Acento"
-              hint="Notificaciones, alertas"
-              value={colors.accentColor}
-              onChange={(v) =>
-                setColors((c) => ({ ...c, accentColor: v }))
-              }
-            />
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setColors({
-                  primaryColor: branding?.primaryColor || "",
-                  secondaryColor: branding?.secondaryColor || "",
-                  accentColor: branding?.accentColor || "",
-                });
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveColors} disabled={saving}>
-              {saving ? "Guardando..." : "Guardar cambios"}
-            </Button>
-          </div>
+        <CardContent>
+          <ThemeEditor
+            branding={branding}
+            logoUrl={branding?.logoUrl ?? null}
+            onSaved={refreshBranding}
+          />
         </CardContent>
       </Card>
     </div>

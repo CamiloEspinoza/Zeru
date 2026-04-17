@@ -11,20 +11,24 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { PermissionGuard } from '../../common/guards/permission.guard';
+import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { CurrentTenant } from '../../common/decorators/current-tenant.decorator';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, PermissionGuard)
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
+  @RequirePermission('settings', 'view')
   findAll(@CurrentTenant() tenantId: string) {
     return this.rolesService.findAll(tenantId);
   }
 
   @Get(':id')
+  @RequirePermission('settings', 'view')
   findOne(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -33,6 +37,7 @@ export class RolesController {
   }
 
   @Post()
+  @RequirePermission('settings', 'manage-roles')
   create(
     @CurrentTenant() tenantId: string,
     @Body() body: any,
@@ -41,6 +46,7 @@ export class RolesController {
   }
 
   @Patch(':id')
+  @RequirePermission('settings', 'manage-roles')
   update(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -51,6 +57,7 @@ export class RolesController {
 
   @Delete(':id')
   @HttpCode(204)
+  @RequirePermission('settings', 'manage-roles')
   async remove(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

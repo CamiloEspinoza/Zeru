@@ -8,6 +8,23 @@ const LEVEL_HIERARCHY: Record<AccessLevel, number> = {
   MANAGE: 3,
 };
 
+/**
+ * Well-known action names that map directly to an access level.
+ * Used as a fallback when a permissionKey does NOT match any
+ * granular permission defined on the module.
+ *
+ * If a module explicitly defines a granular permission with the
+ * same key, the granular permission takes precedence.
+ */
+const ACTION_LEVEL_MAP: Record<string, AccessLevel> = {
+  view: 'VIEW',
+  read: 'VIEW',
+  write: 'EDIT',
+  edit: 'EDIT',
+  manage: 'MANAGE',
+  admin: 'MANAGE',
+};
+
 export interface ModuleAccessEntry {
   moduleKey: string;
   accessLevel: AccessLevel;
@@ -57,10 +74,20 @@ export function hasPermission(
   const moduleDef = MODULE_DEFINITIONS.find((m) => m.key === moduleKey);
   if (!moduleDef) return false;
 
+  // Granular permission takes precedence
   const perm = moduleDef.granularPermissions.find(
     (p) => p.key === permissionKey,
   );
-  if (!perm) return false;
+  if (perm) {
+    return LEVEL_HIERARCHY[access.accessLevel] >= LEVEL_HIERARCHY[perm.minLevel];
+  }
 
-  return LEVEL_HIERARCHY[access.accessLevel] >= LEVEL_HIERARCHY[perm.minLevel];
+  // Fallback: well-known action names map to access levels
+  const requiredLevel = ACTION_LEVEL_MAP[permissionKey];
+  if (requiredLevel) {
+    return LEVEL_HIERARCHY[access.accessLevel] >= LEVEL_HIERARCHY[requiredLevel];
+  }
+
+  // Unknown permission key — deny
+  return false;
 }

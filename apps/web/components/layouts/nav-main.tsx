@@ -33,6 +33,7 @@ import {
   Plug01Icon,
   ChartColumnIcon,
   TaskDone01Icon,
+  Download01Icon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
@@ -150,6 +151,7 @@ const appNavSections: NavSection[] = [
   {
     label: "Laboratorio",
     items: [
+      { title: "Dashboard", href: "/laboratory/dashboard", icon: Analytics02Icon, moduleKey: "lab" },
       { title: "Recepción", href: "/laboratory/reception", icon: InboxIcon, moduleKey: "lab-reception" },
       { title: "Procesamiento", href: "/laboratory/processing", icon: MicroscopeIcon, moduleKey: "lab-processing" },
       { title: "Informes", href: "/laboratory/reports", icon: MedicalFileIcon, moduleKey: "lab-reports" },
@@ -175,7 +177,15 @@ const appNavSections: NavSection[] = [
   {
     label: "Sistema",
     items: [
-      { title: "Integraciones", href: "/integrations", icon: Plug01Icon, moduleKey: "integrations" },
+      {
+        title: "Integraciones",
+        href: "/integrations",
+        icon: Plug01Icon,
+        moduleKey: "integrations",
+        items: [
+          { title: "FileMaker", href: "/integrations/filemaker" },
+        ],
+      },
       { title: "Reportes", href: "/reports", icon: ChartColumnIcon, moduleKey: "reports" },
       {
         title: "Administración",
@@ -185,6 +195,7 @@ const appNavSections: NavSection[] = [
         items: [
           { title: "Costos IA (Global)", href: "/admin/ai-costs" },
           { title: "Precios IA", href: "/admin/ai-pricing" },
+          { title: "Colas de trabajo", href: "/admin/queues" },
         ],
       },
     ],

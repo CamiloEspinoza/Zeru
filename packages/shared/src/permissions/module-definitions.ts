@@ -209,6 +209,15 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
 
   // ── Laboratorio ──
   {
+    key: 'lab',
+    label: 'Laboratorio (Admin)',
+    section: 'laboratory',
+    granularPermissions: [
+      { key: 'admin', label: 'Administrar importaciones', minLevel: 'MANAGE' },
+      { key: 'view-financial', label: 'Ver datos financieros del laboratorio', minLevel: 'MANAGE' },
+    ],
+  },
+  {
     key: 'lab-reception',
     label: 'Recepción',
     section: 'laboratory',
@@ -288,7 +297,10 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     key: 'lab-origins',
     label: 'Procedencias',
     section: 'laboratory',
-    granularPermissions: [],
+    granularPermissions: [
+      { key: 'write', label: 'Crear y editar procedencias', minLevel: 'EDIT' },
+      { key: 'export', label: 'Exportar procedencias', minLevel: 'VIEW' },
+    ],
   },
 
   // ── Marketing ──
