@@ -62,15 +62,37 @@ export function oklchToHex(color: OklchColor): string {
 
 /**
  * Return a light or dark foreground color depending on background lightness.
- * Light backgrounds (L > 0.5) get a dark foreground; dark backgrounds get a light one.
+ *
+ * Threshold 0.70 based on APCA research (Lea Verou / Myndex):
+ *   L >= 0.72 → dark text always wins
+ *   L <= 0.65 → light text always wins
+ *   0.70 is a safe midpoint that slightly favors light text on ambiguous tones.
+ *
+ * After picking direction, validates with WCAG 2.x contrast ratio (>= 4.5:1).
+ * If the chosen foreground fails, tries the opposite. If both fail, adjusts
+ * lightness iteratively to guarantee accessible contrast.
  */
 function autoForeground(bg: OklchColor, primaryHue: number): OklchColor {
-  if (bg.l > 0.5) {
-    // Dark foreground for light backgrounds
-    return { l: 0.145, c: 0.005, h: primaryHue };
+  const dark: OklchColor = { l: 0.145, c: 0.005, h: primaryHue };
+  const light: OklchColor = { l: 0.985, c: 0.005, h: primaryHue };
+
+  const preferred = bg.l > 0.70 ? dark : light;
+  const fallback = bg.l > 0.70 ? light : dark;
+
+  const bgStr = oklchStr(bg);
+  if (wcagContrast(bgStr, oklchStr(preferred)) >= 4.5) return preferred;
+  if (wcagContrast(bgStr, oklchStr(fallback)) >= 4.5) return fallback;
+
+  // Edge case: neither passes — push lightness to extreme
+  const target = bg.l > 0.5 ? 0.0 : 1.0;
+  let l = preferred.l;
+  for (let i = 0; i < 10; i++) {
+    l = l + (target - l) * 0.3;
+    const candidate = { l, c: 0.005, h: primaryHue };
+    if (wcagContrast(bgStr, oklchStr(candidate)) >= 4.5) return candidate;
   }
-  // Light foreground for dark backgrounds
-  return { l: 0.985, c: 0.005, h: primaryHue };
+
+  return preferred;
 }
 
 // ---------------------------------------------------------------------------

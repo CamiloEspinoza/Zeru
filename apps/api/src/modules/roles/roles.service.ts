@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { AccessLevel } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MODULE_DEFINITIONS } from '@zeru/shared';
 
 interface CreateRoleDto {
   name: string;
@@ -23,30 +24,8 @@ interface UpdateRoleDto {
   overrides?: { permission: string; granted: boolean }[];
 }
 
-const ALL_MODULE_KEYS = [
-  'dashboard',
-  'assistant',
-  'calendar',
-  'documents',
-  'projects',
-  'clients',
-  'collections',
-  'invoicing',
-  'accounting',
-  'directory',
-  'orgchart',
-  'org-intelligence',
-  'lab-reception',
-  'lab-processing',
-  'lab-reports',
-  'lab-coding',
-  'lab-origins',
-  'linkedin',
-  'integrations',
-  'reports',
-  'admin',
-  'settings',
-] as const;
+/** Derived from MODULE_DEFINITIONS — single source of truth */
+const ALL_MODULE_KEYS = MODULE_DEFINITIONS.map((m) => m.key);
 
 /** Helper to build moduleAccess array where every module has the same level */
 function allModulesAt(level: AccessLevel) {
@@ -93,6 +72,7 @@ const DEFAULT_ROLES: {
       { moduleKey: 'directory', accessLevel: 'VIEW' as AccessLevel },
       { moduleKey: 'orgchart', accessLevel: 'VIEW' as AccessLevel },
       { moduleKey: 'org-intelligence', accessLevel: 'NONE' as AccessLevel },
+      { moduleKey: 'lab', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-reception', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-processing', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-reports', accessLevel: 'NONE' as AccessLevel },
@@ -123,6 +103,7 @@ const DEFAULT_ROLES: {
       { moduleKey: 'directory', accessLevel: 'VIEW' as AccessLevel },
       { moduleKey: 'orgchart', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'org-intelligence', accessLevel: 'NONE' as AccessLevel },
+      { moduleKey: 'lab', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-reception', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-processing', accessLevel: 'NONE' as AccessLevel },
       { moduleKey: 'lab-reports', accessLevel: 'NONE' as AccessLevel },

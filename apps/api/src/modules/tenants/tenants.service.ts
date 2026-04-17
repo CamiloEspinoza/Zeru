@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PlatformStorageService } from '../platform-storage/platform-storage.service';
 import { RolesService } from '../roles/roles.service';
 import type { CreateTenantSchema, UpdateTenantSchema } from '@zeru/shared';
 
@@ -9,6 +10,7 @@ export class TenantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rolesService: RolesService,
+    private readonly storage: PlatformStorageService,
   ) {}
 
   /** Create a new organization and add the requesting user as OWNER */
@@ -65,6 +67,25 @@ export class TenantsService {
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
+
+    if (tenant.branding) {
+      const [logoUrl, isotipoUrl, faviconUrl] = await Promise.all([
+        tenant.branding.logoUrl
+          ? this.storage.getPresignedUrl(tenant.branding.logoUrl)
+          : null,
+        tenant.branding.isotipoUrl
+          ? this.storage.getPresignedUrl(tenant.branding.isotipoUrl)
+          : null,
+        tenant.branding.faviconUrl
+          ? this.storage.getPresignedUrl(tenant.branding.faviconUrl)
+          : null,
+      ]);
+      return {
+        ...tenant,
+        branding: { ...tenant.branding, logoUrl, isotipoUrl, faviconUrl },
+      };
+    }
+
     return tenant;
   }
 
