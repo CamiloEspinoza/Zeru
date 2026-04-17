@@ -174,6 +174,13 @@ model Tenant {
   billingAgreements   BillingAgreement[]
   billingConcepts     BillingConcept[]
   projects            Project[]
+  dteConfig           DteConfig?
+  dteCertificates     DteCertificate[]
+  dteFolios           DteFolio[]
+  dtes                Dte[]
+  dteRcofs            DteRcof[]
+  dteAccountMappings  DteAccountMapping[]
+  dteExchanges        DteExchange[]
 
   @@map("tenants")
   @@schema("public")
@@ -201,34 +208,36 @@ model User {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  memberships             UserTenant[]
-  conversations           Conversation[]
-  documents               Document[]
-  stepCompletions         AccountingStepCompletion[]
-  memories                Memory[]
-  journalEntriesCreated   JournalEntry[]
-  apiKeys                 ApiKey[]
-  orgProjectsCreated      OrgProject[]               @relation("OrgProjectsCreated")
-  aiUsageLogs             AiUsageLog[]
-  channelsCreated         Channel[]                  @relation("ChannelCreator")
-  channelMemberships      ChannelMember[]
-  chatMessages            ChatMessage[]              @relation("ChatMessageAuthor")
-  chatReactions           ChatReaction[]             @relation("ChatReactionUser")
-  chatMentionsOf          ChatMention[]              @relation("ChatMentionTarget")
-  notifications           Notification[]             @relation("NotificationRecipient")
-  notificationPreferences NotificationPreference[]   @relation("NotificationPref")
-  personProfiles          PersonProfile[]
-  projectsCreated         Project[]                  @relation("ProjectsCreated")
-  projectMemberships      ProjectMember[]            @relation("ProjectMemberships")
-  tasksCreated            Task[]                     @relation("TasksCreated")
-  taskAssignments         TaskAssignee[]             @relation("TaskAssignments")
-  taskSubscriptions       TaskSubscriber[]           @relation("TaskSubscriptions")
-  taskComments            TaskComment[]              @relation("TaskComments")
-  taskCommentReactions    TaskCommentReaction[]      @relation("TaskCommentReactions")
-  taskActivities          TaskActivity[]             @relation("TaskActivities")
-  taskAttachments         TaskAttachment[]           @relation("TaskAttachments")
-  taskViewsCreated        TaskView[]                 @relation("TaskViewsCreated")
-  taskPropertyPersonValues TaskPropertyValue[]       @relation("TaskPropertyPersonValues")
+  memberships              UserTenant[]
+  conversations            Conversation[]
+  documents                Document[]
+  stepCompletions          AccountingStepCompletion[]
+  memories                 Memory[]
+  journalEntriesCreated    JournalEntry[]
+  apiKeys                  ApiKey[]
+  orgProjectsCreated       OrgProject[]               @relation("OrgProjectsCreated")
+  aiUsageLogs              AiUsageLog[]
+  channelsCreated          Channel[]                  @relation("ChannelCreator")
+  channelMemberships       ChannelMember[]
+  chatMessages             ChatMessage[]              @relation("ChatMessageAuthor")
+  chatReactions            ChatReaction[]             @relation("ChatReactionUser")
+  chatMentionsOf           ChatMention[]              @relation("ChatMentionTarget")
+  notifications            Notification[]             @relation("NotificationRecipient")
+  notificationPreferences  NotificationPreference[]   @relation("NotificationPref")
+  personProfiles           PersonProfile[]
+  projectsCreated          Project[]                  @relation("ProjectsCreated")
+  projectMemberships       ProjectMember[]            @relation("ProjectMemberships")
+  tasksCreated             Task[]                     @relation("TasksCreated")
+  taskAssignments          TaskAssignee[]             @relation("TaskAssignments")
+  taskSubscriptions        TaskSubscriber[]           @relation("TaskSubscriptions")
+  taskComments             TaskComment[]              @relation("TaskComments")
+  taskCommentReactions     TaskCommentReaction[]      @relation("TaskCommentReactions")
+  taskActivities           TaskActivity[]             @relation("TaskActivities")
+  taskAttachments          TaskAttachment[]           @relation("TaskAttachments")
+  taskViewsCreated         TaskView[]                 @relation("TaskViewsCreated")
+  taskPropertyPersonValues TaskPropertyValue[]        @relation("TaskPropertyPersonValues")
+  dtesCreated              Dte[]                      @relation("DteCreatedBy")
+  dtesDecided              Dte[]                      @relation("DteDecidedBy")
 
   @@map("users")
   @@schema("public")
@@ -601,6 +610,17 @@ model Account {
 
   journalEntryLines JournalEntryLine[]
 
+  dteMappingsReceivable     DteAccountMapping[] @relation("DteMappingReceivable")
+  dteMappingsPayable        DteAccountMapping[] @relation("DteMappingPayable")
+  dteMappingsCash           DteAccountMapping[] @relation("DteMappingCash")
+  dteMappingsRevenue        DteAccountMapping[] @relation("DteMappingRevenue")
+  dteMappingsRevenueExempt  DteAccountMapping[] @relation("DteMappingRevenueExempt")
+  dteMappingsPurchase       DteAccountMapping[] @relation("DteMappingPurchase")
+  dteMappingsIvaDebito      DteAccountMapping[] @relation("DteMappingIvaDebito")
+  dteMappingsIvaCredito     DteAccountMapping[] @relation("DteMappingIvaCredito")
+  dteMappingsSalesReturn    DteAccountMapping[] @relation("DteMappingSalesReturn")
+  dteMappingsPurchaseReturn DteAccountMapping[] @relation("DteMappingPurchaseReturn")
+
   @@unique([code, tenantId])
   @@index([tenantId])
   @@map("accounts")
@@ -670,6 +690,7 @@ model JournalEntry {
 
   lines     JournalEntryLine[]
   documents DocumentJournalEntry[]
+  dte       Dte?
 
   @@unique([number, tenantId])
   @@index([tenantId])
@@ -1925,9 +1946,12 @@ model LegalEntity {
   commune      String?
   city         String?
 
-  email   String?
-  phone   String?
-  website String?
+  email            String?
+  phone            String?
+  website          String?
+  dteExchangeEmail String?
+  isAuthorizedDte  Boolean   @default(false)
+  siiLastRefresh   DateTime?
 
   isActive  Boolean   @default(true)
   deletedAt DateTime?
@@ -1937,14 +1961,15 @@ model LegalEntity {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  contacts          LegalEntityContact[]
-  bankAccounts      LegalEntityBankAccount[]
-  labOrigins        LabOrigin[]
-  billingAgreements BillingAgreement[]
-  practitioners     LabPractitioner[]        @relation("PractitionerInstitution")
-  labLiquidations   LabLiquidation[]         @relation("LiquidationLegalEntity")
-  labExamCharges    LabExamCharge[]          @relation("ExamChargeLegalEntity")
-  labDirectPaymentBatches LabDirectPaymentBatch[] @relation("DpbLegalEntity")
+  contacts                LegalEntityContact[]
+  bankAccounts            LegalEntityBankAccount[]
+  labOrigins              LabOrigin[]
+  billingAgreements       BillingAgreement[]
+  practitioners           LabPractitioner[]        @relation("PractitionerInstitution")
+  labLiquidations         LabLiquidation[]         @relation("LiquidationLegalEntity")
+  labExamCharges          LabExamCharge[]          @relation("ExamChargeLegalEntity")
+  labDirectPaymentBatches LabDirectPaymentBatch[]  @relation("DpbLegalEntity")
+  dtes                    Dte[]
 
   @@unique([tenantId, rut])
   @@index([tenantId])
@@ -2084,7 +2109,7 @@ model BillingConcept {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   agreementLines BillingAgreementLine[]
-  labExamCharges LabExamCharge[]       @relation("ExamChargeBillingConcept")
+  labExamCharges LabExamCharge[]        @relation("ExamChargeBillingConcept")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2126,7 +2151,7 @@ model BillingAgreement {
   lines           BillingAgreementLine[]
   contacts        BillingContact[]
   labOrigins      LabOrigin[]
-  labLiquidations LabLiquidation[] @relation("LiquidationBillingAgreement")
+  labLiquidations LabLiquidation[]       @relation("LiquidationBillingAgreement")
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2212,13 +2237,13 @@ model Project {
   createdById String
   createdBy   User   @relation("ProjectsCreated", fields: [createdById], references: [id], onDelete: Restrict)
 
-  members              ProjectMember[]
-  tasks                Task[]
-  taskViews            TaskView[]
-  labels               Label[]
-  taskStatuses         TaskStatusConfig[]
-  sections             ProjectSection[]
-  propertyDefinitions  ProjectPropertyDefinition[]
+  members             ProjectMember[]
+  tasks               Task[]
+  taskViews           TaskView[]
+  labels              Label[]
+  taskStatuses        TaskStatusConfig[]
+  sections            ProjectSection[]
+  propertyDefinitions ProjectPropertyDefinition[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -2331,15 +2356,15 @@ model Task {
 
   tenantId String
 
-  assignees       TaskAssignee[]
-  labels          TaskLabel[]
-  comments        TaskComment[]
-  attachments     TaskAttachment[]
-  dependencies    TaskDependency[] @relation("DependentTask")
-  dependents      TaskDependency[] @relation("DependencyOf")
-  subscribers     TaskSubscriber[]
-  activities      TaskActivity[]
-  propertyValues  TaskPropertyValue[]
+  assignees      TaskAssignee[]
+  labels         TaskLabel[]
+  comments       TaskComment[]
+  attachments    TaskAttachment[]
+  dependencies   TaskDependency[]    @relation("DependentTask")
+  dependents     TaskDependency[]    @relation("DependencyOf")
+  subscribers    TaskSubscriber[]
+  activities     TaskActivity[]
+  propertyValues TaskPropertyValue[]
 
   @@unique([projectId, number])
   @@index([tenantId])
@@ -2578,23 +2603,23 @@ enum PropertyType {
   CHECKBOX
   URL
 
-  @@schema("public")
   @@map("property_type")
+  @@schema("public")
 }
 
 model ProjectPropertyDefinition {
-  id          String       @id @default(uuid())
-  name        String
-  type        PropertyType
+  id           String       @id @default(uuid())
+  name         String
+  type         PropertyType
   /// For SELECT / MULTI_SELECT: JSON array of { id: string, label: string, color: string }
-  options     Json?
-  sortOrder   Int          @default(0)
-  isRequired  Boolean      @default(false)
-  isVisible   Boolean      @default(false)
-  isFilterable Boolean     @default(true)
-  deletedAt   DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  options      Json?
+  sortOrder    Int          @default(0)
+  isRequired   Boolean      @default(false)
+  isVisible    Boolean      @default(false)
+  isFilterable Boolean      @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -2621,15 +2646,15 @@ model TaskPropertyValue {
   propertyDefinition   ProjectPropertyDefinition @relation(fields: [propertyDefinitionId], references: [id], onDelete: Cascade)
 
   /// Populated according to the property's type
-  textValue        String?
-  numberValue      Float?
-  dateValue        DateTime?
-  booleanValue     Boolean?
+  textValue         String?
+  numberValue       Float?
+  dateValue         DateTime?
+  booleanValue      Boolean?
   /// SELECT stores one id; MULTI_SELECT stores multiple ids (from options JSON)
   selectedOptionIds String[]
   /// PERSON stores the userId of a project member
-  personUserId     String?
-  personUser       User?    @relation("TaskPropertyPersonValues", fields: [personUserId], references: [id], onDelete: SetNull)
+  personUserId      String?
+  personUser        User?     @relation("TaskPropertyPersonValues", fields: [personUserId], references: [id], onDelete: SetNull)
 
   tenantId String
 
@@ -2637,6 +2662,464 @@ model TaskPropertyValue {
   @@index([propertyDefinitionId])
   @@index([tenantId])
   @@map("task_property_values")
+  @@schema("public")
+}
+
+// ─── DTE (Documentos Tributarios Electrónicos) ─────────
+
+enum DteType {
+  FACTURA_ELECTRONICA
+  FACTURA_EXENTA_ELECTRONICA
+  BOLETA_ELECTRONICA
+  BOLETA_EXENTA_ELECTRONICA
+  LIQUIDACION_FACTURA_ELECTRONICA
+  FACTURA_COMPRA_ELECTRONICA
+  GUIA_DESPACHO_ELECTRONICA
+  NOTA_DEBITO_ELECTRONICA
+  NOTA_CREDITO_ELECTRONICA
+
+  @@schema("public")
+}
+
+enum DteStatus {
+  DRAFT
+  QUEUED
+  SIGNED
+  SENT
+  ACCEPTED
+  ACCEPTED_WITH_OBJECTION
+  REJECTED
+  VOIDED
+  ERROR
+
+  @@schema("public")
+}
+
+enum DteEnvironment {
+  CERTIFICATION
+  PRODUCTION
+
+  @@schema("public")
+}
+
+enum DteDirection {
+  EMITTED
+  RECEIVED
+
+  @@schema("public")
+}
+
+enum DteLogAction {
+  CREATED
+  QUEUED
+  FOLIO_ASSIGNED
+  SIGNED
+  SENT_TO_SII
+  SII_RESPONSE
+  ACCEPTED
+  REJECTED
+  VOIDED
+  ERROR
+  EXCHANGE_SENT
+  EXCHANGE_RECEIVED
+  ACCOUNTING_POSTED
+  PDF_GENERATED
+
+  @@schema("public")
+}
+
+enum CertificateStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+
+  @@schema("public")
+}
+
+enum ExchangeStatus {
+  PENDING_SEND
+  SENT
+  RECEIPT_CONFIRMED
+  ACCEPTED
+  REJECTED
+  CLAIMED
+  TACIT_ACCEPTANCE
+
+  @@schema("public")
+}
+
+enum RcofStatus {
+  PENDING
+  GENERATED
+  SENT
+  ACCEPTED
+  REJECTED
+  ERROR
+
+  @@schema("public")
+}
+
+enum DteReferenceCode {
+  ANULA_DOCUMENTO
+  CORRIGE_TEXTO
+  CORRIGE_MONTOS
+
+  @@schema("public")
+}
+
+model DteConfig {
+  id                     String         @id @default(uuid())
+  rut                    String
+  razonSocial            String
+  giro                   String
+  actividadEco           Int
+  direccion              String
+  comuna                 String
+  ciudad                 String
+  codigoSucursal         Int?
+  environment            DteEnvironment @default(CERTIFICATION)
+  resolutionNum          Int
+  resolutionDate         DateTime
+  exchangeEmail          String?
+  imapHost               String?
+  imapPort               Int?           @default(993)
+  imapUser               String?
+  encryptedImapPass      String?
+  imapEnabled            Boolean        @default(false)
+  imapLastPollAt         DateTime?
+  imapLastUid            Int?
+  autoCreateJournalEntry Boolean        @default(true)
+  autoPostJournalEntry   Boolean        @default(false)
+  certificationData      Json?
+  isActive               Boolean        @default(true)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  tenantId               String         @unique
+  tenant                 Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("dte_configs")
+  @@schema("public")
+}
+
+model DteCertificate {
+  id                String            @id @default(uuid())
+  subjectName       String
+  subjectRut        String
+  issuer            String
+  serialNumber      String
+  validFrom         DateTime
+  validUntil        DateTime
+  status            CertificateStatus @default(ACTIVE)
+  encryptedP12      String
+  encryptedPassword String
+  sha256Fingerprint String
+  isPrimary         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sha256Fingerprint])
+  @@index([tenantId, isPrimary])
+  @@map("dte_certificates")
+  @@schema("public")
+}
+
+model DteFolio {
+  id              String         @id @default(uuid())
+  dteType         DteType
+  environment     DteEnvironment
+  rangeFrom       Int
+  rangeTo         Int
+  nextFolio       Int
+  encryptedCafXml String
+  authorizedAt    DateTime
+  expiresAt       DateTime
+  isActive        Boolean        @default(true)
+  isExhausted     Boolean        @default(false)
+  alertThreshold  Int            @default(10)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dtes            Dte[]
+
+  @@unique([tenantId, dteType, environment, rangeFrom])
+  @@index([tenantId, dteType, environment, isActive, isExhausted])
+  @@map("dte_folios")
+  @@schema("public")
+}
+
+model Dte {
+  id          String         @id @default(uuid())
+  dteType     DteType
+  folio       Int
+  environment DteEnvironment
+  status      DteStatus      @default(DRAFT)
+  direction   DteDirection   @default(EMITTED)
+
+  emisorRut   String
+  emisorRazon String
+  emisorGiro  String?
+
+  receptorRut    String?
+  receptorRazon  String?
+  receptorGiro   String?
+  receptorDir    String?
+  receptorComuna String?
+  receptorCiudad String?
+
+  formaPago    Int?
+  medioPago    String?
+  indServicio  Int?
+  periodoDesde DateTime?
+  periodoHasta DateTime?
+  fechaVenc    DateTime?
+
+  montoNeto   Int     @default(0)
+  montoExento Int     @default(0)
+  montoBruto  Int?
+  tasaIva     Decimal @default(19) @db.Decimal(5, 2)
+  iva         Int     @default(0)
+  ivaRetTotal Int     @default(0)
+  montoTotal  Int     @default(0)
+
+  fechaEmision DateTime
+
+  xmlContent String? @db.Text
+  tedXml     String? @db.Text
+  xmlS3Key   String?
+  pdfS3Key   String?
+
+  siiTrackId  String?
+  siiResponse Json?
+
+  // Set to true when a terminal ERROR state leaves the allocated folio
+  // unused. Such folios must be reported to the SII as `FoliosAnulados`
+  // in the next RCOF. See `DteEmissionProcessor.onFailed`.
+  folioReleased Boolean @default(false)
+
+  receptionDate DateTime?
+  deadlineDate  DateTime?
+  decidedAt     DateTime?
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  folioRangeId String?
+  folioRange   DteFolio? @relation(fields: [folioRangeId], references: [id])
+
+  legalEntityId String?
+  legalEntity   LegalEntity? @relation(fields: [legalEntityId], references: [id])
+
+  journalEntryId String?       @unique
+  journalEntry   JournalEntry? @relation(fields: [journalEntryId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation("DteCreatedBy", fields: [createdById], references: [id])
+
+  decidedById String?
+  decidedBy   User?   @relation("DteDecidedBy", fields: [decidedById], references: [id])
+
+  items           DteItem[]
+  references      DteReference[]      @relation("DteOwnReferences")
+  referencedBy    DteReference[]      @relation("DteReferencedBy")
+  globalDiscounts DteGlobalDiscount[]
+  logs            DteLog[]
+  exchanges       DteExchange[]
+
+  @@unique([tenantId, dteType, folio, emisorRut])
+  @@index([tenantId, status])
+  @@index([tenantId, dteType])
+  @@index([tenantId, direction])
+  @@index([tenantId, direction, status])
+  @@index([tenantId, fechaEmision])
+  @@index([tenantId, receptorRut])
+  @@index([tenantId, emisorRut])
+  @@index([tenantId, legalEntityId])
+  @@index([tenantId, deadlineDate])
+  // siiTrackId should be unique when non-null, but Prisma lacks partial unique.
+  // Uniqueness enforced in application layer; keep a simple index for lookups.
+  @@index([siiTrackId])
+  @@map("dtes")
+  @@schema("public")
+}
+
+model DteItem {
+  id             String   @id @default(uuid())
+  lineNumber     Int
+  itemName       String
+  description    String?
+  indExe         Int?
+  quantity       Decimal  @db.Decimal(18, 6)
+  unit           String?
+  unitPrice      Decimal  @db.Decimal(18, 6)
+  descuentoPct   Decimal? @db.Decimal(5, 2)
+  descuentoMonto Decimal? @db.Decimal(18, 2)
+  recargoPct     Decimal? @db.Decimal(5, 2)
+  recargoMonto   Decimal? @db.Decimal(18, 2)
+  montoItem      Decimal  @db.Decimal(18, 2)
+  codigosItem    Json?
+  dteId          String
+  dte            Dte      @relation(fields: [dteId], references: [id], onDelete: Cascade)
+
+  @@index([dteId])
+  @@map("dte_items")
+  @@schema("public")
+}
+
+model DteReference {
+  id              String            @id @default(uuid())
+  lineNumber      Int
+  tipoDocRef      Int
+  folioRef        Int
+  fechaRef        DateTime
+  codRef          DteReferenceCode?
+  razonRef        String?
+  dteId           String
+  dte             Dte               @relation("DteOwnReferences", fields: [dteId], references: [id], onDelete: Cascade)
+  referencedDteId String?
+  referencedDte   Dte?              @relation("DteReferencedBy", fields: [referencedDteId], references: [id], onDelete: SetNull)
+
+  @@index([dteId])
+  @@index([referencedDteId])
+  @@map("dte_references")
+  @@schema("public")
+}
+
+model DteGlobalDiscount {
+  id             String  @id @default(uuid())
+  lineNumber     Int
+  tipoMovimiento String
+  glosa          String?
+  tipoValor      String
+  valor          Decimal @db.Decimal(18, 2)
+  indExeDR       Int?
+  dteId          String
+  dte            Dte     @relation(fields: [dteId], references: [id], onDelete: Cascade)
+
+  @@index([dteId])
+  @@map("dte_global_discounts")
+  @@schema("public")
+}
+
+model DteLog {
+  id        String       @id @default(uuid())
+  action    DteLogAction
+  message   String?
+  metadata  Json?
+  actorId   String?
+  createdAt DateTime     @default(now())
+  dteId     String
+  dte       Dte          @relation(fields: [dteId], references: [id], onDelete: Cascade)
+
+  @@index([dteId, action])
+  @@index([createdAt])
+  @@map("dte_logs")
+  @@schema("public")
+}
+
+model DteExchange {
+  id             String             @id @default(uuid())
+  status         ExchangeStatus     @default(PENDING_SEND)
+  recipientEmail String
+  deadlineAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  dteId          String
+  dte            Dte                @relation(fields: [dteId], references: [id], onDelete: Cascade)
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events         DteExchangeEvent[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, deadlineAt])
+  @@map("dte_exchanges")
+  @@schema("public")
+}
+
+model DteExchangeEvent {
+  id         String      @id @default(uuid())
+  eventType  String
+  xmlContent String?     @db.Text
+  metadata   Json?
+  actorId    String?
+  createdAt  DateTime    @default(now())
+  exchangeId String
+  exchange   DteExchange @relation(fields: [exchangeId], references: [id], onDelete: Cascade)
+
+  @@index([exchangeId])
+  @@index([exchangeId, eventType])
+  @@map("dte_exchange_events")
+  @@schema("public")
+}
+
+model DteRcof {
+  id          String         @id @default(uuid())
+  date        DateTime       @db.Date
+  environment DteEnvironment
+  status      RcofStatus     @default(PENDING)
+  summary     Json
+  xmlContent  String?        @db.Text
+  siiTrackId  String?
+  siiResponse Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, date, environment])
+  @@index([tenantId, status])
+  @@map("dte_rcofs")
+  @@schema("public")
+}
+
+model DteAccountMapping {
+  id                      String       @id @default(uuid())
+  dteTypeCode             Int
+  direction               DteDirection
+  receivableAccountId     String?
+  receivableAccount       Account?     @relation("DteMappingReceivable", fields: [receivableAccountId], references: [id], onDelete: Restrict)
+  payableAccountId        String?
+  payableAccount          Account?     @relation("DteMappingPayable", fields: [payableAccountId], references: [id], onDelete: Restrict)
+  cashAccountId           String?
+  cashAccount             Account?     @relation("DteMappingCash", fields: [cashAccountId], references: [id], onDelete: Restrict)
+  revenueAccountId        String?
+  revenueAccount          Account?     @relation("DteMappingRevenue", fields: [revenueAccountId], references: [id], onDelete: Restrict)
+  revenueExemptAccountId  String?
+  revenueExemptAccount    Account?     @relation("DteMappingRevenueExempt", fields: [revenueExemptAccountId], references: [id], onDelete: Restrict)
+  purchaseAccountId       String?
+  purchaseAccount         Account?     @relation("DteMappingPurchase", fields: [purchaseAccountId], references: [id], onDelete: Restrict)
+  ivaDebitoAccountId      String?
+  ivaDebitoAccount        Account?     @relation("DteMappingIvaDebito", fields: [ivaDebitoAccountId], references: [id], onDelete: Restrict)
+  ivaCreditoAccountId     String?
+  ivaCreditoAccount       Account?     @relation("DteMappingIvaCredito", fields: [ivaCreditoAccountId], references: [id], onDelete: Restrict)
+  salesReturnAccountId    String?
+  salesReturnAccount      Account?     @relation("DteMappingSalesReturn", fields: [salesReturnAccountId], references: [id], onDelete: Restrict)
+  purchaseReturnAccountId String?
+  purchaseReturnAccount   Account?     @relation("DteMappingPurchaseReturn", fields: [purchaseReturnAccountId], references: [id], onDelete: Restrict)
+  isActive                Boolean      @default(true)
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
+  tenantId                String
+  tenant                  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dteTypeCode, direction])
+  @@index([receivableAccountId])
+  @@index([payableAccountId])
+  @@index([cashAccountId])
+  @@index([revenueAccountId])
+  @@index([revenueExemptAccountId])
+  @@index([purchaseAccountId])
+  @@index([ivaDebitoAccountId])
+  @@index([ivaCreditoAccountId])
+  @@index([salesReturnAccountId])
+  @@index([purchaseReturnAccountId])
+  @@map("dte_account_mappings")
   @@schema("public")
 }
 
@@ -2961,7 +3444,7 @@ enum AdverseStatus {
 // ─── mod_lab Models ─────────────────────────────────────
 
 model LabPatient {
-  id               String    @id @default(uuid())
+  id               String       @id @default(uuid())
   tenantId         String
   rut              String?
   firstName        String
@@ -3261,7 +3744,7 @@ model LabAdverseEvent {
   updatedAt              DateTime             @updatedAt
   deletedAt              DateTime?
 
-  attachments            LabDiagnosticReportAttachment[]
+  attachments LabDiagnosticReportAttachment[]
 
   @@index([tenantId, diagnosticReportId])
   @@index([tenantId, severity, status])
@@ -3373,9 +3856,9 @@ model LabLiquidation {
   fmRecordId              String
   fmPk                    Int?
   legalEntityId           String
-  legalEntity             LegalEntity        @relation("LiquidationLegalEntity", fields: [legalEntityId], references: [id], onDelete: Cascade)
+  legalEntity             LegalEntity       @relation("LiquidationLegalEntity", fields: [legalEntityId], references: [id], onDelete: Cascade)
   billingAgreementId      String?
-  billingAgreement        BillingAgreement?  @relation("LiquidationBillingAgreement", fields: [billingAgreementId], references: [id], onDelete: SetNull)
+  billingAgreement        BillingAgreement? @relation("LiquidationBillingAgreement", fields: [billingAgreementId], references: [id], onDelete: SetNull)
   period                  DateTime
   periodLabel             String
   totalAmount             Decimal           @db.Decimal(14, 2)

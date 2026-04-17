@@ -39,7 +39,11 @@ import { HelpTooltip } from "@/components/org-intelligence/help-tooltip";
 import { EducationalEmptyState } from "@/components/org-intelligence/educational-empty-state";
 import { PersonSearchSelect } from "@/components/org-intelligence/person-search-select";
 import { SpeakerList, type SpeakerItem } from "@/components/org-intelligence/speaker-list";
-import { InterviewCard } from "@/components/org-intelligence/interview-card";
+import {
+  InterviewCard,
+  type Interview as InterviewCardInterview,
+  type InterviewSpeaker as InterviewCardSpeaker,
+} from "@/components/org-intelligence/interview-card";
 import { ProjectHeader } from "@/components/org-intelligence/project-header";
 import { EditInterviewDialog } from "@/components/org-intelligence/edit-interview-dialog";
 
@@ -59,23 +63,9 @@ interface Project {
   };
 }
 
-interface InterviewSpeaker {
-  id: string;
-  speakerLabel: string;
-  name: string | null;
-  role: string | null;
-  department: string | null;
-  isInterviewer: boolean;
-}
+type InterviewSpeaker = InterviewCardSpeaker;
 
-interface Interview {
-  id: string;
-  title: string | null;
-  interviewDate: string | null;
-  objective: string | null;
-  processingStatus: string;
-  speakers: InterviewSpeaker[];
-  createdAt: string;
+interface Interview extends InterviewCardInterview {
   _count?: {
     speakers?: number;
     chunks?: number;

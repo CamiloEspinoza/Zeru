@@ -38,14 +38,14 @@ const TYPE_ICONS: Record<PropertyType, typeof TextIcon> = {
 interface TaskCustomPropertiesProps {
   taskId: string;
   projectId: string;
-  members: ProjectMember[];
+  members?: ProjectMember[];
   disabled?: boolean;
 }
 
 export function TaskCustomProperties({
   taskId,
   projectId,
-  members,
+  members = [],
   disabled = false,
 }: TaskCustomPropertiesProps) {
   const [definitions, setDefinitions] = React.useState<

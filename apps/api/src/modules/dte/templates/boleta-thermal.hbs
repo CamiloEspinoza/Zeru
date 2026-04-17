@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; font-size: 10px; width: 72mm; padding: 3mm; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .separator { border-top: 1px dashed #000; margin: 3px 0; }
+  .right { text-align: right; }
+  .row { display: flex; justify-content: space-between; }
+  h1 { font-size: 11px; }
+  .rut-box { border: 2px solid #E4002B; padding: 3px; text-align: center; margin: 3px 0; }
+  .rut-box p { color: #E4002B; font-weight: bold; font-size: 9px; }
+  .rut-box .folio { font-size: 12px; }
+  table { width: 100%; font-size: 9px; }
+  td { padding: 1px 0; }
+  .total { font-size: 14px; font-weight: bold; text-align: right; margin: 5px 0; }
+  .timbre { width: 100%; margin-top: 5px; }
+  .timbre-text { font-size: 7px; text-align: center; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="center">
+  <h1>{{emisor.razonSocial}}</h1>
+  <p>{{emisor.giro}}</p>
+  <p>{{emisor.direccion}}</p>
+</div>
+
+<div class="rut-box">
+  <p>R.U.T.: {{emisor.rut}}</p>
+  <p>{{tipoDteNombre}}</p>
+  <p class="folio">N° {{folio}}</p>
+</div>
+
+<p class="center" style="font-size:9px;">{{fechaEmision}}</p>
+<div class="separator"></div>
+
+<table>
+  {{#each items}}
+  <tr>
+    <td>{{itemName}}</td>
+    <td class="right">${{formatNumber montoItem}}</td>
+  </tr>
+  {{/each}}
+</table>
+
+<div class="separator"></div>
+<div class="total">TOTAL: ${{formatNumber montoTotal}}</div>
+<div class="separator"></div>
+
+{{#if pdf417Base64}}
+<img src="{{pdf417Base64}}" class="timbre" />
+{{/if}}
+<p class="timbre-text">Timbre Electronico SII</p>
+<p class="timbre-text">Verifique: www.sii.cl/verificaDTE</p>
+
+</body>
+</html>

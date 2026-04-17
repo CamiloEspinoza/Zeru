@@ -25,7 +25,7 @@ import {
   Delete02Icon,
 } from "@hugeicons/core-free-icons";
 
-interface InterviewSpeaker {
+export interface InterviewSpeaker {
   id: string;
   speakerLabel: string;
   name: string | null;
@@ -36,7 +36,7 @@ interface InterviewSpeaker {
   avatarUrl?: string | null;
 }
 
-interface Interview {
+export interface Interview {
   id: string;
   title: string | null;
   interviewDate: string | null;

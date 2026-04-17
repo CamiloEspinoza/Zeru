@@ -38,12 +38,9 @@ export class LabDashboardService {
 
   private async _getStatusSummary(
     tenantId: string,
-    dateFrom?: string,
-    dateTo?: string,
+    _dateFrom?: string,
+    _dateTo?: string,
   ) {
-    const df = dateFrom ?? null;
-    const dt = dateTo ?? null;
-
     // Query 1: Report counts by status + category (current state — no date filter)
     const byStatusAndCategory: any[] = await this.prisma.$queryRawUnsafe(
       `SELECT dr.status, sr.category, COUNT(*)::int AS count

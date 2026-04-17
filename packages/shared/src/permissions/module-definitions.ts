@@ -113,13 +113,41 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
     label: 'Facturación',
     section: 'business',
     granularPermissions: [
+      { key: 'view-dte', label: 'Ver DTEs', minLevel: 'VIEW' },
       { key: 'emit-dte', label: 'Emitir DTE', minLevel: 'MANAGE' },
       { key: 'void-dte', label: 'Anular DTE', minLevel: 'MANAGE' },
       {
-        key: 'manage-caf',
-        label: 'Configurar folios CAF',
+        key: 'manage-certificate',
+        label: 'Gestionar certificados',
         minLevel: 'MANAGE',
       },
+      {
+        key: 'manage-caf',
+        label: 'Gestionar folios CAF',
+        minLevel: 'MANAGE',
+      },
+      { key: 'view-config', label: 'Ver configuración', minLevel: 'VIEW' },
+      {
+        key: 'manage-config',
+        label: 'Modificar configuración',
+        minLevel: 'MANAGE',
+      },
+      {
+        key: 'switch-environment',
+        label: 'Cambiar ambiente SII',
+        minLevel: 'MANAGE',
+      },
+      {
+        key: 'manage-received',
+        label: 'Aceptar/rechazar DTEs recibidos',
+        minLevel: 'EDIT',
+      },
+      {
+        key: 'view-reports',
+        label: 'Ver libros y reportes',
+        minLevel: 'VIEW',
+      },
+      { key: 'download-xml', label: 'Descargar XML', minLevel: 'EDIT' },
     ],
   },
   {

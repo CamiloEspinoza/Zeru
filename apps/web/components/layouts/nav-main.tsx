@@ -110,8 +110,11 @@ const appNavSections: NavSection[] = [
         icon: Invoice01Icon,
         moduleKey: "invoicing",
         items: [
-          { title: "DTEs", href: "/invoicing/dtes" },
-          { title: "Libros", href: "/invoicing/books" },
+          { title: "Dashboard", href: "/invoicing" },
+          { title: "Emitidos", href: "/invoicing/emitidos" },
+          { title: "Recibidos", href: "/invoicing/recibidos" },
+          { title: "Nueva emisión", href: "/invoicing/new" },
+          { title: "Certificación SII", href: "/invoicing/certification" },
         ],
       },
       {
@@ -212,6 +215,7 @@ const settingsNav: NavItem[] = [
   { title: "Costos IA", href: "/settings/ai/costs", icon: Analytics02Icon },
   { title: "LinkedIn", href: "/settings/linkedin", icon: Linkedin01Icon },
   { title: "Almacenamiento y Email", href: "/settings/storage", icon: HardDriveIcon },
+  { title: "Facturación", href: "/settings/invoicing", icon: Invoice01Icon },
   { title: "Proceso Contable", href: "/settings/accounting-process", icon: CheckListIcon },
   { title: "Catálogo CDC", href: "/settings/billing-concepts", icon: Dollar02Icon },
   { title: "API Keys", href: "/settings/api-keys", icon: Key01Icon },

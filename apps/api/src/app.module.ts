@@ -21,6 +21,7 @@ import { LinkedInModule } from './modules/linkedin/linkedin.module';
 import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligence.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { RedisModule } from './common/services/redis.module';
+import { QueueModule } from './common/queue/queue.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 import { AuditModule } from './modules/audit/audit.module';
@@ -37,6 +38,8 @@ import { LabModule } from './modules/lab/lab.module';
 import { PlatformStorageModule } from './modules/platform-storage/platform-storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
 import { QueueAdminModule } from './modules/queue-admin/queue-admin.module';
+import { DteModule } from './modules/dte/dte.module';
+import { BrowserModule } from './modules/browser/browser.module';
 
 @Module({
   imports: [
@@ -62,6 +65,7 @@ import { QueueAdminModule } from './modules/queue-admin/queue-admin.module';
     OrgIntelligenceModule,
     CalendarModule,
     RedisModule,
+    QueueModule,
     RealtimeModule,
     AuditModule,
     NotificationModule,
@@ -76,6 +80,8 @@ import { QueueAdminModule } from './modules/queue-admin/queue-admin.module';
     PlatformStorageModule,
     BrandingModule,
     QueueAdminModule,
+    DteModule,
+    BrowserModule,
   ],
 })
 export class AppModule implements NestModule {

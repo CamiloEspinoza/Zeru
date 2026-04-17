@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -123,7 +124,7 @@ function renderCommentContent(
   }
 
   // Render text with @mentions highlighted in blue
-  const parts: (string | JSX.Element)[] = [];
+  const parts: (string | React.JSX.Element)[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   const regex = new RegExp(MENTION_REGEX.source, "g");

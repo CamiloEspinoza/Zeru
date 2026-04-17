@@ -5,7 +5,7 @@ const PUBLIC_ROUTES = ["/login", "/register", "/", "/docs", "/oauth-linkedin-red
 // Auth-only routes that should redirect to dashboard when logged in
 const AUTH_ONLY_ROUTES = ["/login", "/register"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("access_token")?.value;
   const isPublic = PUBLIC_ROUTES.some((r) =>
