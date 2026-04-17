@@ -36,6 +36,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { LabModule } from './modules/lab/lab.module';
 import { PlatformStorageModule } from './modules/platform-storage/platform-storage.module';
 import { BrandingModule } from './modules/branding/branding.module';
+import { QueueAdminModule } from './modules/queue-admin/queue-admin.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { BrandingModule } from './modules/branding/branding.module';
     LabModule,
     PlatformStorageModule,
     BrandingModule,
+    QueueAdminModule,
   ],
 })
 export class AppModule implements NestModule {

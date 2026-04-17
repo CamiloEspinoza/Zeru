@@ -28,7 +28,7 @@ export const PHASES = {
 // ── Configuration ──
 
 export const IMPORT_QUEUE_CONFIG = {
-  concurrency: 3,
+  concurrency: 20,
   defaultBatchSize: 100,
   retryAttempts: 5,
   retryBackoff: {

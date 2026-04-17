@@ -37,7 +37,11 @@ import { CommunicationsBatchHandler } from './processors/handlers/communications
 import { LiquidationsHandler } from './processors/handlers/liquidations.handler';
 import { ChargesBatchHandler } from './processors/handlers/charges-batch.handler';
 
+// Services — Dashboard
+import { LabDashboardService } from './services/lab-dashboard.service';
+
 // Controllers
+import { LabDashboardController } from './controllers/lab-dashboard.controller';
 import { LabImportController } from './controllers/lab-import.controller';
 import { LabPatientController } from './controllers/lab-patient.controller';
 import { LabPractitionerController } from './controllers/lab-practitioner.controller';
@@ -80,6 +84,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     ),
   ],
   controllers: [
+    LabDashboardController,
     LabImportController,
     LabPatientController,
     LabPractitionerController,
@@ -89,6 +94,9 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     LabDiagnosticReportController,
   ],
   providers: [
+    // Dashboard
+    LabDashboardService,
+
     // Import pipeline services
     LabImportOrchestratorService,
     FmRangeResolverService,

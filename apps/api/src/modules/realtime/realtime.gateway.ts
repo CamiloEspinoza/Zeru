@@ -688,6 +688,11 @@ export class RealtimeGateway
     this.emitToRoom(payload.room, payload.event, payload.data);
   }
 
+  @OnEvent('queues.stats')
+  handleQueuesStats(payload: { queues: unknown[] }) {
+    this.server.emit('queues:stats' as any, payload as any);
+  }
+
   emitToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event as any, data as any);
   }
