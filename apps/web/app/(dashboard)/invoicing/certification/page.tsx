@@ -82,21 +82,21 @@ const STAGES: StageMeta[] = [
     key: CertificationStage.STAGE_1_SET_PRUEBAS,
     number: 1,
     title: "Set de Pruebas",
-    description: "Generacion y envio del set de pruebas al SII",
+    description: "Generación y envío del set de pruebas al SII",
     instructions:
-      "Se generaran automaticamente facturas, notas de credito y notas de debito con los patrones requeridos por el SII. " +
-      "Los documentos se firman y envian al ambiente de certificacion. " +
+      "Se generarán automáticamente facturas, notas de crédito y notas de débito con los patrones requeridos por el SII. " +
+      "Los documentos se firman y envían al ambiente de certificación. " +
       "Requiere: certificado digital activo y folios disponibles para Factura, NC y ND.",
     automated: true,
   },
   {
     key: CertificationStage.STAGE_2_SIMULACION,
     number: 2,
-    title: "Simulacion",
-    description: "Simulacion con datos reales de facturacion",
+    title: "Simulación",
+    description: "Simulación con datos reales de facturación",
     instructions:
-      "Emita documentos de prueba usando el flujo normal de emision (menu Facturacion > Nueva emision). " +
-      "Envie al menos 3 facturas y 1 nota de credito al SII de certificacion. " +
+      "Emita documentos de prueba usando el flujo normal de emisión (menú Facturación > Nueva emisión). " +
+      "Envíe al menos 3 facturas y 1 nota de crédito al SII de certificación. " +
       "Verifique que todos sean aceptados antes de marcar como completado.",
     automated: true,
   },
@@ -104,10 +104,10 @@ const STAGES: StageMeta[] = [
     key: CertificationStage.STAGE_3_INTERCAMBIO,
     number: 3,
     title: "Intercambio de DTEs",
-    description: "Prueba de intercambio electronico de documentos",
+    description: "Prueba de intercambio electrónico de documentos",
     instructions:
       "Realice el intercambio de DTEs con el receptor de prueba del SII. " +
-      "Esto incluye el envio de acuse de recibo y aceptacion/rechazo comercial. " +
+      "Esto incluye el envío de acuse de recibo y aceptación/rechazo comercial. " +
       "Siga las instrucciones del set de pruebas proporcionado por el SII.",
     automated: false,
   },
@@ -119,29 +119,29 @@ const STAGES: StageMeta[] = [
     instructions:
       "Genere PDFs de los documentos emitidos en las etapas anteriores. " +
       "Suba las muestras impresas al portal del SII (mipyme.sii.cl). " +
-      "Asegurese de que incluyan el timbre electronico (codigo de barras PDF417) correctamente.",
+      "Asegúrese de que incluyan el timbre electrónico (código de barras PDF417) correctamente.",
     automated: false,
   },
   {
     key: CertificationStage.STAGE_5_DECLARACION,
     number: 5,
-    title: "Declaracion Jurada",
-    description: "Declaracion de cumplimiento de requisitos",
+    title: "Declaración Jurada",
+    description: "Declaración de cumplimiento de requisitos",
     instructions:
-      "Complete la declaracion jurada en el portal del SII que certifica " +
-      "que su sistema cumple con todos los requisitos tecnicos para la emision de DTEs. " +
-      "Acceda a: www.sii.cl > Factura electronica > Certificacion.",
+      "Complete la declaración jurada en el portal del SII que certifica " +
+      "que su sistema cumple con todos los requisitos técnicos para la emisión de DTEs. " +
+      "Acceda a: www.sii.cl > Factura electrónica > Certificación.",
     automated: false,
   },
   {
     key: CertificationStage.STAGE_6_AUTORIZACION,
     number: 6,
-    title: "Autorizacion Final",
-    description: "Obtencion de la resolucion de autorizacion del SII",
+    title: "Autorización Final",
+    description: "Obtención de la resolución de autorización del SII",
     instructions:
-      "Una vez aprobadas todas las etapas anteriores, el SII emitira la resolucion " +
-      "que autoriza a su empresa a emitir documentos tributarios electronicos en produccion. " +
-      "Cuando reciba la notificacion de aprobacion, cambie el ambiente a Produccion en la configuracion.",
+      "Una vez aprobadas todas las etapas anteriores, el SII emitirá la resolución " +
+      "que autoriza a su empresa a emitir documentos tributarios electrónicos en producción. " +
+      "Cuando reciba la notificación de aprobación, cambie el ambiente a Producción en la configuración.",
     automated: false,
   },
 ];
@@ -333,7 +333,7 @@ export default function CertificationPage() {
       setStatus((prev) =>
         prev ? { ...prev, certification: result.certification } : prev
       );
-      setSuccessMessage("Certificacion reiniciada.");
+      setSuccessMessage("Certificación reiniciada.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error al reiniciar";
       setError(msg);
@@ -361,7 +361,7 @@ export default function CertificationPage() {
   if (!status?.configured) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Certificacion SII</h1>
+        <h1 className="text-2xl font-bold">Certificación SII</h1>
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-muted-foreground">
@@ -391,16 +391,16 @@ export default function CertificationPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Certificacion SII</h1>
+          <h1 className="text-2xl font-bold">Certificación SII</h1>
           <p className="text-sm text-muted-foreground">
-            Proceso de certificacion para emision de documentos tributarios
+            Proceso de certificacion para emisión de documentos tributarios
             electronicos.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {status.environment && (
             <Badge variant="outline" className="text-xs">
-              Ambiente: {status.environment === "CERTIFICATION" ? "Certificacion" : "Produccion"}
+              Ambiente: {status.environment === "CERTIFICATION" ? "Certificación" : "Producción"}
             </Badge>
           )}
           <AlertDialog>
@@ -452,7 +452,7 @@ export default function CertificationPage() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">
               {isCompleted
-                ? "Certificacion completada"
+                ? "Certificación completada"
                 : `${completedCount} de ${STAGES.length} etapas completadas`}
             </span>
             <span className="text-sm text-muted-foreground">{progressPct}%</span>
@@ -579,9 +579,9 @@ export default function CertificationPage() {
                       {detail.result.totalDocuments
                         ? `${detail.result.totalDocuments} documentos generados`
                         : "Etapa completada exitosamente"}
-                      {detail.result.trackId && (
+                      {detail.result.trackId ? (
                         <> — Track ID: {String(detail.result.trackId)}</>
-                      )}
+                      ) : null}
                     </p>
                   </div>
                 )}

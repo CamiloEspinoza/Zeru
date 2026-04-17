@@ -26,7 +26,7 @@ const DTE_TYPE_SHORT_NAMES: Record<string, string> = {
   BOLETA_EXENTA_ELECTRONICA: "Boleta Exenta",
   LIQUIDACION_FACTURA_ELECTRONICA: "Liq. Factura",
   FACTURA_COMPRA_ELECTRONICA: "Fact. Compra",
-  GUIA_DESPACHO_ELECTRONICA: "Guia Despacho",
+  GUIA_DESPACHO_ELECTRONICA: "Guía Despacho",
   NOTA_DEBITO_ELECTRONICA: "Nota Debito",
   NOTA_CREDITO_ELECTRONICA: "Nota Credito",
 };
@@ -188,7 +188,7 @@ function EmitidosContent() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/invoicing/new">Nueva emision</Link>
+          <Link href="/invoicing/new">Nueva emisión</Link>
         </Button>
       </div>
 
@@ -246,8 +246,16 @@ function EmitidosContent() {
                     {dtes.map((dte) => (
                       <tr
                         key={dte.id}
-                        className="border-b last:border-0 cursor-pointer hover:bg-muted/40"
+                        role="button"
+                        tabIndex={0}
+                        className="border-b last:border-0 cursor-pointer hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => router.push(`/invoicing/${dte.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            router.push(`/invoicing/${dte.id}`);
+                          }
+                        }}
                       >
                         <td className="py-2 px-3">
                           {DTE_TYPE_SHORT_NAMES[dte.dteType] ?? dte.dteType}

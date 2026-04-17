@@ -162,6 +162,12 @@ export const dteApi = {
   deleteCertificate: (id: string) =>
     api.delete<void>(`/dte/certificates/${id}`),
 
+  setPrimaryCertificate: (id: string) =>
+    api.patch<{ id: string; isPrimary: boolean }>(
+      `/dte/certificates/${id}/set-primary`,
+      {},
+    ),
+
   // ── Folios ──
   listFolios: () => api.get<DteFolio[]>("/dte/folios"),
 

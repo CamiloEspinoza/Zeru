@@ -15,32 +15,33 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api-client";
 import { useTenantContext } from "@/providers/tenant-provider";
+import { validateRut, formatRut } from "@/lib/chilean-rut";
 
 // ─── Constants ────────────────────────────────────
 
 const DTE_TYPE_OPTIONS = [
-  { value: "FACTURA_ELECTRONICA", label: "Factura Electronica (33)" },
+  { value: "FACTURA_ELECTRONICA", label: "Factura Electrónica (33)" },
   {
     value: "FACTURA_EXENTA_ELECTRONICA",
-    label: "Factura Exenta Electronica (34)",
+    label: "Factura Exenta Electrónica (34)",
   },
-  { value: "BOLETA_ELECTRONICA", label: "Boleta Electronica (39)" },
-  { value: "BOLETA_EXENTA_ELECTRONICA", label: "Boleta Exenta Electronica (41)" },
+  { value: "BOLETA_ELECTRONICA", label: "Boleta Electrónica (39)" },
+  { value: "BOLETA_EXENTA_ELECTRONICA", label: "Boleta Exenta Electrónica (41)" },
   {
     value: "NOTA_DEBITO_ELECTRONICA",
-    label: "Nota de Debito Electronica (56)",
+    label: "Nota de Débito Electrónica (56)",
   },
   {
     value: "NOTA_CREDITO_ELECTRONICA",
-    label: "Nota de Credito Electronica (61)",
+    label: "Nota de Crédito Electrónica (61)",
   },
   {
     value: "GUIA_DESPACHO_ELECTRONICA",
-    label: "Guia de Despacho Electronica (52)",
+    label: "Guía de Despacho Electrónica (52)",
   },
   {
     value: "FACTURA_COMPRA_ELECTRONICA",
-    label: "Factura de Compra Electronica (46)",
+    label: "Factura de Compra Electrónica (46)",
   },
 ];
 
@@ -113,6 +114,21 @@ export default function NewDtePage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [receptorRutError, setReceptorRutError] = useState<string | null>(null);
+
+  const handleReceptorRutBlur = () => {
+    const trimmed = receptorRut.trim();
+    if (!trimmed) {
+      setReceptorRutError(null);
+      return;
+    }
+    if (!validateRut(trimmed)) {
+      setReceptorRutError("RUT inválido. Verifique el dígito verificador.");
+      return;
+    }
+    setReceptorRutError(null);
+    setReceptorRut(formatRut(trimmed));
+  };
 
   const isBoleta = BOLETA_TYPES.includes(dteType);
   const requiresRef = REQUIRES_REFERENCE.includes(dteType);
@@ -212,7 +228,7 @@ export default function NewDtePage() {
       }
     } catch (err) {
       setError(
-        (err as Error).message ?? "No se encontro informacion del receptor",
+        (err as Error).message ?? "No se encontró información del receptor",
       );
     } finally {
       setLookupLoading(false);
@@ -295,9 +311,9 @@ export default function NewDtePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Nueva emision</h1>
+        <h1 className="text-2xl font-bold">Nueva emisión</h1>
         <p className="text-sm text-muted-foreground">
-          Crear y emitir un documento tributario electronico.
+          Crear y emitir un documento tributario electrónico.
         </p>
       </div>
 
@@ -348,7 +364,15 @@ export default function NewDtePage() {
                     id="receptorRut"
                     placeholder="12.345.678-9"
                     value={receptorRut}
-                    onChange={(e) => setReceptorRut(e.target.value)}
+                    onChange={(e) => {
+                      setReceptorRut(e.target.value);
+                      if (receptorRutError) setReceptorRutError(null);
+                    }}
+                    onBlur={handleReceptorRutBlur}
+                    aria-invalid={!!receptorRutError}
+                    aria-describedby={
+                      receptorRutError ? "receptorRut-error" : undefined
+                    }
                   />
                   <Button
                     variant="outline"
@@ -359,9 +383,17 @@ export default function NewDtePage() {
                     {lookupLoading ? "Buscando..." : "Buscar"}
                   </Button>
                 </div>
+                {receptorRutError && (
+                  <p
+                    id="receptorRut-error"
+                    className="text-destructive text-xs mt-1"
+                  >
+                    {receptorRutError}
+                  </p>
+                )}
               </div>
               <div>
-                <Label htmlFor="receptorRazon">Razon social</Label>
+                <Label htmlFor="receptorRazon">Razón social</Label>
                 <Input
                   id="receptorRazon"
                   className="mt-1"
@@ -379,7 +411,7 @@ export default function NewDtePage() {
                 />
               </div>
               <div>
-                <Label htmlFor="receptorDir">Direccion</Label>
+                <Label htmlFor="receptorDir">Dirección</Label>
                 <Input
                   id="receptorDir"
                   className="mt-1"
@@ -533,7 +565,7 @@ export default function NewDtePage() {
           <CardContent>
             {references.length === 0 ? (
               <p className="text-muted-foreground text-sm py-4 text-center">
-                Las notas de credito y debito requieren al menos una referencia.
+                Las notas de crédito y débito requieren al menos una referencia.
                 Haz clic en &quot;Agregar referencia&quot;.
               </p>
             ) : (
@@ -579,7 +611,7 @@ export default function NewDtePage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Codigo</Label>
+                      <Label className="text-xs">Código</Label>
                       <Select
                         value={ref.codRef}
                         onValueChange={(v) => updateRef(ref.key, "codRef", v)}
@@ -602,10 +634,10 @@ export default function NewDtePage() {
                     </div>
                     <div className="flex items-end gap-2">
                       <div className="flex-1">
-                        <Label className="text-xs">Razon</Label>
+                        <Label className="text-xs">Razón</Label>
                         <Input
                           className="mt-1"
-                          placeholder="Razon de la referencia"
+                          placeholder="Razón de la referencia"
                           value={ref.razonRef}
                           onChange={(e) =>
                             updateRef(ref.key, "razonRef", e.target.value)

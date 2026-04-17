@@ -24,15 +24,15 @@ import { useTenantContext } from "@/providers/tenant-provider";
 // ─── Helpers ──────────────────────────────────────
 
 const DTE_TYPE_NAMES: Record<string, string> = {
-  FACTURA_ELECTRONICA: "Factura Electronica",
-  FACTURA_EXENTA_ELECTRONICA: "Factura Exenta Electronica",
-  BOLETA_ELECTRONICA: "Boleta Electronica",
-  BOLETA_EXENTA_ELECTRONICA: "Boleta Exenta Electronica",
-  LIQUIDACION_FACTURA_ELECTRONICA: "Liquidacion-Factura Electronica",
-  FACTURA_COMPRA_ELECTRONICA: "Factura de Compra Electronica",
-  GUIA_DESPACHO_ELECTRONICA: "Guia de Despacho Electronica",
-  NOTA_DEBITO_ELECTRONICA: "Nota de Debito Electronica",
-  NOTA_CREDITO_ELECTRONICA: "Nota de Credito Electronica",
+  FACTURA_ELECTRONICA: "Factura Electrónica",
+  FACTURA_EXENTA_ELECTRONICA: "Factura Exenta Electrónica",
+  BOLETA_ELECTRONICA: "Boleta Electrónica",
+  BOLETA_EXENTA_ELECTRONICA: "Boleta Exenta Electrónica",
+  LIQUIDACION_FACTURA_ELECTRONICA: "Liquidación-Factura Electrónica",
+  FACTURA_COMPRA_ELECTRONICA: "Factura de Compra Electrónica",
+  GUIA_DESPACHO_ELECTRONICA: "Guía de Despacho Electrónica",
+  NOTA_DEBITO_ELECTRONICA: "Nota de Débito Electrónica",
+  NOTA_CREDITO_ELECTRONICA: "Nota de Crédito Electrónica",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -317,7 +317,7 @@ export default function DteDetailPage() {
               {dte.direction === "EMITTED" ? "Emitido" : "Recibido"}
             </Badge>
             {dte.environment === "CERTIFICATION" && (
-              <Badge variant="secondary">Certificacion</Badge>
+              <Badge variant="secondary">Certificación</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
@@ -382,7 +382,7 @@ export default function DteDetailPage() {
               {dte.emisorRut}
             </p>
             <p>
-              <span className="text-muted-foreground">Razon social:</span>{" "}
+              <span className="text-muted-foreground">Razón social:</span>{" "}
               {dte.emisorRazon}
             </p>
             {dte.emisorGiro && (
@@ -406,7 +406,7 @@ export default function DteDetailPage() {
                   {dte.receptorRut}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Razon social:</span>{" "}
+                  <span className="text-muted-foreground">Razón social:</span>{" "}
                   {dte.receptorRazon}
                 </p>
                 {dte.receptorGiro && (
@@ -417,7 +417,7 @@ export default function DteDetailPage() {
                 )}
                 {dte.receptorDir && (
                   <p>
-                    <span className="text-muted-foreground">Direccion:</span>{" "}
+                    <span className="text-muted-foreground">Dirección:</span>{" "}
                     {dte.receptorDir}
                     {dte.receptorComuna && `, ${dte.receptorComuna}`}
                     {dte.receptorCiudad && `, ${dte.receptorCiudad}`}
@@ -554,8 +554,8 @@ export default function DteDetailPage() {
                     </th>
                     <th className="text-left py-2 px-3 font-medium">Folio</th>
                     <th className="text-left py-2 px-3 font-medium">Fecha</th>
-                    <th className="text-left py-2 px-3 font-medium">Codigo</th>
-                    <th className="text-left py-2 px-3 font-medium">Razon</th>
+                    <th className="text-left py-2 px-3 font-medium">Código</th>
+                    <th className="text-left py-2 px-3 font-medium">Razón</th>
                   </tr>
                 </thead>
                 <tbody>

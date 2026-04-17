@@ -66,6 +66,7 @@ export default function CertificatesPage() {
   const [uploading, setUploading] = useState(false);
   const [password, setPassword] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [settingPrimaryId, setSettingPrimaryId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchCertificates = () => {
@@ -88,7 +89,7 @@ export default function CertificatesPage() {
       return;
     }
     if (!password.trim()) {
-      toast.error("Ingrese la contrasena del certificado");
+      toast.error("Ingrese la contraseña del certificado");
       return;
     }
 
@@ -109,13 +110,20 @@ export default function CertificatesPage() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleSetPrimary = async (_id: string) => {
+  const handleSetPrimary = async (id: string) => {
+    setSettingPrimaryId(id);
     try {
-      // TODO: A dedicated set-primary endpoint would be needed
-      toast.info("Funcionalidad en desarrollo");
-    } catch {
-      toast.error("Error al establecer certificado primario");
+      await dteApi.setPrimaryCertificate(id);
+      toast.success("Certificado establecido como primario");
+      fetchCertificates();
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Error al establecer certificado primario",
+      );
+    } finally {
+      setSettingPrimaryId(null);
     }
   };
 
@@ -155,13 +163,13 @@ export default function CertificatesPage() {
               />
             </div>
             <div className="w-64 space-y-2">
-              <Label htmlFor="cert-password">Contrasena</Label>
+              <Label htmlFor="cert-password">Contraseña</Label>
               <Input
                 id="cert-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contrasena del .p12"
+                placeholder="Contraseña del .p12"
               />
             </div>
             <Button onClick={handleUpload} disabled={uploading}>
@@ -192,8 +200,8 @@ export default function CertificatesPage() {
                 <TableRow>
                   <TableHead>Titular</TableHead>
                   <TableHead>RUT</TableHead>
-                  <TableHead>Valido desde</TableHead>
-                  <TableHead>Valido hasta</TableHead>
+                  <TableHead>Válido desde</TableHead>
+                  <TableHead>Válido hasta</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Primario</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -223,9 +231,12 @@ export default function CertificatesPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            disabled={settingPrimaryId === cert.id}
                             onClick={() => handleSetPrimary(cert.id)}
                           >
-                            Usar como primario
+                            {settingPrimaryId === cert.id
+                              ? "Estableciendo..."
+                              : "Usar como primario"}
                           </Button>
                         )}
                       </TableCell>

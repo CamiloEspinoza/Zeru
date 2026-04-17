@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { validateRut, formatRut } from "@/lib/chilean-rut";
 
 const EMPTY_FORM: DteConfigInput = {
   rut: "",
@@ -74,6 +75,21 @@ export default function InvoicingSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showImap, setShowImap] = useState(false);
+  const [rutError, setRutError] = useState<string | null>(null);
+
+  const handleRutBlur = () => {
+    const trimmed = form.rut.trim();
+    if (!trimmed) {
+      setRutError(null);
+      return;
+    }
+    if (!validateRut(trimmed)) {
+      setRutError("RUT inválido. Verifique el dígito verificador.");
+      return;
+    }
+    setRutError(null);
+    setForm((prev) => ({ ...prev, rut: formatRut(trimmed) }));
+  };
 
   useEffect(() => {
     dteApi
@@ -110,10 +126,10 @@ export default function InvoicingSettingsPage() {
       };
       const updated = await dteApi.upsertConfig(payload);
       setForm(configToForm(updated));
-      toast.success("Configuracion guardada correctamente");
+      toast.success("Configuración guardada correctamente");
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Error al guardar configuracion",
+        err instanceof Error ? err.message : "Error al guardar configuración",
       );
     } finally {
       setSaving(false);
@@ -123,7 +139,7 @@ export default function InvoicingSettingsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Facturacion Electronica</h1>
+        <h1 className="text-2xl font-bold">Facturación Electrónica</h1>
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-48" />
@@ -140,7 +156,7 @@ export default function InvoicingSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Facturacion Electronica</h1>
+      <h1 className="text-2xl font-bold">Facturación Electrónica</h1>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Datos del Emisor ── */}
@@ -155,12 +171,23 @@ export default function InvoicingSettingsPage() {
                 <Input
                   id="rut"
                   value={form.rut}
-                  onChange={(e) => setField("rut", e.target.value)}
+                  onChange={(e) => {
+                    setField("rut", e.target.value);
+                    if (rutError) setRutError(null);
+                  }}
+                  onBlur={handleRutBlur}
                   placeholder="76.123.456-7"
+                  aria-invalid={!!rutError}
+                  aria-describedby={rutError ? "rut-error" : undefined}
                 />
+                {rutError && (
+                  <p id="rut-error" className="text-destructive text-xs">
+                    {rutError}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="razonSocial">Razon Social</Label>
+                <Label htmlFor="razonSocial">Razón Social</Label>
                 <Input
                   id="razonSocial"
                   value={form.razonSocial}
@@ -176,11 +203,11 @@ export default function InvoicingSettingsPage() {
                   id="giro"
                   value={form.giro}
                   onChange={(e) => setField("giro", e.target.value)}
-                  placeholder="Servicios de tecnologia"
+                  placeholder="Servicios de tecnología"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="actividadEco">Actividad Economica</Label>
+                <Label htmlFor="actividadEco">Actividad Económica</Label>
                 <Input
                   id="actividadEco"
                   type="number"
@@ -194,7 +221,7 @@ export default function InvoicingSettingsPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="direccion">Direccion</Label>
+                <Label htmlFor="direccion">Dirección</Label>
                 <Input
                   id="direccion"
                   value={form.direccion}
@@ -224,15 +251,15 @@ export default function InvoicingSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* ── Configuracion SII ── */}
+        {/* ── Configuración SII ── */}
         <Card>
           <CardHeader>
-            <CardTitle>Configuracion SII</CardTitle>
+            <CardTitle>Configuración SII</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="resolutionNum">Numero de Resolucion</Label>
+                <Label htmlFor="resolutionNum">Número de Resolución</Label>
                 <Input
                   id="resolutionNum"
                   type="number"
@@ -244,7 +271,7 @@ export default function InvoicingSettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="resolutionDate">Fecha de Resolucion</Label>
+                <Label htmlFor="resolutionDate">Fecha de Resolución</Label>
                 <Input
                   id="resolutionDate"
                   type="date"
@@ -268,9 +295,9 @@ export default function InvoicingSettingsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CERTIFICATION">
-                      Certificacion
+                      Certificación
                     </SelectItem>
-                    <SelectItem value="PRODUCTION">Produccion</SelectItem>
+                    <SelectItem value="PRODUCTION">Producción</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -295,7 +322,7 @@ export default function InvoicingSettingsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Recepcion IMAP</CardTitle>
+              <CardTitle>Recepción IMAP</CardTitle>
               <div className="flex items-center gap-2">
                 <Label htmlFor="imap-toggle" className="text-sm font-normal">
                   {showImap ? "Configurado" : "Desactivado"}
@@ -347,7 +374,7 @@ export default function InvoicingSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="imapPass">Contrasena</Label>
+                  <Label htmlFor="imapPass">Contraseña</Label>
                   <Input
                     id="imapPass"
                     type="password"
@@ -366,7 +393,7 @@ export default function InvoicingSettingsPage() {
                   }
                 />
                 <Label htmlFor="imapEnabled" className="font-normal">
-                  Habilitar recepcion automatica por IMAP
+                  Habilitar recepción automática por IMAP
                 </Label>
               </div>
             </CardContent>
@@ -382,11 +409,11 @@ export default function InvoicingSettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">
-                  Crear asiento contable automaticamente
+                  Crear asiento contable automáticamente
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Al emitir o recibir un DTE se crea el asiento de forma
-                  automatica
+                  automática
                 </p>
               </div>
               <Switch
@@ -399,10 +426,10 @@ export default function InvoicingSettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">
-                  Contabilizar asiento automaticamente
+                  Contabilizar asiento automáticamente
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  El asiento creado se contabiliza sin revision manual
+                  El asiento creado se contabiliza sin revisión manual
                 </p>
               </div>
               <Switch
@@ -418,7 +445,7 @@ export default function InvoicingSettingsPage() {
         {/* ── Guardar ── */}
         <div className="flex justify-end">
           <Button type="submit" disabled={saving}>
-            {saving ? "Guardando..." : "Guardar configuracion"}
+            {saving ? "Guardando..." : "Guardar configuración"}
           </Button>
         </div>
       </form>

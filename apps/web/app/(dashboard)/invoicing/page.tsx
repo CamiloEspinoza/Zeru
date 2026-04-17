@@ -19,7 +19,7 @@ const DTE_TYPE_SHORT_NAMES: Record<string, string> = {
   BOLETA_EXENTA_ELECTRONICA: "Boleta Exenta",
   LIQUIDACION_FACTURA_ELECTRONICA: "Liq. Factura",
   FACTURA_COMPRA_ELECTRONICA: "Fact. Compra",
-  GUIA_DESPACHO_ELECTRONICA: "Guia Despacho",
+  GUIA_DESPACHO_ELECTRONICA: "Guía Despacho",
   NOTA_DEBITO_ELECTRONICA: "Nota Debito",
   NOTA_CREDITO_ELECTRONICA: "Nota Credito",
 };
@@ -150,7 +150,7 @@ export default function InvoicingDashboard() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Facturacion</h1>
+        <h1 className="text-2xl font-bold">Facturación</h1>
         <p className="text-destructive">{error}</p>
       </div>
     );
@@ -160,14 +160,14 @@ export default function InvoicingDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Facturacion</h1>
+          <h1 className="text-2xl font-bold">Facturación</h1>
           <p className="text-sm text-muted-foreground">
             Resumen mensual de documentos tributarios electronicos.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild>
-            <Link href="/invoicing/new">Nueva emision</Link>
+            <Link href="/invoicing/new">Nueva emisión</Link>
           </Button>
           <Button variant="outline" asChild>
             <Link href="/invoicing/emitidos">Emitidos</Link>
@@ -211,13 +211,13 @@ export default function InvoicingDashboard() {
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">IVA debito</p>
+                <p className="text-sm text-muted-foreground">IVA débito</p>
                 <p className="text-lg font-semibold tabular-nums">
                   {clpFormatter.format(summary.ivaDebito)}
                 </p>
               </div>
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">IVA credito</p>
+                <p className="text-sm text-muted-foreground">IVA crédito</p>
                 <p className="text-lg font-semibold tabular-nums">
                   {clpFormatter.format(summary.ivaCredito)}
                 </p>
@@ -262,8 +262,16 @@ export default function InvoicingDashboard() {
                 {recentEmitted.map((dte) => (
                   <div
                     key={dte.id}
-                    className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/40 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/40 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onClick={() => router.push(`/invoicing/${dte.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        router.push(`/invoicing/${dte.id}`);
+                      }
+                    }}
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
