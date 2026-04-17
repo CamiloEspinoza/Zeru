@@ -57,6 +57,8 @@ export class DteReceivedProcessor extends WorkerHost {
     );
 
     // 3. Validate and persist each DTE via DteReceivedService
+    let successCount = 0;
+    let failCount = 0;
     for (const parsed of parsedDtes) {
       try {
         const result = await this.receivedService.processReceivedDte(
@@ -64,10 +66,12 @@ export class DteReceivedProcessor extends WorkerHost {
           parsed,
           fromEmail,
         );
+        successCount++;
         this.logger.log(
           `Processed received DTE ${result.dteId}: isNew=${result.isNew}, valid=${result.validation.valid}`,
         );
       } catch (error) {
+        failCount++;
         this.logger.error(
           `Failed to process received DTE tipo=${parsed.tipoDTE} folio=${parsed.folio}: ${error}`,
         );
@@ -75,8 +79,14 @@ export class DteReceivedProcessor extends WorkerHost {
     }
 
     this.logger.log(
-      `Received DTE processing complete: tenant=${tenantId}, source=${source}`,
+      `Received DTE processing complete: tenant=${tenantId}, source=${source}, success=${successCount}, failed=${failCount}`,
     );
+
+    if (failCount > 0 && successCount === 0) {
+      throw new Error(
+        `All ${failCount} DTEs failed to process for tenant ${tenantId}`,
+      );
+    }
   }
 
   @OnWorkerEvent('failed')

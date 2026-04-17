@@ -126,4 +126,41 @@ export class CertificateService {
       action: 'DELETED',
     });
   }
+
+  /**
+   * Atomically set a certificate as primary: clears isPrimary on all other
+   * certificates for the tenant, and sets isPrimary=true on the target.
+   */
+  async setPrimary(tenantId: string, id: string) {
+    const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    const target = await db.dteCertificate.findFirst({ where: { id } });
+    if (!target) {
+      throw new BadRequestException('Certificado no encontrado.');
+    }
+    if (target.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        'Solo se pueden marcar como primarios certificados activos.',
+      );
+    }
+
+    await db.$transaction([
+      db.dteCertificate.updateMany({
+        where: { isPrimary: true, id: { not: id } },
+        data: { isPrimary: false },
+      }),
+      db.dteCertificate.update({
+        where: { id },
+        data: { isPrimary: true },
+      }),
+    ]);
+
+    await this.audit.log({
+      entityType: 'DteCertificate',
+      entityId: id,
+      action: 'SET_PRIMARY',
+    });
+
+    return { id, isPrimary: true };
+  }
 }

@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { validateRut } from '@zeru/shared';
 import { DteConfigService } from '../services/dte-config.service';
+import { ChileanHolidaysService } from '../../../common/services/chilean-holidays.service';
 import { ParsedDte } from './dte-xml-parser.service';
 import { TASA_IVA } from '../constants/dte-types.constants';
 
@@ -42,7 +44,10 @@ const EXEMPT_DTE_TYPES = new Set([34, 41]);
 export class DteValidationService {
   private readonly logger = new Logger(DteValidationService.name);
 
-  constructor(private readonly configService: DteConfigService) {}
+  constructor(
+    private readonly configService: DteConfigService,
+    private readonly holidaysService: ChileanHolidaysService,
+  ) {}
 
   /**
    * Validate a parsed DTE document.
@@ -96,12 +101,16 @@ export class DteValidationService {
       errors.push('El DTE no tiene fecha de emisión');
     }
 
-    // ─── 5. Emisor RUT format validation ────────────────────
+    // ─── 5. Emisor RUT format + mod-11 DV validation ────────
     if (!parsedDte.emisor.rut) {
       errors.push('El DTE no tiene RUT de emisor');
     } else if (!this.isValidRutFormat(parsedDte.emisor.rut)) {
       errors.push(
         `El RUT del emisor tiene formato inválido: ${parsedDte.emisor.rut}`,
+      );
+    } else if (!validateRut(parsedDte.emisor.rut)) {
+      errors.push(
+        `El RUT del emisor tiene dígito verificador inválido (mod-11): ${parsedDte.emisor.rut}`,
       );
     }
 
@@ -202,8 +211,8 @@ export class DteValidationService {
   }
 
   /**
-   * Calculate a deadline date adding N business days (skipping weekends).
-   * Chilean holidays can be added later via a holiday calendar.
+   * Calculate a deadline date adding N business days, skipping weekends
+   * and Chilean national holidays (feriados).
    */
   calculateDeadline(fromDate: Date, businessDays: number): Date {
     const result = new Date(fromDate);
@@ -214,11 +223,12 @@ export class DteValidationService {
       const dayOfWeek = result.getDay();
 
       // Skip Saturday (6) and Sunday (0)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        daysAdded++;
-      }
-      // TODO: Add Chilean national holidays (feriados) to skip as well.
-      // Could be loaded from a configurable table or a static list.
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+      // Skip Chilean national holidays
+      if (this.holidaysService.isHoliday(result)) continue;
+
+      daysAdded++;
     }
 
     return result;

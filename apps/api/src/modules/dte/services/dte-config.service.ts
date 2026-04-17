@@ -19,9 +19,11 @@ export class DteConfigService {
         'Configuración DTE no encontrada. Configure los datos del emisor primero.',
       );
     }
-    // Decrypt imapPass for internal use, but mask it in API responses
-    if (config.imapPass) {
-      config.imapPass = this.encryption.decrypt(config.imapPass);
+    // Decrypt encryptedImapPass for internal use, but mask it in API responses
+    if (config.encryptedImapPass) {
+      config.encryptedImapPass = this.encryption.decrypt(
+        config.encryptedImapPass,
+      );
     }
     return config;
   }
@@ -30,15 +32,17 @@ export class DteConfigService {
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     const config = await db.dteConfig.findUnique({ where: { tenantId } });
     if (!config) return null;
-    // Decrypt imapPass for internal use
-    if (config.imapPass) {
-      config.imapPass = this.encryption.decrypt(config.imapPass);
+    // Decrypt encryptedImapPass for internal use
+    if (config.encryptedImapPass) {
+      config.encryptedImapPass = this.encryption.decrypt(
+        config.encryptedImapPass,
+      );
     }
     return config;
   }
 
   /**
-   * Returns config safe for API responses (imapPass masked).
+   * Returns config safe for API responses (encryptedImapPass masked).
    */
   async getForApi(tenantId: string) {
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
@@ -50,26 +54,28 @@ export class DteConfigService {
     }
     return {
       ...config,
-      imapPass: config.imapPass ? '***' : null,
+      encryptedImapPass: config.encryptedImapPass ? '***' : null,
     };
   }
 
   async upsert(tenantId: string, data: CreateDteConfigSchema) {
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
-    // Encrypt imapPass before saving if provided
+    // Encrypt encryptedImapPass before saving if provided (accepts `imapPass`
+    // from the client and stores it encrypted into `encryptedImapPass`).
     const processedData = { ...data } as Record<string, unknown>;
     if (
       'imapPass' in processedData &&
       processedData.imapPass &&
       typeof processedData.imapPass === 'string'
     ) {
-      processedData.imapPass = this.encryption.encrypt(
+      processedData.encryptedImapPass = this.encryption.encrypt(
         processedData.imapPass as string,
       );
+      delete processedData.imapPass;
     }
 
-    return db.dteConfig.upsert({
+    await db.dteConfig.upsert({
       where: { tenantId },
       create: {
         ...processedData,
@@ -81,5 +87,7 @@ export class DteConfigService {
         resolutionDate: new Date(data.resolutionDate),
       } as any,
     });
+
+    return this.getForApi(tenantId);
   }
 }

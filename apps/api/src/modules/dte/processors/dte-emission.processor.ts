@@ -266,6 +266,18 @@ export class DteEmissionProcessor extends WorkerHost {
 
       let sendResult: { trackId: string };
 
+      // Record send attempt marker used by OrphanRecoveryCron to detect
+      // an in-flight SII send and skip re-queuing within the 5min window.
+      // The message prefix "SII_SEND_ATTEMPTED" is the discriminator since
+      // the DteLogAction enum cannot be extended without a migration.
+      await db.dteLog.create({
+        data: {
+          dteId,
+          action: 'SENT_TO_SII',
+          message: 'SII_SEND_ATTEMPTED: invoking SII send API',
+        },
+      });
+
       if (signedIsBoleta) {
         // Boletas use EnvioBOLETA envelope + REST API
         const envelopeXml = this.boletaBuilder.buildEnvelope(
@@ -303,21 +315,27 @@ export class DteEmissionProcessor extends WorkerHost {
         );
       }
 
-      await db.dte.update({
-        where: { id: dteId },
-        data: {
-          siiTrackId: sendResult.trackId,
-          siiResponse: sendResult as any,
-        },
-      });
+      // Phase 2 atomic commit: persist trackId and transition SIGNED → SENT
+      // in a single transaction. If the state transition fails (e.g. stale
+      // row), the trackId write is rolled back to avoid orphaned rows where
+      // siiTrackId is set while status is still SIGNED.
+      await db.$transaction(async (tx) => {
+        await tx.dte.update({
+          where: { id: dteId },
+          data: {
+            siiTrackId: sendResult.trackId,
+            siiResponse: sendResult as any,
+          },
+        });
 
-      await this.stateMachine.transition(
-        dteId,
-        'SIGNED',
-        'SENT',
-        db,
-        `Enviado al SII, TrackID: ${sendResult.trackId}`,
-      );
+        await this.stateMachine.transition(
+          dteId,
+          'SIGNED',
+          'SENT',
+          tx,
+          `Enviado al SII, TrackID: ${sendResult.trackId}`,
+        );
+      });
       await this.queueStatusCheck(dteId, tenantId, sendResult.trackId);
 
       this.logger.log(
@@ -380,6 +398,38 @@ export class DteEmissionProcessor extends WorkerHost {
           dteId: job.data.dteId,
           error: error.message,
         });
+
+        // ─── Fix 3: Release the allocated folio ─────────────────
+        // On a terminal ERROR the folio that was reserved for this DTE
+        // will never be used. Mark it as released and emit an event so
+        // `RcofService` can report it as `FoliosAnulados` in the next
+        // RCOF and keep the folio range consistent with the SII.
+        if (dte && dte.folio != null) {
+          try {
+            await db.dte.update({
+              where: { id: job.data.dteId },
+              data: { folioReleased: true },
+            });
+          } catch (flagErr) {
+            this.logger.warn(
+              `Could not mark folio as released on DTE ${job.data.dteId}: ${(flagErr as Error).message}`,
+            );
+          }
+
+          this.logger.warn(
+            `Folio released: DTE ${job.data.dteId} failed terminally ` +
+              `(tenant=${job.data.tenantId}, type=${dte.dteType}, ` +
+              `folio=${dte.folio}). Must be reported as FoliosAnulados.`,
+          );
+
+          this.eventEmitter.emit('dte.folio.released', {
+            tenantId: job.data.tenantId,
+            dteId: job.data.dteId,
+            dteType: dte.dteType,
+            folio: dte.folio,
+            reason: error.message,
+          });
+        }
       }
     } catch (logError) {
       this.logger.error(`Failed to log emission error: ${logError}`);

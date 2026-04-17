@@ -24,7 +24,7 @@ export interface ImapXmlReceivedPayload {
  * downstream processing.
  *
  * IMAP credentials are stored per-tenant in DteConfig
- * (imapHost, imapPort, imapUser, imapPass, imapEnabled).
+ * (imapHost, imapPort, imapUser, encryptedImapPass, imapEnabled).
  *
  * The service tracks the last processed UID so it only picks up new emails.
  */
@@ -54,7 +54,7 @@ export class ImapPollingService {
       return 0;
     }
 
-    if (!config.imapHost || !config.imapUser || !config.imapPass) {
+    if (!config.imapHost || !config.imapUser || !config.encryptedImapPass) {
       this.logger.warn(
         `IMAP credentials incomplete for tenant ${tenantId}, skipping poll`,
       );
@@ -71,7 +71,8 @@ export class ImapPollingService {
         secure: true,
         auth: {
           user: config.imapUser,
-          pass: config.imapPass,
+          // DteConfigService.get() already decrypts this in-memory.
+          pass: config.encryptedImapPass,
         },
         logger: false,
       });

@@ -89,6 +89,9 @@ CREATE UNIQUE INDEX "dte_rcofs_tenantId_date_environment_key" ON "dte_rcofs"("te
 CREATE UNIQUE INDEX "dte_account_mappings_tenantId_dteTypeCode_direction_key" ON "dte_account_mappings"("tenantId", "dteTypeCode", "direction");
 
 -- AddForeignKey
+ALTER TABLE "dte_exchanges" ADD CONSTRAINT "dte_exchanges_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "dte_exchanges" ADD CONSTRAINT "dte_exchanges_dteId_fkey" FOREIGN KEY ("dteId") REFERENCES "dtes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey

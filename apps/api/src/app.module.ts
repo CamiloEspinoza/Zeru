@@ -21,6 +21,7 @@ import { LinkedInModule } from './modules/linkedin/linkedin.module';
 import { OrgIntelligenceModule } from './modules/org-intelligence/org-intelligence.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { RedisModule } from './common/services/redis.module';
+import { QueueModule } from './common/queue/queue.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { TenantResolverMiddleware } from './common/middleware/tenant-resolver.middleware';
 import { AuditModule } from './modules/audit/audit.module';
@@ -63,6 +64,7 @@ import { BrowserModule } from './modules/browser/browser.module';
     OrgIntelligenceModule,
     CalendarModule,
     RedisModule,
+    QueueModule,
     RealtimeModule,
     AuditModule,
     NotificationModule,

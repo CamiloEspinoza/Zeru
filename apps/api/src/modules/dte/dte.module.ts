@@ -94,6 +94,9 @@ import { AccountingModule } from '../accounting/accounting.module';
 // Notification module (for DTE event notifications)
 import { NotificationModule } from '../notification/notification.module';
 
+// Common services
+import { ChileanHolidaysService } from '../../common/services/chilean-holidays.service';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -105,17 +108,6 @@ import { NotificationModule } from '../notification/notification.module';
         },
       }),
       inject: [ConfigService],
-    }),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          url: config.get<string>('REDIS_URL'),
-          host: config.get<string>('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6380),
-          maxRetriesPerRequest: null,
-        },
-      }),
     }),
     BullModule.registerQueue(
       {
@@ -176,6 +168,7 @@ import { NotificationModule } from '../notification/notification.module';
     BoletaBuilderService,
     RcofService,
     XmlSanitizerService,
+    ChileanHolidaysService,
 
     // Certificate
     CertificateService,

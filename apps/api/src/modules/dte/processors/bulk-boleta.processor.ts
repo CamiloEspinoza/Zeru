@@ -186,7 +186,7 @@ export class BulkBoletaProcessor extends WorkerHost {
         for (const dteId of job.data.dteIds) {
           const dte = await db.dte.findUnique({
             where: { id: dteId },
-            select: { status: true },
+            select: { status: true, folio: true, dteType: true },
           });
 
           if (dte?.status === 'SIGNED') {
@@ -201,6 +201,8 @@ export class BulkBoletaProcessor extends WorkerHost {
             this.eventEmitter.emit('dte.failed', {
               tenantId: job.data.tenantId,
               dteId,
+              folio: dte.folio,
+              dteType: dte.dteType,
               error: error.message,
             });
           }

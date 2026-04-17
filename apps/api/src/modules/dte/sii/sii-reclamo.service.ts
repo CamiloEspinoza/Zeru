@@ -4,6 +4,7 @@ import { SiiCircuitBreakerService } from './sii-circuit-breaker.service';
 import { CertificateService } from '../certificate/certificate.service';
 import { SII_ENVIRONMENTS } from '../constants/sii-endpoints.constants';
 import { DteConfigService } from '../services/dte-config.service';
+import { mtlsFetch } from './sii-mtls-fetcher';
 
 /**
  * SII RegistroReclamoDTE actions:
@@ -74,8 +75,7 @@ export class SiiReclamoService {
     folio: number,
     action: ReclamoAction,
   ): Promise<ReclamoResult> {
-    // Certificate will be used for mTLS once signing is implemented
-    const _cert = await this.certificateService.getPrimaryCert(tenantId);
+    const cert = await this.certificateService.getPrimaryCert(tenantId);
     const environment = await this.resolveEnvironment(tenantId);
     const url = this.getEndpointUrl(environment);
     const rutSanitized = sanitizeRut(emisorRut);
@@ -92,17 +92,14 @@ export class SiiReclamoService {
     );
 
     const result = await this.circuitBreaker.execute(async () => {
-      const response = await fetch(url, {
+      const response = await mtlsFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
           SOAPAction: '',
         },
         body: soapBody,
-        // TODO: Add mTLS configuration with certificate
-        // The fetch call needs to be configured with the tenant's
-        // client certificate for mutual TLS authentication.
-        // This requires an https.Agent with pfx/passphrase from CertificateService.
+        cert,
       });
 
       if (!response.ok) {
@@ -132,8 +129,7 @@ export class SiiReclamoService {
     tipoDte: number,
     folio: number,
   ): Promise<DteReclamoStatus> {
-    // Certificate will be used for mTLS once signing is implemented
-    const _cert = await this.certificateService.getPrimaryCert(tenantId);
+    const cert = await this.certificateService.getPrimaryCert(tenantId);
     const environment = await this.resolveEnvironment(tenantId);
     const url = this.getEndpointUrl(environment);
     const rutSanitized = sanitizeRut(emisorRut);
@@ -149,14 +145,14 @@ export class SiiReclamoService {
     );
 
     const result = await this.circuitBreaker.execute(async () => {
-      const response = await fetch(url, {
+      const response = await mtlsFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'text/xml; charset=utf-8',
           SOAPAction: '',
         },
         body: soapBody,
-        // TODO: Add mTLS configuration with certificate
+        cert,
       });
 
       if (!response.ok) {

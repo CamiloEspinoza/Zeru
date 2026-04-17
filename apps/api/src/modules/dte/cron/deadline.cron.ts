@@ -3,6 +3,8 @@ import { Cron } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PrismaClient } from '@prisma/client';
+import { SiiReclamoService } from '../sii/sii-reclamo.service';
+import { DTE_TYPE_TO_SII_CODE } from '../constants/dte-types.constants';
 
 /**
  * Daily cron job (08:00) that handles received DTE deadlines:
@@ -20,6 +22,7 @@ export class DeadlineCron {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly siiReclamoService: SiiReclamoService,
   ) {}
 
   @Cron('0 8 * * *')
@@ -57,7 +60,13 @@ export class DeadlineCron {
         deadlineDate: { lt: now },
         status: { notIn: ['VOIDED', 'ERROR'] },
       },
-      select: { id: true, tenantId: true, folio: true, emisorRut: true },
+      select: {
+        id: true,
+        tenantId: true,
+        folio: true,
+        emisorRut: true,
+        dteType: true,
+      },
     });
 
     // Group by tenantId so writes use tenant-scoped clients
@@ -100,6 +109,34 @@ export class DeadlineCron {
             dteId: dte.id,
             folio: dte.folio,
           });
+
+          // Register ACD at SII. Non-fatal: local tacit acceptance stands
+          // regardless of whether SII registration succeeds.
+          if (dte.emisorRut) {
+            const tipoDte = DTE_TYPE_TO_SII_CODE[dte.dteType];
+            if (tipoDte) {
+              try {
+                const result = await this.siiReclamoService.registrarReclamo(
+                  dte.tenantId,
+                  dte.emisorRut,
+                  tipoDte,
+                  dte.folio,
+                  'ACD',
+                );
+                this.logger.log(
+                  `SII ACD registered for tacit acceptance of DTE ${dte.id} (codResp=${result.codResp})`,
+                );
+              } catch (siiError) {
+                this.logger.error(
+                  `Failed to register SII ACD for DTE ${dte.id} (tacit): ${siiError}. Local acceptance stands.`,
+                );
+              }
+            } else {
+              this.logger.warn(
+                `Skipping SII ACD for DTE ${dte.id}: unknown dteType ${dte.dteType}`,
+              );
+            }
+          }
 
           this.logger.log(
             `Tacit acceptance for DTE ${dte.id} (folio ${dte.folio} from ${dte.emisorRut})`,

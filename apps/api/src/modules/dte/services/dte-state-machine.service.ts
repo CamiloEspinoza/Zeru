@@ -1,6 +1,12 @@
 import { Injectable, ConflictException, Logger } from '@nestjs/common';
-import { DteStatus, PrismaClient } from '@prisma/client';
+import { DteStatus, Prisma, PrismaClient } from '@prisma/client';
 import { VALID_TRANSITIONS } from '../constants/state-machine.constants';
+
+/**
+ * Accepts either a full PrismaClient or a Prisma.TransactionClient so the
+ * caller can execute the state transition inside an outer `$transaction`.
+ */
+export type DteTxClient = PrismaClient | Prisma.TransactionClient;
 
 @Injectable()
 export class DteStateMachineService {
@@ -10,7 +16,7 @@ export class DteStateMachineService {
     dteId: string,
     from: DteStatus,
     to: DteStatus,
-    db: PrismaClient,
+    db: DteTxClient,
     logMessage?: string,
     actorId?: string,
   ): Promise<void> {

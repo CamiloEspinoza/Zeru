@@ -16,8 +16,12 @@ import {
 import { ExchangeResponseService } from '../exchange/exchange-response.service';
 import { CertificateService } from '../certificate/certificate.service';
 import { XmlSanitizerService } from './xml-sanitizer.service';
-import { SII_CODE_TO_DTE_TYPE } from '../constants/dte-types.constants';
+import {
+  SII_CODE_TO_DTE_TYPE,
+  DTE_TYPE_TO_SII_CODE,
+} from '../constants/dte-types.constants';
 import { ImapXmlReceivedPayload } from '../exchange/imap-polling.service';
+import { SiiReclamoService, ReclamoAction } from '../sii/sii-reclamo.service';
 
 export interface ReceivedDteResult {
   dteId: string;
@@ -37,6 +41,7 @@ export class DteReceivedService {
     private readonly certificateService: CertificateService,
     private readonly xmlSanitizer: XmlSanitizerService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly siiReclamoService: SiiReclamoService,
   ) {}
 
   /**
@@ -89,6 +94,7 @@ export class DteReceivedService {
     if (dteTypeName) {
       const existing = await db.dte.findFirst({
         where: {
+          tenantId,
           dteType: dteTypeName as any,
           folio: parsed.folio,
           emisorRut: parsed.emisor.rut,
@@ -200,15 +206,8 @@ export class DteReceivedService {
       `Persisted received DTE ${dte.id}: tipo=${parsed.tipoDTE} folio=${parsed.folio} from ${parsed.emisor.rut} (valid=${validation.valid})`,
     );
 
-    // Emit event for downstream processing
-    this.eventEmitter.emit('dte.received', {
-      tenantId,
-      dteId: dte.id,
-      folio: parsed.folio,
-      dteType: dteTypeName,
-      emisorRut: parsed.emisor.rut,
-      valid: validation.valid,
-    });
+    // Note: 'dte.received' emit removed — 'dte.xml-received' covers the
+    // notification path and no other listener consumed this redundant event.
 
     return { dteId: dte.id, validation, isNew: true };
   }
@@ -252,7 +251,15 @@ export class DteReceivedService {
 
     const dte = await db.dte.findUnique({
       where: { id: dteId },
-      select: { id: true, direction: true, status: true, deadlineDate: true },
+      select: {
+        id: true,
+        direction: true,
+        status: true,
+        deadlineDate: true,
+        dteType: true,
+        folio: true,
+        emisorRut: true,
+      },
     });
 
     if (!dte) throw new NotFoundException(`DTE ${dteId} no encontrado`);
@@ -338,6 +345,10 @@ export class DteReceivedService {
       dteId,
     });
 
+    // Register the acceptance at the SII (RegistroReclamoDTE — ACD).
+    // Failure here must not rollback the local decision.
+    await this.registerReclamoSafely(tenantId, dte, 'ACD');
+
     this.logger.log(`DTE ${dteId} accepted by user ${userId}`);
   }
 
@@ -354,7 +365,13 @@ export class DteReceivedService {
 
     const dte = await db.dte.findUnique({
       where: { id: dteId },
-      select: { id: true, direction: true },
+      select: {
+        id: true,
+        direction: true,
+        dteType: true,
+        folio: true,
+        emisorRut: true,
+      },
     });
 
     if (!dte) throw new NotFoundException(`DTE ${dteId} no encontrado`);
@@ -418,7 +435,58 @@ export class DteReceivedService {
       reason,
     });
 
+    // Register the rejection at the SII (RegistroReclamoDTE — RCD).
+    // Failure here must not rollback the local decision.
+    await this.registerReclamoSafely(tenantId, dte, 'RCD');
+
     this.logger.log(`DTE ${dteId} rejected by user ${userId}`);
+  }
+
+  /**
+   * Call SiiReclamoService to register an ACD/RCD action at the SII.
+   * Logs and swallows any error — the local decision is authoritative.
+   */
+  private async registerReclamoSafely(
+    tenantId: string,
+    dte: {
+      id: string;
+      dteType: string;
+      folio: number;
+      emisorRut: string | null;
+    },
+    action: ReclamoAction,
+  ): Promise<void> {
+    if (!dte.emisorRut) {
+      this.logger.warn(
+        `Skipping SII reclamo ${action} for DTE ${dte.id}: missing emisorRut`,
+      );
+      return;
+    }
+
+    const tipoDte = DTE_TYPE_TO_SII_CODE[dte.dteType];
+    if (!tipoDte) {
+      this.logger.warn(
+        `Skipping SII reclamo ${action} for DTE ${dte.id}: unknown dteType ${dte.dteType}`,
+      );
+      return;
+    }
+
+    try {
+      const result = await this.siiReclamoService.registrarReclamo(
+        tenantId,
+        dte.emisorRut,
+        tipoDte,
+        dte.folio,
+        action,
+      );
+      this.logger.log(
+        `SII reclamo ${action} registered for DTE ${dte.id} (codResp=${result.codResp})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to register SII reclamo ${action} for DTE ${dte.id}: ${error}. Local decision stands.`,
+      );
+    }
   }
 
   /**

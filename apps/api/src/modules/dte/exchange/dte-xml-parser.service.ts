@@ -76,12 +76,15 @@ export class DteXmlParserService {
 
   private readonly parser = new XMLParser({
     ignoreAttributes: false,
+    allowBooleanAttributes: true,
     attributeNamePrefix: '@_',
     textNodeName: '#text',
     // SII XML uses namespaces — remove them for easier access
     removeNSPrefix: true,
     // Preserve number-like strings as strings; we'll parse numbers explicitly
     parseTagValue: false,
+    // Disable XML entity expansion (XXE defense)
+    processEntities: false,
     // Always return arrays for these tags even when there's only one element
     isArray: (name: string) => {
       return ['DTE', 'Detalle', 'Referencia'].includes(name);
@@ -90,10 +93,13 @@ export class DteXmlParserService {
 
   private readonly xmlBuilder = new XMLParser({
     ignoreAttributes: false,
+    allowBooleanAttributes: true,
     attributeNamePrefix: '@_',
     textNodeName: '#text',
     removeNSPrefix: true,
     parseTagValue: false,
+    // Disable XML entity expansion (XXE defense)
+    processEntities: false,
   });
 
   /**

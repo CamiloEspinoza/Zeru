@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PrismaClient, DteEnvironment } from '@prisma/client';
 import { RcofService } from '../services/rcof.service';
 import { SiiBoletaRestService } from '../sii/sii-boleta-rest.service';
+import { CertificateService } from '../certificate/certificate.service';
 import {
   DTE_RCOF_QUEUE,
   DTE_QUEUE_CONFIG,
@@ -26,6 +27,7 @@ export class RcofProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly rcofService: RcofService,
     private readonly siiBoletaRest: SiiBoletaRestService,
+    private readonly certService: CertificateService,
   ) {
     super();
   }
@@ -51,12 +53,19 @@ export class RcofProcessor extends WorkerHost {
       `RCOF generated and saved: ${summary.length} type(s), date=${date}`,
     );
 
-    // 3. TODO: Send to SII via SiiBoletaRestService (for now, log)
-    this.logger.log(
-      `[TODO] Would send RCOF to SII for tenant=${tenantId}, date=${date}`,
+    // 3. Send to SII via SiiBoletaRestService (POST /rcof/envio, mTLS).
+    const cert = await this.certService.getPrimaryCert(tenantId);
+    const sendResult = await this.siiBoletaRest.sendRcof(
+      xml,
+      cert,
+      environment,
     );
 
-    // 4. Update DteRcof status to SENT once sending is implemented
+    this.logger.log(
+      `RCOF sent to SII: tenant=${tenantId}, date=${date}, trackId=${sendResult.trackId}`,
+    );
+
+    // 4. Update DteRcof to SENT with the trackId returned by SII.
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
     await db.dteRcof.updateMany({
       where: {
@@ -65,12 +74,14 @@ export class RcofProcessor extends WorkerHost {
         environment,
       },
       data: {
-        status: 'GENERATED',
+        status: 'SENT',
+        siiTrackId: sendResult.trackId,
+        siiResponse: sendResult.raw as any,
       },
     });
 
     this.logger.log(
-      `RCOF processing complete: tenant=${tenantId}, date=${date}`,
+      `RCOF processing complete: tenant=${tenantId}, date=${date}, trackId=${sendResult.trackId}`,
     );
   }
 

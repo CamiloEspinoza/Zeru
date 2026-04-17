@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as https from 'https';
+import { Agent, fetch as undiciFetch } from 'undici';
 import {
   Certificado,
   SiiSession,
@@ -40,6 +40,12 @@ export interface BoletaStatusResult {
   raw: Record<string, unknown>;
 }
 
+export interface RcofSendResult {
+  trackId: string;
+  timestamp: string;
+  raw: Record<string, unknown>;
+}
+
 // ─── Helpers ─────────────────────────────────────
 
 function toAmbiente(env: DteEnvironment): 'certificacion' | 'produccion' {
@@ -52,6 +58,15 @@ function getBoletaBaseUrl(env: DteEnvironment): string {
   return SII_ENVIRONMENTS[key].BOLETA_BASE;
 }
 
+// ─── Token cache ─────────────────────────────────
+// SII REST tokens have an observed lifetime of ~60min; we refresh proactively.
+const TOKEN_TTL_MS = 55 * 60 * 1000;
+
+interface CachedToken {
+  token: string;
+  expiresAt: number;
+}
+
 /**
  * Service for communicating with the SII Boleta REST API.
  *
@@ -59,15 +74,37 @@ function getBoletaBaseUrl(env: DteEnvironment): string {
  * (tipos 39 and 41) use a REST API at `apicert.sii.cl` / `api.sii.cl`.
  *
  * All requests are rate-limited (600/hour) and protected by the circuit breaker.
+ *
+ * mTLS: Node's global `fetch` (undici) ignores `https.Agent`. We build an
+ * `undici.Agent` with `connect: { key, cert }` and pass it as the `dispatcher`
+ * so the client certificate is actually presented to the SII.
  */
 @Injectable()
 export class SiiBoletaRestService {
   private readonly logger = new Logger(SiiBoletaRestService.name);
 
+  // Per-tenant/env token cache (scope = `${tenantOrRut}:${ambiente}`).
+  private readonly tokenCache = new Map<string, CachedToken>();
+
   constructor(
     private readonly circuitBreaker: SiiCircuitBreakerService,
     private readonly rateLimiter: SiiRateLimiterService,
   ) {}
+
+  /**
+   * Build an undici dispatcher that presents the tenant's client certificate
+   * for mTLS. Node's global `fetch` ignores the legacy `https.Agent`, so we
+   * must use `undici.Agent.connect`.
+   */
+  private buildMtlsDispatcher(cert: Certificado): Agent {
+    return new Agent({
+      connect: {
+        key: cert.getPrivateKeyPem(),
+        cert: cert.getCertificatePem(),
+        rejectUnauthorized: true,
+      },
+    });
+  }
 
   /**
    * Authenticate with SII via the Boleta REST seed/token flow.
@@ -87,11 +124,7 @@ export class SiiBoletaRestService {
     await this.rateLimiter.acquire();
 
     const token = await this.circuitBreaker.execute(async () => {
-      const session = new SiiSession({
-        ambiente,
-        certificado: cert,
-      });
-      return session.getToken('rest');
+      return this.fetchFreshToken(cert, ambiente);
     });
 
     this.logger.log('SII Boleta REST token obtained successfully');
@@ -124,21 +157,16 @@ export class SiiBoletaRestService {
       const { token } = await this.getTokenInternal(cert, ambiente);
 
       const url = `${baseUrl}/boleta.electronica.envio`;
+      const dispatcher = this.buildMtlsDispatcher(cert);
 
-      const agent = new https.Agent({
-        key: cert.getPrivateKeyPEM(),
-        cert: cert.getCertificatePEM(),
-      });
-
-      const response = await fetch(url, {
+      const response = await undiciFetch(url, {
         method: 'POST',
         body: envelopeXml,
         headers: {
           'Content-Type': 'application/xml',
           Cookie: `TOKEN=${token}`,
         },
-        // @ts-expect-error Node.js fetch supports agent via dispatcher
-        dispatcher: agent,
+        dispatcher,
       });
 
       const body = await response.text();
@@ -151,9 +179,7 @@ export class SiiBoletaRestService {
 
       const trackId = extractTagContent(body, 'TRACKID');
       if (!trackId) {
-        throw new Error(
-          `SII response did not contain TRACKID: ${body}`,
-        );
+        throw new Error(`SII response did not contain TRACKID: ${body}`);
       }
 
       return trackId;
@@ -164,6 +190,69 @@ export class SiiBoletaRestService {
     return {
       trackId: result,
       timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Send an RCOF (Reporte de Consumo de Folios) envelope to the SII Boleta REST API.
+   *
+   * POST `/rcof/envio` — accepts a signed ConsumoFolios XML for the given date.
+   * Returns a trackId for subsequent status checks.
+   */
+  async sendRcof(
+    xml: string,
+    cert: Certificado,
+    environment: DteEnvironment,
+  ): Promise<RcofSendResult> {
+    const ambiente = toAmbiente(environment);
+    const baseUrl = getBoletaBaseUrl(environment);
+
+    this.logger.log(`Sending RCOF to SII REST API (${ambiente})`);
+
+    await this.rateLimiter.acquire();
+
+    const result = await this.circuitBreaker.execute(async () => {
+      const { token } = await this.getTokenInternal(cert, ambiente);
+
+      const url = `${baseUrl}/rcof/envio`;
+      const dispatcher = this.buildMtlsDispatcher(cert);
+
+      const response = await undiciFetch(url, {
+        method: 'POST',
+        body: xml,
+        headers: {
+          'Content-Type': 'application/xml',
+          Cookie: `TOKEN=${token}`,
+        },
+        dispatcher,
+      });
+
+      const body = await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          `SII RCOF envio failed with status ${response.status}: ${body}`,
+        );
+      }
+
+      const trackId =
+        extractTagContent(body, 'TRACKID') ||
+        extractTagContent(body, 'trackid') ||
+        '';
+
+      if (!trackId) {
+        throw new Error(`SII RCOF response did not contain TRACKID: ${body}`);
+      }
+
+      return { trackId, body };
+    });
+
+    this.logger.log(`SII RCOF envio success: trackId=${result.trackId}`);
+
+    return {
+      trackId: result.trackId,
+      timestamp: new Date().toISOString(),
+      raw: { responseXml: result.body },
     };
   }
 
@@ -192,18 +281,13 @@ export class SiiBoletaRestService {
       const { token } = await this.getTokenInternal(cert, ambiente);
 
       const url = `${baseUrl}/boleta.electronica.envio/${numero}-${dv}-${trackId}`;
+      const dispatcher = this.buildMtlsDispatcher(cert);
 
-      const agent = new https.Agent({
-        key: cert.getPrivateKeyPEM(),
-        cert: cert.getCertificatePEM(),
-      });
-
-      const response = await fetch(url, {
+      const response = await undiciFetch(url, {
         headers: {
           Cookie: `TOKEN=${token}`,
         },
-        // @ts-expect-error Node.js fetch supports agent via dispatcher
-        dispatcher: agent,
+        dispatcher,
       });
 
       const body = await response.text();
@@ -264,18 +348,13 @@ export class SiiBoletaRestService {
       const { token } = await this.getTokenInternal(cert, ambiente);
 
       const url = `${baseUrl}/boleta.electronica/${numero}-${dv}-${tipo}-${folio}/estado`;
+      const dispatcher = this.buildMtlsDispatcher(cert);
 
-      const agent = new https.Agent({
-        key: cert.getPrivateKeyPEM(),
-        cert: cert.getCertificatePEM(),
-      });
-
-      const response = await fetch(url, {
+      const response = await undiciFetch(url, {
         headers: {
           Cookie: `TOKEN=${token}`,
         },
-        // @ts-expect-error Node.js fetch supports agent via dispatcher
-        dispatcher: agent,
+        dispatcher,
       });
 
       const body = await response.text();
@@ -300,18 +379,37 @@ export class SiiBoletaRestService {
   }
 
   /**
-   * Internal helper to get a REST token without consuming a rate limiter token
-   * (since the caller already acquired one for the outer request).
+   * Fetch a fresh token via SiiSession (seed → sign → token) bypassing cache.
+   */
+  private async fetchFreshToken(
+    cert: Certificado,
+    ambiente: 'certificacion' | 'produccion',
+  ): Promise<string> {
+    const session = new SiiSession({ ambiente, certificado: cert });
+    return session.getToken('rest');
+  }
+
+  /**
+   * Internal helper to get a REST token (cached per tenant/env with ~55min TTL)
+   * without consuming a rate-limiter token (callers already acquired one).
    */
   private async getTokenInternal(
     cert: Certificado,
     ambiente: 'certificacion' | 'produccion',
   ): Promise<{ token: string }> {
-    const session = new SiiSession({
-      ambiente,
-      certificado: cert,
+    const scope = `${cert.rut ?? 'unknown'}:${ambiente}`;
+    const cached = this.tokenCache.get(scope);
+    const now = Date.now();
+
+    if (cached && cached.expiresAt > now) {
+      return { token: cached.token };
+    }
+
+    const token = await this.fetchFreshToken(cert, ambiente);
+    this.tokenCache.set(scope, {
+      token,
+      expiresAt: now + TOKEN_TTL_MS,
     });
-    const token = await session.getToken('rest');
     return { token };
   }
 }

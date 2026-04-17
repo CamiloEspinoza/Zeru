@@ -89,6 +89,18 @@ export class DteAccountingListener {
     const { tenantId, dteId } = payload;
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
 
+    // Idempotency guard: skip if a journal entry already exists for this DTE
+    const existing = await db.dte.findUnique({
+      where: { id: dteId },
+      select: { journalEntryId: true },
+    });
+    if (existing?.journalEntryId) {
+      this.logger.log(
+        `DTE ${dteId} already has journalEntry ${existing.journalEntryId}, skipping`,
+      );
+      return;
+    }
+
     const config = await db.dteConfig.findFirst({ where: {} });
     if (!config?.autoCreateJournalEntry) {
       this.logger.debug(
@@ -180,6 +192,18 @@ export class DteAccountingListener {
   ) {
     const { tenantId, dteId } = payload;
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
+
+    // Idempotency guard: skip if a journal entry already exists for this DTE
+    const existing = await db.dte.findUnique({
+      where: { id: dteId },
+      select: { journalEntryId: true },
+    });
+    if (existing?.journalEntryId) {
+      this.logger.log(
+        `DTE ${dteId} already has journalEntry ${existing.journalEntryId}, skipping`,
+      );
+      return;
+    }
 
     const config = await db.dteConfig.findFirst({ where: {} });
     if (!config?.autoCreateJournalEntry) {
@@ -289,17 +313,46 @@ export class DteAccountingListener {
       return;
     }
 
-    // Create a reversal entry (debit/credit swapped)
-    const reversalLines = (original.lines as Array<{ accountId: string; credit: any; debit: any; description: string | null }>).map((line) => ({
+    // Idempotency guard for reversal: check if a reversal entry already exists.
+    // TODO: Add `reversalOfId String?` (self-relation) to JournalEntry model
+    // for a proper link. For now we fall back to matching on description.
+    const reversalDescription = `Reverso por rechazo - ${original.description}`;
+    const existingReversal = await db.journalEntry.findFirst({
+      where: {
+        tenantId,
+        description: reversalDescription,
+        deletedAt: null,
+      },
+    });
+    if (existingReversal) {
+      this.logger.log(
+        `Reversal journal entry already exists (#${existingReversal.number}) for DTE ${dteId}, skipping`,
+      );
+      return;
+    }
+
+    // Create a reversal entry (debit/credit swapped).
+    // Use Decimal values directly; Prisma accepts Decimal/string without
+    // coercion to Number (which would lose precision).
+    const reversalLines = (
+      original.lines as Array<{
+        accountId: string;
+        credit: any;
+        debit: any;
+        description: string | null;
+      }>
+    ).map((line) => ({
       accountId: line.accountId,
-      debit: Number(line.credit),
-      credit: Number(line.debit),
+      debit: line.credit,
+      credit: line.debit,
       description: `Reverso - ${line.description ?? ''}`.trim(),
     }));
 
+    // Use the original entry's date so the reversal lands in the same
+    // accounting context (critical if the current period differs).
     const fiscalPeriod = await this.findOpenFiscalPeriod(
       tenantId,
-      new Date(),
+      original.date,
     );
     if (!fiscalPeriod) {
       this.logger.warn(
@@ -309,10 +362,17 @@ export class DteAccountingListener {
     }
 
     const reversal = await this.journalEntries.create(tenantId, {
-      date: new Date().toISOString().split('T')[0],
-      description: `Reverso por rechazo - ${original.description}`,
+      date: original.date.toISOString().split('T')[0],
+      description: reversalDescription,
       fiscalPeriodId: fiscalPeriod.id,
-      lines: reversalLines,
+      // Cast: CreateJournalEntrySchema types debit/credit as number, but
+      // Prisma accepts Decimal directly and we want to preserve precision.
+      lines: reversalLines as unknown as Array<{
+        accountId: string;
+        debit: number;
+        credit: number;
+        description?: string;
+      }>,
     });
 
     // Void the original entry if it was posted

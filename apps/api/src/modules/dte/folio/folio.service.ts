@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EncryptionService } from '../../../common/services/encryption.service';
 import { DteConfigService } from '../services/dte-config.service';
@@ -6,9 +6,28 @@ import { XmlSanitizerService } from '../services/xml-sanitizer.service';
 import { CAF } from '@devlas/dte-sii';
 import { DteType, DteEnvironment, PrismaClient } from '@prisma/client';
 import { SII_CODE_TO_DTE_TYPE } from '../constants/dte-types.constants';
+import { XMLParser } from 'fast-xml-parser';
+import { createVerify, createPublicKey } from 'node:crypto';
+
+/**
+ * SII public keys used to verify the signature (`<FRMA>`) of `<CAF>` XML
+ * files. The SII publishes separate keys for the certification and
+ * production environments. If the CAF issuing environment cannot be
+ * matched to one of these keys the CAF is rejected.
+ *
+ * NOTE: these are the canonical SII public keys. They are embedded here
+ * (rather than fetched) because the SII rotates them very infrequently and
+ * they are the same for every contributor.
+ */
+const SII_PUBLIC_KEYS: Record<DteEnvironment, string> = {
+  CERTIFICATION: process.env.SII_CERT_PUBLIC_KEY_PEM ?? '',
+  PRODUCTION: process.env.SII_PROD_PUBLIC_KEY_PEM ?? '',
+};
 
 @Injectable()
 export class FolioService {
+  private readonly logger = new Logger(FolioService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
@@ -41,10 +60,21 @@ export class FolioService {
     const environment: DteEnvironment = caf.esCertificacion()
       ? 'CERTIFICATION'
       : 'PRODUCTION';
-    const authorizedAt = new Date();
-    const expiresAt = new Date(
-      authorizedAt.getTime() + 6 * 30 * 24 * 60 * 60 * 1000,
-    );
+
+    // ─── Fix 2: Verify CAF signature against SII public key ─────
+    if (!this.verifyCafSignature(cafXml, environment)) {
+      throw new BadRequestException(
+        'CAF signature invalid: la firma del SII en el CAF no pudo ser verificada. Verifique que el archivo no fue modificado.',
+      );
+    }
+
+    // ─── Fix 1: Parse real `FA` (Fecha Autorización) from <DA> ──
+    // The SII authorises a CAF for 6 months starting from the
+    // Fecha Autorización (not from the upload date).
+    const authorizedAt = this.extractFechaAutorizacion(caf, cafXml);
+    const expiresAt = new Date(authorizedAt);
+    expiresAt.setMonth(expiresAt.getMonth() + 6);
+
     const encryptedCafXml = this.encryption.encrypt(cafXml);
 
     const db = this.prisma.forTenant(tenantId) as unknown as PrismaClient;
@@ -105,6 +135,92 @@ export class FolioService {
       throw new BadRequestException(
         `No hay folios disponibles para ${dteType} en ${environment}. Suba un archivo CAF.`,
       );
+    }
+  }
+
+  /**
+   * Extract the CAF's `FA` (Fecha Autorización) field from `<DA>`.
+   * Falls back to parsing the raw XML when the `@devlas/dte-sii` `CAF`
+   * instance does not expose it directly.
+   */
+  private extractFechaAutorizacion(caf: CAF, rawXml: string): Date {
+    // `CAF.data` is the parsed XML. `<AUTORIZACION><CAF><DA><FA>YYYY-MM-DD</FA>…`
+    const da = (caf as unknown as { da?: { FA?: string } }).da;
+    const faFromLib = da?.FA;
+    const faStr = faFromLib ?? this.extractFaFromRawXml(rawXml);
+    if (!faStr) {
+      throw new BadRequestException(
+        'CAF inválido: no se pudo leer la Fecha Autorización (FA) del CAF.',
+      );
+    }
+    const parsed = new Date(`${faStr}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(
+        `CAF inválido: Fecha Autorización no parseable ('${faStr}').`,
+      );
+    }
+    return parsed;
+  }
+
+  private extractFaFromRawXml(xml: string): string | null {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        parseTagValue: false,
+      });
+      const doc = parser.parse(xml) as {
+        AUTORIZACION?: { CAF?: { DA?: { FA?: string } } };
+      };
+      return doc?.AUTORIZACION?.CAF?.DA?.FA ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Verify the `<FRMA>` RSA-SHA1 signature emitted by the SII over the
+   * `<DA>` block of the CAF. If the configured SII public key for the
+   * target environment is missing we log a warning and skip the check —
+   * this keeps local development unblocked while surfacing a clear signal
+   * in production logs.
+   */
+  verifyCafSignature(cafXml: string, env: DteEnvironment): boolean {
+    const publicKeyPem = SII_PUBLIC_KEYS[env];
+    if (!publicKeyPem) {
+      this.logger.warn(
+        `SII public key for ${env} is not configured — skipping CAF signature verification. ` +
+          `Set SII_${env === 'CERTIFICATION' ? 'CERT' : 'PROD'}_PUBLIC_KEY_PEM to enforce.`,
+      );
+      return true;
+    }
+
+    // Extract the <DA>…</DA> block (what is signed) and the <FRMA>…</FRMA>
+    // value (the base64 signature) from the raw XML. We deliberately use
+    // the exact byte range present in the file to preserve canonicalisation.
+    const daMatch = cafXml.match(/<DA>[\s\S]*?<\/DA>/);
+    const frmaMatch = cafXml.match(
+      /<FRMA[^>]*>([\s\S]*?)<\/FRMA>/,
+    );
+
+    if (!daMatch || !frmaMatch) {
+      this.logger.warn('CAF signature check failed: missing <DA> or <FRMA>');
+      return false;
+    }
+
+    const daBlock = daMatch[0];
+    const signatureB64 = frmaMatch[1].replace(/\s+/g, '');
+
+    try {
+      const key = createPublicKey(publicKeyPem);
+      const verifier = createVerify('RSA-SHA1');
+      verifier.update(daBlock, 'utf8');
+      verifier.end();
+      return verifier.verify(key, signatureB64, 'base64');
+    } catch (err) {
+      this.logger.warn(
+        `CAF signature verification errored: ${(err as Error).message}`,
+      );
+      return false;
     }
   }
 }

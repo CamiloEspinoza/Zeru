@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Delete,
+  Patch,
   Param,
   Body,
   UseGuards,
@@ -96,5 +97,11 @@ export class CertificateController {
   @RequirePermission('invoicing', 'manage-certificate')
   delete(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.delete(tenantId, id);
+  }
+
+  @Patch(':id/set-primary')
+  @RequirePermission('invoicing', 'manage-certificate')
+  setPrimary(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.setPrimary(tenantId, id);
   }
 }

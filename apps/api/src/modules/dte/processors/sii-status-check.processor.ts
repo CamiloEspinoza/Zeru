@@ -136,6 +136,8 @@ export class SiiStatusCheckProcessor extends WorkerHost {
         this.eventEmitter.emit('dte.failed', {
           tenantId,
           dteId,
+          folio: dte.folio,
+          dteType: dte.dteType,
           error: `Status check exceeded maximum re-checks (${recheckCount})`,
         });
 
@@ -186,9 +188,16 @@ export class SiiStatusCheckProcessor extends WorkerHost {
           `Status check failed after ${job.attemptsMade} attempts: ${error.message}`,
         );
 
+        const failedDte = await db.dte.findUnique({
+          where: { id: job.data.dteId },
+          select: { folio: true, dteType: true },
+        });
+
         this.eventEmitter.emit('dte.failed', {
           tenantId: job.data.tenantId,
           dteId: job.data.dteId,
+          folio: failedDte?.folio,
+          dteType: failedDte?.dteType,
           error: error.message,
         });
       }
