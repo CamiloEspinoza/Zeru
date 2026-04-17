@@ -1,9 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import {
+  SESClient,
+  SendEmailCommand,
+  SendRawEmailCommand,
+} from '@aws-sdk/client-ses';
+import * as crypto from 'crypto';
 import { EmailConfigService, type DecryptedEmailConfig } from '../email-config/email-config.service';
 import { BrandingService } from '../branding/branding.service';
 import type { TenantBrandingAssets } from '@zeru/shared';
+
+export interface EmailAttachment {
+  filename: string;
+  content: string | Buffer;
+  contentType: string;
+}
 
 @Injectable()
 export class EmailService {
@@ -166,7 +177,110 @@ export class EmailService {
     }
   }
 
+  /**
+   * Envía un email con attachments usando SendRawEmailCommand (MIME multipart/mixed).
+   * El método `sendEmail` estándar usa SendEmailCommand que NO soporta attachments.
+   * Usado por el flujo de DTE para enviar XMLs firmados (acuses de recibo Ley 19.983).
+   */
+  async sendWithAttachments(
+    tenantId: string,
+    to: string,
+    subject: string,
+    html: string,
+    attachments: EmailAttachment[],
+  ): Promise<void> {
+    const creds = await this.resolveCredentialsByTenant(tenantId);
+    const resolvedTo = this.resolveRecipient(to);
+    const boundary = `boundary_${crypto.randomBytes(16).toString('hex')}`;
+
+    const rawMessage = this.buildRawMimeMessage({
+      from: creds.fromEmail,
+      to: resolvedTo,
+      subject,
+      html,
+      attachments,
+      boundary,
+    });
+
+    const command = new SendRawEmailCommand({
+      Source: creds.fromEmail,
+      Destinations: [resolvedTo],
+      RawMessage: { Data: Buffer.from(rawMessage, 'utf-8') },
+    });
+
+    try {
+      await this.withSesClient(creds, (client) => client.send(command));
+      this.logger.log(
+        `Email with ${attachments.length} attachment(s) sent to ${this.maskEmail(to)}`,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to send email with attachments to ${this.maskEmail(to)}: ${(err as Error).message}`,
+      );
+      throw err;
+    }
+  }
+
   // ─── Private ──────────────────────────────────────────────────────────────
+
+  /**
+   * Construye un mensaje MIME multipart/mixed crudo con cuerpo HTML y attachments
+   * codificados en base64. Compatible con AWS SES SendRawEmail.
+   */
+  private buildRawMimeMessage(options: {
+    from: string;
+    to: string;
+    subject: string;
+    html: string;
+    attachments: EmailAttachment[];
+    boundary: string;
+  }): string {
+    const { from, to, subject, html, attachments, boundary } = options;
+
+    // RFC 2047 encoding para asuntos con caracteres no-ASCII
+    const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
+
+    const lines: string[] = [];
+    lines.push(`From: ${from}`);
+    lines.push(`To: ${to}`);
+    lines.push(`Subject: ${encodedSubject}`);
+    lines.push('MIME-Version: 1.0');
+    lines.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    lines.push('');
+
+    // HTML body part
+    lines.push(`--${boundary}`);
+    lines.push('Content-Type: text/html; charset=UTF-8');
+    lines.push('Content-Transfer-Encoding: 7bit');
+    lines.push('');
+    lines.push(html);
+    lines.push('');
+
+    // Attachments
+    for (const att of attachments) {
+      const content =
+        att.content instanceof Buffer
+          ? att.content
+          : Buffer.from(att.content, 'utf-8');
+      // Chunk base64 into 76-char lines per RFC 2045
+      const base64 = content.toString('base64').replace(/(.{76})/g, '$1\r\n');
+
+      lines.push(`--${boundary}`);
+      lines.push(`Content-Type: ${att.contentType}; name="${att.filename}"`);
+      lines.push(
+        `Content-Disposition: attachment; filename="${att.filename}"`,
+      );
+      lines.push('Content-Transfer-Encoding: base64');
+      lines.push('');
+      lines.push(base64);
+      lines.push('');
+    }
+
+    lines.push(`--${boundary}--`);
+
+    return lines.join('\r\n');
+  }
+
 
   private buildBrandedEmailHtml(options: {
     branding: TenantBrandingAssets | null;

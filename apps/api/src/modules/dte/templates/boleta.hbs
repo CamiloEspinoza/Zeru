@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="ISO-8859-1">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #333; padding: 15mm; width: 216mm; }
+  .header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+  .company-info h1 { font-size: 14px; }
+  .company-info p { font-size: 10px; }
+  .rut-box { border: 3px solid #E4002B; padding: 8px 15px; text-align: center; min-width: 180px; }
+  .rut-box p { color: #E4002B; font-weight: bold; }
+  .rut-box .rut { font-size: 14px; }
+  .rut-box .doc-type { font-size: 12px; }
+  .rut-box .folio { font-size: 16px; }
+  .meta { margin: 8px 0; font-size: 10px; color: #666; }
+  table.items { width: 100%; border-collapse: collapse; margin: 10px 0; }
+  table.items th { background: #333; color: white; padding: 5px 8px; text-align: left; font-size: 10px; }
+  table.items td { padding: 4px 8px; border-bottom: 1px solid #eee; font-size: 10px; }
+  .right { text-align: right; }
+  .total-box { text-align: right; font-size: 16px; font-weight: bold; margin: 15px 0; }
+  .timbre-section { display: flex; gap: 15px; margin-top: 15px; border-top: 1px solid #ddd; padding-top: 10px; }
+  .timbre-img { width: 180px; }
+  .timbre-text { font-size: 8px; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="company-info">
+    <h1>{{emisor.razonSocial}}</h1>
+    <p>{{emisor.giro}}</p>
+    <p>{{emisor.direccion}}, {{emisor.comuna}}</p>
+  </div>
+  <div class="rut-box">
+    <p class="rut">R.U.T.: {{emisor.rut}}</p>
+    <p class="doc-type">{{tipoDteNombre}}</p>
+    <p class="folio">N° {{folio}}</p>
+  </div>
+</div>
+
+<p class="meta">Fecha: {{fechaEmision}}</p>
+
+<table class="items">
+  <thead>
+    <tr><th>Descripcion</th><th class="right">Cant.</th><th class="right">Total</th></tr>
+  </thead>
+  <tbody>
+    {{#each items}}
+    <tr>
+      <td>{{itemName}}</td>
+      <td class="right">{{formatNumber quantity}}</td>
+      <td class="right">${{formatNumber montoItem}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+
+<div class="total-box">TOTAL: ${{formatNumber montoTotal}}</div>
+
+<div class="timbre-section">
+  {{#if pdf417Base64}}
+  <img src="{{pdf417Base64}}" class="timbre-img" />
+  {{/if}}
+  <div class="timbre-text">
+    <p><strong>Timbre Electronico SII</strong></p>
+    <p>Res. Ex. SII N° {{resolutionNum}} del {{resolutionDate}}</p>
+    <p>Verifique: www.sii.cl/verificaDTE</p>
+  </div>
+</div>
+
+</body>
+</html>
