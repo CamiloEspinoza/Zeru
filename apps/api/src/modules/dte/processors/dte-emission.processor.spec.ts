@@ -2,11 +2,13 @@ import { Test } from '@nestjs/testing';
 import { DteEmissionProcessor } from './dte-emission.processor';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DteBuilderService } from '../services/dte-builder.service';
+import { BoletaBuilderService } from '../services/boleta-builder.service';
 import { DteConfigService } from '../services/dte-config.service';
 import { DteStateMachineService } from '../services/dte-state-machine.service';
 import { CertificateService } from '../certificate/certificate.service';
 import { FolioService } from '../folio/folio.service';
 import { SiiSenderService } from '../sii/sii-sender.service';
+import { SiiBoletaRestService } from '../sii/sii-boleta-rest.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getQueueToken } from '@nestjs/bullmq';
 import { DTE_STATUS_CHECK_QUEUE } from '../constants/queue.constants';
@@ -80,7 +82,8 @@ describe('DteEmissionProcessor', () => {
         findUnique: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
       },
-      dteLog: { create: jest.fn() },
+      dteLog: { create: jest.fn(), findFirst: jest.fn() },
+      $transaction: jest.fn(async (cb: any) => cb(tenantDb)),
     };
 
     prisma = { forTenant: jest.fn().mockReturnValue(tenantDb) };
@@ -109,10 +112,24 @@ describe('DteEmissionProcessor', () => {
         DteEmissionProcessor,
         { provide: PrismaService, useValue: prisma },
         { provide: DteBuilderService, useValue: builder },
+        {
+          provide: BoletaBuilderService,
+          useValue: {
+            buildBoleta: jest
+              .fn()
+              .mockResolvedValue({ xml: '<DTE/>', signedXml: '<DTE/>' }),
+          },
+        },
         { provide: DteConfigService, useValue: configService },
         { provide: CertificateService, useValue: certService },
         { provide: FolioService, useValue: folioService },
         { provide: SiiSenderService, useValue: siiSender },
+        {
+          provide: SiiBoletaRestService,
+          useValue: {
+            sendBoleta: jest.fn().mockResolvedValue({ trackId: '123' }),
+          },
+        },
         { provide: DteStateMachineService, useValue: stateMachine },
         { provide: EventEmitter2, useValue: eventEmitter },
         {
@@ -217,6 +234,7 @@ describe('DteEmissionProcessor', () => {
     expect(siiSender.sendDte).toHaveBeenCalledWith(
       '<EnvioDTE>envelope</EnvioDTE>',
       mockCert,
+      '76123456-7',
       'CERTIFICATION',
     );
 
@@ -319,7 +337,7 @@ describe('DteEmissionProcessor', () => {
       'QUEUED',
       'ERROR',
       tenantDb,
-      'Error: Build XML failed',
+      expect.stringContaining('Build XML failed'),
     );
 
     expect(eventEmitter.emit).toHaveBeenCalledWith(

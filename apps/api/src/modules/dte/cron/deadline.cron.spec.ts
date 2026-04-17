@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeadlineCron } from './deadline.cron';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { SiiReclamoService } from '../sii/sii-reclamo.service';
 
 describe('DeadlineCron', () => {
   let cron: DeadlineCron;
@@ -12,6 +13,7 @@ describe('DeadlineCron', () => {
     prisma = {
       dte: {
         findMany: jest.fn().mockResolvedValue([]),
+        update: jest.fn(),
       },
       dteExchange: {
         updateMany: jest.fn(),
@@ -19,6 +21,7 @@ describe('DeadlineCron', () => {
       dteLog: {
         create: jest.fn(),
       },
+      forTenant: jest.fn().mockImplementation(() => prisma),
     };
 
     eventEmitter = {
@@ -30,6 +33,14 @@ describe('DeadlineCron', () => {
         DeadlineCron,
         { provide: PrismaService, useValue: prisma },
         { provide: EventEmitter2, useValue: eventEmitter },
+        {
+          provide: SiiReclamoService,
+          useValue: {
+            registrarReclamo: jest
+              .fn()
+              .mockResolvedValue({ success: true, codResp: 0, descResp: 'OK' }),
+          },
+        },
       ],
     }).compile();
 

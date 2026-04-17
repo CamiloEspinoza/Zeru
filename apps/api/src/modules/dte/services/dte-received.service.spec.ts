@@ -6,6 +6,8 @@ import { DteXmlParserService } from '../exchange/dte-xml-parser.service';
 import { DteValidationService } from '../exchange/dte-validation.service';
 import { ExchangeResponseService } from '../exchange/exchange-response.service';
 import { CertificateService } from '../certificate/certificate.service';
+import { XmlSanitizerService } from './xml-sanitizer.service';
+import { SiiReclamoService } from '../sii/sii-reclamo.service';
 
 const mockCert = { fake: 'cert' };
 
@@ -115,7 +117,22 @@ describe('DteReceivedService', () => {
         { provide: DteValidationService, useValue: validationService },
         { provide: ExchangeResponseService, useValue: exchangeResponse },
         { provide: CertificateService, useValue: certificateService },
+        {
+          provide: XmlSanitizerService,
+          useValue: {
+            sanitize: jest.fn((x: string) => x),
+            validateNoInjection: jest.fn(),
+          },
+        },
         { provide: EventEmitter2, useValue: eventEmitter },
+        {
+          provide: SiiReclamoService,
+          useValue: {
+            registrarReclamo: jest
+              .fn()
+              .mockResolvedValue({ success: true, codResp: 0, descResp: 'OK' }),
+          },
+        },
       ],
     }).compile();
 
@@ -178,11 +195,11 @@ describe('DteReceivedService', () => {
     );
   });
 
-  it('should emit dte.received event after persisting', async () => {
+  it('should NOT emit redundant dte.received event (superseded by dte.xml-received)', async () => {
     const parsed = xmlParser.parseEnvioDte()[0];
     await service.processReceivedDte('tenant-1', parsed);
 
-    expect(eventEmitter.emit).toHaveBeenCalledWith(
+    expect(eventEmitter.emit).not.toHaveBeenCalledWith(
       'dte.received',
       expect.objectContaining({
         tenantId: 'tenant-1',

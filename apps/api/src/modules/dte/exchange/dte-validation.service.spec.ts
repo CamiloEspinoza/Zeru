@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { DteValidationService } from './dte-validation.service';
 import { DteConfigService } from '../services/dte-config.service';
+import { ChileanHolidaysService } from '../../../common/services/chilean-holidays.service';
 import { ParsedDte } from './dte-xml-parser.service';
 
 describe('DteValidationService', () => {
@@ -8,7 +9,7 @@ describe('DteValidationService', () => {
   let configService: any;
 
   const mockConfig = {
-    rut: '77654321-K',
+    rut: '77654321-7',
     razonSocial: 'Mi Empresa SpA',
     giro: 'Servicios',
     direccion: 'Test 123',
@@ -26,6 +27,7 @@ describe('DteValidationService', () => {
       providers: [
         DteValidationService,
         { provide: DteConfigService, useValue: configService },
+        ChileanHolidaysService,
       ],
     }).compile();
 
@@ -37,12 +39,12 @@ describe('DteValidationService', () => {
     folio: 12345,
     fechaEmision: '2026-04-10',
     emisor: {
-      rut: '76123456-7',
+      rut: '76123456-0',
       razonSocial: 'Emisor SpA',
       giro: 'Comercio',
     },
     receptor: {
-      rut: '77654321-K',
+      rut: '77654321-7',
       razonSocial: 'Mi Empresa SpA',
     },
     totales: {
