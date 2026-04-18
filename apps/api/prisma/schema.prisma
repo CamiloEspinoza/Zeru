@@ -127,6 +127,54 @@ enum TaskViewType {
   @@schema("public")
 }
 
+enum ApprovalSubjectType {
+  LAB_REPORT_VALIDATION
+
+  @@schema("public")
+}
+
+enum ApprovalReason {
+  CRITICAL_VALIDATION_FAILED
+  NON_CRITICAL_VALIDATION_FAILED
+
+  @@schema("public")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+
+  @@schema("public")
+}
+
+enum ApprovalDecisionKind {
+  APPROVE
+  REJECT
+
+  @@schema("public")
+}
+
+enum AlertChannel {
+  IN_APP
+  EMAIL
+  SMS
+  WEBHOOK
+
+  @@schema("public")
+}
+
+enum RecipientScope {
+  GROUP_MEMBER
+  PERMISSION
+  USER
+  ORIGINAL_ACTOR
+
+  @@schema("public")
+}
+
 // ─── Core ────────────────────────────────────────────────
 
 model Tenant {
@@ -3309,6 +3357,14 @@ enum WorkflowEventType {
   AMENDMENT
   CRITICAL_NOTIFICATION
   OTHER_EVENT
+  SECRETARY_PRE_VALIDATION
+  TM_REVIEW
+  SCANNER_CAPTURE
+  CRITICAL_NOTIFICATION_SENT
+  PATIENT_NOTIFICATION
+  AGENT_VALIDATION_RUN
+  AGENT_VALIDATION_PASSED
+  AGENT_VALIDATION_FAILED
 
   @@schema("mod_lab")
 }
@@ -3437,6 +3493,102 @@ enum AdverseStatus {
   INVESTIGATING
   RESOLVED
   CLOSED_ADV
+
+  @@schema("mod_lab")
+}
+
+enum ValidationRunStatus {
+  PENDING
+  SYNCED
+  ANALYZING
+  COMPLETED
+  ERROR
+  CANCELLED
+
+  @@schema("mod_lab")
+}
+
+enum ValidationVerdict {
+  GREEN
+  YELLOW
+  RED
+  PENDING
+
+  @@schema("mod_lab")
+}
+
+enum ValidationAgentKey {
+  IDENTITY
+  ORIGIN
+  SAMPLE
+  CONCORDANCE
+  CRITICALITY
+  TRACEABILITY
+  VISION_REQUEST
+  VISION_ENCAPSULATION_MACRO
+  PDF_FINAL
+
+  @@schema("mod_lab")
+}
+
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+
+  @@schema("mod_lab")
+}
+
+enum FindingVerdict {
+  PASS
+  WARN
+  FAIL
+
+  @@schema("mod_lab")
+}
+
+enum SensitiveRule {
+  MUESTRA_TEXTUAL_EXACTA
+
+  @@schema("mod_lab")
+}
+
+enum LexCategory {
+  MALIGNIDAD
+  INVASION
+  IN_SITU
+  SOSPECHA
+  INFECCION_CRITICA
+  HEMATOLOGIA_AGRESIVA
+  TRASPLANTE_VASCULITIS
+  NEGACION
+
+  @@schema("mod_lab")
+}
+
+enum LateralityReq {
+  REQUIRED
+  NOT_APPLICABLE
+  CONTEXTUAL
+
+  @@schema("mod_lab")
+}
+
+enum AuditSource {
+  RANDOM_SAMPLING
+  ESCALATION
+  REPLAY
+  FEEDBACK
+
+  @@schema("mod_lab")
+}
+
+enum HumanJudgement {
+  AGENT_CORRECT
+  AGENT_MISSED
+  AGENT_FALSE_POSITIVE
+  UNCERTAIN
 
   @@schema("mod_lab")
 }
