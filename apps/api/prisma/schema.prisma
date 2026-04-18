@@ -3785,16 +3785,19 @@ model LabDiagnosticReport {
 
   // Añadidos por F0 — Validación automatizada
   validationVerdict          ValidationVerdict?
+  /// Denormalized pointer to the most recent LabReportValidation for quick lookup.
+  /// Not a Prisma relation on purpose (V1): no referential integrity needed since
+  /// validations are append-only and diagnostic report deletion cascades separately.
   lastValidationRunId        String?
   blockedForDispatch         Boolean             @default(false)
   criticalPatientNotifyFlag  Boolean             @default(false)
   criticalNotificationPdfKey String?
   criticalNotifiedAt         DateTime?
-  criticalNotifiedBy         String?
+  criticalNotifiedByNameSnapshot String?
   rejectedByCcb              Boolean             @default(false)
   ccbComments                String?
   diagnosticModified         Boolean             @default(false)
-  modifiedByUser             String?
+  modifiedByNameSnapshot     String?
   modifiedAt                 DateTime?
 
   signers               LabDiagnosticReportSigner[]
