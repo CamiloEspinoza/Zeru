@@ -12,7 +12,6 @@ import {
   toDiagnosticReportStatus,
   toFmSource,
   toSigningRole,
-  toAttachmentCategory,
   toGender,
 } from '../constants/enum-maps';
 
