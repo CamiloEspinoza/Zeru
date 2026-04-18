@@ -286,6 +286,8 @@ model User {
   taskPropertyPersonValues TaskPropertyValue[]        @relation("TaskPropertyPersonValues")
   dtesCreated              Dte[]                      @relation("DteCreatedBy")
   dtesDecided              Dte[]                      @relation("DteDecidedBy")
+  approvalGroupMembers     ApprovalGroupMember[]
+  approvalDecisions        ApprovalDecision[]
 
   @@map("users")
   @@schema("public")
@@ -4200,8 +4202,7 @@ model LabReportValidation {
   isReplay            Boolean              @default(false)
   agentRuns           LabValidationAgentRun[]
   findings            LabValidationFinding[]
-  // TODO(T5): re-enable once ApprovalRequest model is created
-  // approvalRequest     ApprovalRequest?
+  approvalRequest     ApprovalRequest?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -4274,5 +4275,108 @@ model TenantBranding {
   updatedAt      DateTime @updatedAt
 
   @@map("tenant_brandings")
+  @@schema("public")
+}
+
+// ─── Approval Models (SoD) ──────────────────────────────
+
+model ApprovalGroup {
+  id                    String                   @id @default(uuid())
+  tenantId              String
+  slug                  String
+  name                  String
+  description           String?
+  reason                ApprovalReason
+  minApprovers          Int                      @default(1)
+  excludeOriginalActor  Boolean                  @default(true)
+  slaHours              Int                      @default(72)
+  isActive              Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  members               ApprovalGroupMember[]
+  requests              ApprovalRequest[]
+  alertRecipients       ApprovalAlertRecipient[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, isActive, reason])
+  @@map("approval_groups")
+  @@schema("public")
+}
+
+model ApprovalGroupMember {
+  id         String        @id @default(uuid())
+  groupId    String
+  group      ApprovalGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedAt    DateTime      @default(now())
+  addedById  String?
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("approval_group_members")
+  @@schema("public")
+}
+
+model ApprovalRequest {
+  id                  String              @id @default(uuid())
+  tenantId            String
+  subjectType         ApprovalSubjectType
+  subjectId           String              @unique
+  reason              ApprovalReason
+  status              ApprovalStatus      @default(PENDING)
+  originalActorId     String?
+  groupId             String
+  group               ApprovalGroup       @relation(fields: [groupId], references: [id])
+  approvalsRequired   Int
+  approvalsCount      Int                 @default(0)
+  rejectionsCount     Int                 @default(0)
+  snapshot            Json
+  createdAt           DateTime            @default(now())
+  expiresAt           DateTime?
+  resolvedAt          DateTime?
+
+  decisions           ApprovalDecision[]
+  validation          LabReportValidation? @relation(fields: [subjectId], references: [id], map: "approval_req_validation_fk")
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, subjectType, subjectId])
+  @@map("approval_requests")
+  @@schema("public")
+}
+
+model ApprovalDecision {
+  id           String               @id @default(uuid())
+  requestId    String
+  request      ApprovalRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  decidedById  String
+  decidedBy    User                 @relation(fields: [decidedById], references: [id])
+  decision     ApprovalDecisionKind
+  notes        String               @db.Text
+  ipAddress    String?
+  userAgent    String?
+  decidedAt    DateTime             @default(now())
+
+  @@unique([requestId, decidedById])
+  @@index([decidedById])
+  @@map("approval_decisions")
+  @@schema("public")
+}
+
+model ApprovalAlertRecipient {
+  id             String          @id @default(uuid())
+  tenantId       String
+  groupId        String?
+  group          ApprovalGroup?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  reason         ApprovalReason?
+  scope          RecipientScope
+  permissionKey  String?
+  userId         String?
+  channels       AlertChannel[]
+  createdAt      DateTime        @default(now())
+
+  @@index([tenantId, groupId, reason])
+  @@map("approval_alert_recipients")
   @@schema("public")
 }
