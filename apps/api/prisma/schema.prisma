@@ -4178,37 +4178,83 @@ model LabImportBatch {
 }
 
 model LabReportValidation {
-  id                   String              @id @default(uuid())
-  tenantId             String
-  diagnosticReportId   String
-  diagnosticReport     LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
-  fmSource             FmSource
-  fmInformeNumber      Int
-  status               String              @default("PENDING") // PENDING, SYNCED, ANALYZING, COMPLETED, ERROR
-  hasPdf               Boolean             @default(false)
-  syncedAt             DateTime?
-  analysisStartedAt    DateTime?
-  completedAt          DateTime?
-  // AI analysis results
-  aiProvider           String?             // OPENAI, etc.
-  aiModel              String?             // gpt-5.4, etc.
-  inputTokens          Int?
-  outputTokens         Int?
-  // Validation results
-  validationResult     Json?               // { discrepancies: [...], summary, score }
-  pdfExtractedData     Json?               // Data extracted from PDF by AI
-  patientMatchResult   Json?               // Comparison: FM vs PDF vs DB
-  error                String?             @db.Text
-  // FM write-back
-  fmScriptExecuted     Boolean             @default(false)
-  fmScriptResult       String?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  id                  String               @id @default(uuid())
+  tenantId            String
+  diagnosticReportId  String
+  diagnosticReport    LabDiagnosticReport  @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  fmInformeNumber     Int
+  fmSource            FmSource
+  triggeredByUserId   String?
+  status              ValidationRunStatus  @default(PENDING)
+  verdict             ValidationVerdict?
+  confidenceAvg       Decimal?             @db.Decimal(5, 4)
+  isCritical          Boolean              @default(false)
+  isAcuteCritical     Boolean              @default(false)
+  startedAt           DateTime             @default(now())
+  syncedAt            DateTime?
+  analysisStartedAt   DateTime?
+  completedAt         DateTime?
+  errorMessage        String?              @db.Text
+  pdfExtractedText    String?              @db.Text
+  summary             Json?
+  isReplay            Boolean              @default(false)
+  agentRuns           LabValidationAgentRun[]
+  findings            LabValidationFinding[]
+  // TODO(T5): re-enable once ApprovalRequest model is created
+  // approvalRequest     ApprovalRequest?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
 
+  @@index([tenantId, status, startedAt])
   @@index([tenantId, diagnosticReportId])
-  @@index([tenantId, status])
   @@index([tenantId, fmSource, fmInformeNumber])
   @@map("lab_report_validations")
+  @@schema("mod_lab")
+}
+
+model LabValidationAgentRun {
+  id             String              @id @default(uuid())
+  validationId   String
+  validation     LabReportValidation @relation(fields: [validationId], references: [id], onDelete: Cascade)
+  agentKey       ValidationAgentKey
+  verdict        FindingVerdict
+  severity       FindingSeverity
+  confidence     Decimal             @db.Decimal(5, 4)
+  durationMs     Int
+  model          String?
+  provider       String?
+  inputTokens    Int?
+  outputTokens   Int?
+  aiUsageLogId   String?
+  rawOutput      Json?
+  createdAt      DateTime            @default(now())
+
+  @@unique([validationId, agentKey])
+  @@index([validationId])
+  @@map("lab_validation_agent_runs")
+  @@schema("mod_lab")
+}
+
+model LabValidationFinding {
+  id                   String              @id @default(uuid())
+  validationId         String
+  validation           LabReportValidation @relation(fields: [validationId], references: [id], onDelete: Cascade)
+  agentKey             ValidationAgentKey
+  ruleId               String
+  verdict              FindingVerdict
+  severity             FindingSeverity
+  message              String              @db.Text
+  field                String?
+  evidenceQuote        String?             @db.Text
+  evidenceSource       String?
+  suggestion           String?             @db.Text
+  requiresHumanReview  Boolean             @default(false)
+  blocksDispatch       Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+
+  @@index([validationId, severity])
+  @@index([ruleId])
+  @@map("lab_validation_findings")
   @@schema("mod_lab")
 }
 
