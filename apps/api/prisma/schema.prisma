@@ -4202,7 +4202,7 @@ model LabReportValidation {
   isReplay            Boolean              @default(false)
   agentRuns           LabValidationAgentRun[]
   findings            LabValidationFinding[]
-  approvalRequest     ApprovalRequest?
+  approvalRequests    ApprovalRequest[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -4323,7 +4323,7 @@ model ApprovalRequest {
   id                  String              @id @default(uuid())
   tenantId            String
   subjectType         ApprovalSubjectType
-  subjectId           String              @unique
+  subjectId           String
   reason              ApprovalReason
   status              ApprovalStatus      @default(PENDING)
   originalActorId     String?
