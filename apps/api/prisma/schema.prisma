@@ -4259,6 +4259,102 @@ model LabValidationFinding {
   @@schema("mod_lab")
 }
 
+model LabSensitiveOrigin {
+  id           String        @id @default(uuid())
+  tenantId     String
+  labOriginId  String?
+  nameMatch    String?
+  rule         SensitiveRule @default(MUESTRA_TEXTUAL_EXACTA)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([tenantId, isActive])
+  @@map("lab_sensitive_origins")
+  @@schema("mod_lab")
+}
+
+model LabCriticalityLexicon {
+  id          String      @id @default(uuid())
+  tenantId    String
+  category    LexCategory
+  pattern     String
+  isRegex     Boolean     @default(false)
+  weight      Int         @default(1)
+  locale      String      @default("es-CL")
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  @@index([tenantId, category, isActive])
+  @@map("lab_criticality_lexicon")
+  @@schema("mod_lab")
+}
+
+model LabLateralityOrganRule {
+  id            String        @id @default(uuid())
+  tenantId      String
+  organPattern  String
+  requirement   LateralityReq
+
+  @@unique([tenantId, organPattern])
+  @@map("lab_laterality_organ_rules")
+  @@schema("mod_lab")
+}
+
+model LabValidationRuleset {
+  id                          String   @id @default(uuid())
+  tenantId                    String   @unique
+  gateEnabled                 Boolean  @default(false)
+  thresholdCritical           Int      @default(3)
+  thresholdMediumConfidence   Decimal  @default(0.70) @db.Decimal(5, 4)
+  autoApproveWithExplicitFlag Boolean  @default(true)
+  concordanceEnsembleOnMalign Boolean  @default(true)
+  visionVlmEnabled            Boolean  @default(true)
+  pdfFinalVlmEnabled          Boolean  @default(false)
+  agentsEnabled               Json
+  updatedAt                   DateTime @updatedAt
+
+  @@map("lab_validation_rulesets")
+  @@schema("mod_lab")
+}
+
+model LabValidationAuditRecord {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  validationId       String           @unique
+  source             AuditSource
+  sampledAt          DateTime         @default(now())
+  reviewerId         String?
+  reviewedAt         DateTime?
+  judgement          HumanJudgement?
+  comments           String?          @db.Text
+  missedFindingsRule String[]
+  agreedFindingsRule String[]
+  falsePositiveRule  String[]
+
+  @@index([tenantId, source, sampledAt])
+  @@index([reviewerId, reviewedAt])
+  @@map("lab_validation_audit_records")
+  @@schema("mod_lab")
+}
+
+model LabValidationReplayRun {
+  id              String    @id @default(uuid())
+  tenantId        String
+  name            String
+  filterCriteria  Json
+  totalCases      Int
+  processedCases  Int       @default(0)
+  detectedCases   Int       @default(0)
+  status          String
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  @@index([tenantId, status, startedAt])
+  @@map("lab_validation_replay_runs")
+  @@schema("mod_lab")
+}
+
 model TenantBranding {
   id             String   @id @default(uuid())
   tenantId       String   @unique
