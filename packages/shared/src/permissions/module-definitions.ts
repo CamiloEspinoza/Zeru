@@ -258,7 +258,7 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   },
   {
     key: 'lab-reports',
-    label: 'Informes',
+    label: 'Informes de laboratorio',
     section: 'laboratory',
     granularPermissions: [
       { key: 'create-draft', label: 'Crear borrador', minLevel: 'EDIT' },
@@ -272,6 +272,18 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
         key: 'export-report',
         label: 'Exportar informes',
         minLevel: 'VIEW',
+      },
+      {
+        key: 'validate',
+        label: 'Validar informes anatomopatológicos',
+        description: 'Validación y firma de informes anatomopatológicos',
+        minLevel: 'MANAGE',
+      },
+      {
+        key: 'override',
+        label: 'Sobrescribir validación de informes',
+        description: 'Permite anular o forzar el resultado de validación',
+        minLevel: 'MANAGE',
       },
     ],
   },
@@ -316,6 +328,39 @@ export const MODULE_DEFINITIONS: ModuleDefinition[] = [
   },
 
   // ── Sistema ──
+  {
+    key: 'operations',
+    label: 'Operaciones',
+    section: 'system',
+    granularPermissions: [
+      {
+        key: 'manage',
+        label: 'Gestión operacional transversal',
+        description:
+          'Gestión operacional transversal (gerencia de operaciones)',
+        minLevel: 'MANAGE',
+      },
+    ],
+  },
+  {
+    key: 'approvals',
+    label: 'Aprobaciones',
+    section: 'system',
+    granularPermissions: [
+      {
+        key: 'decide',
+        label: 'Aprobar o rechazar solicitudes',
+        description: 'Decide sobre solicitudes de aprobación',
+        minLevel: 'EDIT',
+      },
+      {
+        key: 'configure-groups',
+        label: 'Configurar grupos aprobadores',
+        description: 'Aprobación de solicitudes y configuración de grupos',
+        minLevel: 'MANAGE',
+      },
+    ],
+  },
   {
     key: 'integrations',
     label: 'Integraciones',
@@ -380,6 +425,8 @@ export const ROUTE_MODULE_MAP: Record<string, string> = {
   '/laboratory/coding': 'lab-coding',
   '/laboratory/origins': 'lab-origins',
   '/linkedin': 'linkedin',
+  '/operations': 'operations',
+  '/approvals': 'approvals',
   '/integrations': 'integrations',
   '/reports': 'reports',
   '/admin': 'admin',
