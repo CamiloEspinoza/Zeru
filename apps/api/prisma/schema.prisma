@@ -3647,6 +3647,10 @@ model LabPractitioner {
   updatedAt        DateTime           @updatedAt
   deletedAt        DateTime?
 
+  // Añadidos por F0
+  rutSnapshot  String? // poblado desde Biopsias::Rut Medico Solicitante
+  codeSnapshot String? // poblado desde COD. MEDICO
+
   @@unique([tenantId, rut])
   @@unique([tenantId, code])
   @@index([tenantId, paternalLastName, firstName])
@@ -3682,6 +3686,12 @@ model LabServiceRequest {
   updatedAt               DateTime     @updatedAt
   deletedAt               DateTime?
 
+  // Añadidos por F0
+  externalFolioNumber      String?
+  externalInstitutionId    String?
+  externalOrderNumber      String?
+  requestingPhysicianEmail String?
+
   specimens         LabSpecimen[]
   diagnosticReports LabDiagnosticReport[]
 
@@ -3710,6 +3720,19 @@ model LabSpecimen {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deletedAt        DateTime?
+
+  // Añadidos por F0
+  containerType              String?
+  tacoCount                  Int?
+  cassetteCount              Int?
+  placaHeCount               Int?
+  specialTechniquesCount     Int?
+  ihqAntibodies              String[]
+  ihqNumbers                 String?
+  ihqStatus                  String?
+  ihqRequestedAt             DateTime?
+  ihqRespondedAt             DateTime?
+  ihqResponsibleNameSnapshot String?
 
   slides LabSlide[]
 
@@ -3759,6 +3782,20 @@ model LabDiagnosticReport {
   createdAt                 DateTime               @default(now())
   updatedAt                 DateTime               @updatedAt
   deletedAt                 DateTime?
+
+  // Añadidos por F0 — Validación automatizada
+  validationVerdict          ValidationVerdict?
+  lastValidationRunId        String?
+  blockedForDispatch         Boolean             @default(false)
+  criticalPatientNotifyFlag  Boolean             @default(false)
+  criticalNotificationPdfKey String?
+  criticalNotifiedAt         DateTime?
+  criticalNotifiedBy         String?
+  rejectedByCcb              Boolean             @default(false)
+  ccbComments                String?
+  diagnosticModified         Boolean             @default(false)
+  modifiedByUser             String?
+  modifiedAt                 DateTime?
 
   signers               LabDiagnosticReportSigner[]
   observations          LabObservation[]
