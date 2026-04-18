@@ -3616,6 +3616,7 @@ model LabDiagnosticReport {
   technicalObservations LabTechnicalObservation[]
   attachments           LabDiagnosticReportAttachment[]
   examCharges           LabExamCharge[]
+  validations           LabReportValidation[]
 
   @@unique([tenantId, fmSource, fmInformeNumber])
   @@index([tenantId, status])
@@ -3981,6 +3982,41 @@ model LabImportBatch {
 
   @@index([runId, status])
   @@map("lab_import_batches")
+  @@schema("mod_lab")
+}
+
+model LabReportValidation {
+  id                   String              @id @default(uuid())
+  tenantId             String
+  diagnosticReportId   String
+  diagnosticReport     LabDiagnosticReport @relation(fields: [diagnosticReportId], references: [id], onDelete: Cascade)
+  fmSource             FmSource
+  fmInformeNumber      Int
+  status               String              @default("PENDING") // PENDING, SYNCED, ANALYZING, COMPLETED, ERROR
+  hasPdf               Boolean             @default(false)
+  syncedAt             DateTime?
+  analysisStartedAt    DateTime?
+  completedAt          DateTime?
+  // AI analysis results
+  aiProvider           String?             // OPENAI, etc.
+  aiModel              String?             // gpt-5.4, etc.
+  inputTokens          Int?
+  outputTokens         Int?
+  // Validation results
+  validationResult     Json?               // { discrepancies: [...], summary, score }
+  pdfExtractedData     Json?               // Data extracted from PDF by AI
+  patientMatchResult   Json?               // Comparison: FM vs PDF vs DB
+  error                String?             @db.Text
+  // FM write-back
+  fmScriptExecuted     Boolean             @default(false)
+  fmScriptResult       String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([tenantId, diagnosticReportId])
+  @@index([tenantId, status])
+  @@index([tenantId, fmSource, fmInformeNumber])
+  @@map("lab_report_validations")
   @@schema("mod_lab")
 }
 
