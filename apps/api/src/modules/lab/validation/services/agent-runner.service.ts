@@ -84,6 +84,10 @@ export class AgentRunnerService {
             verdict: severityToFindingVerdict(finding.severity),
             severity: mapSeverityToPrisma(finding.severity),
             message: finding.message,
+            // TODO(F4): el schema actual no tiene `evidenceJson Json?`.
+            // Para F1 serializamos `evidence` como JSON string en evidenceQuote;
+            // F4 (UI bandeja/detalle) deberá agregar ese field y migrar este
+            // serialization a un Json column propio para queries estructuradas.
             evidenceQuote:
               finding.evidence !== undefined
                 ? JSON.stringify(finding.evidence)
