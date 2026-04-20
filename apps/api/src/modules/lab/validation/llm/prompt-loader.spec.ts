@@ -35,11 +35,10 @@ describe('renderPrompt', () => {
     spy.mockRestore();
   });
 
-  it('escapes {{ }} inside values to prevent re-interpolation', () => {
-    const out = renderPrompt('{{a}}', { a: '{{b}}' });
+  it('inserts values literally and does not re-scan its own output in the same call', () => {
+    // If renderPrompt re-scanned its output, then `a` => `{{b}}` => `ESCAPED` would resolve.
+    // Single-pass insertion must yield `{{b}}` untouched.
+    const out = renderPrompt('{{a}}', { a: '{{b}}', b: 'ESCAPED' });
     expect(out).toBe('{{b}}');
-    // render again to prove it is treated as literal
-    const again = renderPrompt(out, { b: 'ESCAPED' });
-    expect(again).toBe('{{b}}'); // no re-expansion because body comes as-is
   });
 });
