@@ -4187,6 +4187,10 @@ model LabReportValidation {
   fmInformeNumber     Int
   fmSource            FmSource
   triggeredByUserId   String?
+  /// BullMQ job id of the dispatch that owns this validation row.
+  /// Unique constraint guarantees at most one validation row per BullMQ job
+  /// (idempotent retries). NULL only for legacy rows pre F0.5.
+  triggeredJobId      String?              @unique
   status              ValidationRunStatus  @default(PENDING)
   verdict             ValidationVerdict?
   confidenceAvg       Decimal?             @db.Decimal(5, 4)
