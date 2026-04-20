@@ -213,6 +213,20 @@ export class ReportValidationService {
             targetStatus: 'ERROR',
             errorMessage: msg,
           });
+        } else {
+          // Sin DR existente la FK de LabReportValidation impide registrar el
+          // error. Lo dejamos en FmSyncLog para no perder visibilidad.
+          await this.prisma.fmSyncLog.create({
+            data: {
+              tenantId,
+              entityType: 'lab_report_validation',
+              fmRecordId: String(informeNumber),
+              action: 'validation_trigger',
+              direction: 'inbound',
+              error: msg,
+              details: { database, triggeredByUserId: triggeredByUserId ?? null },
+            },
+          });
         }
       } catch {
         // Best effort
@@ -228,6 +242,14 @@ export class ReportValidationService {
    *   - Si existe y fue creada hace < 1 hora: actualiza in-place (mismo "intento").
    *   - Si no existe o es más antigua: crea una fila nueva.
    * Esto previene que un retry de BullMQ produzca SYNCED + ERROR coexistiendo.
+   *
+   * TODO(F1): este patrón find-then-create tiene races bajo concurrency=5
+   * (R3-1: dos jobs simultáneos pasan ambos por findFirst→null→create).
+   * El refactor correcto es agregar `triggeredJobId String? @unique` al modelo
+   * y reemplazar todo este método por `prisma.labReportValidation.upsert({
+   *   where: { triggeredJobId } })`. Eso elimina además R3-2 (estado SYNCED+ERROR),
+   * R3-4 (cutoff arbitrario) y R3-5 (pérdida de syncedAt en re-validations).
+   * La ventana de 1h es un band-aid aceptable para F0 single-tenant low-throughput.
    */
   private async upsertValidationRow(input: {
     tenantId: string;
@@ -511,7 +533,13 @@ export class ReportValidationService {
 
       // Upsert signers (dentro de la misma transacción para evitar entrelazado
       // entre dos jobs concurrentes con concurrency=5).
-      for (const signer of exam.signers) {
+      // Ordenamos por signatureOrder para garantizar orden canónico de
+      // adquisición de locks de fila — evita deadlocks cuando dos jobs
+      // concurrentes tocan el mismo DR.
+      const sortedSigners = [...exam.signers].sort(
+        (a, b) => a.signatureOrder - b.signatureOrder,
+      );
+      for (const signer of sortedSigners) {
         await tx.labDiagnosticReportSigner.upsert({
           where: {
             diagnosticReportId_signatureOrder: {

@@ -346,6 +346,12 @@ function extractAttachmentRefs(
   informeNumber: number,
 ): ExtractedAttachmentRef[] {
   const refs: ExtractedAttachmentRef[] = [];
+  // Sin labOriginCode generaríamos s3Keys malformados (`Biopsias//2026/...`).
+  // Evitamos crear refs basura: el service va a rechazar el upsert igualmente.
+  if (!labOriginCode || informeNumber <= 0) {
+    return refs;
+  }
+
   const d = record.fieldData;
 
   // Build S3 key components
