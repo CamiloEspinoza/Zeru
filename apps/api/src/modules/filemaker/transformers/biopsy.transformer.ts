@@ -116,7 +116,9 @@ export class BiopsyTransformer {
       subcategory: str(d['SUBTIPO EXAMEN']) || null,
       isUrgent: str(d['URGENTES']).toUpperCase().includes('URGENTE'),
       requestingPhysicianName: str(d['SOLICITADA POR']) || null,
-      labOriginCode: labOriginCode || record.recordId,
+      // Sentinel cuando FM no entrega código — evita crear procedencias fantasma
+      // basadas en recordId volátil. Downstream debe filtrar/loggear UNKNOWN.
+      labOriginCode: labOriginCode || 'UNKNOWN',
       anatomicalSite: str(d['MUESTRA DE']) || null,
       clinicalHistory: str(d['ANTECEDENTES']) || null,
       sampleCollectedAt: null, // Not typically in biopsies
@@ -153,9 +155,10 @@ export class BiopsyTransformer {
     result.cassetteCount = parseNum(d['CASSETTES DE INCLUSION']) || null;
     result.placaHeCount = parseNum(d['PLACAS HE']) || null;
     result.specialTechniquesCount = parseNum(d['Total especiales']) || null;
+    // Solo separamos por | y ; (la coma aparece en nombres reales como "anti-CD20, clon L26")
     const anticuerpos = str(d['ANTICUERPOS']);
     result.ihqAntibodies = anticuerpos
-      ? anticuerpos.split(/[|,;]/).map((s) => s.trim()).filter(Boolean)
+      ? anticuerpos.split(/[|;]/).map((s) => s.trim()).filter(Boolean)
       : [];
     result.ihqNumbers = str(d['INMUNO NUMEROS']) || null;
     result.ihqStatus = str(d['INMUNOS Estado Solicitud']) || null;

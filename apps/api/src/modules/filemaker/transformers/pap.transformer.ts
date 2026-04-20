@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path } from './helpers';
+import { str, parseNum, parseDate, encodeS3Path, normalizeEmail } from './helpers';
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -52,7 +52,9 @@ export class PapTransformer {
       subcategory: null, // PAPs don't have subcategory
       isUrgent: false, // PAPs are never urgent
       requestingPhysicianName: str(d['SOLICITADO POR']) || null,
-      labOriginCode: labOriginCode || record.recordId,
+      // Sentinel cuando FM no entrega código — evita crear procedencias fantasma
+      // basadas en recordId volátil. Downstream debe filtrar/loggear UNKNOWN.
+      labOriginCode: labOriginCode || 'UNKNOWN',
       anatomicalSite: str(d['MUESTRA DE']) || null,
       clinicalHistory,
       sampleCollectedAt,
@@ -78,14 +80,18 @@ export class PapTransformer {
 
     // F0 — nuevos campos PAP
     result.subjectBirthDate = parseDate(str(d['FECHA NACIMIENTO']));
-    result.patientEmail = str(d['E MAIL PACIENTE']) || null;
-    result.requestingPhysicianEmail = str(d['EMAIL MEDICO']) || null;
+    result.patientEmail = normalizeEmail(d['E MAIL PACIENTE']);
+    result.requestingPhysicianEmail = normalizeEmail(d['EMAIL MEDICO']);
+    result.externalFolioNumber = str(d['FOLIO V.INTEGRA']) || null;
+    // TODO(F1+): persistir en columnas dedicadas — hoy solo viajan en el DTO.
+    // Requieren migración para agregar `alertText`, `qualityControlNote` en
+    // LabDiagnosticReport y crear LabExamWorkflowEvent rows para los timestamps
+    // de revisión TM / pre-validación secretaría / validación secretaría.
     result.alertText = str(d['ALERTA']) || null;
     result.qualityControlNote = str(d['Control de Calidad']) || null;
     result.tmReviewedAt = parseDate(str(d['FECHA REVISIÓN TM']));
     result.secretaryPreValidatedAt = parseDate(str(d['FECHA SECRETARIA PRE VALIDA']));
     result.secretaryValidatedAt = parseDate(str(d['FECHA SERCRETARIA VALIDA']));
-    result.externalFolioNumber = str(d['FOLIO V.INTEGRA']) || null;
 
     return result;
   }

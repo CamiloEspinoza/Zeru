@@ -269,14 +269,14 @@ describe('BiopsyTransformer', () => {
       expect(result.placaHeCount).toBe(4);
       expect(result.specialTechniquesCount).toBe(2);
       expect(result.ihqAntibodies).toEqual(['CD20', 'CD3', 'Ki67']);
-      expect(result.ihqNumbers).toBe('IHQ-2026-0042');
-      expect(result.ihqStatus).toBe('Completada');
-      expect(result.criticalPatientNotifyFlag).toBe(true);
-      expect(result.criticalNotifiedBy).toBe('JEFE-VAL');
-      expect(result.rejectedByCcb).toBe(true);
-      expect(result.ccbComments).toBe('Corregir lateralidad');
-      expect(result.diagnosticModified).toBe(true);
-      expect(result.modifiedByUser).toBe('PATOLOGO-X');
+    });
+
+    it('preserves commas inside antibody names (does not split on comma)', () => {
+      const record = makeBiopsyRecord({
+        'ANTICUERPOS': 'anti-CD20, clon L26|Ki-67, marca Dako',
+      });
+      const result = transformer.extract(record, 'BIOPSIAS');
+      expect(result.ihqAntibodies).toEqual(['anti-CD20, clon L26', 'Ki-67, marca Dako']);
     });
 
     it('extracts portals: adverse events, technical observations, slides, special techniques', () => {

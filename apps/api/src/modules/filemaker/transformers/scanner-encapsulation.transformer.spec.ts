@@ -44,4 +44,26 @@ describe('ScannerEncapsulationTransformer', () => {
     const result = ScannerEncapsulationTransformer.extract(record);
     expect(result.attachments).toHaveLength(1);
   });
+
+  it('preserves compound informe number (e.g. "2026-99999") in s3Key path', () => {
+    const record = makeScannerRecord({
+      'INFORME Nº': '2026-99999',
+      'FOTO 1': 'https://fm/container/enc/foto-A.jpg',
+    }, '72');
+    const result = ScannerEncapsulationTransformer.extract(record);
+    expect(result.fmInformeKey).toBe('2026-99999');
+    expect(result.attachments[0].s3Key).toContain('cases/2026-99999/');
+    // Solo el basename del archivo, no la URL completa
+    expect(result.attachments[0].s3Key).not.toContain('https');
+    expect(result.attachments[0].s3Key).toMatch(/foto-A\.jpg$/);
+  });
+
+  it('uses sentinel basename when URL is malformed', () => {
+    const record = makeScannerRecord({
+      'INFORME Nº': 999,
+      'FOTO 1': 'not-a-valid-url',
+    });
+    const result = ScannerEncapsulationTransformer.extract(record);
+    expect(result.attachments[0].s3Key).toContain('attachment');
+  });
 });
