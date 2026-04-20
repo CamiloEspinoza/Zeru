@@ -99,7 +99,9 @@ export class IdentityAgent implements ValidationAgent {
  * (sin puntos ni guión, K mayúscula).
  */
 function isValidChileanRut(rut: string): boolean {
-  if (!/^\d+[0-9K]$/.test(rut)) return false;
+  // Real Chilean RUTs have 7-8 digits in the body. Accepting shorter inputs
+  // masks upstream extraction bugs and defeats V001's purpose.
+  if (!/^\d{7,8}[0-9K]$/.test(rut)) return false;
   const body = rut.slice(0, -1);
   const dv = rut.slice(-1);
   let sum = 0;

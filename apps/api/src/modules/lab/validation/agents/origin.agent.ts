@@ -57,12 +57,16 @@ export class OriginAgent implements ValidationAgent {
     // Cargamos toda la lista del tenant — son pocos rows (≤20 esperado para
     // Citolab) y el match es por substring case-insensitive en aplicación,
     // no expresable como índice Postgres.
+    // nameMatch es nullable en el schema (algunas reglas pueden usar otros
+    // mecanismos en F2+); excluimos las nulas a nivel de query.
     const sensitiveList = await this.prisma.labSensitiveOrigin.findMany({
-      where: { tenantId, isActive: true },
+      where: { tenantId, isActive: true, nameMatch: { not: null } },
       select: { id: true, nameMatch: true },
     });
-    const matchedSensitive = sensitiveList.find((s) =>
-      origin.name.toUpperCase().includes(s.nameMatch.toUpperCase()),
+    const matchedSensitive = sensitiveList.find(
+      (s) =>
+        s.nameMatch != null &&
+        origin.name.toUpperCase().includes(s.nameMatch.toUpperCase()),
     );
     if (matchedSensitive) {
       findings.push({
