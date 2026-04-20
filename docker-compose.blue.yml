@@ -8,6 +8,7 @@ services:
     env_file: /opt/zeru/.env.production
     environment:
       API_PORT: "3000"
+      TZ: "America/Santiago"
     networks:
       - zeru-infra
     depends_on:
