@@ -391,6 +391,7 @@ model RolePermissionOverride {
 
 enum AiProvider {
   OPENAI
+  ANTHROPIC
 
   @@map("ai_provider")
   @@schema("public")
@@ -413,6 +414,10 @@ model AiUsageLog {
   units           Decimal?
   pricingUnit     String?
   createdAt       DateTime @default(now())
+  /// Latency of the LLM call in milliseconds (nullable: legacy rows have no value)
+  durationMs      Int?
+  /// Timestamp when the LLM call finished (nullable: legacy rows have no value)
+  completedAt     DateTime?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
