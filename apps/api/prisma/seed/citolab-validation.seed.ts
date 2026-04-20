@@ -1,10 +1,48 @@
 import { PrismaClient } from '@prisma/client';
+import { createHash } from 'node:crypto';
 
-const CITOLAB_TENANT_ID = 'd8d330f3-075d-41a5-9e6b-783d26f2070d';
+/**
+ * Resuelve el tenantId de Citolab. Lee primero `CITOLAB_TENANT_ID` del entorno
+ * y, si no existe, busca el tenant por slug `citolab` en la DB.
+ * Lanza si no encuentra ninguno — preferimos fallar antes que sembrar contra
+ * un tenant inexistente y crear FKs huérfanas.
+ */
+async function resolveCitolabTenantId(prisma: PrismaClient): Promise<string> {
+  const fromEnv = process.env.CITOLAB_TENANT_ID;
+  if (fromEnv) {
+    const exists = await prisma.tenant.findUnique({ where: { id: fromEnv } });
+    if (!exists) {
+      throw new Error(`CITOLAB_TENANT_ID=${fromEnv} no existe en la tabla tenants`);
+    }
+    return fromEnv;
+  }
+  const bySlug = await prisma.tenant.findUnique({ where: { slug: 'citolab' } });
+  if (!bySlug) {
+    throw new Error(
+      'No se pudo resolver el tenant de Citolab. Define CITOLAB_TENANT_ID en env o crea el tenant con slug "citolab".',
+    );
+  }
+  return bySlug.id;
+}
+
+/**
+ * Genera un id determinístico estable para un seed row.
+ * El hash evita colisiones entre patrones que normalizan al mismo string
+ * con sustituciones de caracteres especiales.
+ */
+function seedId(prefix: string, tenantId: string, ...parts: string[]): string {
+  const key = parts.join('::');
+  const hash = createHash('sha1').update(key).digest('hex').slice(0, 16);
+  return `seed-${prefix}-${tenantId.slice(0, 8)}-${hash}`;
+}
 
 export async function seedCitolabValidation(prisma: PrismaClient) {
-  const tenantId = CITOLAB_TENANT_ID;
+  const tenantId = await resolveCitolabTenantId(prisma);
 
+  // Todo el seed corre en una transacción para evitar estado parcial si
+  // falla a la mitad. Timeout 60s — son ~110 upserts.
+  return prisma.$transaction(
+    async (tx) => {
   // ─── 1. Procedencias sensibles ────────────────────────────────────────
   const sensitiveOrigins = [
     { nameMatch: 'HTSP' },
@@ -15,11 +53,11 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
     { nameMatch: 'HOSPITAL DEL PROFESOR' },
   ];
   for (const o of sensitiveOrigins) {
-    const seedId = `seed-sensitive-${tenantId}-${o.nameMatch.replace(/\s+/g, '-').toLowerCase()}`;
-    await prisma.labSensitiveOrigin.upsert({
-      where: { id: seedId },
+    const id = seedId('sensitive', tenantId, o.nameMatch);
+    await tx.labSensitiveOrigin.upsert({
+      where: { id },
       create: {
-        id: seedId,
+        id,
         tenantId,
         nameMatch: o.nameMatch,
         rule: 'MUESTRA_TEXTUAL_EXACTA',
@@ -98,11 +136,11 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
     { category: 'NEGACION', pattern: 'NILM', weight: 1 },
   ];
   for (const entry of lexicon) {
-    const seedId = `seed-lex-${tenantId}-${entry.category}-${entry.pattern}`.replace(/[^a-z0-9-]/gi, '_');
-    await prisma.labCriticalityLexicon.upsert({
-      where: { id: seedId },
+    const id = seedId('lex', tenantId, entry.category, entry.pattern);
+    await tx.labCriticalityLexicon.upsert({
+      where: { id },
       create: {
-        id: seedId,
+        id,
         tenantId,
         category: entry.category as any,
         pattern: entry.pattern,
@@ -186,7 +224,7 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
     { organPattern: 'vulva', requirement: 'CONTEXTUAL' },
   ];
   for (const rule of laterality) {
-    await prisma.labLateralityOrganRule.upsert({
+    await tx.labLateralityOrganRule.upsert({
       where: {
         tenantId_organPattern: {
           tenantId,
@@ -203,7 +241,7 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
   }
 
   // ─── 4. Ruleset default ────────────────────────────────────────────────
-  await prisma.labValidationRuleset.upsert({
+  await tx.labValidationRuleset.upsert({
     where: { tenantId },
     create: {
       tenantId,
@@ -231,7 +269,7 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
 
   // ─── 5. Grupos de aprobadores ──────────────────────────────────────────
   const criticalsGroupId = `approval-group-${tenantId}-critical`;
-  await prisma.approvalGroup.upsert({
+  await tx.approvalGroup.upsert({
     where: { tenantId_slug: { tenantId, slug: 'citolab-criticals' } },
     create: {
       id: criticalsGroupId,
@@ -249,7 +287,7 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
   });
 
   const qualityGroupId = `approval-group-${tenantId}-quality`;
-  await prisma.approvalGroup.upsert({
+  await tx.approvalGroup.upsert({
     where: { tenantId_slug: { tenantId, slug: 'citolab-quality' } },
     create: {
       id: qualityGroupId,
@@ -274,11 +312,11 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
     { scope: 'PERMISSION' as const, reason: 'CRITICAL_VALIDATION_FAILED' as const, permissionKey: 'tenant:manage', channels: ['EMAIL'] },
   ];
   for (const r of recipients) {
-    const seedId = `seed-recip-${tenantId}-${r.scope}-${r.permissionKey ?? 'any'}-${r.reason ?? 'any'}`;
-    await prisma.approvalAlertRecipient.upsert({
-      where: { id: seedId },
+    const id = seedId('recip', tenantId, r.scope, r.permissionKey ?? 'any', r.reason ?? 'any');
+    await tx.approvalAlertRecipient.upsert({
+      where: { id },
       create: {
-        id: seedId,
+        id,
         tenantId,
         scope: r.scope,
         reason: r.reason as any,
@@ -296,4 +334,7 @@ export async function seedCitolabValidation(prisma: PrismaClient) {
     approvalGroups: 2,
     alertRecipients: recipients.length,
   };
+    },
+    { timeout: 60000, maxWait: 10000 },
+  );
 }
