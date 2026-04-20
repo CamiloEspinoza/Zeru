@@ -30,6 +30,8 @@ export interface ReportValidationTrigger {
   informeNumber: number;
   tenantId?: string;
   triggeredByUserId?: string | null;
+  /** BullMQ job id propagado desde el processor para idempotencia. */
+  jobId?: string;
 }
 
 export interface ProcessValidationJobData {
@@ -157,7 +159,14 @@ export class ReportValidationService {
       );
     }
 
-    this.logger.log(`[Validation] Starting for ${database} #${informeNumber} (tenant=${tenantId})`);
+    // jobId obligatorio en el flow normal (lo pasa el processor). Para llamadas
+    // directas sin job (tests, scripts ad-hoc) generamos uno determinístico.
+    const triggeredJobId =
+      trigger.jobId ?? `direct-${tenantId}-${database}-${informeNumber}-${Date.now()}`;
+
+    this.logger.log(
+      `[Validation] Starting for ${database} #${informeNumber} (tenant=${tenantId}, job=${triggeredJobId})`,
+    );
 
     try {
       // Step 1: Sync from FM
@@ -166,15 +175,14 @@ export class ReportValidationService {
         `[Validation] Synced ${database} #${informeNumber} → SR:${syncResult.serviceRequestId} DR:${syncResult.diagnosticReportId}`,
       );
 
-      // Step 2: Upsert validation record (idempotente para retries de BullMQ).
-      // Reusa la fila reciente (último 1h) en estado PENDING/ERROR para el mismo
-      // informe; si la última está SYNCED y es muy reciente, no creamos duplicado.
+      // Step 2: Upsert validation por triggeredJobId (idempotente).
       const validation = await this.upsertValidationRow({
         tenantId,
         fmSource,
         informeNumber,
         diagnosticReportId: syncResult.diagnosticReportId,
         triggeredByUserId: triggeredByUserId ?? null,
+        triggeredJobId,
         targetStatus: 'SYNCED',
       });
 
@@ -211,6 +219,7 @@ export class ReportValidationService {
             informeNumber,
             diagnosticReportId: dr.id,
             triggeredByUserId: triggeredByUserId ?? null,
+            triggeredJobId,
             targetStatus: 'ERROR',
             errorMessage: msg,
           });
@@ -237,20 +246,10 @@ export class ReportValidationService {
   }
 
   /**
-   * Crea o actualiza la fila de LabReportValidation evitando duplicados por retries.
-   * Reglas:
-   *   - Busca la fila más reciente del mismo (tenant, informe, fmSource).
-   *   - Si existe y fue creada hace < 1 hora: actualiza in-place (mismo "intento").
-   *   - Si no existe o es más antigua: crea una fila nueva.
-   * Esto previene que un retry de BullMQ produzca SYNCED + ERROR coexistiendo.
-   *
-   * TODO(F1): este patrón find-then-create tiene races bajo concurrency=5
-   * (R3-1: dos jobs simultáneos pasan ambos por findFirst→null→create).
-   * El refactor correcto es agregar `triggeredJobId String? @unique` al modelo
-   * y reemplazar todo este método por `prisma.labReportValidation.upsert({
-   *   where: { triggeredJobId } })`. Eso elimina además R3-2 (estado SYNCED+ERROR),
-   * R3-4 (cutoff arbitrario) y R3-5 (pérdida de syncedAt en re-validations).
-   * La ventana de 1h es un band-aid aceptable para F0 single-tenant low-throughput.
+   * Crea o actualiza la fila de LabReportValidation por triggeredJobId.
+   * El BullMQ job id es la clave de idempotencia: retries del mismo job
+   * actualizan la fila existente, mientras que un re-trigger explícito
+   * (jobId nuevo) crea una nueva.
    */
   private async upsertValidationRow(input: {
     tenantId: string;
@@ -258,50 +257,38 @@ export class ReportValidationService {
     informeNumber: number;
     diagnosticReportId: string;
     triggeredByUserId: string | null;
+    triggeredJobId: string;
     targetStatus: 'SYNCED' | 'ERROR';
     errorMessage?: string;
   }): Promise<{ id: string }> {
-    const recentCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
-    const existing = await this.prisma.labReportValidation.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        fmSource: toFmSource(input.fmSource),
-        fmInformeNumber: input.informeNumber,
-        startedAt: { gte: recentCutoff },
-      },
-      orderBy: { startedAt: 'desc' },
-      select: { id: true, status: true },
-    });
+    const baseData = {
+      tenantId: input.tenantId,
+      diagnosticReportId: input.diagnosticReportId,
+      fmSource: toFmSource(input.fmSource),
+      fmInformeNumber: input.informeNumber,
+      triggeredByUserId: input.triggeredByUserId,
+      triggeredJobId: input.triggeredJobId,
+    };
 
-    if (existing) {
-      const updated = await this.prisma.labReportValidation.update({
-        where: { id: existing.id },
-        data: {
-          status: input.targetStatus,
-          syncedAt: input.targetStatus === 'SYNCED' ? new Date() : undefined,
-          errorMessage: input.errorMessage ?? null,
-          completedAt: input.targetStatus === 'ERROR' ? new Date() : undefined,
-        },
-        select: { id: true },
-      });
-      return updated;
-    }
-
-    const created = await this.prisma.labReportValidation.create({
-      data: {
-        tenantId: input.tenantId,
-        diagnosticReportId: input.diagnosticReportId,
-        fmSource: toFmSource(input.fmSource),
-        fmInformeNumber: input.informeNumber,
-        triggeredByUserId: input.triggeredByUserId,
+    const isError = input.targetStatus === 'ERROR';
+    return this.prisma.labReportValidation.upsert({
+      where: { triggeredJobId: input.triggeredJobId },
+      create: {
+        ...baseData,
         status: input.targetStatus,
-        syncedAt: input.targetStatus === 'SYNCED' ? new Date() : null,
+        syncedAt: isError ? null : new Date(),
         errorMessage: input.errorMessage ?? null,
-        completedAt: input.targetStatus === 'ERROR' ? new Date() : null,
+        completedAt: isError ? new Date() : null,
+      },
+      update: {
+        status: input.targetStatus,
+        // Para ERROR limpiamos syncedAt explícitamente (R3-2: evita estado contradictorio).
+        syncedAt: isError ? null : new Date(),
+        errorMessage: input.errorMessage ?? null,
+        completedAt: isError ? new Date() : null,
       },
       select: { id: true },
     });
-    return created;
   }
 
   /**
