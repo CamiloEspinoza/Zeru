@@ -3841,6 +3841,7 @@ model LabDiagnosticReportSigner {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
+  @@unique([diagnosticReportId, signatureOrder])
   @@index([tenantId, diagnosticReportId])
   @@index([tenantId, practitionerId])
   @@index([tenantId, role])
