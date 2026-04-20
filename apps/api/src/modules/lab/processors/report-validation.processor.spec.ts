@@ -50,6 +50,7 @@ describe('ReportValidationProcessor', () => {
       informeNumber: 42,
       tenantId: 'tenant-1',
       triggeredByUserId: 'user-1',
+      jobId: 'job-1',
     });
   });
 

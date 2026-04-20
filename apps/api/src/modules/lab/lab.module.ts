@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { FileMakerModule } from '../filemaker/filemaker.module';
 import { FilesModule } from '../files/files.module';
+import { ValidationModule } from './validation/validation.module';
 
 // Constants
 import {
@@ -62,6 +63,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     PrismaModule,
     FileMakerModule,
     FilesModule,
+    ValidationModule,
     BullModule.registerQueue(
       {
         name: LAB_IMPORT_QUEUE,
