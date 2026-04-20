@@ -61,13 +61,21 @@ export class ReportValidationController {
     this.logger.log(
       `[Trigger] Enqueue requested: ${body.database} #${body.informeNumber}`,
     );
-    const { jobId } = await this.service.enqueueValidation({
-      tenantId: this.tenantId,
-      database: body.database,
-      informeNumber: body.informeNumber,
-      triggeredByUserId: triggeredByUserId ?? null,
-    });
-    return { status: 'enqueued', jobId };
+    try {
+      const { jobId } = await this.service.enqueueValidation({
+        tenantId: this.tenantId,
+        database: body.database,
+        informeNumber: body.informeNumber,
+        triggeredByUserId: triggeredByUserId ?? null,
+      });
+      return { status: 'enqueued', jobId };
+    } catch (err) {
+      this.logger.error(
+        `[Trigger] enqueueValidation failed: ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
+    }
   }
 
   @Get('can-dispatch/:database/:informeNumber')

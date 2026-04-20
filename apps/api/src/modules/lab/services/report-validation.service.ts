@@ -91,10 +91,11 @@ export class ReportValidationService {
       enqueuedAt: new Date().toISOString(),
     };
 
-    // jobId incluye timestamp + uuid para permitir re-validaciones y evitar
-    // colisiones entre requests simultáneos en el mismo milisegundo.
+    // jobId usa "-" como separador (BullMQ rechaza ":" en jobIds custom).
+    // Incluye timestamp + uuid para permitir re-validaciones y evitar colisiones
+    // entre requests simultáneos en el mismo milisegundo.
     const buildJobId = () =>
-      `${tenantId}:${trigger.database}:${trigger.informeNumber}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+      `${tenantId}-${trigger.database}-${trigger.informeNumber}-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
     const job = await this.queue.add(
       REPORT_VALIDATION_JOB_NAMES.PROCESS_VALIDATION,
