@@ -9,6 +9,8 @@ import { FilesModule } from '../files/files.module';
 import {
   LAB_IMPORT_QUEUE,
   ATTACHMENT_MIGRATION_QUEUE,
+  REPORT_VALIDATION_QUEUE,
+  REPORT_VALIDATION_QUEUE_CONFIG,
 } from './constants/queue.constants';
 
 // Services — Import pipeline
@@ -73,6 +75,10 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
           attempts: 10,
           backoff: { type: 'exponential', delay: 5000 },
         },
+      },
+      {
+        name: REPORT_VALIDATION_QUEUE,
+        defaultJobOptions: REPORT_VALIDATION_QUEUE_CONFIG.defaultJobOptions,
       },
     ),
   ],
