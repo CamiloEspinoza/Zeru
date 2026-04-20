@@ -116,9 +116,10 @@ export class BiopsyTransformer {
       subcategory: str(d['SUBTIPO EXAMEN']) || null,
       isUrgent: str(d['URGENTES']).toUpperCase().includes('URGENTE'),
       requestingPhysicianName: str(d['SOLICITADA POR']) || null,
-      // Sentinel cuando FM no entrega código — evita crear procedencias fantasma
-      // basadas en recordId volátil. Downstream debe filtrar/loggear UNKNOWN.
-      labOriginCode: labOriginCode || 'UNKNOWN',
+      // Empty cuando FM no entrega código. NO usamos recordId como fallback
+      // (volátil, crea procedencias fantasma). El service debe rechazar el
+      // upsert con un error claro en vez de inventar un código.
+      labOriginCode,
       anatomicalSite: str(d['MUESTRA DE']) || null,
       clinicalHistory: str(d['ANTECEDENTES']) || null,
       sampleCollectedAt: null, // Not typically in biopsies

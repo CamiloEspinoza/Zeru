@@ -52,9 +52,10 @@ export class PapTransformer {
       subcategory: null, // PAPs don't have subcategory
       isUrgent: false, // PAPs are never urgent
       requestingPhysicianName: str(d['SOLICITADO POR']) || null,
-      // Sentinel cuando FM no entrega código — evita crear procedencias fantasma
-      // basadas en recordId volátil. Downstream debe filtrar/loggear UNKNOWN.
-      labOriginCode: labOriginCode || 'UNKNOWN',
+      // Empty cuando FM no entrega código. NO usamos recordId como fallback
+      // (volátil, crea procedencias fantasma). El service debe rechazar el
+      // upsert con un error claro en vez de inventar un código.
+      labOriginCode,
       anatomicalSite: str(d['MUESTRA DE']) || null,
       clinicalHistory,
       sampleCollectedAt,
