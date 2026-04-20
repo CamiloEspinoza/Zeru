@@ -2,8 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { createHash } from 'node:crypto';
 
 /**
- * Resuelve el tenantId de Citolab. Lee primero `CITOLAB_TENANT_ID` del entorno
- * y, si no existe, busca el tenant por slug `citolab` en la DB.
+ * Resuelve el tenantId de Citolab.
+ * Orden de búsqueda:
+ *   1. env `CITOLAB_TENANT_ID` (validamos que el id exista)
+ *   2. tenant con slug 'citolab' o 'ulern' (slug legacy)
+ *   3. tenant cuyo nombre comience con 'Citolab' (fallback case-insensitive)
  * Lanza si no encuentra ninguno — preferimos fallar antes que sembrar contra
  * un tenant inexistente y crear FKs huérfanas.
  */
@@ -16,13 +19,19 @@ async function resolveCitolabTenantId(prisma: PrismaClient): Promise<string> {
     }
     return fromEnv;
   }
-  const bySlug = await prisma.tenant.findUnique({ where: { slug: 'citolab' } });
-  if (!bySlug) {
-    throw new Error(
-      'No se pudo resolver el tenant de Citolab. Define CITOLAB_TENANT_ID en env o crea el tenant con slug "citolab".',
-    );
-  }
-  return bySlug.id;
+  const bySlug = await prisma.tenant.findFirst({
+    where: { slug: { in: ['citolab', 'ulern'] } },
+  });
+  if (bySlug) return bySlug.id;
+
+  const byName = await prisma.tenant.findFirst({
+    where: { name: { startsWith: 'Citolab', mode: 'insensitive' } },
+  });
+  if (byName) return byName.id;
+
+  throw new Error(
+    'No se pudo resolver el tenant de Citolab. Define CITOLAB_TENANT_ID en env o crea el tenant.',
+  );
 }
 
 /**
