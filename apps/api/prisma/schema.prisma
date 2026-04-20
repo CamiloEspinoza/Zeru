@@ -4202,7 +4202,9 @@ model LabReportValidation {
   isReplay            Boolean              @default(false)
   agentRuns           LabValidationAgentRun[]
   findings            LabValidationFinding[]
-  approvalRequests    ApprovalRequest[]
+  auditRecord         LabValidationAuditRecord?
+  // approvalRequests es polimórfico — no declaramos relation aquí; queries usan
+  // ApprovalRequest.findMany({ where: { subjectType: 'LAB_REPORT_VALIDATION', subjectId: ... } })
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 
@@ -4319,15 +4321,19 @@ model LabValidationRuleset {
 }
 
 model LabValidationAuditRecord {
-  id                 String           @id @default(uuid())
+  id                 String              @id @default(uuid())
   tenantId           String
-  validationId       String           @unique
+  validationId       String              @unique
+  // Restrict on delete: la auditoría debe sobrevivir a la validación.
+  // Si se necesita borrar una validación con audit asociado, se debe borrar
+  // primero el audit de forma explícita (o usar SetNull en una migración).
+  validation         LabReportValidation @relation(fields: [validationId], references: [id], onDelete: Restrict)
   source             AuditSource
-  sampledAt          DateTime         @default(now())
+  sampledAt          DateTime            @default(now())
   reviewerId         String?
   reviewedAt         DateTime?
   judgement          HumanJudgement?
-  comments           String?          @db.Text
+  comments           String?             @db.Text
   missedFindingsRule String[]
   agreedFindingsRule String[]
   falsePositiveRule  String[]
@@ -4434,7 +4440,11 @@ model ApprovalRequest {
   resolvedAt          DateTime?
 
   decisions           ApprovalDecision[]
-  validation          LabReportValidation? @relation(fields: [subjectId], references: [id], map: "approval_req_validation_fk")
+
+  // NOTA: subjectId es polimórfico (discriminado por subjectType). NO declaramos
+  // FK a LabReportValidation aquí porque rompería al agregar otros subjectType
+  // en el enum (HOY solo LAB_REPORT_VALIDATION, pero el modelo es extensible).
+  // El lookup polimórfico se resuelve en aplicación.
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, subjectType, subjectId])
