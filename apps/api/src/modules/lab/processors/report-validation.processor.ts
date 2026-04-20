@@ -38,6 +38,7 @@ export class ReportValidationProcessor extends WorkerHost {
       informeNumber,
       tenantId,
       triggeredByUserId,
+      jobId: typeof job.id === 'string' ? job.id : String(job.id),
     });
     await job.updateProgress(100);
   }
