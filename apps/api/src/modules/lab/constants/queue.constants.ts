@@ -2,6 +2,26 @@
 
 export const LAB_IMPORT_QUEUE = 'lab-import';
 export const ATTACHMENT_MIGRATION_QUEUE = 'attachment-migration';
+export const REPORT_VALIDATION_QUEUE = 'report-validation';
+
+export const REPORT_VALIDATION_JOB_NAMES = {
+  PROCESS_VALIDATION: 'process-validation',
+} as const;
+
+export const REPORT_VALIDATION_QUEUE_CONFIG = {
+  concurrency: 5,
+  retryAttempts: 3,
+  retryBackoff: {
+    type: 'exponential' as const,
+    delay: 3000, // 3s → 6s → 12s
+  },
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential' as const, delay: 3000 },
+    removeOnComplete: { age: 86400, count: 1000 },
+    removeOnFail: { age: 604800 },
+  },
+};
 
 // ── Job names ──
 

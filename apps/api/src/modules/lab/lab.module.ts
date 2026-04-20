@@ -9,6 +9,8 @@ import { FilesModule } from '../files/files.module';
 import {
   LAB_IMPORT_QUEUE,
   ATTACHMENT_MIGRATION_QUEUE,
+  REPORT_VALIDATION_QUEUE,
+  REPORT_VALIDATION_QUEUE_CONFIG,
 } from './constants/queue.constants';
 
 // Services — Import pipeline
@@ -29,6 +31,7 @@ import { FmLabSyncService } from './services/fm-lab-sync.service';
 // Processors (queue dispatchers)
 import { LabImportProcessor } from './processors/lab-import.processor';
 import { AttachmentDownloadProcessor } from './processors/attachment-download.processor';
+import { ReportValidationProcessor } from './processors/report-validation.processor';
 
 // Handlers (business logic)
 import { ExamsBatchHandler } from './processors/handlers/exams-batch.handler';
@@ -40,8 +43,12 @@ import { ChargesBatchHandler } from './processors/handlers/charges-batch.handler
 // Services — Dashboard
 import { LabDashboardService } from './services/lab-dashboard.service';
 
+// Services — Report validation
+import { ReportValidationService } from './services/report-validation.service';
+
 // Controllers
 import { LabDashboardController } from './controllers/lab-dashboard.controller';
+import { ReportValidationController } from './controllers/report-validation.controller';
 import { LabImportController } from './controllers/lab-import.controller';
 import { LabPatientController } from './controllers/lab-patient.controller';
 import { LabPractitionerController } from './controllers/lab-practitioner.controller';
@@ -70,10 +77,15 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
           backoff: { type: 'exponential', delay: 5000 },
         },
       },
+      {
+        name: REPORT_VALIDATION_QUEUE,
+        defaultJobOptions: REPORT_VALIDATION_QUEUE_CONFIG.defaultJobOptions,
+      },
     ),
   ],
   controllers: [
     LabDashboardController,
+    ReportValidationController,
     LabImportController,
     LabPatientController,
     LabPractitionerController,
@@ -85,6 +97,9 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
   providers: [
     // Dashboard
     LabDashboardService,
+
+    // Report validation
+    ReportValidationService,
 
     // Import pipeline services
     LabImportOrchestratorService,
@@ -104,6 +119,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     // Queue processors (one per queue)
     LabImportProcessor,
     AttachmentDownloadProcessor,
+    ReportValidationProcessor,
 
     // Handlers (injected into LabImportProcessor)
     ExamsBatchHandler,

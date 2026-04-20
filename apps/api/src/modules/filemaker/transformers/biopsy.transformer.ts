@@ -1,7 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path, isYes } from './helpers';
+import { str, parseNum, parseDate, parseFmDateTime, encodeS3Path, isYes } from './helpers';
+
+function mapGender(raw: string | null | undefined): 'MALE' | 'FEMALE' | 'OTHER' | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  if (v === 'M' || v === 'MASCULINO' || v === 'MALE' || v === 'HOMBRE') return 'MALE';
+  if (v === 'F' || v === 'FEMENINO' || v === 'FEMALE' || v === 'MUJER') return 'FEMALE';
+  return 'OTHER';
+}
+
+function mapSeverity(
+  raw: string | null | undefined,
+): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  if (v === 'BAJA' || v === 'LOW') return 'LOW';
+  if (v === 'MEDIA' || v === 'MEDIUM') return 'MEDIUM';
+  if (v === 'ALTA' || v === 'HIGH') return 'HIGH';
+  if (v === 'CRÍTICA' || v === 'CRITICA' || v === 'CRITICAL') return 'CRITICAL';
+  return null;
+}
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -78,7 +98,7 @@ export class BiopsyTransformer {
     const validatedAt = parseDate(validationDateField);
     const requestedAt = parseDate(str(d['FECHA']));
 
-    return {
+    const result: ExtractedExam = {
       fmInformeNumber: informeNumber,
       fmSource,
       fmRecordId: record.recordId,
@@ -89,14 +109,17 @@ export class BiopsyTransformer {
       subjectMaternalLastName: str(d['A.MATERNO']) || null,
       subjectRut: rut && rut.length >= 3 ? rut : null,
       subjectAge: parseNum(d['EDAD']) || null,
-      subjectGender: null, // Not available in biopsies
+      subjectGender: mapGender(str(d['SEXO'])),
 
       // ServiceRequest
       category: parseExamCategory(str(d['TIPO DE EXAMEN'])),
       subcategory: str(d['SUBTIPO EXAMEN']) || null,
       isUrgent: str(d['URGENTES']).toUpperCase().includes('URGENTE'),
       requestingPhysicianName: str(d['SOLICITADA POR']) || null,
-      labOriginCode: labOriginCode || record.recordId,
+      // Empty cuando FM no entrega código. NO usamos recordId como fallback
+      // (volátil, crea procedencias fantasma). El service debe rechazar el
+      // upsert con un error claro en vez de inventar un código.
+      labOriginCode,
       anatomicalSite: str(d['MUESTRA DE']) || null,
       clinicalHistory: str(d['ANTECEDENTES']) || null,
       sampleCollectedAt: null, // Not typically in biopsies
@@ -119,6 +142,89 @@ export class BiopsyTransformer {
       // Attachment refs
       attachmentRefs: extractAttachmentRefs(record, labOriginCode, validatedAt, informeNumber),
     };
+
+    // F0 — nuevos campos
+    result.subjectBirthDate = parseDate(str(d['FECHA NACIMIENTO']));
+    result.externalFolioNumber = str(d['NºFOLIO']) || null;
+    result.externalOrderNumber = str(d['Nº ORDEN ATENCION']) || null;
+    result.externalInstitutionId = str(d['NUMERO IDENTIFICADOR INSTITUCION']) || null;
+    result.requestingPhysicianCode = str(d['COD. MEDICO']) || null;
+    const reqRut = str(d['Biopsias::Rut Medico Solicitante']);
+    result.requestingPhysicianRut = reqRut ? normalizeRut(reqRut) : null;
+    result.containerType = str(d['TIPO ENVASE']) || null;
+    result.tacoCount = parseNum(d['TACOS']) || null;
+    result.cassetteCount = parseNum(d['CASSETTES DE INCLUSION']) || null;
+    result.placaHeCount = parseNum(d['PLACAS HE']) || null;
+    result.specialTechniquesCount = parseNum(d['Total especiales']) || null;
+    // Solo separamos por | y ; (la coma aparece en nombres reales como "anti-CD20, clon L26")
+    const anticuerpos = str(d['ANTICUERPOS']);
+    result.ihqAntibodies = anticuerpos
+      ? anticuerpos.split(/[|;]/).map((s) => s.trim()).filter(Boolean)
+      : [];
+    result.ihqNumbers = str(d['INMUNO NUMEROS']) || null;
+    result.ihqStatus = str(d['INMUNOS Estado Solicitud']) || null;
+    result.ihqRequestedAt = parseDate(str(d['INMUNOS Fecha solicitud']));
+    result.ihqRespondedAt = parseDate(str(d['INMUNOS Fecha Respuesta']));
+    result.ihqResponsibleNameSnapshot = str(d['INMUNOS Responsable solicitud']) || null;
+    result.criticalPatientNotifyFlag = isYes(str(d['AVISAR PACIENTE']));
+    result.criticalNotifiedBy = str(d['RESULTADO CRITICO RESPONSABLE NOTIFICACION']) || null;
+    result.criticalNotifiedAt = parseFmDateTime(
+      str(d['FECHA NOTIFICACION CRITICO']),
+      str(d['HORA NOTIFICACION VALOR CRITICO']),
+    );
+    result.criticalNotificationPdfKey = str(d['PDF Notificación Crítico']) || null;
+    result.ccbComments = str(d['COMENTARIOS CCB']) || null;
+    result.rejectedByCcb = isYes(str(d['Rechazado por CCB']));
+    result.diagnosticModified = isYes(str(d['DIAGNOSTICO MODIFICADO']));
+    result.modifiedByUser = str(d['Modifcado Por']) || null;
+    result.modifiedAt = parseFmDateTime(
+      str(d['Modifcado Por Fecha']),
+      str(d['Modifcado Por Hora']),
+    );
+
+    // Portales F0
+    const pd = (record.portalData ?? {}) as Record<string, Record<string, unknown>[]>;
+
+    result.adverseEvents = (pd['portalEventosAdversos'] ?? [])
+      .map((row) => ({
+        eventType: str(row['EventosAdversos::tipo']) || 'DESCONOCIDO',
+        severity: mapSeverity(str(row['EventosAdversos::severidad'])),
+        description: str(row['EventosAdversos::descripcion']),
+        occurredAt: parseDate(str(row['EventosAdversos::fechaOcurrencia'])),
+        detectedAt: parseDate(str(row['EventosAdversos::fechaDeteccion'])),
+        status: str(row['EventosAdversos::estado']) || null,
+      }))
+      .filter((e) => e.description);
+
+    result.technicalObservations = (pd['Observaciones Tecnicas'] ?? [])
+      .map((row) => ({
+        workflowStage: str(row['Obs::etapa']) || null,
+        description: str(row['Obs::descripcion']),
+        observedAt: parseDate(str(row['Obs::fecha'])),
+        observedByNameSnapshot: str(row['Obs::responsable']) || null,
+      }))
+      .filter((o) => o.description);
+
+    result.slides = (pd['Placas'] ?? [])
+      .map((row) => ({
+        placaCode: str(row['Placas::codigo']) || null,
+        stain: str(row['Placas::tincion']) || null,
+        level: str(row['Placas::nivel']) || null,
+      }))
+      .filter((s) => s.placaCode);
+
+    result.specialTechniques = (pd['TÉCNICAS ESPECIALES'] ?? [])
+      .map((row) => ({
+        name: str(row['Tec::nombre']),
+        code: str(row['Tec::codigo']) || null,
+        status: str(row['Tec::estado']) || null,
+        requestedAt: parseDate(str(row['Tec::fechaSolicitud'])),
+        respondedAt: parseDate(str(row['Tec::fechaRespuesta'])),
+        responsibleNameSnapshot: str(row['Tec::responsable']) || null,
+      }))
+      .filter((t) => t.name);
+
+    return result;
   }
 }
 
@@ -240,6 +346,12 @@ function extractAttachmentRefs(
   informeNumber: number,
 ): ExtractedAttachmentRef[] {
   const refs: ExtractedAttachmentRef[] = [];
+  // Sin labOriginCode generaríamos s3Keys malformados (`Biopsias//2026/...`).
+  // Evitamos crear refs basura: el service va a rechazar el upsert igualmente.
+  if (!labOriginCode || informeNumber <= 0) {
+    return refs;
+  }
+
   const d = record.fieldData;
 
   // Build S3 key components
@@ -266,6 +378,7 @@ function extractAttachmentRefs(
   const scannerPortal = record.portalData?.['SCANNER BP 8'];
   if (scannerPortal && Array.isArray(scannerPortal)) {
     let photoIndex = 0;
+    let dictationIndex = 0;
     for (const row of scannerPortal) {
       // Check FOTO 1 through FOTO 22
       for (let i = 1; i <= 22; i++) {
@@ -300,7 +413,53 @@ function extractAttachmentRefs(
           citolabS3KeyOriginal: null,
         });
       }
+
+      // F0 — DICTADO MACRO (audio del patólogo)
+      const dictationUrl = str(row['SCANNER BP 8::DICTADO MACRO']);
+      if (dictationUrl) {
+        dictationIndex++;
+        refs.push({
+          category: 'MACRO_DICTATION',
+          label: `Dictado macro ${dictationIndex}`,
+          sequenceOrder: dictationIndex,
+          s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_dictado_${dictationIndex}.mp3`,
+          contentType: 'audio/mpeg',
+          fmSourceField: 'SCANNER BP 8::DICTADO MACRO',
+          fmContainerUrlOriginal: dictationUrl,
+          citolabS3KeyOriginal: null,
+        });
+      }
     }
+  }
+
+  // F0 — REQUEST_DOCUMENT (solicitud escaneada)
+  const requestDocUrl = str(d['Biopsias_Ingresos::Scanner Documento']);
+  if (requestDocUrl) {
+    refs.push({
+      category: 'REQUEST_DOCUMENT',
+      label: `Solicitud ${informeNumber}`,
+      sequenceOrder: 0,
+      s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_solicitud.pdf`,
+      contentType: 'application/pdf',
+      fmSourceField: 'Biopsias_Ingresos::Scanner Documento',
+      fmContainerUrlOriginal: requestDocUrl,
+      citolabS3KeyOriginal: null,
+    });
+  }
+
+  // F0 — CRITICAL_NOTIFICATION_PDF
+  const critPdfUrl = str(d['PDF Notificación Crítico']);
+  if (critPdfUrl) {
+    refs.push({
+      category: 'CRITICAL_NOTIFICATION_PDF',
+      label: `Notificación crítico ${informeNumber}`,
+      sequenceOrder: 0,
+      s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_critico.pdf`,
+      contentType: 'application/pdf',
+      fmSourceField: 'PDF Notificación Crítico',
+      fmContainerUrlOriginal: critPdfUrl,
+      citolabS3KeyOriginal: null,
+    });
   }
 
   return refs;

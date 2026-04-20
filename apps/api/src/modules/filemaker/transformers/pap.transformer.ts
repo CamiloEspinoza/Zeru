@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path } from './helpers';
+import { str, parseNum, parseDate, encodeS3Path, normalizeEmail } from './helpers';
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -30,7 +30,11 @@ export class PapTransformer {
     const validatedAt = parseDate(fecha);
     const sampleCollectedAt = parseDate(str(d['FECHA TOMA MUESTRA']));
 
-    return {
+    const antClin = str(d['ANTECEDENTES CLINICOS']);
+    const antCuello = str(d['ANTECEDENTES CUELLO']);
+    const clinicalHistory = [antClin, antCuello].filter(Boolean).join(' | ') || null;
+
+    const result: ExtractedExam = {
       fmInformeNumber: informeNumber,
       fmSource,
       fmRecordId: record.recordId,
@@ -48,9 +52,12 @@ export class PapTransformer {
       subcategory: null, // PAPs don't have subcategory
       isUrgent: false, // PAPs are never urgent
       requestingPhysicianName: str(d['SOLICITADO POR']) || null,
-      labOriginCode: labOriginCode || record.recordId,
+      // Empty cuando FM no entrega código. NO usamos recordId como fallback
+      // (volátil, crea procedencias fantasma). El service debe rechazar el
+      // upsert con un error claro en vez de inventar un código.
+      labOriginCode,
       anatomicalSite: str(d['MUESTRA DE']) || null,
-      clinicalHistory: null, // PAPs don't have antecedentes field
+      clinicalHistory,
       sampleCollectedAt,
       receivedAt: null,
       requestedAt: validatedAt,
@@ -71,6 +78,23 @@ export class PapTransformer {
       // Attachment refs
       attachmentRefs: extractPapAttachmentRefs(d, labOriginCode, validatedAt, informeNumber),
     };
+
+    // F0 — nuevos campos PAP
+    result.subjectBirthDate = parseDate(str(d['FECHA NACIMIENTO']));
+    result.patientEmail = normalizeEmail(d['E MAIL PACIENTE']);
+    result.requestingPhysicianEmail = normalizeEmail(d['EMAIL MEDICO']);
+    result.externalFolioNumber = str(d['FOLIO V.INTEGRA']) || null;
+    // TODO(F1+): persistir en columnas dedicadas — hoy solo viajan en el DTO.
+    // Requieren migración para agregar `alertText`, `qualityControlNote` en
+    // LabDiagnosticReport y crear LabExamWorkflowEvent rows para los timestamps
+    // de revisión TM / pre-validación secretaría / validación secretaría.
+    result.alertText = str(d['ALERTA']) || null;
+    result.qualityControlNote = str(d['Control de Calidad']) || null;
+    result.tmReviewedAt = parseDate(str(d['FECHA REVISIÓN TM']));
+    result.secretaryPreValidatedAt = parseDate(str(d['FECHA SECRETARIA PRE VALIDA']));
+    result.secretaryValidatedAt = parseDate(str(d['FECHA SERCRETARIA VALIDA']));
+
+    return result;
   }
 }
 

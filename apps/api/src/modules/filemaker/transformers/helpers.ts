@@ -57,6 +57,12 @@ export function parseDate(val: string): Date | null {
 /**
  * Combine an FM date string and time string into a single Date.
  * Returns null when date is empty.
+ *
+ * IMPORTANTE: Date(year, month, day) y setHours() interpretan los valores en
+ * la zona horaria local del proceso. Para Citolab (timestamps de FM en hora
+ * chilena) el contenedor del API debe correr con `TZ=America/Santiago` para
+ * evitar desfases (ver docker-compose.yml). En tests CI se usa UTC y los
+ * valores quedan offset.
  */
 export function parseFmDateTime(dateStr: string, timeStr: string): Date | null {
   const d = parseDate(dateStr);
@@ -78,6 +84,19 @@ export function parseFmDateTime(dateStr: string, timeStr: string): Date | null {
  */
 export function isYes(val: string): boolean {
   return /^s[iíÍ]/i.test(val);
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Normalize an email value coming from FileMaker.
+ * Returns trimmed lowercase email if valid, or null otherwise.
+ * Discards garbage like "no tiene", "—", "sin correo".
+ */
+export function normalizeEmail(val: unknown): string | null {
+  const s = str(val).toLowerCase();
+  if (!s) return null;
+  return EMAIL_RE.test(s) ? s : null;
 }
 
 /**
