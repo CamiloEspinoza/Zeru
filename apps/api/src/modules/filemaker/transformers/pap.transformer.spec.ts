@@ -258,5 +258,38 @@ describe('PapTransformer', () => {
       const result = transformer.extract(record, 'PAPANICOLAOU');
       expect(result.subjectMaternalLastName).toBeNull();
     });
+
+    it('extracts new F0 fields: DOB, emails, antecedentes, alerta, QC, tracking dates', () => {
+      const record = makePapRecord({
+        'FECHA NACIMIENTO': '04/20/1980',
+        'E MAIL PACIENTE': 'ana@example.com',
+        'EMAIL MEDICO': 'medico@hospital.cl',
+        'EMAIL INSTITUCION': 'lab@hospital.cl',
+        'ANTECEDENTES CLINICOS': 'Control anual',
+        'ANTECEDENTES CUELLO': 'Sin lesión previa',
+        'ALERTA': 'Paciente gestante',
+        'Control de Calidad': 'Revisado 2 lecturas',
+        'FECHA REVISIÓN TM': '02/15/2026',
+        'FECHA SECRETARIA PRE VALIDA': '02/16/2026',
+        'FECHA SERCRETARIA VALIDA': '02/17/2026',
+        'FOLIO V.INTEGRA': 'VI-88',
+      });
+
+      const result = transformer.extract(record, 'PAPANICOLAOU');
+      expect(result.subjectBirthDate).toBeInstanceOf(Date);
+      expect(result.subjectBirthDate!.getFullYear()).toBe(1980);
+      expect(result.subjectBirthDate!.getMonth()).toBe(3);
+      expect(result.subjectBirthDate!.getDate()).toBe(20);
+      expect(result.clinicalHistory).toContain('Control anual');
+      expect(result.clinicalHistory).toContain('Sin lesión previa');
+      expect(result.patientEmail).toBe('ana@example.com');
+      expect(result.requestingPhysicianEmail).toBe('medico@hospital.cl');
+      expect(result.externalFolioNumber).toBe('VI-88');
+      expect(result.alertText).toBe('Paciente gestante');
+      expect(result.qualityControlNote).toBe('Revisado 2 lecturas');
+      expect(result.tmReviewedAt).toBeInstanceOf(Date);
+      expect(result.secretaryPreValidatedAt).toBeInstanceOf(Date);
+      expect(result.secretaryValidatedAt).toBeInstanceOf(Date);
+    });
   });
 });

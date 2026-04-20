@@ -30,7 +30,11 @@ export class PapTransformer {
     const validatedAt = parseDate(fecha);
     const sampleCollectedAt = parseDate(str(d['FECHA TOMA MUESTRA']));
 
-    return {
+    const antClin = str(d['ANTECEDENTES CLINICOS']);
+    const antCuello = str(d['ANTECEDENTES CUELLO']);
+    const clinicalHistory = [antClin, antCuello].filter(Boolean).join(' | ') || null;
+
+    const result: ExtractedExam = {
       fmInformeNumber: informeNumber,
       fmSource,
       fmRecordId: record.recordId,
@@ -50,7 +54,7 @@ export class PapTransformer {
       requestingPhysicianName: str(d['SOLICITADO POR']) || null,
       labOriginCode: labOriginCode || record.recordId,
       anatomicalSite: str(d['MUESTRA DE']) || null,
-      clinicalHistory: null, // PAPs don't have antecedentes field
+      clinicalHistory,
       sampleCollectedAt,
       receivedAt: null,
       requestedAt: validatedAt,
@@ -71,6 +75,19 @@ export class PapTransformer {
       // Attachment refs
       attachmentRefs: extractPapAttachmentRefs(d, labOriginCode, validatedAt, informeNumber),
     };
+
+    // F0 — nuevos campos PAP
+    result.subjectBirthDate = parseDate(str(d['FECHA NACIMIENTO']));
+    result.patientEmail = str(d['E MAIL PACIENTE']) || null;
+    result.requestingPhysicianEmail = str(d['EMAIL MEDICO']) || null;
+    result.alertText = str(d['ALERTA']) || null;
+    result.qualityControlNote = str(d['Control de Calidad']) || null;
+    result.tmReviewedAt = parseDate(str(d['FECHA REVISIÓN TM']));
+    result.secretaryPreValidatedAt = parseDate(str(d['FECHA SECRETARIA PRE VALIDA']));
+    result.secretaryValidatedAt = parseDate(str(d['FECHA SERCRETARIA VALIDA']));
+    result.externalFolioNumber = str(d['FOLIO V.INTEGRA']) || null;
+
+    return result;
   }
 }
 

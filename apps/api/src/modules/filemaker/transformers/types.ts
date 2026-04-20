@@ -224,6 +224,15 @@ export interface ExtractedExam {
   modifiedByUser?: string | null;
   modifiedAt?: Date | null;
 
+  // F0 — PAP-specific extras
+  patientEmail?: string | null;
+  requestingPhysicianEmail?: string | null;
+  alertText?: string | null;
+  qualityControlNote?: string | null;
+  tmReviewedAt?: Date | null;
+  secretaryPreValidatedAt?: Date | null;
+  secretaryValidatedAt?: Date | null;
+
   // F0 — portales
   adverseEvents?: ExtractedAdverseEvent[];
   technicalObservations?: ExtractedTechnicalObservation[];
