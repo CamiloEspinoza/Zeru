@@ -90,12 +90,14 @@ export class ReportValidationService {
       enqueuedAt: new Date().toISOString(),
     };
 
+    // jobId incluye timestamp para permitir re-validaciones del mismo informe.
+    // Si BullMQ usa jobId determinístico ignora silenciosamente requests subsecuentes.
     const job = await this.queue.add(
       REPORT_VALIDATION_JOB_NAMES.PROCESS_VALIDATION,
       data,
       {
         ...REPORT_VALIDATION_QUEUE_CONFIG.defaultJobOptions,
-        jobId: `${tenantId}:${trigger.database}:${trigger.informeNumber}`,
+        jobId: `${tenantId}:${trigger.database}:${trigger.informeNumber}:${Date.now()}`,
       },
     );
 
@@ -227,7 +229,7 @@ export class ReportValidationService {
     const response = await this.fmApi.findRecords(
       fmSource,
       meta.layout,
-      [{ 'INFORME No': `=${informeNumber}` }],
+      [{ 'INFORME Nº': `=${informeNumber}` }],
       { limit: 1, dateformats: 2 },
     );
 
@@ -290,11 +292,16 @@ export class ReportValidationService {
           paternalLastName: exam.subjectPaternalLastName,
           maternalLastName: exam.subjectMaternalLastName,
           gender: exam.subjectGender ? toGender(exam.subjectGender) : null,
+          birthDate: exam.subjectBirthDate ?? null,
+          email: exam.patientEmail ?? null,
         },
         update: {
           firstName: exam.subjectFirstName,
           paternalLastName: exam.subjectPaternalLastName,
           maternalLastName: exam.subjectMaternalLastName,
+          // Solo actualizamos birthDate/email si llegan; preservamos lo existente.
+          ...(exam.subjectBirthDate ? { birthDate: exam.subjectBirthDate } : {}),
+          ...(exam.patientEmail ? { email: exam.patientEmail } : {}),
         },
       });
       patientId = patient.id;
@@ -338,6 +345,10 @@ export class ReportValidationService {
         requestedAt: exam.requestedAt,
         clinicalHistory: exam.clinicalHistory,
         muestraDe: exam.anatomicalSite,
+        externalFolioNumber: exam.externalFolioNumber ?? null,
+        externalInstitutionId: exam.externalInstitutionId ?? null,
+        externalOrderNumber: exam.externalOrderNumber ?? null,
+        requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
       },
       update: {
         subjectFirstName: exam.subjectFirstName,
@@ -353,6 +364,10 @@ export class ReportValidationService {
         receivedAt: exam.receivedAt,
         clinicalHistory: exam.clinicalHistory,
         muestraDe: exam.anatomicalSite,
+        externalFolioNumber: exam.externalFolioNumber ?? null,
+        externalInstitutionId: exam.externalInstitutionId ?? null,
+        externalOrderNumber: exam.externalOrderNumber ?? null,
+        requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
       },
     });
 
@@ -381,6 +396,15 @@ export class ReportValidationService {
         issuedAt: exam.issuedAt,
         primarySignerCodeSnapshot:
           exam.signers.find((s) => s.role === 'PRIMARY_PATHOLOGIST')?.codeSnapshot ?? null,
+        criticalPatientNotifyFlag: exam.criticalPatientNotifyFlag ?? false,
+        criticalNotificationPdfKey: exam.criticalNotificationPdfKey ?? null,
+        criticalNotifiedAt: exam.criticalNotifiedAt ?? null,
+        criticalNotifiedByNameSnapshot: exam.criticalNotifiedBy ?? null,
+        rejectedByCcb: exam.rejectedByCcb ?? false,
+        ccbComments: exam.ccbComments ?? null,
+        diagnosticModified: exam.diagnosticModified ?? false,
+        modifiedByNameSnapshot: exam.modifiedByUser ?? null,
+        modifiedAt: exam.modifiedAt ?? null,
       },
       update: {
         status: toDiagnosticReportStatus(exam.status),
@@ -394,6 +418,15 @@ export class ReportValidationService {
         issuedAt: exam.issuedAt,
         primarySignerCodeSnapshot:
           exam.signers.find((s) => s.role === 'PRIMARY_PATHOLOGIST')?.codeSnapshot ?? null,
+        criticalPatientNotifyFlag: exam.criticalPatientNotifyFlag ?? false,
+        criticalNotificationPdfKey: exam.criticalNotificationPdfKey ?? null,
+        criticalNotifiedAt: exam.criticalNotifiedAt ?? null,
+        criticalNotifiedByNameSnapshot: exam.criticalNotifiedBy ?? null,
+        rejectedByCcb: exam.rejectedByCcb ?? false,
+        ccbComments: exam.ccbComments ?? null,
+        diagnosticModified: exam.diagnosticModified ?? false,
+        modifiedByNameSnapshot: exam.modifiedByUser ?? null,
+        modifiedAt: exam.modifiedAt ?? null,
       },
     });
 
