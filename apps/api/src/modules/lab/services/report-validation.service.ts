@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
 import { FmAuthService } from '../../filemaker/services/fm-auth.service';
@@ -14,13 +16,32 @@ import {
   toSigningRole,
   toGender,
 } from '../constants/enum-maps';
+import {
+  REPORT_VALIDATION_QUEUE,
+  REPORT_VALIDATION_JOB_NAMES,
+  REPORT_VALIDATION_QUEUE_CONFIG,
+} from '../constants/queue.constants';
 
 // ── Types ──
 
 export interface ReportValidationTrigger {
   database: string;
   informeNumber: number;
+  tenantId?: string;
+  triggeredByUserId?: string | null;
 }
+
+export interface ProcessValidationJobData {
+  tenantId: string;
+  database: string;
+  informeNumber: number;
+  triggeredByUserId: string | null;
+  enqueuedAt: string;
+}
+
+export type CanDispatchResult =
+  | { canDispatch: true; reason: string }
+  | { canDispatch: false; reason: string };
 
 interface SyncResult {
   serviceRequestId: string;
@@ -50,9 +71,65 @@ export class ReportValidationService {
     private readonly biopsyTransformer: BiopsyTransformer,
     private readonly papTransformer: PapTransformer,
     private readonly eventEmitter: EventEmitter2,
+    @InjectQueue(REPORT_VALIDATION_QUEUE) private readonly queue: Queue,
     config: ConfigService,
   ) {
     this.tenantId = config.getOrThrow<string>('FM_TENANT_ID');
+  }
+
+  /**
+   * Enqueue a validation job. The processor picks it up and runs the pipeline.
+   */
+  async enqueueValidation(trigger: ReportValidationTrigger): Promise<{ jobId: string }> {
+    const tenantId = trigger.tenantId ?? this.tenantId;
+    const data: ProcessValidationJobData = {
+      tenantId,
+      database: trigger.database,
+      informeNumber: trigger.informeNumber,
+      triggeredByUserId: trigger.triggeredByUserId ?? null,
+      enqueuedAt: new Date().toISOString(),
+    };
+
+    const job = await this.queue.add(
+      REPORT_VALIDATION_JOB_NAMES.PROCESS_VALIDATION,
+      data,
+      {
+        ...REPORT_VALIDATION_QUEUE_CONFIG.defaultJobOptions,
+        jobId: `${tenantId}:${trigger.database}:${trigger.informeNumber}`,
+      },
+    );
+
+    this.logger.log(
+      `Enqueued validation job ${job.id} for ${trigger.database}:${trigger.informeNumber} (tenant=${tenantId})`,
+    );
+    return { jobId: job.id ?? 'unknown' };
+  }
+
+  /**
+   * Tell FM whether it should dispatch this report (i.e. set Activar Subir Examen).
+   * Default to true when the report is unknown — FM may be calling before sync.
+   */
+  async getCanDispatch(
+    tenantId: string,
+    informeNumber: number,
+    fmSource: string,
+  ): Promise<CanDispatchResult> {
+    const report = await this.prisma.labDiagnosticReport.findFirst({
+      where: {
+        tenantId,
+        fmInformeNumber: informeNumber,
+        fmSource: toFmSource(fmSource as FmSourceType),
+      },
+      select: { id: true, blockedForDispatch: true },
+    });
+
+    if (!report) {
+      return { canDispatch: true, reason: 'report-not-found-yet' };
+    }
+    if (report.blockedForDispatch) {
+      return { canDispatch: false, reason: 'blocked-by-validation' };
+    }
+    return { canDispatch: true, reason: 'not-blocked' };
   }
 
   /**
