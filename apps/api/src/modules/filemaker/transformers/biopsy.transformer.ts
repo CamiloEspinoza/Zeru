@@ -10,6 +10,18 @@ function mapGender(raw: string | null | undefined): 'MALE' | 'FEMALE' | 'OTHER' 
   if (v === 'F' || v === 'FEMENINO' || v === 'FEMALE' || v === 'MUJER') return 'FEMALE';
   return 'OTHER';
 }
+
+function mapSeverity(
+  raw: string | null | undefined,
+): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  if (v === 'BAJA' || v === 'LOW') return 'LOW';
+  if (v === 'MEDIA' || v === 'MEDIUM') return 'MEDIUM';
+  if (v === 'ALTA' || v === 'HIGH') return 'HIGH';
+  if (v === 'CRÍTICA' || v === 'CRITICA' || v === 'CRITICAL') return 'CRITICAL';
+  return null;
+}
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -165,6 +177,48 @@ export class BiopsyTransformer {
       str(d['Modifcado Por Fecha']),
       str(d['Modifcado Por Hora']),
     );
+
+    // Portales F0
+    const pd = (record.portalData ?? {}) as Record<string, Record<string, unknown>[]>;
+
+    result.adverseEvents = (pd['portalEventosAdversos'] ?? [])
+      .map((row) => ({
+        eventType: str(row['EventosAdversos::tipo']) || 'DESCONOCIDO',
+        severity: mapSeverity(str(row['EventosAdversos::severidad'])),
+        description: str(row['EventosAdversos::descripcion']),
+        occurredAt: parseDate(str(row['EventosAdversos::fechaOcurrencia'])),
+        detectedAt: parseDate(str(row['EventosAdversos::fechaDeteccion'])),
+        status: str(row['EventosAdversos::estado']) || null,
+      }))
+      .filter((e) => e.description);
+
+    result.technicalObservations = (pd['Observaciones Tecnicas'] ?? [])
+      .map((row) => ({
+        workflowStage: str(row['Obs::etapa']) || null,
+        description: str(row['Obs::descripcion']),
+        observedAt: parseDate(str(row['Obs::fecha'])),
+        observedByNameSnapshot: str(row['Obs::responsable']) || null,
+      }))
+      .filter((o) => o.description);
+
+    result.slides = (pd['Placas'] ?? [])
+      .map((row) => ({
+        placaCode: str(row['Placas::codigo']) || null,
+        stain: str(row['Placas::tincion']) || null,
+        level: str(row['Placas::nivel']) || null,
+      }))
+      .filter((s) => s.placaCode);
+
+    result.specialTechniques = (pd['TÉCNICAS ESPECIALES'] ?? [])
+      .map((row) => ({
+        name: str(row['Tec::nombre']),
+        code: str(row['Tec::codigo']) || null,
+        status: str(row['Tec::estado']) || null,
+        requestedAt: parseDate(str(row['Tec::fechaSolicitud'])),
+        respondedAt: parseDate(str(row['Tec::fechaRespuesta'])),
+        responsibleNameSnapshot: str(row['Tec::responsable']) || null,
+      }))
+      .filter((t) => t.name);
 
     return result;
   }

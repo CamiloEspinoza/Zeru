@@ -223,6 +223,43 @@ export interface ExtractedExam {
   diagnosticModified?: boolean;
   modifiedByUser?: string | null;
   modifiedAt?: Date | null;
+
+  // F0 — portales
+  adverseEvents?: ExtractedAdverseEvent[];
+  technicalObservations?: ExtractedTechnicalObservation[];
+  specialTechniques?: ExtractedSpecialTechnique[];
+  slides?: ExtractedSlide[];
+}
+
+export interface ExtractedAdverseEvent {
+  eventType: string;
+  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
+  description: string;
+  occurredAt?: Date | null;
+  detectedAt?: Date | null;
+  status?: string | null;
+}
+
+export interface ExtractedTechnicalObservation {
+  workflowStage?: string | null;
+  description: string;
+  observedAt?: Date | null;
+  observedByNameSnapshot?: string | null;
+}
+
+export interface ExtractedSpecialTechnique {
+  name: string;
+  code?: string | null;
+  requestedAt?: Date | null;
+  respondedAt?: Date | null;
+  responsibleNameSnapshot?: string | null;
+  status?: string | null;
+}
+
+export interface ExtractedSlide {
+  placaCode?: string | null;
+  stain?: string | null;
+  level?: string | null;
 }
 
 export interface ExtractedExamCharge {

@@ -278,6 +278,48 @@ describe('BiopsyTransformer', () => {
       expect(result.diagnosticModified).toBe(true);
       expect(result.modifiedByUser).toBe('PATOLOGO-X');
     });
+
+    it('extracts portals: adverse events, technical observations, slides, special techniques', () => {
+      const record: FmRecord = {
+        recordId: '43',
+        modId: '1',
+        fieldData: { 'INFORME Nº': '2026-99998' },
+        portalData: {
+          portalEventosAdversos: [
+            {
+              'EventosAdversos::tipo': 'Corte mal teñido',
+              'EventosAdversos::severidad': 'Media',
+              'EventosAdversos::descripcion': 'Tinción pálida en lámina 2',
+            },
+          ],
+          'Observaciones Tecnicas': [
+            {
+              'Obs::etapa': 'MACROSCOPY',
+              'Obs::descripcion': 'Orientación cambiada',
+              'Obs::responsable': 'TM-JB',
+            },
+          ],
+          Placas: [
+            { 'Placas::codigo': 'PL-001', 'Placas::tincion': 'H&E', 'Placas::nivel': '1' },
+            { 'Placas::codigo': 'PL-002', 'Placas::tincion': 'PAS', 'Placas::nivel': '2' },
+          ],
+          'TÉCNICAS ESPECIALES': [
+            { 'Tec::nombre': 'PAS', 'Tec::codigo': 'PAS-01', 'Tec::estado': 'Completada' },
+          ],
+        },
+      };
+
+      const result = transformer.extract(record, 'BIOPSIAS');
+      expect(result.adverseEvents).toHaveLength(1);
+      expect(result.adverseEvents?.[0].eventType).toBe('Corte mal teñido');
+      expect(result.adverseEvents?.[0].severity).toBe('MEDIUM');
+      expect(result.technicalObservations).toHaveLength(1);
+      expect(result.technicalObservations?.[0].workflowStage).toBe('MACROSCOPY');
+      expect(result.slides).toHaveLength(2);
+      expect(result.slides?.[0].placaCode).toBe('PL-001');
+      expect(result.specialTechniques).toHaveLength(1);
+      expect(result.specialTechniques?.[0].name).toBe('PAS');
+    });
   });
 
   describe('signers extraction', () => {
