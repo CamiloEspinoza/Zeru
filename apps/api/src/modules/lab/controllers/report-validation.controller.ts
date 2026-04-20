@@ -1,15 +1,19 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Param,
   Headers,
   UnauthorizedException,
   UseGuards,
   Logger,
+  HttpCode,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
 import { ReportValidationService } from '../services/report-validation.service';
@@ -23,64 +27,70 @@ const triggerSchema = z.object({
   ]),
   informeNumber: z.coerce.number().int().positive(),
 });
-
-type TriggerDto = z.infer<typeof triggerSchema>;
+type TriggerInput = z.infer<typeof triggerSchema>;
 
 @Controller('lab/report-validation')
 export class ReportValidationController {
   private readonly logger = new Logger(ReportValidationController.name);
+  private readonly tenantId: string;
   private readonly webhookKey: string;
 
   constructor(
-    private readonly validationService: ReportValidationService,
+    private readonly service: ReportValidationService,
     config: ConfigService,
   ) {
-    this.webhookKey = config.getOrThrow<string>('FM_WEBHOOK_KEY');
+    this.tenantId = config.get<string>('FM_TENANT_ID') ?? '';
+    this.webhookKey = config.get<string>('FM_WEBHOOK_KEY') ?? '';
+    if (!this.tenantId || !this.webhookKey) {
+      this.logger.warn(
+        'FM_TENANT_ID or FM_WEBHOOK_KEY not configured — endpoints will reject all requests',
+      );
+    }
   }
 
-  /**
-   * Endpoint called by FileMaker when a report is validated.
-   * Responds immediately with { status: "received" },
-   * then processes the validation asynchronously.
-   */
   @Post('trigger')
+  @HttpCode(200)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   async trigger(
-    @Headers('x-fm-webhook-key') apiKey: string,
-    @Body(new ZodValidationPipe(triggerSchema)) body: TriggerDto,
+    @Headers('x-fm-webhook-key') providedKey: string | undefined,
+    @Body(new ZodValidationPipe(triggerSchema)) body: TriggerInput,
+    @Headers('x-triggered-by-user-id') triggeredByUserId?: string,
   ) {
-    // Authenticate via API key (same mechanism as FM webhook)
-    const keyBuffer = Buffer.from(apiKey ?? '');
-    const expectedBuffer = Buffer.from(this.webhookKey);
-    if (
-      keyBuffer.length !== expectedBuffer.length ||
-      !timingSafeEqual(keyBuffer, expectedBuffer)
-    ) {
-      this.logger.warn('Invalid webhook key on validation trigger');
-      throw new UnauthorizedException('Invalid webhook key');
-    }
-
+    this.assertWebhookKey(providedKey);
     this.logger.log(
-      `[Trigger] Report validation requested: ${body.database} #${body.informeNumber}`,
+      `[Trigger] Enqueue requested: ${body.database} #${body.informeNumber}`,
     );
-
-    // Fire and forget — process in background
-    this.validationService
-      .processValidation({
-        database: body.database,
-        informeNumber: body.informeNumber,
-      })
-      .catch((err) => {
-        this.logger.error(
-          `[Trigger] Background processing failed: ${err instanceof Error ? err.message : err}`,
-        );
-      });
-
-    return {
-      status: 'received',
+    const { jobId } = await this.service.enqueueValidation({
+      tenantId: this.tenantId,
       database: body.database,
       informeNumber: body.informeNumber,
-    };
+      triggeredByUserId: triggeredByUserId ?? null,
+    });
+    return { status: 'enqueued', jobId };
+  }
+
+  @Get('can-dispatch/:database/:informeNumber')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 600, ttl: 60000 } })
+  async canDispatch(
+    @Headers('x-fm-webhook-key') providedKey: string | undefined,
+    @Param('database') database: string,
+    @Param('informeNumber', ParseIntPipe) informeNumber: number,
+  ) {
+    this.assertWebhookKey(providedKey);
+    return this.service.getCanDispatch(this.tenantId, informeNumber, database);
+  }
+
+  private assertWebhookKey(provided: string | undefined): void {
+    if (!provided || !this.webhookKey) {
+      throw new UnauthorizedException('missing webhook key');
+    }
+    const a = Buffer.from(provided, 'utf8');
+    const b = Buffer.from(this.webhookKey, 'utf8');
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      this.logger.warn('Invalid webhook key on report-validation endpoint');
+      throw new UnauthorizedException('invalid webhook key');
+    }
   }
 }
