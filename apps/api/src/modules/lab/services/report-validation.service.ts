@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bullmq';
+import { randomUUID } from 'node:crypto';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FmApiService } from '../../filemaker/services/fm-api.service';
@@ -90,14 +91,17 @@ export class ReportValidationService {
       enqueuedAt: new Date().toISOString(),
     };
 
-    // jobId incluye timestamp para permitir re-validaciones del mismo informe.
-    // Si BullMQ usa jobId determinístico ignora silenciosamente requests subsecuentes.
+    // jobId incluye timestamp + uuid para permitir re-validaciones y evitar
+    // colisiones entre requests simultáneos en el mismo milisegundo.
+    const buildJobId = () =>
+      `${tenantId}:${trigger.database}:${trigger.informeNumber}:${Date.now()}:${randomUUID().slice(0, 8)}`;
+
     const job = await this.queue.add(
       REPORT_VALIDATION_JOB_NAMES.PROCESS_VALIDATION,
       data,
       {
         ...REPORT_VALIDATION_QUEUE_CONFIG.defaultJobOptions,
-        jobId: `${tenantId}:${trigger.database}:${trigger.informeNumber}:${Date.now()}`,
+        jobId: buildJobId(),
       },
     );
 
@@ -146,6 +150,12 @@ export class ReportValidationService {
     const tenantId = trigger.tenantId ?? this.tenantId;
     const fmSource = database as FmSourceType;
 
+    if (!Number.isInteger(informeNumber) || informeNumber <= 0) {
+      throw new Error(
+        `Invalid informeNumber for validation: ${informeNumber} (database=${database})`,
+      );
+    }
+
     this.logger.log(`[Validation] Starting for ${database} #${informeNumber} (tenant=${tenantId})`);
 
     try {
@@ -155,17 +165,16 @@ export class ReportValidationService {
         `[Validation] Synced ${database} #${informeNumber} → SR:${syncResult.serviceRequestId} DR:${syncResult.diagnosticReportId}`,
       );
 
-      // Step 2: Create validation record
-      const validation = await this.prisma.labReportValidation.create({
-        data: {
-          tenantId,
-          diagnosticReportId: syncResult.diagnosticReportId,
-          fmSource: toFmSource(fmSource),
-          fmInformeNumber: informeNumber,
-          triggeredByUserId: triggeredByUserId ?? null,
-          status: 'SYNCED',
-          syncedAt: new Date(),
-        },
+      // Step 2: Upsert validation record (idempotente para retries de BullMQ).
+      // Reusa la fila reciente (último 1h) en estado PENDING/ERROR para el mismo
+      // informe; si la última está SYNCED y es muy reciente, no creamos duplicado.
+      const validation = await this.upsertValidationRow({
+        tenantId,
+        fmSource,
+        informeNumber,
+        diagnosticReportId: syncResult.diagnosticReportId,
+        triggeredByUserId: triggeredByUserId ?? null,
+        targetStatus: 'SYNCED',
       });
 
       // Step 3: Emit event for AI processing (will be handled by AI service)
@@ -185,7 +194,7 @@ export class ReportValidationService {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(`[Validation] Failed for ${database} #${informeNumber}: ${msg}`);
 
-      // Try to record the failure
+      // Try to record the failure (best-effort, sin duplicar la fila reciente)
       try {
         const dr = await this.prisma.labDiagnosticReport.findFirst({
           where: {
@@ -195,16 +204,14 @@ export class ReportValidationService {
           },
         });
         if (dr) {
-          await this.prisma.labReportValidation.create({
-            data: {
-              tenantId,
-              diagnosticReportId: dr.id,
-              fmSource: toFmSource(fmSource),
-              fmInformeNumber: informeNumber,
-              triggeredByUserId: triggeredByUserId ?? null,
-              status: 'ERROR',
-              errorMessage: msg,
-            },
+          await this.upsertValidationRow({
+            tenantId,
+            fmSource,
+            informeNumber,
+            diagnosticReportId: dr.id,
+            triggeredByUserId: triggeredByUserId ?? null,
+            targetStatus: 'ERROR',
+            errorMessage: msg,
           });
         }
       } catch {
@@ -212,6 +219,66 @@ export class ReportValidationService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Crea o actualiza la fila de LabReportValidation evitando duplicados por retries.
+   * Reglas:
+   *   - Busca la fila más reciente del mismo (tenant, informe, fmSource).
+   *   - Si existe y fue creada hace < 1 hora: actualiza in-place (mismo "intento").
+   *   - Si no existe o es más antigua: crea una fila nueva.
+   * Esto previene que un retry de BullMQ produzca SYNCED + ERROR coexistiendo.
+   */
+  private async upsertValidationRow(input: {
+    tenantId: string;
+    fmSource: FmSourceType;
+    informeNumber: number;
+    diagnosticReportId: string;
+    triggeredByUserId: string | null;
+    targetStatus: 'SYNCED' | 'ERROR';
+    errorMessage?: string;
+  }): Promise<{ id: string }> {
+    const recentCutoff = new Date(Date.now() - 60 * 60 * 1000); // 1 hora
+    const existing = await this.prisma.labReportValidation.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        fmSource: toFmSource(input.fmSource),
+        fmInformeNumber: input.informeNumber,
+        startedAt: { gte: recentCutoff },
+      },
+      orderBy: { startedAt: 'desc' },
+      select: { id: true, status: true },
+    });
+
+    if (existing) {
+      const updated = await this.prisma.labReportValidation.update({
+        where: { id: existing.id },
+        data: {
+          status: input.targetStatus,
+          syncedAt: input.targetStatus === 'SYNCED' ? new Date() : undefined,
+          errorMessage: input.errorMessage ?? null,
+          completedAt: input.targetStatus === 'ERROR' ? new Date() : undefined,
+        },
+        select: { id: true },
+      });
+      return updated;
+    }
+
+    const created = await this.prisma.labReportValidation.create({
+      data: {
+        tenantId: input.tenantId,
+        diagnosticReportId: input.diagnosticReportId,
+        fmSource: toFmSource(input.fmSource),
+        fmInformeNumber: input.informeNumber,
+        triggeredByUserId: input.triggeredByUserId,
+        status: input.targetStatus,
+        syncedAt: input.targetStatus === 'SYNCED' ? new Date() : null,
+        errorMessage: input.errorMessage ?? null,
+        completedAt: input.targetStatus === 'ERROR' ? new Date() : null,
+      },
+      select: { id: true },
+    });
+    return created;
   }
 
   /**
@@ -279,44 +346,56 @@ export class ReportValidationService {
     serviceRequestId: string;
     diagnosticReportId: string;
   }> {
+    // Validaciones tempranas — evitan upserts con claves degeneradas.
+    if (!exam.fmInformeNumber || exam.fmInformeNumber <= 0) {
+      throw new Error(
+        `Refusing to upsert exam with degenerate fmInformeNumber=${exam.fmInformeNumber} (fmSource=${exam.fmSource})`,
+      );
+    }
+    if (!exam.labOriginCode) {
+      throw new Error(
+        `Refusing to upsert exam #${exam.fmInformeNumber}: FM record has no labOriginCode (PROCEDENCIA CODIGO UNICO)`,
+      );
+    }
 
-    // Resolve patient
-    let patientId: string | null = null;
-    if (exam.subjectRut) {
-      const patient = await this.prisma.labPatient.upsert({
-        where: { tenantId_rut: { tenantId, rut: exam.subjectRut } },
-        create: {
-          tenantId,
-          rut: exam.subjectRut,
-          firstName: exam.subjectFirstName,
-          paternalLastName: exam.subjectPaternalLastName,
-          maternalLastName: exam.subjectMaternalLastName,
-          gender: exam.subjectGender ? toGender(exam.subjectGender) : null,
-          birthDate: exam.subjectBirthDate ?? null,
-          email: exam.patientEmail ?? null,
-        },
-        update: {
-          firstName: exam.subjectFirstName,
-          paternalLastName: exam.subjectPaternalLastName,
-          maternalLastName: exam.subjectMaternalLastName,
-          // Solo actualizamos birthDate/email si llegan; preservamos lo existente.
-          ...(exam.subjectBirthDate ? { birthDate: exam.subjectBirthDate } : {}),
-          ...(exam.patientEmail ? { email: exam.patientEmail } : {}),
-        },
+    return this.prisma.$transaction(async (tx) => {
+      // Resolve patient (preserve existing fields when sync arrives without them)
+      let patientId: string | null = null;
+      if (exam.subjectRut) {
+        const patient = await tx.labPatient.upsert({
+          where: { tenantId_rut: { tenantId, rut: exam.subjectRut } },
+          create: {
+            tenantId,
+            rut: exam.subjectRut,
+            firstName: exam.subjectFirstName,
+            paternalLastName: exam.subjectPaternalLastName,
+            maternalLastName: exam.subjectMaternalLastName,
+            gender: exam.subjectGender ? toGender(exam.subjectGender) : null,
+            // Spread pattern: solo escribir si el sync trae el valor.
+            ...(exam.subjectBirthDate ? { birthDate: exam.subjectBirthDate } : {}),
+            ...(exam.patientEmail ? { email: exam.patientEmail } : {}),
+          },
+          update: {
+            firstName: exam.subjectFirstName,
+            paternalLastName: exam.subjectPaternalLastName,
+            maternalLastName: exam.subjectMaternalLastName,
+            ...(exam.subjectBirthDate ? { birthDate: exam.subjectBirthDate } : {}),
+            ...(exam.patientEmail ? { email: exam.patientEmail } : {}),
+          },
+        });
+        patientId = patient.id;
+      }
+
+      // Resolve origin
+      const labOrigin = await tx.labOrigin.findFirst({
+        where: { tenantId, code: exam.labOriginCode },
       });
-      patientId = patient.id;
-    }
+      if (!labOrigin) {
+        throw new Error(`Unknown labOriginCode: ${exam.labOriginCode}`);
+      }
 
-    // Resolve origin
-    const labOrigin = await this.prisma.labOrigin.findFirst({
-      where: { tenantId, code: exam.labOriginCode },
-    });
-    if (!labOrigin) {
-      throw new Error(`Unknown labOriginCode: ${exam.labOriginCode}`);
-    }
-
-    // Upsert ServiceRequest
-    const sr = await this.prisma.labServiceRequest.upsert({
+      // Upsert ServiceRequest
+      const sr = await tx.labServiceRequest.upsert({
       where: {
         tenantId_fmSource_fmInformeNumber: {
           tenantId,
@@ -371,8 +450,8 @@ export class ReportValidationService {
       },
     });
 
-    // Upsert DiagnosticReport
-    const dr = await this.prisma.labDiagnosticReport.upsert({
+      // Upsert DiagnosticReport
+      const dr = await tx.labDiagnosticReport.upsert({
       where: {
         tenantId_fmSource_fmInformeNumber: {
           tenantId,
@@ -430,40 +509,42 @@ export class ReportValidationService {
       },
     });
 
-    // Upsert signers
-    for (const signer of exam.signers) {
-      await this.prisma.labDiagnosticReportSigner.upsert({
-        where: {
-          diagnosticReportId_signatureOrder: {
-            diagnosticReportId: dr.id,
-            signatureOrder: signer.signatureOrder,
+      // Upsert signers (dentro de la misma transacción para evitar entrelazado
+      // entre dos jobs concurrentes con concurrency=5).
+      for (const signer of exam.signers) {
+        await tx.labDiagnosticReportSigner.upsert({
+          where: {
+            diagnosticReportId_signatureOrder: {
+              diagnosticReportId: dr.id,
+              signatureOrder: signer.signatureOrder,
+            },
           },
-        },
-        create: {
-          tenantId,
-          diagnosticReportId: dr.id,
-          codeSnapshot: signer.codeSnapshot,
-          nameSnapshot: signer.nameSnapshot,
-          role: toSigningRole(signer.role),
-          signatureOrder: signer.signatureOrder,
-          signedAt: signer.signedAt,
-          isActive: signer.isActive,
-          supersededBy: signer.supersededBy,
-          correctionReason: signer.correctionReason,
-        },
-        update: {
-          codeSnapshot: signer.codeSnapshot,
-          nameSnapshot: signer.nameSnapshot,
-          role: toSigningRole(signer.role),
-          signedAt: signer.signedAt,
-          isActive: signer.isActive,
-          supersededBy: signer.supersededBy,
-          correctionReason: signer.correctionReason,
-        },
-      });
-    }
+          create: {
+            tenantId,
+            diagnosticReportId: dr.id,
+            codeSnapshot: signer.codeSnapshot,
+            nameSnapshot: signer.nameSnapshot,
+            role: toSigningRole(signer.role),
+            signatureOrder: signer.signatureOrder,
+            signedAt: signer.signedAt,
+            isActive: signer.isActive,
+            supersededBy: signer.supersededBy,
+            correctionReason: signer.correctionReason,
+          },
+          update: {
+            codeSnapshot: signer.codeSnapshot,
+            nameSnapshot: signer.nameSnapshot,
+            role: toSigningRole(signer.role),
+            signedAt: signer.signedAt,
+            isActive: signer.isActive,
+            supersededBy: signer.supersededBy,
+            correctionReason: signer.correctionReason,
+          },
+        });
+      }
 
-    return { serviceRequestId: sr.id, diagnosticReportId: dr.id };
+      return { serviceRequestId: sr.id, diagnosticReportId: dr.id };
+    }, { timeout: 30000 });
   }
 
   /**
