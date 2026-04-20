@@ -198,6 +198,86 @@ describe('BiopsyTransformer', () => {
       const result = transformer.extract(record, 'BIOPSIAS');
       expect(result.status).toBe('REGISTERED');
     });
+
+    it('extracts new F0 fields: sex, birthDate, folio, IHQ, criticality, CCB', () => {
+      const record: FmRecord = {
+        recordId: '42',
+        modId: '1',
+        fieldData: {
+          'INFORME Nº': '2026-99999',
+          'RUT': '12345678-9',
+          'NOMBRE': 'JUAN',
+          'A.PATERNO': 'PÉREZ',
+          'A.MATERNO': 'SOTO',
+          'EDAD': '65',
+          'SEXO': 'M',
+          'FECHA NACIMIENTO': '05/15/1960',
+          'NºFOLIO': 'FOL-12345',
+          'Nº ORDEN ATENCION': 'OA-777',
+          'NUMERO IDENTIFICADOR INSTITUCION': 'HTSP-555',
+          'COD. MEDICO': 'MED-99',
+          'TIPO DE EXAMEN': 'Biopsia',
+          'TIPO ENVASE': 'Frasco 10ml',
+          'TACOS': '3',
+          'CASSETTES DE INCLUSION': '4',
+          'PLACAS HE': '4',
+          'T.ESPECIALES': '2',
+          'Total especiales': '2',
+          'ANTICUERPOS': 'CD20|CD3|Ki67',
+          'INMUNO NUMEROS': 'IHQ-2026-0042',
+          'Total Inmunos': '3',
+          'INMUNOS Estado Solicitud': 'Completada',
+          'INMUNOS Fecha solicitud': '03/01/2026',
+          'INMUNOS Fecha Respuesta': '03/03/2026',
+          'INMUNOS Responsable solicitud': 'TM-ATENEA',
+          'AVISAR PACIENTE': 'Sí',
+          'RESULTADO CRITICO RESPONSABLE NOTIFICACION': 'JEFE-VAL',
+          'FECHA NOTIFICACION CRITICO': '03/04/2026',
+          'HORA NOTIFICACION VALOR CRITICO': '14:30',
+          'PDF Notificación Crítico': '/path/to/notif.pdf',
+          'COMENTARIOS CCB': 'Corregir lateralidad',
+          'Rechazado por CCB': 'Sí',
+          'DIAGNOSTICO MODIFICADO': 'Sí',
+          'Modifcado Por': 'PATOLOGO-X',
+          'Modifcado Por Fecha': '03/05/2026',
+          'Modifcado Por Hora': '10:15',
+          'Biopsias::Rut Medico Solicitante': '9876543-K',
+          'FECHA': '02/28/2026',
+          'FECHA VALIDACIÓN': '03/02/2026',
+          'DIAGNOSTICO': 'Carcinoma ductal',
+          'Alterado o Crítico': 'Sí',
+          'PATOLOGO': 'Dr. Smith (DRS01)',
+        },
+        portalData: {},
+      };
+
+      const result = transformer.extract(record, 'BIOPSIAS');
+
+      expect(result.subjectGender).toBe('MALE');
+      expect(result.subjectBirthDate).toBeInstanceOf(Date);
+      expect(result.subjectBirthDate!.getFullYear()).toBe(1960);
+      expect(result.subjectBirthDate!.getMonth()).toBe(4);
+      expect(result.subjectBirthDate!.getDate()).toBe(15);
+      expect(result.externalFolioNumber).toBe('FOL-12345');
+      expect(result.externalOrderNumber).toBe('OA-777');
+      expect(result.externalInstitutionId).toBe('HTSP-555');
+      expect(result.requestingPhysicianCode).toBe('MED-99');
+      expect(result.requestingPhysicianRut).toBe('9876543K');
+      expect(result.containerType).toBe('Frasco 10ml');
+      expect(result.tacoCount).toBe(3);
+      expect(result.cassetteCount).toBe(4);
+      expect(result.placaHeCount).toBe(4);
+      expect(result.specialTechniquesCount).toBe(2);
+      expect(result.ihqAntibodies).toEqual(['CD20', 'CD3', 'Ki67']);
+      expect(result.ihqNumbers).toBe('IHQ-2026-0042');
+      expect(result.ihqStatus).toBe('Completada');
+      expect(result.criticalPatientNotifyFlag).toBe(true);
+      expect(result.criticalNotifiedBy).toBe('JEFE-VAL');
+      expect(result.rejectedByCcb).toBe(true);
+      expect(result.ccbComments).toBe('Corregir lateralidad');
+      expect(result.diagnosticModified).toBe(true);
+      expect(result.modifiedByUser).toBe('PATOLOGO-X');
+    });
   });
 
   describe('signers extraction', () => {

@@ -195,6 +195,34 @@ export interface ExtractedExam {
 
   // Attachment references (not the binary — just metadata + keys)
   attachmentRefs: ExtractedAttachmentRef[];
+
+  // F0 — nuevos campos
+  subjectBirthDate?: Date | null;
+  externalFolioNumber?: string | null;
+  externalOrderNumber?: string | null;
+  externalInstitutionId?: string | null;
+  requestingPhysicianCode?: string | null;
+  requestingPhysicianRut?: string | null;
+  containerType?: string | null;
+  tacoCount?: number | null;
+  cassetteCount?: number | null;
+  placaHeCount?: number | null;
+  specialTechniquesCount?: number | null;
+  ihqAntibodies?: string[];
+  ihqNumbers?: string | null;
+  ihqStatus?: string | null;
+  ihqRequestedAt?: Date | null;
+  ihqRespondedAt?: Date | null;
+  ihqResponsibleNameSnapshot?: string | null;
+  criticalPatientNotifyFlag?: boolean;
+  criticalNotifiedBy?: string | null;
+  criticalNotifiedAt?: Date | null;
+  criticalNotificationPdfKey?: string | null;
+  rejectedByCcb?: boolean;
+  ccbComments?: string | null;
+  diagnosticModified?: boolean;
+  modifiedByUser?: string | null;
+  modifiedAt?: Date | null;
 }
 
 export interface ExtractedExamCharge {

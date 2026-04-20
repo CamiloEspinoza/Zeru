@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path, isYes } from './helpers';
+import { str, parseNum, parseDate, parseFmDateTime, encodeS3Path, isYes } from './helpers';
+
+function mapGender(raw: string | null | undefined): 'MALE' | 'FEMALE' | 'OTHER' | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  if (v === 'M' || v === 'MASCULINO' || v === 'MALE' || v === 'HOMBRE') return 'MALE';
+  if (v === 'F' || v === 'FEMENINO' || v === 'FEMALE' || v === 'MUJER') return 'FEMALE';
+  return 'OTHER';
+}
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -78,7 +86,7 @@ export class BiopsyTransformer {
     const validatedAt = parseDate(validationDateField);
     const requestedAt = parseDate(str(d['FECHA']));
 
-    return {
+    const result: ExtractedExam = {
       fmInformeNumber: informeNumber,
       fmSource,
       fmRecordId: record.recordId,
@@ -89,7 +97,7 @@ export class BiopsyTransformer {
       subjectMaternalLastName: str(d['A.MATERNO']) || null,
       subjectRut: rut && rut.length >= 3 ? rut : null,
       subjectAge: parseNum(d['EDAD']) || null,
-      subjectGender: null, // Not available in biopsies
+      subjectGender: mapGender(str(d['SEXO'])),
 
       // ServiceRequest
       category: parseExamCategory(str(d['TIPO DE EXAMEN'])),
@@ -119,6 +127,46 @@ export class BiopsyTransformer {
       // Attachment refs
       attachmentRefs: extractAttachmentRefs(record, labOriginCode, validatedAt, informeNumber),
     };
+
+    // F0 — nuevos campos
+    result.subjectBirthDate = parseDate(str(d['FECHA NACIMIENTO']));
+    result.externalFolioNumber = str(d['NºFOLIO']) || null;
+    result.externalOrderNumber = str(d['Nº ORDEN ATENCION']) || null;
+    result.externalInstitutionId = str(d['NUMERO IDENTIFICADOR INSTITUCION']) || null;
+    result.requestingPhysicianCode = str(d['COD. MEDICO']) || null;
+    const reqRut = str(d['Biopsias::Rut Medico Solicitante']);
+    result.requestingPhysicianRut = reqRut ? normalizeRut(reqRut) : null;
+    result.containerType = str(d['TIPO ENVASE']) || null;
+    result.tacoCount = parseNum(d['TACOS']) || null;
+    result.cassetteCount = parseNum(d['CASSETTES DE INCLUSION']) || null;
+    result.placaHeCount = parseNum(d['PLACAS HE']) || null;
+    result.specialTechniquesCount = parseNum(d['Total especiales']) || null;
+    const anticuerpos = str(d['ANTICUERPOS']);
+    result.ihqAntibodies = anticuerpos
+      ? anticuerpos.split(/[|,;]/).map((s) => s.trim()).filter(Boolean)
+      : [];
+    result.ihqNumbers = str(d['INMUNO NUMEROS']) || null;
+    result.ihqStatus = str(d['INMUNOS Estado Solicitud']) || null;
+    result.ihqRequestedAt = parseDate(str(d['INMUNOS Fecha solicitud']));
+    result.ihqRespondedAt = parseDate(str(d['INMUNOS Fecha Respuesta']));
+    result.ihqResponsibleNameSnapshot = str(d['INMUNOS Responsable solicitud']) || null;
+    result.criticalPatientNotifyFlag = isYes(str(d['AVISAR PACIENTE']));
+    result.criticalNotifiedBy = str(d['RESULTADO CRITICO RESPONSABLE NOTIFICACION']) || null;
+    result.criticalNotifiedAt = parseFmDateTime(
+      str(d['FECHA NOTIFICACION CRITICO']),
+      str(d['HORA NOTIFICACION VALOR CRITICO']),
+    );
+    result.criticalNotificationPdfKey = str(d['PDF Notificación Crítico']) || null;
+    result.ccbComments = str(d['COMENTARIOS CCB']) || null;
+    result.rejectedByCcb = isYes(str(d['Rechazado por CCB']));
+    result.diagnosticModified = isYes(str(d['DIAGNOSTICO MODIFICADO']));
+    result.modifiedByUser = str(d['Modifcado Por']) || null;
+    result.modifiedAt = parseFmDateTime(
+      str(d['Modifcado Por Fecha']),
+      str(d['Modifcado Por Hora']),
+    );
+
+    return result;
   }
 }
 
