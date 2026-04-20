@@ -455,6 +455,34 @@ describe('BiopsyTransformer', () => {
       const pdfs = result.attachmentRefs.filter(a => a.category === 'REPORT_PDF');
       expect(pdfs.length).toBe(0);
     });
+
+    it('extracts REQUEST_DOCUMENT, MACRO_DICTATION and CRITICAL_NOTIFICATION_PDF', () => {
+      const record = makeBiopsyRecord({
+        'Biopsias_Ingresos::Scanner Documento': 'https://fm.example/container/requests/solicitud-44.pdf',
+        'PDF Notificación Crítico': 'https://fm.example/container/critical/notif-44.pdf',
+      }, {
+        'SCANNER BP 8': [
+          { 'SCANNER BP 8::DICTADO MACRO': 'https://fm.example/container/dictados/dict-44.mp3' },
+        ],
+      });
+
+      const result = transformer.extract(record, 'BIOPSIAS');
+      const requestDoc = result.attachmentRefs.find((a) => a.category === 'REQUEST_DOCUMENT');
+      const dictation = result.attachmentRefs.find((a) => a.category === 'MACRO_DICTATION');
+      const critPdf = result.attachmentRefs.find((a) => a.category === 'CRITICAL_NOTIFICATION_PDF');
+
+      expect(requestDoc).toBeDefined();
+      expect(requestDoc?.fmContainerUrlOriginal).toContain('solicitud-44.pdf');
+      expect(requestDoc?.fmSourceField).toBe('Biopsias_Ingresos::Scanner Documento');
+
+      expect(dictation).toBeDefined();
+      expect(dictation?.fmContainerUrlOriginal).toContain('dict-44.mp3');
+      expect(dictation?.fmSourceField).toBe('SCANNER BP 8::DICTADO MACRO');
+
+      expect(critPdf).toBeDefined();
+      expect(critPdf?.fmContainerUrlOriginal).toContain('notif-44.pdf');
+      expect(critPdf?.fmSourceField).toBe('PDF Notificación Crítico');
+    });
   });
 
   describe('edge cases', () => {

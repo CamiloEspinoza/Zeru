@@ -368,6 +368,7 @@ function extractAttachmentRefs(
   const scannerPortal = record.portalData?.['SCANNER BP 8'];
   if (scannerPortal && Array.isArray(scannerPortal)) {
     let photoIndex = 0;
+    let dictationIndex = 0;
     for (const row of scannerPortal) {
       // Check FOTO 1 through FOTO 22
       for (let i = 1; i <= 22; i++) {
@@ -402,7 +403,53 @@ function extractAttachmentRefs(
           citolabS3KeyOriginal: null,
         });
       }
+
+      // F0 — DICTADO MACRO (audio del patólogo)
+      const dictationUrl = str(row['SCANNER BP 8::DICTADO MACRO']);
+      if (dictationUrl) {
+        dictationIndex++;
+        refs.push({
+          category: 'MACRO_DICTATION',
+          label: `Dictado macro ${dictationIndex}`,
+          sequenceOrder: dictationIndex,
+          s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_dictado_${dictationIndex}.mp3`,
+          contentType: 'audio/mpeg',
+          fmSourceField: 'SCANNER BP 8::DICTADO MACRO',
+          fmContainerUrlOriginal: dictationUrl,
+          citolabS3KeyOriginal: null,
+        });
+      }
     }
+  }
+
+  // F0 — REQUEST_DOCUMENT (solicitud escaneada)
+  const requestDocUrl = str(d['Biopsias_Ingresos::Scanner Documento']);
+  if (requestDocUrl) {
+    refs.push({
+      category: 'REQUEST_DOCUMENT',
+      label: `Solicitud ${informeNumber}`,
+      sequenceOrder: 0,
+      s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_solicitud.pdf`,
+      contentType: 'application/pdf',
+      fmSourceField: 'Biopsias_Ingresos::Scanner Documento',
+      fmContainerUrlOriginal: requestDocUrl,
+      citolabS3KeyOriginal: null,
+    });
+  }
+
+  // F0 — CRITICAL_NOTIFICATION_PDF
+  const critPdfUrl = str(d['PDF Notificación Crítico']);
+  if (critPdfUrl) {
+    refs.push({
+      category: 'CRITICAL_NOTIFICATION_PDF',
+      label: `Notificación crítico ${informeNumber}`,
+      sequenceOrder: 0,
+      s3Key: `Biopsias/${encodedOrigin}/${year}/${month}/${informeNumber}_critico.pdf`,
+      contentType: 'application/pdf',
+      fmSourceField: 'PDF Notificación Crítico',
+      fmContainerUrlOriginal: critPdfUrl,
+      citolabS3KeyOriginal: null,
+    });
   }
 
   return refs;
