@@ -31,6 +31,7 @@ import { FmLabSyncService } from './services/fm-lab-sync.service';
 // Processors (queue dispatchers)
 import { LabImportProcessor } from './processors/lab-import.processor';
 import { AttachmentDownloadProcessor } from './processors/attachment-download.processor';
+import { ReportValidationProcessor } from './processors/report-validation.processor';
 
 // Handlers (business logic)
 import { ExamsBatchHandler } from './processors/handlers/exams-batch.handler';
@@ -118,6 +119,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     // Queue processors (one per queue)
     LabImportProcessor,
     AttachmentDownloadProcessor,
+    ReportValidationProcessor,
 
     // Handlers (injected into LabImportProcessor)
     ExamsBatchHandler,

@@ -140,14 +140,15 @@ export class ReportValidationService {
    * 4. Write results back to FM
    */
   async processValidation(trigger: ReportValidationTrigger): Promise<void> {
-    const { database, informeNumber } = trigger;
+    const { database, informeNumber, triggeredByUserId } = trigger;
+    const tenantId = trigger.tenantId ?? this.tenantId;
     const fmSource = database as FmSourceType;
 
-    this.logger.log(`[Validation] Starting for ${database} #${informeNumber}`);
+    this.logger.log(`[Validation] Starting for ${database} #${informeNumber} (tenant=${tenantId})`);
 
     try {
       // Step 1: Sync from FM
-      const syncResult = await this.syncFromFm(fmSource, informeNumber);
+      const syncResult = await this.syncFromFm(tenantId, fmSource, informeNumber);
       this.logger.log(
         `[Validation] Synced ${database} #${informeNumber} → SR:${syncResult.serviceRequestId} DR:${syncResult.diagnosticReportId}`,
       );
@@ -155,20 +156,20 @@ export class ReportValidationService {
       // Step 2: Create validation record
       const validation = await this.prisma.labReportValidation.create({
         data: {
-          tenantId: this.tenantId,
+          tenantId,
           diagnosticReportId: syncResult.diagnosticReportId,
           fmSource: toFmSource(fmSource),
           fmInformeNumber: informeNumber,
+          triggeredByUserId: triggeredByUserId ?? null,
           status: 'SYNCED',
           syncedAt: new Date(),
-          hasPdf: syncResult.pdfBuffer !== null,
         },
       });
 
       // Step 3: Emit event for AI processing (will be handled by AI service)
       this.eventEmitter.emit('lab.report.validation.synced', {
         validationId: validation.id,
-        tenantId: this.tenantId,
+        tenantId,
         diagnosticReportId: syncResult.diagnosticReportId,
         serviceRequestId: syncResult.serviceRequestId,
         fmSource,
@@ -186,7 +187,7 @@ export class ReportValidationService {
       try {
         const dr = await this.prisma.labDiagnosticReport.findFirst({
           where: {
-            tenantId: this.tenantId,
+            tenantId,
             fmSource: toFmSource(fmSource),
             fmInformeNumber: informeNumber,
           },
@@ -194,18 +195,20 @@ export class ReportValidationService {
         if (dr) {
           await this.prisma.labReportValidation.create({
             data: {
-              tenantId: this.tenantId,
+              tenantId,
               diagnosticReportId: dr.id,
               fmSource: toFmSource(fmSource),
               fmInformeNumber: informeNumber,
+              triggeredByUserId: triggeredByUserId ?? null,
               status: 'ERROR',
-              error: msg,
+              errorMessage: msg,
             },
           });
         }
       } catch {
         // Best effort
       }
+      throw error;
     }
   }
 
@@ -213,6 +216,7 @@ export class ReportValidationService {
    * Sync a single report from FM: fetch record, transform, upsert in DB, download PDF.
    */
   private async syncFromFm(
+    tenantId: string,
     fmSource: FmSourceType,
     informeNumber: number,
   ): Promise<SyncResult> {
@@ -240,7 +244,7 @@ export class ReportValidationService {
         : this.papTransformer.extract(record, fmSource);
 
     // 3. Upsert in DB (reuse the same logic as import)
-    const { serviceRequestId, diagnosticReportId } = await this.upsertExam(exam);
+    const { serviceRequestId, diagnosticReportId } = await this.upsertExam(tenantId, exam);
 
     // 4. Download the PDF from FM container
     let pdfBuffer: Buffer | null = null;
@@ -269,11 +273,10 @@ export class ReportValidationService {
   /**
    * Upsert a single exam into the DB. Returns the IDs.
    */
-  private async upsertExam(exam: ExtractedExam): Promise<{
+  private async upsertExam(tenantId: string, exam: ExtractedExam): Promise<{
     serviceRequestId: string;
     diagnosticReportId: string;
   }> {
-    const tenantId = this.tenantId;
 
     // Resolve patient
     let patientId: string | null = null;
