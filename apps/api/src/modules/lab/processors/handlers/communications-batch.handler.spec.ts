@@ -76,6 +76,47 @@ describe('CommunicationsBatchHandler', () => {
     );
   });
 
+  it('BIOPSIAS filters by FECHA VALIDACIÓN range when dateFrom/dateTo are provided', async () => {
+    fmApi.findAll.mockResolvedValue([]);
+
+    const job = {
+      data: {
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        dateFrom: '2026-03-01T00:00:00.000Z',
+        dateTo: '2026-03-31T23:59:59.000Z',
+      },
+    } as any;
+
+    await handler.handle(job.data);
+
+    expect(fmApi.findAll).toHaveBeenCalledWith(
+      'BIOPSIAS',
+      'Validación Final*',
+      [{ 'FECHA VALIDACIÓN': '03/01/2026...03/31/2026' }],
+      expect.objectContaining({ dateformats: 2, portals: ['COMUNICACIONES'] }),
+    );
+    expect(fmApi.getAllRecords).not.toHaveBeenCalled();
+  });
+
+  it('BIOPSIAS falls back to getAllRecords when no date range is provided', async () => {
+    fmApi.getAllRecords.mockResolvedValue([]);
+
+    const job = {
+      data: { runId: 'run-1', tenantId: 'tenant-1', fmSource: 'BIOPSIAS' },
+    } as any;
+
+    await handler.handle(job.data);
+
+    expect(fmApi.getAllRecords).toHaveBeenCalledWith(
+      'BIOPSIAS',
+      'Validación Final*',
+      expect.objectContaining({ dateformats: 2, portals: ['COMUNICACIONES'] }),
+    );
+    expect(fmApi.findAll).not.toHaveBeenCalled();
+  });
+
   it('skips sources that have no communication data', async () => {
     const job = {
       data: {
