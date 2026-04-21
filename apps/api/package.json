@@ -21,6 +21,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@aws-sdk/client-s3": "^3.996.0",
     "@aws-sdk/client-ses": "^3.996.0",
     "@aws-sdk/s3-request-presigner": "^3.996.0",

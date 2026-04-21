@@ -17,6 +17,8 @@ export interface LogAiUsageParams {
   units?: number;
   pricingUnit?: string;
   costOverrideUsd?: number;
+  durationMs?: number;
+  completedAt?: Date;
 }
 
 @Injectable()
@@ -53,6 +55,8 @@ export class AiUsageService {
         costOverrideUsd: params.costOverrideUsd,
         units: params.units,
         pricingUnit: params.pricingUnit,
+        durationMs: params.durationMs,
+        completedAt: params.completedAt,
         tenantId: params.tenantId,
         userId: params.userId,
         conversationId: params.conversationId,

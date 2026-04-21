@@ -4,6 +4,10 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "builder": "swc"
+    "builder": "swc",
+    "assets": [
+      "modules/lab/validation/llm/prompts/*.md"
+    ],
+    "watchAssets": true
   }
 }
