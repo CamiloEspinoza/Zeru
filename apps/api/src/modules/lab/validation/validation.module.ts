@@ -6,9 +6,10 @@ import { TraceabilityAgent } from './agents/traceability.agent';
 import { ConsolidatorService } from './services/consolidator.service';
 import { AgentRunnerService } from './services/agent-runner.service';
 import { ValidationSyncedListener } from './listeners/validation-synced.listener';
+import { ValidationLlmModule } from './llm/validation-llm.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ValidationLlmModule],
   providers: [
     IdentityAgent,
     OriginAgent,
