@@ -105,6 +105,18 @@ describe('ValidationLlmService.callStructured (OpenAI)', () => {
       }),
     ).rejects.toThrow(/schema validation failed/i);
     expect(responsesParse).toHaveBeenCalledTimes(2);
+    // Security: thrown error must not echo the raw model output that failed parsing.
+    try {
+      await service.callStructured({
+        feature: 'validation.test',
+        tenantId: 't1',
+        prompt: 'body',
+        schema,
+        schemaName: 'TestVerdict',
+      });
+    } catch (e) {
+      expect((e as Error).message).not.toContain('NOPE');
+    }
   });
 
   it('propagates provider errors without logging usage', async () => {

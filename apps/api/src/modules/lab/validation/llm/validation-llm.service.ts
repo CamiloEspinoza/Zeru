@@ -83,16 +83,21 @@ export class ValidationLlmService {
       }
 
       lastParseError = parsed.error;
+      // We log only issue paths and codes — never the raw "received" value,
+      // which can echo PHI back from the model output.
+      const safeSummary = parsed.error.issues
+        .map((i) => `${i.path.join('.') || '<root>'}:${i.code}`)
+        .join('; ');
       this.logger.warn(
-        `[${call.feature}] schema validation failed on attempt ${attempt}: ${parsed.error.message}`,
+        `[${call.feature}] schema validation failed on attempt ${attempt}: ${safeSummary}`,
       );
       // On attempt 1, loop retries. On attempt 2, fall through to throw.
     }
 
-    throw new Error(
-      `${SCHEMA_VALIDATION_ERROR} after 2 attempts: ${
-        (lastParseError as { message?: string })?.message ?? 'unknown'
-      }`,
-    );
+    const finalSummary =
+      (lastParseError as { issues?: { path: (string | number)[]; code: string }[] })?.issues
+        ?.map((i) => `${i.path.join('.') || '<root>'}:${i.code}`)
+        .join('; ') ?? 'unknown';
+    throw new Error(`${SCHEMA_VALIDATION_ERROR} after 2 attempts: ${finalSummary}`);
   }
 }
