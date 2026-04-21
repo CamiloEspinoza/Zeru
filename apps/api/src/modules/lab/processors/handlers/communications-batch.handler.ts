@@ -67,16 +67,32 @@ export class CommunicationsBatchHandler {
         }
       }
 
-      // BIOPSIAS: communications are in the exam portal, already extracted during Phase 1
-      // We re-fetch only the exam records that have communications (portal data)
-      // This is handled separately — for biopsies we re-read the exams and extract portal
+      // BIOPSIAS: communications are in the exam portal of Validación Final*.
+      // When dateFrom/dateTo are provided we filter the biopsy records by
+      // FECHA VALIDACIÓN so a single run only re-fetches the validated exams
+      // of its window (otherwise we would pull the full 1.3 M history each
+      // time and hit FM's request timeout).
       if (fmSource === 'BIOPSIAS') {
-        // Fetch all biopsy records (paginated) and extract communications from portal
-        const allRecords = await this.fmApi.getAllRecords(
-          this.communicationTransformer.biopsyDatabase,
-          this.communicationTransformer.biopsyLayout,
-          { dateformats: 2, portals: ['COMUNICACIONES'] },
-        );
+        const { dateFrom, dateTo } = data;
+        const allRecords =
+          dateFrom && dateTo
+            ? await this.fmApi.findAll(
+                this.communicationTransformer.biopsyDatabase,
+                this.communicationTransformer.biopsyLayout,
+                [
+                  {
+                    'FECHA VALIDACIÓN': `${this.fmDate(new Date(dateFrom))}...${this.fmDate(
+                      new Date(dateTo),
+                    )}`,
+                  },
+                ],
+                { dateformats: 2, portals: ['COMUNICACIONES'] },
+              )
+            : await this.fmApi.getAllRecords(
+                this.communicationTransformer.biopsyDatabase,
+                this.communicationTransformer.biopsyLayout,
+                { dateformats: 2, portals: ['COMUNICACIONES'] },
+              );
 
         for (const record of allRecords) {
           try {
@@ -143,6 +159,10 @@ export class CommunicationsBatchHandler {
 
       throw error;
     }
+  }
+
+  private fmDate(d: Date): string {
+    return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
   }
 
   private async persistCommunication(
