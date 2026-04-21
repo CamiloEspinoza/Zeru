@@ -79,6 +79,14 @@ describe('ValidationLlmService.callStructured (OpenAI)', () => {
     expect(responsesParse).toHaveBeenCalledTimes(2);
     expect(result.data.verdict).toBe('FAIL');
     expect(logUsage).toHaveBeenCalledTimes(2); // one per attempt
+
+    // Each attempt should have logged its own token counts.
+    const firstLog = logUsage.mock.calls[0][0];
+    const secondLog = logUsage.mock.calls[1][0];
+    expect(firstLog.inputTokens).toBe(100);
+    expect(firstLog.outputTokens).toBe(10);
+    expect(secondLog.inputTokens).toBe(110);
+    expect(secondLog.outputTokens).toBe(15);
   });
 
   it('throws after two parse failures (no infinite retries)', async () => {

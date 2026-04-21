@@ -39,15 +39,7 @@ export class ValidationLlmService {
     let lastParseError: unknown;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const started = Date.now();
-      const response = await (client as unknown as {
-        responses: {
-          parse: (args: unknown) => Promise<{
-            output_parsed: unknown;
-            output_text?: string;
-            usage?: { input_tokens?: number; output_tokens?: number };
-          }>;
-        };
-      }).responses.parse({
+      const response = await client.responses.parse({
         model,
         input: call.userMessage
           ? [
