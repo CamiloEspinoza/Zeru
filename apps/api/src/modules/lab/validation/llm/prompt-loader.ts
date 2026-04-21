@@ -13,7 +13,7 @@ export function loadPrompt(key: string): PromptTemplate {
   let body: string;
   try {
     body = readFileSync(path, 'utf8');
-  } catch (err) {
+  } catch {
     throw new Error(`Prompt file not found: ${path}`);
   }
   return { key, body };
