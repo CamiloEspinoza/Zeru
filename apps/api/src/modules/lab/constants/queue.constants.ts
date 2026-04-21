@@ -48,7 +48,10 @@ export const PHASES = {
 // ── Configuration ──
 
 export const IMPORT_QUEUE_CONFIG = {
-  concurrency: 20,
+  // Each worker opens its own FM Data API session + heavy queries. At 20
+  // concurrent workers FM Server saturated (~100 GB RAM, swap, timeouts).
+  // 5 leaves headroom; raise cautiously after monitoring.
+  concurrency: 5,
   defaultBatchSize: 100,
   retryAttempts: 5,
   retryBackoff: {
