@@ -1,14 +1,49 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EncryptionService } from '../../../common/services/encryption.service';
 import { AiProvider } from '@prisma/client';
+import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 @Injectable()
 export class AiConfigService {
+  private openaiClient: OpenAI | null = null;
+  private anthropicClient: Anthropic | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly config: ConfigService,
   ) {}
+
+  getClientFor(provider: 'OPENAI' | 'ANTHROPIC'): OpenAI | Anthropic {
+    if (provider === 'OPENAI') return this.getOpenAiClient();
+    if (provider === 'ANTHROPIC') return this.getAnthropicClient();
+    throw new Error(`Unsupported provider: ${provider}`);
+  }
+
+  private getOpenAiClient(): OpenAI {
+    if (!this.openaiClient) {
+      const apiKey = this.config.get<string>('OPENAI_API_KEY');
+      if (!apiKey) {
+        throw new Error('OPENAI_API_KEY is not set');
+      }
+      this.openaiClient = new OpenAI({ apiKey });
+    }
+    return this.openaiClient;
+  }
+
+  private getAnthropicClient(): Anthropic {
+    if (!this.anthropicClient) {
+      const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY is not set');
+      }
+      this.anthropicClient = new Anthropic({ apiKey });
+    }
+    return this.anthropicClient;
+  }
 
   async getConfig(tenantId: string) {
     const config = await this.prisma.aiProviderConfig.findUnique({
