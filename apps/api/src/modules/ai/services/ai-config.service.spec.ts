@@ -44,4 +44,18 @@ describe('AiConfigService — provider support', () => {
     // @ts-expect-error — probing runtime guard
     expect(() => service.getClientFor('GEMINI')).toThrow(/unsupported provider/i);
   });
+
+  it('throws with the variable name when the API key env var is missing', async () => {
+    const moduleNoKey = await Test.createTestingModule({
+      providers: [
+        AiConfigService,
+        { provide: PrismaService, useValue: {} },
+        { provide: EncryptionService, useValue: {} },
+        { provide: ConfigService, useValue: { get: () => undefined } },
+      ],
+    }).compile();
+    const svc = moduleNoKey.get(AiConfigService);
+    expect(() => svc.getClientFor('OPENAI')).toThrow('OPENAI_API_KEY is not set');
+    expect(() => svc.getClientFor('ANTHROPIC')).toThrow('ANTHROPIC_API_KEY is not set');
+  });
 });

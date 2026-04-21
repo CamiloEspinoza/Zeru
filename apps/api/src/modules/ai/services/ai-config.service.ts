@@ -17,6 +17,9 @@ export class AiConfigService {
     private readonly config: ConfigService,
   ) {}
 
+  getClientFor(provider: 'OPENAI'): OpenAI;
+  getClientFor(provider: 'ANTHROPIC'): Anthropic;
+  getClientFor(provider: 'OPENAI' | 'ANTHROPIC'): OpenAI | Anthropic;
   getClientFor(provider: 'OPENAI' | 'ANTHROPIC'): OpenAI | Anthropic {
     if (provider === 'OPENAI') return this.getOpenAiClient();
     if (provider === 'ANTHROPIC') return this.getAnthropicClient();
