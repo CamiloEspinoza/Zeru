@@ -61,14 +61,18 @@ export const IMPORT_QUEUE_CONFIG = {
 };
 
 export const ATTACHMENT_QUEUE_CONFIG = {
-  concurrency: 10,
+  // Each job opens (and may re-open on 401) an FM Data API session.
+  // Higher concurrency saturated FM's ProConnections=250 and produced
+  // error 812 "Exceeded host's capacity". 3 leaves headroom for other FM
+  // clients. Raise cautiously after confirming FM has capacity.
+  concurrency: 3,
   retryAttempts: 10,
   retryBackoff: {
     type: 'exponential' as const,
     delay: 3000,
   },
   rateLimiter: {
-    max: 50, // 50 jobs
+    max: 20, // 20 jobs
     duration: 1000, // per 1 second
   },
 };
