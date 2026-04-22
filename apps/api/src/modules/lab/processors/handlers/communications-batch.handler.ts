@@ -57,8 +57,8 @@ export class CommunicationsBatchHandler {
             const comm = this.communicationTransformer.extractFromPapRecord(record);
             if (!comm) continue;
 
-            await this.persistCommunication(tenantId, fmSource, comm);
-            processedCount++;
+            const persisted = await this.persistCommunication(tenantId, fmSource, comm);
+            if (persisted) processedCount++;
           } catch (error) {
             errorCount++;
             const msg = error instanceof Error ? error.message : String(error);
@@ -100,8 +100,8 @@ export class CommunicationsBatchHandler {
             if (comms.length === 0) continue;
 
             for (const comm of comms) {
-              await this.persistCommunication(tenantId, fmSource, comm);
-              processedCount++;
+              const persisted = await this.persistCommunication(tenantId, fmSource, comm);
+              if (persisted) processedCount++;
             }
           } catch (error) {
             errorCount++;
@@ -165,11 +165,15 @@ export class CommunicationsBatchHandler {
     return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}/${d.getUTCFullYear()}`;
   }
 
+  /** Returns true only when a new row was actually created. Skipping cases
+   *  (no matching DR, duplicate) return false so the caller does not count
+   *  them as "processed" — otherwise the batch report shows work that never
+   *  happened. */
   private async persistCommunication(
     tenantId: string,
     fmSource: FmSourceType,
     comm: ExtractedCommunication,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // Find DiagnosticReport by informe number
     // For BIOPSIAS comms, the DR source is BIOPSIAS; for PAP, it's PAPANICOLAOU
     const dr = await this.prisma.labDiagnosticReport.findFirst({
@@ -181,8 +185,8 @@ export class CommunicationsBatchHandler {
     });
 
     if (!dr) {
-      this.logger.debug(`No DR for informe ${comm.fkInformeNumber} in ${fmSource}`);
-      return;
+      this.logger.warn(`No DR for informe ${comm.fkInformeNumber} in ${fmSource} — skipping`);
+      return false;
     }
 
     // Dedup by content + loggedAt + DR
@@ -195,7 +199,7 @@ export class CommunicationsBatchHandler {
       },
     });
 
-    if (existing) return;
+    if (existing) return false;
 
     await this.prisma.labCommunication.create({
       data: {
@@ -209,5 +213,6 @@ export class CommunicationsBatchHandler {
         category: comm.category ? toCommunicationCategory(comm.category) : null,
       },
     });
+    return true;
   }
 }

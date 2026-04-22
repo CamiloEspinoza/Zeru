@@ -117,6 +117,66 @@ describe('CommunicationsBatchHandler', () => {
     expect(fmApi.findAll).not.toHaveBeenCalled();
   });
 
+  it('does NOT count as processed when no DR exists for the informe', async () => {
+    // Simulates real bug: PAP run finished with processedCount=1361 but
+    // lab_communications stayed at 0 because none of the informe numbers
+    // had a matching DR in the DB (phase-1 hadn't completed for that run).
+    prisma.labDiagnosticReport.findFirst = jest.fn().mockResolvedValue(null);
+
+    fmApi.getAllRecords.mockResolvedValue([
+      {
+        recordId: '1',
+        modId: '1',
+        fieldData: {
+          'fk_InformeNumero': 5000,
+          'Comentario': 'Sin DR asociado',
+          'Motivo': 'Test',
+          'IngresoResponsable': 'X',
+        },
+      },
+    ]);
+
+    const job = { data: { runId: 'run-1', tenantId: 't1', fmSource: 'PAPANICOLAOU' } } as any;
+    await handler.handle(job.data);
+
+    // Must not create anything
+    expect(prisma.labCommunication.create).not.toHaveBeenCalled();
+    // Must not inflate processedCount on the batch row
+    const batchUpdate = prisma.labImportBatch.update.mock.calls.find((c: any) =>
+      'processedCount' in (c[0]?.data ?? {}),
+    );
+    expect(batchUpdate?.[0].data.processedCount).toBe(0);
+    // Must not inflate processedRecords on the run row
+    const runUpdate = prisma.labImportRun.update.mock.calls[0];
+    expect(runUpdate[0].data.processedRecords.increment).toBe(0);
+  });
+
+  it('does NOT double-count when the communication already exists', async () => {
+    prisma.labCommunication.findFirst = jest.fn().mockResolvedValue({ id: 'already' });
+
+    fmApi.getAllRecords.mockResolvedValue([
+      {
+        recordId: '1',
+        modId: '1',
+        fieldData: {
+          'fk_InformeNumero': 5000,
+          'Comentario': 'Dup',
+          'Motivo': 'Test',
+          'IngresoResponsable': 'X',
+        },
+      },
+    ]);
+
+    const job = { data: { runId: 'run-1', tenantId: 't1', fmSource: 'PAPANICOLAOU' } } as any;
+    await handler.handle(job.data);
+
+    expect(prisma.labCommunication.create).not.toHaveBeenCalled();
+    const batchUpdate = prisma.labImportBatch.update.mock.calls.find((c: any) =>
+      'processedCount' in (c[0]?.data ?? {}),
+    );
+    expect(batchUpdate?.[0].data.processedCount).toBe(0);
+  });
+
   it('skips sources that have no communication data', async () => {
     const job = {
       data: {
