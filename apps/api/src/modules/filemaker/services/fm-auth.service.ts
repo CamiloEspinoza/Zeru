@@ -78,8 +78,32 @@ export class FmAuthService {
     }
   }
 
+  /**
+   * Clear the cached token immediately and fire-and-forget a DELETE /sessions
+   * to FM so the slot is released server-side. Without the DELETE, repeated
+   * re-authentication (e.g. on 401 retries) stacks up zombie sessions until
+   * FM returns error 812 "Exceeded host's capacity".
+   */
   invalidateSession(database: string): void {
+    const session = this.sessions.get(database);
     this.sessions.delete(database);
+    if (!session) return;
+    void this.attemptRemoteLogout(database, session.token);
+  }
+
+  private async attemptRemoteLogout(database: string, token: string): Promise<void> {
+    try {
+      const url = `${this.host}/fmi/data/vLatest/databases/${encodeURIComponent(database)}/sessions/${token}`;
+      await fetch(url, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch (err) {
+      // Best-effort: if the token is already expired or the network is down,
+      // we still succeed (the cache is cleared). Log at debug only.
+      this.logger.debug(`FM remote logout failed for ${database}: ${err}`);
+    }
   }
 
   async testConnection(database: string): Promise<boolean> {
