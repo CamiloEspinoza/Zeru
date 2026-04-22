@@ -63,6 +63,13 @@ export class ChargesBatchHandler {
               ? this.examChargeTransformer.extractBiopsyCharge(record)
               : this.examChargeTransformer.extractPapCharge(record);
 
+          // Some FM charges have no associated informe (fkInformeNumber=0 or
+          // empty) — they are service-level adjustments, not per-report items.
+          // Skipping them silently; they are legitimate data, not errors.
+          if (!charge.fkInformeNumber) {
+            continue;
+          }
+
           // Resolve DiagnosticReport by informe number
           // For biopsy charges, the DR is in BIOPSIAS; for PAP charges, in PAPANICOLAOU
           const drFmSource =
