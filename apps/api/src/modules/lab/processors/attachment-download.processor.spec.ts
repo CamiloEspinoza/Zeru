@@ -46,7 +46,13 @@ describe('AttachmentDownloadProcessor', () => {
           },
         },
         { provide: FmApiService, useValue: {} },
-        { provide: FmAuthService, useValue: { getToken: jest.fn().mockResolvedValue('mock-token') } },
+        {
+          provide: FmAuthService,
+          useValue: {
+            getToken: jest.fn().mockResolvedValue('mock-token'),
+            invalidateSession: jest.fn(),
+          },
+        },
         {
           provide: LabImportOrchestratorService,
           useValue: { advancePhase: jest.fn().mockResolvedValue(undefined) },
@@ -193,6 +199,64 @@ describe('AttachmentDownloadProcessor', () => {
     expect(lastCall.data).toMatchObject({
       migrationStatus: 'SKIPPED',
       migrationError: 'No source URL available',
+    });
+  });
+
+  describe('downloadFromFmContainer — auth retry on 401', () => {
+    let fmAuthService: any;
+    let originalFetch: typeof global.fetch;
+
+    beforeEach(() => {
+      fmAuthService = processor['fmAuthService'];
+      originalFetch = global.fetch;
+    });
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+    });
+
+    it('invalidates session and retries once when the first fetch returns 401', async () => {
+      const firstResponse = new Response(null, { status: 401, statusText: 'Unauthorized' });
+      const secondResponse = new Response(Buffer.from('binary-ok'), {
+        status: 200,
+        headers: { 'content-type': 'application/pdf' },
+      });
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(firstResponse)
+        .mockResolvedValueOnce(secondResponse);
+      global.fetch = fetchMock as any;
+
+      fmAuthService.getToken
+        .mockResolvedValueOnce('stale-token')
+        .mockResolvedValueOnce('fresh-token');
+
+      const result = await processor.downloadFromFmContainer(
+        'https://fm.example.com/Streaming_SSL/foo.pdf',
+        'BIOPSIAS',
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fmAuthService.invalidateSession).toHaveBeenCalledWith('BIOPSIAS');
+      expect(fmAuthService.getToken).toHaveBeenCalledTimes(2);
+      expect(result.contentType).toBe('application/pdf');
+      expect(result.buffer.toString()).toBe('binary-ok');
+    });
+
+    it('throws with the original 401 when the retry also returns 401', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValue(new Response(null, { status: 401, statusText: 'Unauthorized' }));
+      global.fetch = fetchMock as any;
+
+      await expect(
+        processor.downloadFromFmContainer(
+          'https://fm.example.com/Streaming_SSL/foo.pdf',
+          'BIOPSIAS',
+        ),
+      ).rejects.toThrow(/401/);
+      expect(fetchMock).toHaveBeenCalledTimes(2); // initial + one retry
+      expect(fmAuthService.invalidateSession).toHaveBeenCalledTimes(1);
     });
   });
 

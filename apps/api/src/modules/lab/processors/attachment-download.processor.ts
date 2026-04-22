@@ -218,18 +218,32 @@ export class AttachmentDownloadProcessor extends WorkerHost {
     }
   }
 
-  /** Download a file from an FM container streaming URL. */
-  async downloadFromFmContainer(url: string, database = 'BIOPSIAS'): Promise<{ buffer: Buffer; contentType: string }> {
-    // FM container URLs are streaming URLs (Streaming_SSL)
-    // They require authentication — use the FM API's auth token
-    const token = await this.fmAuthService.getToken(database);
-    const response = await fetch(url, {
-      redirect: 'follow',
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(60000),
-    });
+  /** Download a file from an FM container streaming URL.
+   *  Re-authenticates once on 401 — FM sessions expire silently and without
+   *  this recovery the processor would fail every download after the token
+   *  lifetime (~15 min). */
+  async downloadFromFmContainer(
+    url: string,
+    database = 'BIOPSIAS',
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    const doFetch = async (): Promise<Response> => {
+      const token = await this.fmAuthService.getToken(database);
+      return fetch(url, {
+        redirect: 'follow',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(60000),
+      });
+    };
+
+    let response = await doFetch();
+    if (response.status === 401) {
+      this.fmAuthService.invalidateSession(database);
+      response = await doFetch();
+    }
     if (!response.ok) {
-      throw new Error(`FM container download failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `FM container download failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     const arrayBuffer = await response.arrayBuffer();
