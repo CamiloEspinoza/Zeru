@@ -75,6 +75,14 @@ describe('ExamsBatchHandler', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      labAdverseEvent: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
+      labTechnicalObservation: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       labDiagnosticReportAttachment: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -469,6 +477,121 @@ describe('ExamsBatchHandler', () => {
         }),
       );
       expect(prisma.labSlide.createMany).not.toHaveBeenCalled();
+    });
+
+    it('persists adverse events from the portalEventosAdversos portal', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          {
+            ...makeFmRecord(),
+            portalData: {
+              portalEventosAdversos: [
+                {
+                  'EventosAdversos::tipo': 'CONTAMINACION',
+                  'EventosAdversos::severidad': 'ALTA',
+                  'EventosAdversos::descripcion': 'Muestra contaminada',
+                  'EventosAdversos::fechaOcurrencia': '03/12/2026',
+                  'EventosAdversos::estado': 'Investigando',
+                },
+              ],
+            },
+          },
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labAdverseEvent.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant-1', diagnosticReportId: 'dr-1' },
+        }),
+      );
+      expect(prisma.labAdverseEvent.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            expect.objectContaining({
+              eventType: 'CONTAMINACION',
+              severity: 'MAJOR_SEV',
+              description: 'Muestra contaminada',
+              status: 'INVESTIGATING',
+              reportedByNameSnapshot: 'FM_IMPORT',
+              occurredAt: expect.any(Date),
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('persists technical observations from Observaciones Tecnicas portal', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          {
+            ...makeFmRecord(),
+            portalData: {
+              'Observaciones Tecnicas': [
+                {
+                  'Obs::etapa': 'MACROSCOPY',
+                  'Obs::descripcion': 'Fragmento muy pequeño',
+                  'Obs::fecha': '03/10/2026',
+                  'Obs::responsable': 'Tec. Rojas',
+                },
+              ],
+            },
+          },
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labTechnicalObservation.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            expect.objectContaining({
+              workflowStage: 'MACROSCOPY',
+              description: 'Fragmento muy pequeño',
+              observedByNameSnapshot: 'Tec. Rojas',
+              observedAt: expect.any(Date),
+            }),
+          ],
+        }),
+      );
+    });
+
+    it('clears stale adverse events and tech observations when portals are empty', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [makeFmRecord()],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labAdverseEvent.deleteMany).toHaveBeenCalled();
+      expect(prisma.labAdverseEvent.createMany).not.toHaveBeenCalled();
+      expect(prisma.labTechnicalObservation.deleteMany).toHaveBeenCalled();
+      expect(prisma.labTechnicalObservation.createMany).not.toHaveBeenCalled();
     });
 
     it('creates signers for the diagnostic report', async () => {

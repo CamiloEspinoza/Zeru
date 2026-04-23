@@ -12,6 +12,11 @@ import {
   toAttachmentCategory,
   toGender,
 } from '../../constants/enum-maps';
+import {
+  AdverseSeverity,
+  AdverseStatus,
+  WorkflowEventType,
+} from '@prisma/client';
 import type { FmRecord } from '@zeru/shared';
 import type { ExtractedExam, FmSourceType } from '../../../filemaker/transformers/types';
 
@@ -384,6 +389,49 @@ export class ExamsBatchHandler {
       },
     });
 
+    // 5b. Replace Adverse Events (atomic per DR).
+    // Source: FM portal `portalEventosAdversos`. Required fields missing in FM
+    // (reportedBy, firm occurredAt) are filled with import defaults so we don't
+    // drop incident records — see DEFAULT_* constants below.
+    const adverseEvents = exam.adverseEvents ?? [];
+    await this.prisma.labAdverseEvent.deleteMany({
+      where: { tenantId, diagnosticReportId: dr.id },
+    });
+    if (adverseEvents.length > 0) {
+      await this.prisma.labAdverseEvent.createMany({
+        data: adverseEvents.map((e) => ({
+          tenantId,
+          diagnosticReportId: dr.id,
+          eventType: e.eventType,
+          severity: toAdverseSeverity(e.severity),
+          description: e.description,
+          occurredAt: e.occurredAt ?? e.detectedAt ?? exam.validatedAt ?? new Date(),
+          detectedAt: e.detectedAt ?? null,
+          reportedByNameSnapshot: DEFAULT_REPORTED_BY,
+          status: toAdverseStatus(e.status),
+        })),
+      });
+    }
+
+    // 5c. Replace Technical Observations (atomic per DR).
+    // Source: FM portal `Observaciones Tecnicas`. Same pattern.
+    const techObservations = exam.technicalObservations ?? [];
+    await this.prisma.labTechnicalObservation.deleteMany({
+      where: { tenantId, diagnosticReportId: dr.id },
+    });
+    if (techObservations.length > 0) {
+      await this.prisma.labTechnicalObservation.createMany({
+        data: techObservations.map((o) => ({
+          tenantId,
+          diagnosticReportId: dr.id,
+          workflowStage: toWorkflowStageSafe(o.workflowStage),
+          description: o.description,
+          observedAt: o.observedAt ?? exam.validatedAt ?? new Date(),
+          observedByNameSnapshot: o.observedByNameSnapshot ?? DEFAULT_REPORTED_BY,
+        })),
+      });
+    }
+
     // 6. Replace Signers (atomic delete + recreate for idempotency)
     if (exam.signers.length > 0) {
       await this.prisma.$transaction([
@@ -518,4 +566,41 @@ function parseSlideLevel(raw: string | null | undefined): number | null {
   if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? Math.round(n) : null;
+}
+
+// ── Adverse event + tech observation helpers ──
+
+/**
+ * Marker for NameSnapshot columns when FM doesn't track the reporter.
+ * Lets the F3 risk dashboard filter out backfilled records if needed.
+ */
+const DEFAULT_REPORTED_BY = 'FM_IMPORT';
+
+const ADVERSE_SEVERITY_MAP: Record<string, AdverseSeverity> = {
+  LOW: AdverseSeverity.MINOR_SEV,
+  MEDIUM: AdverseSeverity.MODERATE_SEV,
+  HIGH: AdverseSeverity.MAJOR_SEV,
+  CRITICAL: AdverseSeverity.CRITICAL_SEV,
+};
+
+function toAdverseSeverity(raw: string | null | undefined): AdverseSeverity {
+  if (!raw) return AdverseSeverity.MINOR_SEV;
+  return ADVERSE_SEVERITY_MAP[raw] ?? AdverseSeverity.MINOR_SEV;
+}
+
+function toAdverseStatus(raw: string | null | undefined): AdverseStatus {
+  if (!raw) return AdverseStatus.OPEN_ADV;
+  const v = raw.trim().toUpperCase();
+  if (v.includes('RESUELT') || v.includes('RESOLVED')) return AdverseStatus.RESOLVED;
+  if (v.includes('CERRADO') || v.includes('CLOSED')) return AdverseStatus.CLOSED_ADV;
+  if (v.includes('INVESTIG')) return AdverseStatus.INVESTIGATING;
+  return AdverseStatus.OPEN_ADV;
+}
+
+function toWorkflowStageSafe(raw: string | null | undefined): WorkflowEventType | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  // Direct match against the enum values — unknown strings become null rather
+  // than corrupting the record with OTHER_EVENT.
+  return (WorkflowEventType as Record<string, WorkflowEventType>)[v] ?? null;
 }
