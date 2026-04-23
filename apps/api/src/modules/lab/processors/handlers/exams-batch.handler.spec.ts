@@ -71,6 +71,10 @@ describe('ExamsBatchHandler', () => {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
       },
+      labSlide: {
+        deleteMany: jest.fn(),
+        createMany: jest.fn(),
+      },
       labDiagnosticReportAttachment: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -365,6 +369,70 @@ describe('ExamsBatchHandler', () => {
           }),
         }),
       );
+    });
+
+    it('persists slides from the Placas portal (replace semantics)', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          {
+            ...makeFmRecord(),
+            portalData: {
+              Placas: [
+                { 'Placas::codigo': 'PLC-01', 'Placas::tincion': 'HE', 'Placas::nivel': '1' },
+                { 'Placas::codigo': 'PLC-02', 'Placas::tincion': 'IHQ', 'Placas::nivel': '2' },
+                { 'Placas::codigo': '', 'Placas::tincion': '', 'Placas::nivel': '' },
+              ],
+            },
+          },
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labSlide.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant-1', specimenId: 'specimen-1' },
+        }),
+      );
+      expect(prisma.labSlide.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: [
+            { tenantId: 'tenant-1', specimenId: 'specimen-1', placaCode: 'PLC-01', stain: 'HE', level: 1 },
+            { tenantId: 'tenant-1', specimenId: 'specimen-1', placaCode: 'PLC-02', stain: 'IHQ', level: 2 },
+          ],
+        }),
+      );
+    });
+
+    it('clears stale slides when the latest record has none', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [makeFmRecord()],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labSlide.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { tenantId: 'tenant-1', specimenId: 'specimen-1' },
+        }),
+      );
+      expect(prisma.labSlide.createMany).not.toHaveBeenCalled();
     });
 
     it('creates signers for the diagnostic report', async () => {
