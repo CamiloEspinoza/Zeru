@@ -162,6 +162,39 @@ describe('ExamsBatchHandler', () => {
       );
     });
 
+    it('persists subjectBirthDate and subjectGender when creating a new patient', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          makeFmRecord({
+            'RUT': '',
+            'SEXO': 'FEMENINO',
+            'FECHA NACIMIENTO': '05/15/1960',
+          }),
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labPatient.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            gender: 'FEMALE',
+            birthDate: expect.any(Date),
+          }),
+        }),
+      );
+      const call = prisma.labPatient.create.mock.calls[0][0];
+      expect(call.data.birthDate.getFullYear()).toBe(1960);
+    });
+
     it('keeps batch PENDING on intermediate failure (retries)', async () => {
       fmApi.getRecords.mockRejectedValue(new Error('FM timeout'));
 

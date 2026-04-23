@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, encodeS3Path, normalizeEmail } from './helpers';
+import { str, parseNum, parseDate, encodeS3Path, normalizeEmail, mapGender } from './helpers';
 import type {
   ExtractedExam,
   ExtractedSigner,
@@ -45,7 +45,7 @@ export class PapTransformer {
       subjectMaternalLastName: str(d['A.MATERNO']) || null,
       subjectRut: rut && rut.length >= 3 ? rut : null,
       subjectAge: parseNum(d['EDAD']) || null,
-      subjectGender: null,
+      subjectGender: mapGender(str(d['SEXO'])),
 
       // ServiceRequest
       category: parsePapCategory(str(d['EXAMEN'])),

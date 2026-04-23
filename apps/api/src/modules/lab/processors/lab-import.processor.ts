@@ -9,6 +9,7 @@ import { WorkflowEventsBatchHandler } from './handlers/workflow-events-batch.han
 import { CommunicationsBatchHandler } from './handlers/communications-batch.handler';
 import { LiquidationsHandler } from './handlers/liquidations.handler';
 import { ChargesBatchHandler } from './handlers/charges-batch.handler';
+import { PractitionersHandler } from './handlers/practitioners.handler';
 
 /**
  * Single processor for the lab-import queue.
@@ -31,6 +32,7 @@ export class LabImportProcessor extends WorkerHost {
     private readonly commsHandler: CommunicationsBatchHandler,
     private readonly liquidationsHandler: LiquidationsHandler,
     private readonly chargesHandler: ChargesBatchHandler,
+    private readonly practitionersHandler: PractitionersHandler,
   ) {
     super();
   }
@@ -39,6 +41,8 @@ export class LabImportProcessor extends WorkerHost {
     this.logger.log(`Processing job ${job.name} (id: ${job.id})`);
 
     switch (job.name) {
+      case JOB_NAMES.PRACTITIONERS_IMPORT:
+        return this.practitionersHandler.handle(job.data);
       case JOB_NAMES.EXAMS_BATCH:
         return this.examsBatchHandler.handle(job.data);
       case JOB_NAMES.WORKFLOW_EVENTS_BATCH:
@@ -67,6 +71,7 @@ export class LabImportProcessor extends WorkerHost {
           const batchIndex = job.data?.batchIndex;
           const fmSource = job.data?.fmSource || job.data?.chargeSource;
           const phaseMap: Record<string, string> = {
+            [JOB_NAMES.PRACTITIONERS_IMPORT]: 'phase-0-practitioners',
             [JOB_NAMES.EXAMS_BATCH]: 'phase-1-exams',
             [JOB_NAMES.WORKFLOW_EVENTS_BATCH]: 'phase-2-workflow-comms',
             [JOB_NAMES.COMMUNICATIONS_BATCH]: 'phase-2-workflow-comms',

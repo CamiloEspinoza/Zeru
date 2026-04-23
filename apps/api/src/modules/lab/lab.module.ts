@@ -40,6 +40,7 @@ import { WorkflowEventsBatchHandler } from './processors/handlers/workflow-event
 import { CommunicationsBatchHandler } from './processors/handlers/communications-batch.handler';
 import { LiquidationsHandler } from './processors/handlers/liquidations.handler';
 import { ChargesBatchHandler } from './processors/handlers/charges-batch.handler';
+import { PractitionersHandler } from './processors/handlers/practitioners.handler';
 
 // Services — Dashboard
 import { LabDashboardService } from './services/lab-dashboard.service';
@@ -129,6 +130,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     CommunicationsBatchHandler,
     LiquidationsHandler,
     ChargesBatchHandler,
+    PractitionersHandler,
 
     // Citolab S3 config
     {

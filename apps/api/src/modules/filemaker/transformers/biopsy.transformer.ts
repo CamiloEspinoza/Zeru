@@ -1,15 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeRut } from '@zeru/shared';
 import type { FmRecord } from '@zeru/shared';
-import { str, parseNum, parseDate, parseFmDateTime, encodeS3Path, isYes } from './helpers';
-
-function mapGender(raw: string | null | undefined): 'MALE' | 'FEMALE' | 'OTHER' | null {
-  if (!raw) return null;
-  const v = raw.trim().toUpperCase();
-  if (v === 'M' || v === 'MASCULINO' || v === 'MALE' || v === 'HOMBRE') return 'MALE';
-  if (v === 'F' || v === 'FEMENINO' || v === 'FEMALE' || v === 'MUJER') return 'FEMALE';
-  return 'OTHER';
-}
+import { str, parseNum, parseDate, parseFmDateTime, encodeS3Path, isYes, mapGender } from './helpers';
 
 function mapSeverity(
   raw: string | null | undefined,

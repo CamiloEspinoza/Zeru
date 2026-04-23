@@ -259,6 +259,18 @@ describe('PapTransformer', () => {
       expect(result.subjectMaternalLastName).toBeNull();
     });
 
+    it('maps SEXO to subjectGender', () => {
+      expect(
+        transformer.extract(makePapRecord({ SEXO: 'FEMENINO' }), 'PAPANICOLAOU').subjectGender,
+      ).toBe('FEMALE');
+      expect(
+        transformer.extract(makePapRecord({ SEXO: 'M' }), 'PAPANICOLAOU').subjectGender,
+      ).toBe('MALE');
+      expect(
+        transformer.extract(makePapRecord({ SEXO: '' }), 'PAPANICOLAOU').subjectGender,
+      ).toBeNull();
+    });
+
     it('extracts new F0 fields: DOB, emails, antecedentes, alerta, QC, tracking dates', () => {
       const record = makePapRecord({
         'FECHA NACIMIENTO': '04/20/1980',
