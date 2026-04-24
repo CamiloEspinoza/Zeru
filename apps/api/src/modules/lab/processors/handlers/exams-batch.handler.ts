@@ -285,20 +285,43 @@ export class ExamsBatchHandler {
       ihqRespondedAt: exam.ihqRespondedAt ?? null,
       ihqResponsibleNameSnapshot: exam.ihqResponsibleNameSnapshot ?? null,
     };
-    if (existingSpecimen) {
-      await this.prisma.labSpecimen.update({
-        where: { id: existingSpecimen.id },
-        data: specimenFields,
-      });
+    const specimen = existingSpecimen
+      ? await this.prisma.labSpecimen.update({
+          where: { id: existingSpecimen.id },
+          data: specimenFields,
+        })
+      : await this.prisma.labSpecimen.create({
+          data: {
+            tenantId,
+            serviceRequestId: sr.id,
+            sequenceNumber: 1,
+            status: 'RECEIVED_SPECIMEN',
+            ...specimenFields,
+          },
+        });
+
+    // 4b. Replace Slides for this specimen (atomic delete + createMany).
+    // Source: FM portal `Placas` on the biopsy record. Idempotent on re-run.
+    const slides = exam.slides ?? [];
+    if (slides.length > 0) {
+      await this.prisma.$transaction([
+        this.prisma.labSlide.deleteMany({
+          where: { tenantId, specimenId: specimen.id },
+        }),
+        this.prisma.labSlide.createMany({
+          data: slides.map((s) => ({
+            tenantId,
+            specimenId: specimen.id,
+            placaCode: s.placaCode ?? null,
+            stain: s.stain ?? null,
+            level: parseSlideLevel(s.level),
+          })),
+        }),
+      ]);
     } else {
-      await this.prisma.labSpecimen.create({
-        data: {
-          tenantId,
-          serviceRequestId: sr.id,
-          sequenceNumber: 1,
-          status: 'RECEIVED_SPECIMEN',
-          ...specimenFields,
-        },
+      // Clear any stale slides if the latest extract has none.
+      await this.prisma.labSlide.deleteMany({
+        where: { tenantId, specimenId: specimen.id },
       });
     }
 
@@ -481,4 +504,18 @@ export class ExamsBatchHandler {
   private fmDate(d: Date): string {
     return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
   }
+}
+
+/**
+ * Coerce the FM portal `Placas::nivel` string to the schema's Int column.
+ * FM sometimes stores "1", "2", "1.0" or noise — anything unparseable → null.
+ * Note: plain `Number("")` is 0, not NaN, so we must reject the empty string
+ * after stripping non-numeric chars before calling Number().
+ */
+function parseSlideLevel(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const cleaned = String(raw).trim().replace(/[^0-9.-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }
