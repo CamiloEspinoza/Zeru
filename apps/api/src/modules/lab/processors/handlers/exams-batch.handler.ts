@@ -509,9 +509,13 @@ export class ExamsBatchHandler {
 /**
  * Coerce the FM portal `Placas::nivel` string to the schema's Int column.
  * FM sometimes stores "1", "2", "1.0" or noise — anything unparseable → null.
+ * Note: plain `Number("")` is 0, not NaN, so we must reject the empty string
+ * after stripping non-numeric chars before calling Number().
  */
 function parseSlideLevel(raw: string | null | undefined): number | null {
   if (!raw) return null;
-  const n = Number(String(raw).trim().replace(/[^0-9.-]/g, ''));
-  return isNaN(n) ? null : Math.round(n);
+  const cleaned = String(raw).trim().replace(/[^0-9.-]/g, '');
+  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.round(n) : null;
 }

@@ -91,7 +91,9 @@ describe('ExamsBatchHandler', () => {
       labImportRun: {
         update: jest.fn(),
       },
-      $transaction: jest.fn((fn) => fn(prisma)),
+      $transaction: jest.fn((arg) =>
+        Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
+      ),
     };
 
     const module = await Test.createTestingModule({
@@ -410,6 +412,40 @@ describe('ExamsBatchHandler', () => {
           ],
         }),
       );
+    });
+
+    it('coerces slide level: unparseable strings → null (not 0)', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          {
+            ...makeFmRecord(),
+            portalData: {
+              Placas: [
+                { 'Placas::codigo': 'PLC-A', 'Placas::tincion': 'HE', 'Placas::nivel': 'N/A' },
+                { 'Placas::codigo': 'PLC-B', 'Placas::tincion': 'HE', 'Placas::nivel': '' },
+                { 'Placas::codigo': 'PLC-C', 'Placas::tincion': 'HE', 'Placas::nivel': '3' },
+              ],
+            },
+          },
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      const payload = prisma.labSlide.createMany.mock.calls[0][0].data;
+      expect(payload).toEqual([
+        expect.objectContaining({ placaCode: 'PLC-A', level: null }),
+        expect.objectContaining({ placaCode: 'PLC-B', level: null }),
+        expect.objectContaining({ placaCode: 'PLC-C', level: 3 }),
+      ]);
     });
 
     it('clears stale slides when the latest record has none', async () => {
