@@ -2,6 +2,14 @@
 // Extracted from procedencias.transformer.ts and convenio.transformer.ts.
 // All new transformers MUST use these instead of re-declaring locally.
 
+export function mapGender(raw: string | null | undefined): 'MALE' | 'FEMALE' | 'OTHER' | null {
+  if (!raw) return null;
+  const v = raw.trim().toUpperCase();
+  if (v === 'M' || v === 'MASCULINO' || v === 'MALE' || v === 'HOMBRE') return 'MALE';
+  if (v === 'F' || v === 'FEMENINO' || v === 'FEMALE' || v === 'MUJER') return 'FEMALE';
+  return 'OTHER';
+}
+
 /**
  * Convert any FM field value to a trimmed string.
  * Null/undefined → empty string.
@@ -129,6 +137,52 @@ const SPANISH_MONTHS: Record<string, number> = {
  * Parse a Chilean period string like "Enero 2025" or "1-2025" into a Date (first day of month).
  * Returns null if unparseable.
  */
+/**
+ * Split a FileMaker full-name string into first / paternal / maternal parts.
+ *
+ * Rules:
+ * - Strips a leading title (`Dr.`, `Dra.`, `Dr`, `Dra`, case-insensitive, with
+ *   or without trailing period/space).
+ * - Last two tokens → paternalLastName + maternalLastName.
+ * - Everything before them → firstName.
+ * - Only two tokens → firstName + paternalLastName (no maternal).
+ * - Only one token → firstName = token, paternalLastName = '-' (schema NOT NULL).
+ * - Empty input → firstName = '-', paternalLastName = '-'.
+ *
+ * The paternalLastName fallback is '-' because the `LabPractitioner` model
+ * requires a non-null String. Callers can choose to map '-' to something
+ * more descriptive later.
+ */
+export function splitFullName(raw: string | null | undefined): {
+  firstName: string;
+  paternalLastName: string;
+  maternalLastName: string | null;
+} {
+  const trimmed = str(raw);
+  if (!trimmed) {
+    return { firstName: '-', paternalLastName: '-', maternalLastName: null };
+  }
+
+  // Strip leading Dr./Dra. title (case-insensitive).
+  const withoutTitle = trimmed.replace(/^\s*dra?\.?\s+/i, '').trim();
+  if (!withoutTitle) {
+    return { firstName: '-', paternalLastName: '-', maternalLastName: null };
+  }
+
+  const tokens = withoutTitle.split(/\s+/).filter(Boolean);
+  if (tokens.length === 1) {
+    return { firstName: tokens[0], paternalLastName: '-', maternalLastName: null };
+  }
+  if (tokens.length === 2) {
+    return { firstName: tokens[0], paternalLastName: tokens[1], maternalLastName: null };
+  }
+  // 3+ tokens: last two are lastnames, rest is first name(s)
+  const maternalLastName = tokens[tokens.length - 1];
+  const paternalLastName = tokens[tokens.length - 2];
+  const firstName = tokens.slice(0, tokens.length - 2).join(' ');
+  return { firstName, paternalLastName, maternalLastName };
+}
+
 export function parsePeriod(val: string): Date | null {
   if (!val || !val.trim()) return null;
   const trimmed = val.trim();

@@ -47,11 +47,6 @@ export class LabImportOrchestratorService {
     private readonly attachmentQueue: Queue,
   ) {}
 
-  // TODO: Add Phase 0 for practitioners import. Currently, LabPractitioner records
-  // are NOT populated during import. Practitioners referenced by signers (via codeSnapshot)
-  // and requesting physicians (via name) are not resolved to LabPractitioner records.
-  // A dedicated phase or on-the-fly upsert in exams-batch.handler should be added.
-
   /**
    * Start a new import run. Creates LabImportRun, queries FM for counts,
    * partitions into batches, enqueues Phase 1 (exams) jobs.
@@ -64,7 +59,6 @@ export class LabImportOrchestratorService {
       dateTo,
       batchSize = IMPORT_QUEUE_CONFIG.defaultBatchSize,
     } = params;
-    const dateFilter = dateFrom && dateTo ? { dateFrom, dateTo } : undefined;
 
     // Sort sources per SOURCE_ORDER to ensure primary before backup
     const orderedSources = [...sources].sort(
@@ -80,19 +74,63 @@ export class LabImportOrchestratorService {
         dateTo,
         batchSize,
         status: 'RUNNING',
-        phase: PHASES.EXAMS,
+        phase: PHASES.PRACTITIONERS,
         startedAt: new Date(),
       },
     });
 
     this.logger.log(`Created import run ${run.id} for sources: ${orderedSources.join(', ')}`);
 
-    // Resolve record counts per source
+    // Phase 0: practitioners catalog (fixed 1 batch, runs before exams)
+    const practitionersBatch = await this.prisma.labImportBatch.create({
+      data: {
+        runId: run.id,
+        phase: PHASES.PRACTITIONERS,
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 0,
+        limit: 0,
+        status: 'PENDING',
+      },
+    });
+
+    await this.prisma.labImportRun.update({
+      where: { id: run.id },
+      data: { totalBatches: 1 },
+    });
+
+    await this.importQueue.add(
+      JOB_NAMES.PRACTITIONERS_IMPORT,
+      { runId: run.id, tenantId, batchId: practitionersBatch.id },
+      {
+        attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
+        backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
+        jobId: `${run.id}-practitioners`,
+      },
+    );
+    this.logger.log(`Enqueued Phase 0 (practitioners) job for run ${run.id}`);
+
+    return { runId: run.id, totalBatches: 1 };
+  }
+
+  /**
+   * Enqueue Phase 1 exam batch jobs. Called from advancePhase after Phase 0
+   * completes. Returns the number of batches created.
+   */
+  private async enqueueExamsPhase(
+    runId: string,
+    tenantId: string,
+    sources: string[],
+    dateFrom: Date | null,
+    dateTo: Date | null,
+    batchSize: number,
+  ): Promise<number> {
+    const dateFilter = dateFrom && dateTo ? { dateFrom, dateTo } : undefined;
     let totalBatches = 0;
     let totalRecords = 0;
     const allBatchDefs: BatchDefinition[] = [];
 
-    for (const source of orderedSources) {
+    for (const source of sources) {
       const stats = await this.rangeResolver.getSourceStats(
         source as FmSourceType,
         dateFilter,
@@ -105,31 +143,27 @@ export class LabImportOrchestratorService {
       const batchCount = Math.ceil(stats.totalRecords / batchSize);
       for (let i = 0; i < batchCount; i++) {
         allBatchDefs.push({
-          runId: run.id,
+          runId,
           tenantId,
           phase: PHASES.EXAMS,
           fmSource: source as FmSourceType,
           batchIndex: totalBatches + i,
-          offset: i * batchSize + 1, // FM uses 1-based offset
+          offset: i * batchSize + 1,
           limit: batchSize,
-          dateFrom,
-          dateTo,
+          dateFrom: dateFrom ?? undefined,
+          dateTo: dateTo ?? undefined,
           totalRecords: stats.totalRecords,
         });
       }
       totalBatches += batchCount;
     }
 
-    // If no records to import, complete the run immediately
     if (allBatchDefs.length === 0) {
-      await this.prisma.labImportRun.update({
-        where: { id: run.id },
-        data: { status: 'COMPLETED', completedAt: new Date(), phase: 'completed' },
-      });
-      return { runId: run.id, totalBatches: 0 };
+      // No exams to process — complete the run.
+      await this.completeRun(runId);
+      return 0;
     }
 
-    // Create all batch records
     for (const def of allBatchDefs) {
       await this.prisma.labImportBatch.create({
         data: {
@@ -144,41 +178,36 @@ export class LabImportOrchestratorService {
       });
     }
 
-    // Update run totals
     await this.prisma.labImportRun.update({
-      where: { id: run.id },
+      where: { id: runId },
       data: {
-        totalBatches,
-        totalRecords,
+        totalBatches: { increment: totalBatches },
+        totalRecords: { increment: totalRecords },
       },
     });
 
-    // Enqueue Phase 1 exam batch jobs
-    if (allBatchDefs.length > 0) {
-      const jobs = allBatchDefs.map((def) => ({
-        name: JOB_NAMES.EXAMS_BATCH,
-        data: {
-          runId: def.runId,
-          tenantId: def.tenantId,
-          fmSource: def.fmSource,
-          batchIndex: def.batchIndex,
-          offset: def.offset,
-          limit: def.limit,
-          dateFrom: def.dateFrom?.toISOString(),
-          dateTo: def.dateTo?.toISOString(),
-        },
-        opts: {
-          attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
-          backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
-          jobId: `${run.id}-exams-${def.fmSource}-${def.batchIndex}`,
-        },
-      }));
+    const jobs = allBatchDefs.map((def) => ({
+      name: JOB_NAMES.EXAMS_BATCH,
+      data: {
+        runId: def.runId,
+        tenantId: def.tenantId,
+        fmSource: def.fmSource,
+        batchIndex: def.batchIndex,
+        offset: def.offset,
+        limit: def.limit,
+        dateFrom: def.dateFrom?.toISOString(),
+        dateTo: def.dateTo?.toISOString(),
+      },
+      opts: {
+        attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
+        backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
+        jobId: `${runId}-exams-${def.fmSource}-${def.batchIndex}`,
+      },
+    }));
 
-      await this.importQueue.addBulk(jobs);
-      this.logger.log(`Enqueued ${jobs.length} Phase 1 (exams) jobs for run ${run.id}`);
-    }
-
-    return { runId: run.id, totalBatches };
+    await this.importQueue.addBulk(jobs);
+    this.logger.log(`Enqueued ${jobs.length} Phase 1 (exams) jobs for run ${runId}`);
+    return totalBatches;
   }
 
   /**
@@ -200,6 +229,9 @@ export class LabImportOrchestratorService {
     // Determine the next phase before the CAS
     let nextPhase: string;
     switch (run.phase) {
+      case PHASES.PRACTITIONERS:
+        nextPhase = PHASES.EXAMS;
+        break;
       case PHASES.EXAMS:
         nextPhase = PHASES.WORKFLOW_COMMS;
         break;
@@ -231,6 +263,16 @@ export class LabImportOrchestratorService {
     this.logger.log(`Phase ${currentPhase} complete for run ${runId}. Advancing to ${nextPhase}...`);
 
     switch (currentPhase) {
+      case PHASES.PRACTITIONERS:
+        await this.enqueueExamsPhase(
+          runId,
+          run.tenantId,
+          run.sources,
+          run.dateFrom,
+          run.dateTo,
+          run.batchSize,
+        );
+        break;
       case PHASES.EXAMS:
         await this.enqueueWorkflowCommsPhase(
           runId,
@@ -516,6 +558,7 @@ export class LabImportOrchestratorService {
       where: { id: runId },
       data: {
         status: failedCount > 0 ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
+        phase: 'completed',
         completedAt: new Date(),
       },
     });

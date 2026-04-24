@@ -26,6 +26,7 @@ export const REPORT_VALIDATION_QUEUE_CONFIG = {
 // ── Job names ──
 
 export const JOB_NAMES = {
+  PRACTITIONERS_IMPORT: 'practitioners-import',
   EXAMS_BATCH: 'exams-batch',
   WORKFLOW_EVENTS_BATCH: 'workflow-events-batch',
   COMMUNICATIONS_BATCH: 'communications-batch',
@@ -38,6 +39,7 @@ export const JOB_NAMES = {
 // ── Phase identifiers (execution order) ──
 
 export const PHASES = {
+  PRACTITIONERS: 'phase-0-practitioners',
   EXAMS: 'phase-1-exams',
   WORKFLOW_COMMS: 'phase-2-workflow-comms',
   LIQUIDATIONS: 'phase-3-liquidations',

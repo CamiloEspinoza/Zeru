@@ -326,6 +326,15 @@ export interface ExtractedWorkflowEvent {
   sourceField: string;
 }
 
+export interface ExtractedPractitioner {
+  code: string;
+  firstName: string;
+  paternalLastName: string;
+  maternalLastName: string | null;
+  specialty: string | null;
+  isActive: boolean;
+}
+
 export interface ExtractedCommunication {
   fkInformeNumber: number;
   reason: string | null;

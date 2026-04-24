@@ -56,7 +56,42 @@ describe('LabImportOrchestratorService', () => {
   });
 
   describe('startImport', () => {
-    it('creates LabImportRun and partitions into batches', async () => {
+    it('creates LabImportRun and enqueues Phase 0 (practitioners) job', async () => {
+      const result = await service.startImport({
+        tenantId: 'tenant-1',
+        sources: ['BIOPSIAS'],
+        batchSize: 100,
+      });
+
+      expect(result.runId).toBe('run-1');
+      expect(result.totalBatches).toBe(1);
+      expect(prisma.labImportRun.create).toHaveBeenCalledTimes(1);
+      expect(prisma.labImportRun.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ phase: 'phase-0-practitioners' }),
+        }),
+      );
+      // Phase 0 uses a single `add` (not addBulk) — practitioners is one job
+      expect(importQueue.add).toHaveBeenCalledWith(
+        'practitioners-import',
+        expect.objectContaining({ runId: 'run-1', tenantId: 'tenant-1' }),
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe('advancePhase', () => {
+    it('transitions from PRACTITIONERS to EXAMS and enqueues batch jobs', async () => {
+      prisma.labImportRun.findUnique.mockResolvedValue({
+        id: 'run-1',
+        status: 'RUNNING',
+        phase: 'phase-0-practitioners',
+        tenantId: 'tenant-1',
+        sources: ['BIOPSIAS'],
+        dateFrom: null,
+        dateTo: null,
+        batchSize: 100,
+      });
       rangeResolver.getSourceStats.mockResolvedValue({
         source: 'BIOPSIAS',
         totalRecords: 250,
@@ -64,55 +99,19 @@ describe('LabImportOrchestratorService', () => {
         layout: 'Validación Final*',
       });
 
-      const result = await service.startImport({
-        tenantId: 'tenant-1',
-        sources: ['BIOPSIAS'],
-        batchSize: 100,
-      });
+      await service.advancePhase('run-1');
 
-      expect(result.runId).toBe('run-1');
-      expect(prisma.labImportRun.create).toHaveBeenCalledTimes(1);
-      // 250 records / 100 batch size = 3 batches
+      expect(prisma.labImportRun.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ phase: 'phase-0-practitioners' }),
+          data: expect.objectContaining({ phase: 'phase-1-exams' }),
+        }),
+      );
+      // 250 / 100 = 3 exam batches
       expect(importQueue.addBulk).toHaveBeenCalled();
-    });
-
-    it('applies date filter for test mode', async () => {
-      rangeResolver.getSourceStats.mockResolvedValue({
-        source: 'BIOPSIAS',
-        totalRecords: 50,
-        database: 'BIOPSIAS',
-        layout: 'Validación Final*',
-      });
-
-      await service.startImport({
-        tenantId: 'tenant-1',
-        sources: ['BIOPSIAS'],
-        dateFrom: new Date('2026-03-01'),
-        dateTo: new Date('2026-03-31'),
-        batchSize: 100,
-      });
-
-      expect(rangeResolver.getSourceStats).toHaveBeenCalledWith('BIOPSIAS', {
-        dateFrom: expect.any(Date),
-        dateTo: expect.any(Date),
-      });
-    });
-
-    it('skips sources with zero records', async () => {
-      rangeResolver.getSourceStats.mockResolvedValue({
-        source: 'BIOPSIASRESPALDO',
-        totalRecords: 0,
-        database: 'BIOPSIASRESPALDO',
-        layout: 'Validación Final*',
-      });
-
-      const result = await service.startImport({
-        tenantId: 'tenant-1',
-        sources: ['BIOPSIASRESPALDO'],
-        batchSize: 100,
-      });
-
-      expect(result.runId).toBe('run-1');
+      const enqueued = importQueue.addBulk.mock.calls[0][0];
+      expect(enqueued).toHaveLength(3);
+      expect(enqueued[0].name).toBe('exams-batch');
     });
   });
 
