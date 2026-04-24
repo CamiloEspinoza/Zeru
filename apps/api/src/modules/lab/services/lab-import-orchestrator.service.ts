@@ -59,7 +59,6 @@ export class LabImportOrchestratorService {
       dateTo,
       batchSize = IMPORT_QUEUE_CONFIG.defaultBatchSize,
     } = params;
-    const dateFilter = dateFrom && dateTo ? { dateFrom, dateTo } : undefined;
 
     // Sort sources per SOURCE_ORDER to ensure primary before backup
     const orderedSources = [...sources].sort(
@@ -559,6 +558,7 @@ export class LabImportOrchestratorService {
       where: { id: runId },
       data: {
         status: failedCount > 0 ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
+        phase: 'completed',
         completedAt: new Date(),
       },
     });
