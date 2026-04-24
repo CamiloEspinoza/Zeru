@@ -252,6 +252,121 @@ describe('ExamsBatchHandler', () => {
       );
     });
 
+    it('persists F0 fields on ServiceRequest (externalFolio/Institution/Order, requestingPhysicianEmail)', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          makeFmRecord({
+            'NºFOLIO': 'FOLIO-99',
+            'Nº ORDEN ATENCION': 'ORD-55',
+            'NUMERO IDENTIFICADOR INSTITUCION': 'INST-7',
+          }),
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labServiceRequest.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            externalFolioNumber: 'FOLIO-99',
+            externalInstitutionId: 'INST-7',
+            externalOrderNumber: 'ORD-55',
+          }),
+        }),
+      );
+    });
+
+    it('persists F0 specimen fields (containerType, tacoCount, cassetteCount, IHQ)', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          makeFmRecord({
+            'TIPO ENVASE': 'FORMOL',
+            'TACOS': '3',
+            'CASSETTES DE INCLUSION': '4',
+            'PLACAS HE': '8',
+            'Total especiales': '2',
+            'ANTICUERPOS': 'anti-CD20; anti-CK7',
+            'INMUNO NUMEROS': 'I-123',
+            'INMUNOS Estado Solicitud': 'Solicitada',
+          }),
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labSpecimen.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            containerType: 'FORMOL',
+            tacoCount: 3,
+            cassetteCount: 4,
+            placaHeCount: 8,
+            specialTechniquesCount: 2,
+            ihqAntibodies: ['anti-CD20', 'anti-CK7'],
+            ihqNumbers: 'I-123',
+            ihqStatus: 'Solicitada',
+          }),
+        }),
+      );
+    });
+
+    it('persists F0 DR fields (critical notification, CCB rejection, diagnostic modification)', async () => {
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          makeFmRecord({
+            'AVISAR PACIENTE': 'Si',
+            'RESULTADO CRITICO RESPONSABLE NOTIFICACION': 'Dra. Contreras',
+            'FECHA NOTIFICACION CRITICO': '03/16/2026',
+            'PDF Notificación Crítico': '/fmi/foo',
+            'Rechazado por CCB': 'Si',
+            'COMENTARIOS CCB': 'Muestra insuficiente',
+            'DIAGNOSTICO MODIFICADO': 'Si',
+            'Modifcado Por': 'Dr. Silva',
+          }),
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labDiagnosticReport.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            criticalPatientNotifyFlag: true,
+            criticalNotifiedByNameSnapshot: 'Dra. Contreras',
+            criticalNotificationPdfKey: '/fmi/foo',
+            rejectedByCcb: true,
+            ccbComments: 'Muestra insuficiente',
+            diagnosticModified: true,
+            modifiedByNameSnapshot: 'Dr. Silva',
+          }),
+        }),
+      );
+    });
+
     it('creates signers for the diagnostic report', async () => {
       fmApi.getRecords.mockResolvedValue({
         records: [makeFmRecord()],

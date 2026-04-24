@@ -228,6 +228,7 @@ export class ExamsBatchHandler {
         subcategory: exam.subcategory,
         priority: exam.isUrgent ? 'URGENT' : 'ROUTINE',
         requestingPhysicianName: exam.requestingPhysicianName,
+        requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
         labOriginId,
         labOriginCodeSnapshot: exam.labOriginCode,
         sampleCollectedAt: exam.sampleCollectedAt,
@@ -235,6 +236,9 @@ export class ExamsBatchHandler {
         requestedAt: exam.requestedAt,
         clinicalHistory: exam.clinicalHistory,
         muestraDe: exam.anatomicalSite,
+        externalFolioNumber: exam.externalFolioNumber ?? null,
+        externalInstitutionId: exam.externalInstitutionId ?? null,
+        externalOrderNumber: exam.externalOrderNumber ?? null,
       },
       update: {
         subjectFirstName: exam.subjectFirstName,
@@ -246,6 +250,7 @@ export class ExamsBatchHandler {
         category: toExamCategory(exam.category),
         subcategory: exam.subcategory,
         requestingPhysicianName: exam.requestingPhysicianName,
+        requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
         labOriginId,
         labOriginCodeSnapshot: exam.labOriginCode,
         sampleCollectedAt: exam.sampleCollectedAt,
@@ -253,6 +258,9 @@ export class ExamsBatchHandler {
         requestedAt: exam.requestedAt,
         clinicalHistory: exam.clinicalHistory,
         muestraDe: exam.anatomicalSite,
+        externalFolioNumber: exam.externalFolioNumber ?? null,
+        externalInstitutionId: exam.externalInstitutionId ?? null,
+        externalOrderNumber: exam.externalOrderNumber ?? null,
       },
     });
 
@@ -262,10 +270,25 @@ export class ExamsBatchHandler {
     const existingSpecimen = await this.prisma.labSpecimen.findFirst({
       where: { tenantId, serviceRequestId: sr.id, sequenceNumber: 1 },
     });
+    const specimenFields = {
+      anatomicalSite: exam.anatomicalSite,
+      muestraDeText: exam.anatomicalSite,
+      containerType: exam.containerType ?? null,
+      tacoCount: exam.tacoCount ?? null,
+      cassetteCount: exam.cassetteCount ?? null,
+      placaHeCount: exam.placaHeCount ?? null,
+      specialTechniquesCount: exam.specialTechniquesCount ?? null,
+      ihqAntibodies: exam.ihqAntibodies ?? [],
+      ihqNumbers: exam.ihqNumbers ?? null,
+      ihqStatus: exam.ihqStatus ?? null,
+      ihqRequestedAt: exam.ihqRequestedAt ?? null,
+      ihqRespondedAt: exam.ihqRespondedAt ?? null,
+      ihqResponsibleNameSnapshot: exam.ihqResponsibleNameSnapshot ?? null,
+    };
     if (existingSpecimen) {
       await this.prisma.labSpecimen.update({
         where: { id: existingSpecimen.id },
-        data: { anatomicalSite: exam.anatomicalSite, muestraDeText: exam.anatomicalSite },
+        data: specimenFields,
       });
     } else {
       await this.prisma.labSpecimen.create({
@@ -273,9 +296,8 @@ export class ExamsBatchHandler {
           tenantId,
           serviceRequestId: sr.id,
           sequenceNumber: 1,
-          anatomicalSite: exam.anatomicalSite,
-          muestraDeText: exam.anatomicalSite,
           status: 'RECEIVED_SPECIMEN',
+          ...specimenFields,
         },
       });
     }
@@ -305,6 +327,15 @@ export class ExamsBatchHandler {
         issuedAt: exam.issuedAt,
         primarySignerCodeSnapshot:
           exam.signers.find((s) => s.role === 'PRIMARY_PATHOLOGIST')?.codeSnapshot ?? null,
+        criticalPatientNotifyFlag: exam.criticalPatientNotifyFlag ?? false,
+        criticalNotifiedAt: exam.criticalNotifiedAt ?? null,
+        criticalNotifiedByNameSnapshot: exam.criticalNotifiedBy ?? null,
+        criticalNotificationPdfKey: exam.criticalNotificationPdfKey ?? null,
+        rejectedByCcb: exam.rejectedByCcb ?? false,
+        ccbComments: exam.ccbComments ?? null,
+        diagnosticModified: exam.diagnosticModified ?? false,
+        modifiedByNameSnapshot: exam.modifiedByUser ?? null,
+        modifiedAt: exam.modifiedAt ?? null,
       },
       update: {
         status: toDiagnosticReportStatus(exam.status),
@@ -318,6 +349,15 @@ export class ExamsBatchHandler {
         issuedAt: exam.issuedAt,
         primarySignerCodeSnapshot:
           exam.signers.find((s) => s.role === 'PRIMARY_PATHOLOGIST')?.codeSnapshot ?? null,
+        criticalPatientNotifyFlag: exam.criticalPatientNotifyFlag ?? false,
+        criticalNotifiedAt: exam.criticalNotifiedAt ?? null,
+        criticalNotifiedByNameSnapshot: exam.criticalNotifiedBy ?? null,
+        criticalNotificationPdfKey: exam.criticalNotificationPdfKey ?? null,
+        rejectedByCcb: exam.rejectedByCcb ?? false,
+        ccbComments: exam.ccbComments ?? null,
+        diagnosticModified: exam.diagnosticModified ?? false,
+        modifiedByNameSnapshot: exam.modifiedByUser ?? null,
+        modifiedAt: exam.modifiedAt ?? null,
       },
     });
 
