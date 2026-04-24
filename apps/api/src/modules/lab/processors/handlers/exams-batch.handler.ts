@@ -583,9 +583,16 @@ const ADVERSE_SEVERITY_MAP: Record<string, AdverseSeverity> = {
   CRITICAL: AdverseSeverity.CRITICAL_SEV,
 };
 
+/**
+ * Map the transformer-normalized severity to the Prisma enum.
+ * - `null` (FM had nothing) → MINOR_SEV: benign default for "unclassified".
+ * - Unknown non-null value → MAJOR_SEV: fail-safe so unmapped severities
+ *   surface in risk dashboards instead of hiding as MINOR. Upstream should
+ *   then extend ADVERSE_SEVERITY_MAP with the new label.
+ */
 function toAdverseSeverity(raw: string | null | undefined): AdverseSeverity {
   if (!raw) return AdverseSeverity.MINOR_SEV;
-  return ADVERSE_SEVERITY_MAP[raw] ?? AdverseSeverity.MINOR_SEV;
+  return ADVERSE_SEVERITY_MAP[raw] ?? AdverseSeverity.MAJOR_SEV;
 }
 
 function toAdverseStatus(raw: string | null | undefined): AdverseStatus {
