@@ -41,6 +41,7 @@ import { CommunicationsBatchHandler } from './processors/handlers/communications
 import { LiquidationsHandler } from './processors/handlers/liquidations.handler';
 import { ChargesBatchHandler } from './processors/handlers/charges-batch.handler';
 import { PractitionersHandler } from './processors/handlers/practitioners.handler';
+import { RequestingPhysiciansHandler } from './processors/handlers/requesting-physicians.handler';
 
 // Services — Dashboard
 import { LabDashboardService } from './services/lab-dashboard.service';
@@ -131,6 +132,7 @@ import { LabDiagnosticReportController } from './controllers/lab-diagnostic-repo
     LiquidationsHandler,
     ChargesBatchHandler,
     PractitionersHandler,
+    RequestingPhysiciansHandler,
 
     // Citolab S3 config
     {

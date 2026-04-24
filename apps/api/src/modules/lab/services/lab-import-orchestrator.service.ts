@@ -81,7 +81,8 @@ export class LabImportOrchestratorService {
 
     this.logger.log(`Created import run ${run.id} for sources: ${orderedSources.join(', ')}`);
 
-    // Phase 0: practitioners catalog (fixed 1 batch, runs before exams)
+    // Phase 0: practitioner catalogs — two independent FM layouts (pathologists
+    // and requesting physicians). Both must complete before the phase advances.
     const practitionersBatch = await this.prisma.labImportBatch.create({
       data: {
         runId: run.id,
@@ -93,24 +94,48 @@ export class LabImportOrchestratorService {
         status: 'PENDING',
       },
     });
+    const requestingPhysiciansBatch = await this.prisma.labImportBatch.create({
+      data: {
+        runId: run.id,
+        phase: PHASES.PRACTITIONERS,
+        fmSource: 'BIOPSIAS',
+        batchIndex: 1,
+        offset: 0,
+        limit: 0,
+        status: 'PENDING',
+      },
+    });
 
     await this.prisma.labImportRun.update({
       where: { id: run.id },
-      data: { totalBatches: 1 },
+      data: { totalBatches: 2 },
     });
 
-    await this.importQueue.add(
-      JOB_NAMES.PRACTITIONERS_IMPORT,
-      { runId: run.id, tenantId, batchId: practitionersBatch.id },
+    await this.importQueue.addBulk([
       {
-        attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
-        backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
-        jobId: `${run.id}-practitioners`,
+        name: JOB_NAMES.PRACTITIONERS_IMPORT,
+        data: { runId: run.id, tenantId, batchId: practitionersBatch.id },
+        opts: {
+          attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
+          backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
+          jobId: `${run.id}-practitioners`,
+        },
       },
+      {
+        name: JOB_NAMES.REQUESTING_PHYSICIANS_IMPORT,
+        data: { runId: run.id, tenantId, batchId: requestingPhysiciansBatch.id },
+        opts: {
+          attempts: IMPORT_QUEUE_CONFIG.retryAttempts,
+          backoff: IMPORT_QUEUE_CONFIG.retryBackoff,
+          jobId: `${run.id}-requesting-physicians`,
+        },
+      },
+    ]);
+    this.logger.log(
+      `Enqueued Phase 0 (pathologists + requesting physicians) jobs for run ${run.id}`,
     );
-    this.logger.log(`Enqueued Phase 0 (practitioners) job for run ${run.id}`);
 
-    return { runId: run.id, totalBatches: 1 };
+    return { runId: run.id, totalBatches: 2 };
   }
 
   /**

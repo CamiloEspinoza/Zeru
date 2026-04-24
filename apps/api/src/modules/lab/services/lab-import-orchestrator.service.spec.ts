@@ -56,7 +56,7 @@ describe('LabImportOrchestratorService', () => {
   });
 
   describe('startImport', () => {
-    it('creates LabImportRun and enqueues Phase 0 (practitioners) job', async () => {
+    it('creates LabImportRun and enqueues Phase 0 jobs (pathologists + requesting physicians)', async () => {
       const result = await service.startImport({
         tenantId: 'tenant-1',
         sources: ['BIOPSIAS'],
@@ -64,19 +64,19 @@ describe('LabImportOrchestratorService', () => {
       });
 
       expect(result.runId).toBe('run-1');
-      expect(result.totalBatches).toBe(1);
-      expect(prisma.labImportRun.create).toHaveBeenCalledTimes(1);
+      expect(result.totalBatches).toBe(2);
       expect(prisma.labImportRun.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ phase: 'phase-0-practitioners' }),
         }),
       );
-      // Phase 0 uses a single `add` (not addBulk) — practitioners is one job
-      expect(importQueue.add).toHaveBeenCalledWith(
+      expect(importQueue.addBulk).toHaveBeenCalled();
+      const jobs = importQueue.addBulk.mock.calls[0][0];
+      expect(jobs).toHaveLength(2);
+      expect(jobs.map((j: { name: string }) => j.name).sort()).toEqual([
         'practitioners-import',
-        expect.objectContaining({ runId: 'run-1', tenantId: 'tenant-1' }),
-        expect.any(Object),
-      );
+        'requesting-physicians-import',
+      ]);
     });
   });
 

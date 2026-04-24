@@ -17,6 +17,7 @@ import { LiquidationTransformer } from './transformers/liquidation.transformer';
 import { TraceabilityTransformer } from './transformers/traceability.transformer';
 import { CommunicationTransformer } from './transformers/communication.transformer';
 import { PractitionersTransformer } from './transformers/practitioners.transformer';
+import { RequestingPhysiciansTransformer } from './transformers/requesting-physicians.transformer';
 import { FmImportService } from './services/fm-import.service';
 
 @Module({
@@ -27,14 +28,14 @@ import { FmImportService } from './services/fm-import.service';
     ProcedenciasTransformer, ConvenioTransformer,
     BiopsyTransformer, PapTransformer, ExamChargeTransformer,
     LiquidationTransformer, TraceabilityTransformer, CommunicationTransformer,
-    PractitionersTransformer,
+    PractitionersTransformer, RequestingPhysiciansTransformer,
   ],
   exports: [
     FmAuthService, FmApiService, FmSyncService,
     ProcedenciasTransformer, ConvenioTransformer,
     BiopsyTransformer, PapTransformer, ExamChargeTransformer,
     LiquidationTransformer, TraceabilityTransformer, CommunicationTransformer,
-    PractitionersTransformer,
+    PractitionersTransformer, RequestingPhysiciansTransformer,
   ],
 })
 export class FileMakerModule {}
