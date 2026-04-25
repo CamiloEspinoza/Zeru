@@ -92,6 +92,9 @@ describe('ExamsBatchHandler', () => {
       labOrigin: {
         findFirst: jest.fn().mockResolvedValue({ id: 'origin-1' }),
       },
+      labPractitioner: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       labImportBatch: {
         update: jest.fn(),
         findFirst: jest.fn().mockResolvedValue({ id: 'batch-1' }),
@@ -630,6 +633,83 @@ describe('ExamsBatchHandler', () => {
       expect(prisma.labAdverseEvent.createMany).not.toHaveBeenCalled();
       expect(prisma.labTechnicalObservation.deleteMany).toHaveBeenCalled();
       expect(prisma.labTechnicalObservation.createMany).not.toHaveBeenCalled();
+    });
+
+    it('resolves signer codeSnapshots and requestingPhysicianCode to practitionerId', async () => {
+      prisma.labPractitioner.findMany.mockResolvedValue([
+        { id: 'pract-pat', code: 'PAT-001' },
+        { id: 'pract-md', code: '999' },
+      ]);
+
+      fmApi.getRecords.mockResolvedValue({
+        records: [makeFmRecord({ 'COD. MEDICO': '999' })],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      // Single batched query against lab_practitioners with all referenced codes
+      expect(prisma.labPractitioner.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            tenantId: 'tenant-1',
+            code: { in: expect.arrayContaining(['PAT-001', '999']) },
+          }),
+        }),
+      );
+
+      // ServiceRequest gets the FK
+      expect(prisma.labServiceRequest.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ requestingPhysicianId: 'pract-md' }),
+          update: expect.objectContaining({ requestingPhysicianId: 'pract-md' }),
+        }),
+      );
+
+      // Signers' practitionerId is populated for matched codes
+      const signersCall = prisma.labDiagnosticReportSigner.createMany.mock.calls[0][0];
+      expect(signersCall.data[0]).toEqual(
+        expect.objectContaining({
+          codeSnapshot: 'PAT-001',
+          practitionerId: 'pract-pat',
+        }),
+      );
+    });
+
+    it('leaves practitionerId null when the code is not in the catalog', async () => {
+      // Mock returns empty: nobody matched
+      prisma.labPractitioner.findMany.mockResolvedValue([]);
+
+      fmApi.getRecords.mockResolvedValue({
+        records: [makeFmRecord({ 'COD. MEDICO': 'UNKNOWN-MD' })],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      expect(prisma.labServiceRequest.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ requestingPhysicianId: null }),
+        }),
+      );
+      const signersCall = prisma.labDiagnosticReportSigner.createMany.mock.calls[0][0];
+      expect(signersCall.data[0]).toEqual(
+        expect.objectContaining({ practitionerId: null }),
+      );
     });
 
     it('creates signers for the diagnostic report', async () => {
