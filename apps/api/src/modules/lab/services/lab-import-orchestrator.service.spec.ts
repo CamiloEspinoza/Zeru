@@ -56,7 +56,7 @@ describe('LabImportOrchestratorService', () => {
   });
 
   describe('startImport', () => {
-    it('creates LabImportRun and enqueues Phase 0 (practitioners) job', async () => {
+    it('creates LabImportRun and enqueues Phase 0 jobs (pathologists + requesting physicians)', async () => {
       const result = await service.startImport({
         tenantId: 'tenant-1',
         sources: ['BIOPSIAS'],
@@ -64,23 +64,51 @@ describe('LabImportOrchestratorService', () => {
       });
 
       expect(result.runId).toBe('run-1');
-      expect(result.totalBatches).toBe(1);
-      expect(prisma.labImportRun.create).toHaveBeenCalledTimes(1);
+      expect(result.totalBatches).toBe(2);
       expect(prisma.labImportRun.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ phase: 'phase-0-practitioners' }),
         }),
       );
-      // Phase 0 uses a single `add` (not addBulk) — practitioners is one job
-      expect(importQueue.add).toHaveBeenCalledWith(
+      expect(importQueue.addBulk).toHaveBeenCalled();
+      const jobs = importQueue.addBulk.mock.calls[0][0];
+      expect(jobs).toHaveLength(2);
+      expect(jobs.map((j: { name: string }) => j.name).sort()).toEqual([
         'practitioners-import',
-        expect.objectContaining({ runId: 'run-1', tenantId: 'tenant-1' }),
-        expect.any(Object),
+        'requesting-physicians-import',
+      ]);
+      // Two LabImportBatch rows created — one per Phase 0 job (batchIndex 0/1)
+      expect(prisma.labImportBatch.create).toHaveBeenCalledTimes(2);
+      const indices = prisma.labImportBatch.create.mock.calls.map(
+        (c: any[]) => c[0].data.batchIndex,
       );
+      expect(indices.sort()).toEqual([0, 1]);
     });
   });
 
   describe('advancePhase', () => {
+    it('does NOT advance Phase 0 while at least one Phase 0 batch is pending', async () => {
+      prisma.labImportRun.findUnique.mockResolvedValue({
+        id: 'run-1',
+        status: 'RUNNING',
+        phase: 'phase-0-practitioners',
+        tenantId: 'tenant-1',
+        sources: ['BIOPSIAS'],
+        dateFrom: null,
+        dateTo: null,
+        batchSize: 100,
+      });
+      // One Phase 0 batch still pending (the other already completed)
+      prisma.labImportBatch.count.mockResolvedValue(1);
+
+      await service.advancePhase('run-1');
+
+      // CAS NOT triggered — still on phase-0
+      expect(prisma.labImportRun.updateMany).not.toHaveBeenCalled();
+      // No exam jobs enqueued yet
+      expect(importQueue.addBulk).not.toHaveBeenCalled();
+    });
+
     it('transitions from PRACTITIONERS to EXAMS and enqueues batch jobs', async () => {
       prisma.labImportRun.findUnique.mockResolvedValue({
         id: 'run-1',

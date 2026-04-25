@@ -27,6 +27,7 @@ export const REPORT_VALIDATION_QUEUE_CONFIG = {
 
 export const JOB_NAMES = {
   PRACTITIONERS_IMPORT: 'practitioners-import',
+  REQUESTING_PHYSICIANS_IMPORT: 'requesting-physicians-import',
   EXAMS_BATCH: 'exams-batch',
   WORKFLOW_EVENTS_BATCH: 'workflow-events-batch',
   COMMUNICATIONS_BATCH: 'communications-batch',
