@@ -683,6 +683,40 @@ describe('ExamsBatchHandler', () => {
       );
     });
 
+    it('handles a mix of resolved and unresolved signers in the same record', async () => {
+      // Catalog has only PAT-001 — the second signer (SUPERVISOR-X) is
+      // unknown. Expect the resolved signer to get the FK and the unknown
+      // one to stay with practitionerId = null.
+      prisma.labPractitioner.findMany.mockResolvedValue([
+        { id: 'pract-pat', code: 'PAT-001' },
+      ]);
+
+      fmApi.getRecords.mockResolvedValue({
+        records: [
+          makeFmRecord({
+            'PATOLOGO': 'Dr. Martinez (PAT-001)',
+            'Revisado por patólogo supervisor': 'Dr. Supervisor (SUPERVISOR-X)',
+          }),
+        ],
+        totalRecordCount: 1,
+      });
+
+      await handler.handle({
+        runId: 'run-1',
+        tenantId: 'tenant-1',
+        fmSource: 'BIOPSIAS',
+        batchIndex: 0,
+        offset: 1,
+        limit: 100,
+      } as any);
+
+      const data = prisma.labDiagnosticReportSigner.createMany.mock.calls[0][0].data;
+      expect(data).toHaveLength(2);
+      const byCode = Object.fromEntries(data.map((s: any) => [s.codeSnapshot, s]));
+      expect(byCode['PAT-001'].practitionerId).toBe('pract-pat');
+      expect(byCode['SUPERVISOR-X'].practitionerId).toBeNull();
+    });
+
     it('leaves practitionerId null when the code is not in the catalog', async () => {
       // Mock returns empty: nobody matched
       prisma.labPractitioner.findMany.mockResolvedValue([]);

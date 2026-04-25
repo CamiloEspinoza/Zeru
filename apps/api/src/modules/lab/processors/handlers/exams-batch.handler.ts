@@ -229,7 +229,17 @@ export class ExamsBatchHandler {
         select: { id: true, code: true },
       });
       for (const r of rows) {
+        // r.code is `String?` in schema but `where.code: { in: [...] }` filters
+        // out NULLs at the SQL level, so this is a TS-level guard only.
         if (r.code) codeToId.set(r.code, r.id);
+      }
+      // Surface unresolved codes so we can tell "catalog not yet imported"
+      // apart from "stray code outside the catalog" in production.
+      if (codeToId.size < practitionerCodes.size) {
+        const missing = Array.from(practitionerCodes).filter((c) => !codeToId.has(c));
+        this.logger.warn(
+          `[${exam.fmSource}] Informe ${exam.fmInformeNumber}: practitioner codes not in catalog: ${missing.join(', ')}`,
+        );
       }
     }
     const requestingPhysicianId = exam.requestingPhysicianCode
