@@ -56,10 +56,10 @@ describe('RequestingPhysiciansHandler', () => {
     expect(prisma.labPractitioner.upsert).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        where: { tenantId_code: { tenantId: 'tenant-1', code: '100' } },
+        where: { tenantId_code: { tenantId: 'tenant-1', code: 'RP-100' } },
         create: expect.objectContaining({
-          code: '100',
-          codeSnapshot: '100',
+          code: 'RP-100',
+          codeSnapshot: 'RP-100',
           firstName: 'Juan',
           paternalLastName: 'Pérez',
           maternalLastName: 'Soto',
@@ -68,6 +68,9 @@ describe('RequestingPhysiciansHandler', () => {
         }),
       }),
     );
+    // isActive must NOT be in the update payload — preserves manual overrides
+    const updatePayload = prisma.labPractitioner.upsert.mock.calls[0][0].update;
+    expect(updatePayload).not.toHaveProperty('isActive');
     expect(orchestrator.advancePhase).toHaveBeenCalledWith('run-1');
   });
 

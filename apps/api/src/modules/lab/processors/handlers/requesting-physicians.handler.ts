@@ -69,7 +69,8 @@ export class RequestingPhysiciansHandler {
               paternalLastName: p.paternalLastName,
               maternalLastName: p.maternalLastName,
               specialty: p.specialty,
-              isActive: p.isActive,
+              // isActive intentionally not in update: FM doesn't track it for
+              // this catalog, so manual deactivations in Postgres survive.
             },
           });
 

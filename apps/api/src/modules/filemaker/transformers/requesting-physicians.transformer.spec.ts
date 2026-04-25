@@ -27,7 +27,7 @@ describe('RequestingPhysiciansTransformer', () => {
         }),
       );
 
-      expect(r.code).toBe('1234');
+      expect(r.code).toBe('RP-1234');
       expect(r.firstName).toBe('Juan');
       expect(r.paternalLastName).toBe('Pérez');
       expect(r.maternalLastName).toBe('Soto');
@@ -35,11 +35,18 @@ describe('RequestingPhysiciansTransformer', () => {
       expect(r.isActive).toBe(true);
     });
 
-    it('coerces numeric CODIGO to string', () => {
+    it('coerces numeric CODIGO to a namespaced string', () => {
       const r = transformer.extract(
         makeRecord({ 'SOLICITADO POR': 'Ana Díaz', 'CODIGO': 42 }),
       );
-      expect(r.code).toBe('42');
+      expect(r.code).toBe('RP-42');
+    });
+
+    it('returns empty code when CODIGO is missing (handler then skips it)', () => {
+      const r = transformer.extract(
+        makeRecord({ 'SOLICITADO POR': 'Anónimo', 'CODIGO': '' }),
+      );
+      expect(r.code).toBe('');
     });
 
     it('handles a single-token name with paternalLastName fallback', () => {

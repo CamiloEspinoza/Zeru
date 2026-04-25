@@ -18,20 +18,30 @@ export class RequestingPhysiciansTransformer {
   readonly database = 'BIOPSIAS';
   readonly layout = 'MEDICOS ENVIO MATERIAL';
 
+  /**
+   * Codes are prefixed with `RP-` so they live in a different namespace from
+   * pathologists (`PATOLOGOS INFORMANTES` uses short alpha codes like `RLC`,
+   * but a numeric pathologist code is plausible — without the prefix a
+   * collision on `(tenantId, code)` would silently flip a pathologist into a
+   * requesting physician on re-import).
+   */
   extract(record: FmRecord): ExtractedPractitioner {
     const d = record.fieldData;
     const { firstName, paternalLastName, maternalLastName } = splitFullName(
       str(d['SOLICITADO POR']),
     );
+    const rawCode = str(d['CODIGO']);
 
     return {
-      code: str(d['CODIGO']),
+      code: rawCode ? `RP-${rawCode}` : '',
       firstName,
       paternalLastName,
       maternalLastName,
       // No specialty in this catalog — schema field stays null.
       specialty: null,
-      // FM doesn't track active/inactive for requesting physicians; assume active.
+      // FM doesn't track active/inactive for requesting physicians; assume
+      // active on first import. Manual deactivations in Postgres are
+      // preserved on re-runs (handler does not pass isActive in update).
       isActive: true,
     };
   }
