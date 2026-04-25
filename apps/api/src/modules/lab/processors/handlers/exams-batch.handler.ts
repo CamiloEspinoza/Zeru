@@ -210,6 +210,42 @@ export class ExamsBatchHandler {
     }
     const labOriginId = labOrigin.id;
 
+    // 2b. Resolve practitioner FKs from snapshot codes against lab_practitioners.
+    // One query per record covers both signers and the requesting physician,
+    // so the cost is O(1) DB roundtrip per exam regardless of signer count.
+    // Misses are tolerated silently — the snapshot strings stay populated and
+    // the FK is left null, so an out-of-catalog code won't break the import.
+    const practitionerCodes = new Set<string>();
+    for (const s of exam.signers) {
+      if (s.codeSnapshot) practitionerCodes.add(s.codeSnapshot);
+    }
+    if (exam.requestingPhysicianCode) {
+      practitionerCodes.add(exam.requestingPhysicianCode);
+    }
+    const codeToId = new Map<string, string>();
+    if (practitionerCodes.size > 0) {
+      const rows = await this.prisma.labPractitioner.findMany({
+        where: { tenantId, code: { in: Array.from(practitionerCodes) } },
+        select: { id: true, code: true },
+      });
+      for (const r of rows) {
+        // r.code is `String?` in schema but `where.code: { in: [...] }` filters
+        // out NULLs at the SQL level, so this is a TS-level guard only.
+        if (r.code) codeToId.set(r.code, r.id);
+      }
+      // Surface unresolved codes so we can tell "catalog not yet imported"
+      // apart from "stray code outside the catalog" in production.
+      if (codeToId.size < practitionerCodes.size) {
+        const missing = Array.from(practitionerCodes).filter((c) => !codeToId.has(c));
+        this.logger.warn(
+          `[${exam.fmSource}] Informe ${exam.fmInformeNumber}: practitioner codes not in catalog: ${missing.join(', ')}`,
+        );
+      }
+    }
+    const requestingPhysicianId = exam.requestingPhysicianCode
+      ? codeToId.get(exam.requestingPhysicianCode) ?? null
+      : null;
+
     // 3. Upsert ServiceRequest
     const sr = await this.prisma.labServiceRequest.upsert({
       where: {
@@ -234,6 +270,7 @@ export class ExamsBatchHandler {
         priority: exam.isUrgent ? 'URGENT' : 'ROUTINE',
         requestingPhysicianName: exam.requestingPhysicianName,
         requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
+        requestingPhysicianId,
         labOriginId,
         labOriginCodeSnapshot: exam.labOriginCode,
         sampleCollectedAt: exam.sampleCollectedAt,
@@ -256,6 +293,7 @@ export class ExamsBatchHandler {
         subcategory: exam.subcategory,
         requestingPhysicianName: exam.requestingPhysicianName,
         requestingPhysicianEmail: exam.requestingPhysicianEmail ?? null,
+        requestingPhysicianId,
         labOriginId,
         labOriginCodeSnapshot: exam.labOriginCode,
         sampleCollectedAt: exam.sampleCollectedAt,
@@ -442,6 +480,7 @@ export class ExamsBatchHandler {
           data: exam.signers.map((s) => ({
             tenantId,
             diagnosticReportId: dr.id,
+            practitionerId: codeToId.get(s.codeSnapshot) ?? null,
             codeSnapshot: s.codeSnapshot,
             nameSnapshot: s.nameSnapshot,
             role: toSigningRole(s.role),
